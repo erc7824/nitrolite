@@ -12,7 +12,7 @@ func (h *Handler) GetAssets(c *rpc.Context) {
 		return
 	}
 
-	assets, err := h.memoryStore.GetAssets(req.ChainID)
+	assets, err := h.memoryStore.GetAssets(req.BlockchainID)
 	if err != nil {
 		c.Fail(err, "failed to retrieve assets")
 		return

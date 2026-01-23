@@ -18,7 +18,7 @@ func TestGetHomeChannel_Success(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
-	minChallenge := uint64(3600)
+	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
@@ -45,16 +45,15 @@ func TestGetHomeChannel_Success(t *testing.T) {
 	homeChannelID := "0xHomeChannel123"
 
 	homeChannel := core.Channel{
-		ChannelID:    homeChannelID,
-		UserWallet:   userWallet,
-		NodeWallet:   nodeAddress,
-		Type:         core.ChannelTypeHome,
-		BlockchainID: 1,
-		TokenAddress: "0xTokenAddress",
-		Challenge:    86400,
-		Nonce:        12345,
-		Status:       core.ChannelStatusOpen,
-		StateVersion: 1,
+		ChannelID:         homeChannelID,
+		UserWallet:        userWallet,
+		Type:              core.ChannelTypeHome,
+		BlockchainID:      1,
+		TokenAddress:      "0xTokenAddress",
+		ChallengeDuration: 86400,
+		Nonce:             12345,
+		Status:            core.ChannelStatusOpen,
+		StateVersion:      1,
 	}
 
 	// Mock expectations
@@ -91,9 +90,8 @@ func TestGetHomeChannel_Success(t *testing.T) {
 
 	assert.Equal(t, homeChannelID, response.Channel.ChannelID)
 	assert.Equal(t, userWallet, response.Channel.UserWallet)
-	assert.Equal(t, nodeAddress, response.Channel.NodeWallet)
 	assert.Equal(t, "home", response.Channel.Type)
-	assert.Equal(t, uint32(1), response.Channel.BlockchainID)
+	assert.Equal(t, uint64(1), response.Channel.BlockchainID)
 	assert.Equal(t, "open", response.Channel.Status)
 
 	// Verify all mock expectations
@@ -107,7 +105,7 @@ func TestGetHomeChannel_NotFound(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
-	minChallenge := uint64(3600)
+	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{

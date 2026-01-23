@@ -1,54 +1,14 @@
 package database
 
 import (
-	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/shopspring/decimal"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
-
-type StateIntent uint8
-
-const (
-	StateIntentOperate    StateIntent = 0 // Operate the state application
-	StateIntentInitialize StateIntent = 1 // Initial funding state
-	StateIntentResize     StateIntent = 2 // Resize state
-	StateIntentFinalize   StateIntent = 3 // Final closing state
-)
-
-type UnsignedState struct {
-	Intent      StateIntent  `json:"intent"`
-	Version     uint64       `json:"version"`
-	Data        string       `json:"state_data"`
-	Allocations []Allocation `json:"allocations"`
-}
-
-// Value implements driver.Valuer interface for database storage
-func (u UnsignedState) Value() (driver.Value, error) {
-	return json.Marshal(u)
-}
-
-// Scan implements sql.Scanner interface for database retrieval
-func (u *UnsignedState) Scan(value interface{}) error {
-	if value == nil {
-		return nil
-	}
-
-	var bytes []byte
-	switch v := value.(type) {
-	case []byte:
-		bytes = v
-	case string:
-		bytes = []byte(v)
-	default:
-		return fmt.Errorf("cannot scan %T into UnsignedState", value)
-	}
-
-	return json.Unmarshal(bytes, u)
-}
 
 type Allocation struct {
 	Participant  string          `json:"destination"`
@@ -60,12 +20,11 @@ type Allocation struct {
 // ID is deterministic: Hash(UserWallet, Asset, CycleIndex, Version)
 type State struct {
 	// ID is a 64-character deterministic hash
-	ID string `gorm:"column:id;primaryKey;size:64"`
-
-	Data       string `gorm:"column:data;type:text"`
-	Asset      string `gorm:"column:asset;not null"`
-	UserWallet string `gorm:"column:user_wallet;not null"`
-	CycleIndex uint64 `gorm:"column:cycle_index;not null"`
+	ID          string         `gorm:"column:id;primaryKey;size:64"`
+	Transitions datatypes.JSON `gorm:"column:transitions;type:text;not null"`
+	Asset       string         `gorm:"column:asset;not null"`
+	UserWallet  string         `gorm:"column:user_wallet;not null"`
+	Epoch       uint64         `gorm:"column:epoch;not null"`
 
 	Version uint64 `gorm:"column:version;not null"`
 
@@ -76,53 +35,92 @@ type State struct {
 	// Home Channel balances and flows
 	// Using decimal.Decimal for int256 values and int64 for flow values
 	HomeUserBalance decimal.Decimal `gorm:"column:home_user_balance;type:varchar(78)"`
-	HomeUserNetFlow int64           `gorm:"column:home_user_net_flow;default:0"`
+	HomeUserNetFlow decimal.Decimal `gorm:"column:home_user_net_flow;default:0"`
 	HomeNodeBalance decimal.Decimal `gorm:"column:home_node_balance;type:varchar(78)"`
-	HomeNodeNetFlow int64           `gorm:"column:home_node_net_flow;default:0"`
+	HomeNodeNetFlow decimal.Decimal `gorm:"column:home_node_net_flow;default:0"`
 
 	// Escrow Channel balances and flows
 	EscrowUserBalance decimal.Decimal `gorm:"column:escrow_user_balance;type:varchar(78)"`
-	EscrowUserNetFlow int64           `gorm:"column:escrow_user_net_flow;default:0"`
+	EscrowUserNetFlow decimal.Decimal `gorm:"column:escrow_user_net_flow;default:0"`
 	EscrowNodeBalance decimal.Decimal `gorm:"column:escrow_node_balance;type:varchar(78)"`
-	EscrowNodeNetFlow int64           `gorm:"column:escrow_node_net_flow;default:0"`
+	EscrowNodeNetFlow decimal.Decimal `gorm:"column:escrow_node_net_flow;default:0"`
 
-	// TODO: Remove in the future if redundant
-	IsFinal bool `gorm:"column:is_final;default:false"`
-
-	UserSig string `gorm:"column:user_sig;type:text"`
-	NodeSig string `gorm:"column:node_sig;type:text"`
+	UserSig *string `gorm:"column:user_sig;type:text"`
+	NodeSig *string `gorm:"column:node_sig;type:text"`
 
 	CreatedAt time.Time
 }
 
 // TableName specifies the table name for the State model
 func (State) TableName() string {
-	return "states"
+	return "channel_states"
 }
 
-// CreateState creates a new state in the database
-func CreateState(tx *gorm.DB, state *State) error {
-	if err := tx.Create(state).Error; err != nil {
-		return err
+// GetLastUserState retrieves the most recent state for a user's asset.
+func (s *DBStore) GetLastUserState(wallet, asset string, signed bool) (*core.State, error) {
+	var dbState State
+	query := s.db.Where("user_wallet = ? AND asset = ?", wallet, asset)
+
+	if signed {
+		query = query.Where("user_sig IS NOT NULL AND node_sig IS NOT NULL")
 	}
+
+	err := query.Order("epoch DESC, version DESC").First(&dbState).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get last user state: %w", err)
+	}
+
+	return databaseStateToCore(&dbState)
+}
+
+// StoreUserState persists a new user state to the database.
+func (s *DBStore) StoreUserState(state core.State) error {
+	dbState, err := coreStateToDB(&state)
+	if err != nil {
+		return fmt.Errorf("failed to encode transitions while creating a db state: %w", err)
+	}
+
+	if err := s.db.Create(dbState).Error; err != nil {
+		return fmt.Errorf("failed to store user state: %w", err)
+	}
+
 	return nil
 }
 
-// GetStateByID retrieves a state by its ID
-func GetStateByID(tx *gorm.DB, id string) (*State, error) {
-	var state State
-	if err := tx.Where("id = ?", id).First(&state).Error; err != nil {
-		return nil, err
+// GetLastStateByChannelID retrieves the most recent state for a given channel.
+func (s *DBStore) GetLastStateByChannelID(channelID string, signed bool) (*core.State, error) {
+	var dbState State
+	query := s.db.Where("home_channel_id = ? OR escrow_channel_id = ?", channelID, channelID)
+
+	if signed {
+		query = query.Where("user_sig IS NOT NULL AND node_sig IS NOT NULL")
 	}
-	return &state, nil
+
+	err := query.Order("epoch DESC, version DESC").First(&dbState).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get last state by channel ID: %w", err)
+	}
+
+	return databaseStateToCore(&dbState)
 }
 
-// GetStateByUserWalletAndAsset retrieves the state for a given user wallet and asset
-// Since there is one state per asset per user, this returns a single state
-func GetStateByUserWalletAndAsset(tx *gorm.DB, userWallet, asset string) (*State, error) {
-	var state State
-	if err := tx.Where("user_wallet = ? AND asset = ?", userWallet, asset).First(&state).Error; err != nil {
-		return nil, err
+// GetStateByChannelIDAndVersion retrieves a specific state version for a channel.
+func (s *DBStore) GetStateByChannelIDAndVersion(channelID string, version uint64) (*core.State, error) {
+	var dbState State
+	err := s.db.Where("(home_channel_id = ? OR escrow_channel_id = ?) AND version = ?", channelID, channelID, version).
+		First(&dbState).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get state by channel ID and version: %w", err)
 	}
-	return &state, nil
+
+	return databaseStateToCore(&dbState)
 }

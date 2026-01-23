@@ -4,6 +4,8 @@
 package rpc
 
 import (
+	"time"
+
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 )
@@ -22,18 +24,18 @@ type ChannelV1 struct {
 	ChannelID string `json:"channel_id"`
 	// UserWallet is the user wallet address
 	UserWallet string `json:"user_wallet"`
-	// NodeWallet is the node wallet address
-	NodeWallet string `json:"node_wallet"`
 	// Type is the type of the channel (home, escrow)
 	Type string `json:"type"`
 	// BlockchainID is the unique identifier for the blockchain
-	BlockchainID uint32 `json:"blockchain_id"`
+	BlockchainID uint64 `json:"blockchain_id"`
 	// TokenAddress is the address of the token used in the channel
 	TokenAddress string `json:"token_address"`
-	// Challenge is the challenge period for the channel in seconds
-	Challenge string `json:"challenge"`
+	// ChallengeDuration is the challenge period for the channel in seconds
+	ChallengeDuration uint32 `json:"challenge_duration"`
+	// ChallegeExpiresAt
+	ChallengeExpiresAt *time.Time `json:"challenge_expires_at"`
 	// Nonce is the nonce for the channel
-	Nonce string `json:"nonce"`
+	Nonce uint64 `json:"nonce"`
 	// Status is the current status of the channel (void, open, challenged, closed)
 	Status string `json:"status"`
 	// StateVersion is the on-chain state version of the channel
@@ -43,9 +45,9 @@ type ChannelV1 struct {
 // ChannelDefinitionV1 represents the configuration for creating a channel.
 type ChannelDefinitionV1 struct {
 	// Nonce is a unique number to prevent replay attacks
-	Nonce string `json:"nonce"`
+	Nonce uint64 `json:"nonce"`
 	// Challenge is the challenge period for the channel in seconds
-	Challenge string `json:"challenge"`
+	Challenge uint32 `json:"challenge"`
 }
 
 // ============================================================================
@@ -69,7 +71,7 @@ type LedgerV1 struct {
 	// TokenAddress is the address of the token used in this channel
 	TokenAddress string `json:"token_address"`
 	// BlockchainID is the unique identifier for the blockchain
-	BlockchainID uint32 `json:"blockchain_id"`
+	BlockchainID uint64 `json:"blockchain_id"`
 	// UserBalance is the user balance in the channel
 	UserBalance string `json:"user_balance"`
 	// UserNetFlow is the user net flow in the channel
@@ -169,7 +171,7 @@ type AppSessionInfoV1 struct {
 	// SessionData is the JSON stringified session data
 	SessionData *string `json:"session_data,omitempty"`
 	// Quorum is the quorum required for operations
-	Quorum uint64 `json:"quorum"`
+	Quorum uint8 `json:"quorum"`
 	// Version is the current version of the session state
 	Version uint64 `json:"version"`
 	// Nonce is the nonce for the session
@@ -233,7 +235,7 @@ type TokenV1 struct {
 	// Address is the token contract address
 	Address string `json:"address"`
 	// BlockchainID is the blockchain network ID
-	BlockchainID uint32 `json:"blockchain_id"`
+	BlockchainID uint64 `json:"blockchain_id"`
 	// Decimals is the number of decimal places
 	Decimals uint8 `json:"decimals"`
 }
@@ -243,7 +245,7 @@ type BlockchainInfoV1 struct {
 	// Name is the blockchain name
 	Name string `json:"name"`
 	// BlockchainID is the blockchain network ID
-	BlockchainID uint32 `json:"blockchain_id"`
+	BlockchainID uint64 `json:"blockchain_id"`
 	// ContractAddress is the contract address on this network
 	ContractAddress string `json:"contract_address"`
 }

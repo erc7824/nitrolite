@@ -17,20 +17,13 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 		{
 			name: "valid config",
 			cfg: BlockchainsConfig{
-				DefaultContractAddresses: ContractAddressesConfig{
-					Custody:        "0x0000000000000000000000000000000000000001",
-					Adjudicator:    "0x0000000000000000000000000000000000000002",
-					BalanceChecker: "0x0000000000000000000000000000000000000003",
-				},
+				DefaultContractAddress: "0x0000000000000000000000000000000000000001",
 				Blockchains: []BlockchainConfig{
 					{
-						ID:   1,
-						Name: "ethereum",
-						ContractAddresses: ContractAddressesConfig{
-							Custody:     "0x1111111111111111111111111111111111111111",
-							Adjudicator: "0x2222222222222222222222222222222222222222",
-						},
-						BlockStep: 10,
+						ID:              1,
+						Name:            "ethereum",
+						ContractAddress: "0x1111111111111111111111111111111111111111",
+						BlockStep:       10,
 					},
 					{
 						ID:   11155111,
@@ -45,18 +38,14 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 				ethCfg := blockchains[0]
 				assert.Equal(t, "ethereum", ethCfg.Name)
 				assert.Equal(t, uint32(1), ethCfg.ID)
-				assert.Equal(t, "0x1111111111111111111111111111111111111111", ethCfg.ContractAddresses.Custody)
-				assert.Equal(t, "0x2222222222222222222222222222222222222222", ethCfg.ContractAddresses.Adjudicator)
-				assert.Equal(t, "0x0000000000000000000000000000000000000003", ethCfg.ContractAddresses.BalanceChecker)
+				assert.Equal(t, "0x1111111111111111111111111111111111111111", ethCfg.ContractAddress)
 				assert.False(t, ethCfg.Disabled)
 				assert.Equal(t, uint64(10), ethCfg.BlockStep)
 
 				sepoliaCfg := blockchains[1]
 				assert.Equal(t, "ethereum_sepolia", sepoliaCfg.Name)
 				assert.Equal(t, uint32(11155111), sepoliaCfg.ID)
-				assert.Equal(t, "0x0000000000000000000000000000000000000001", sepoliaCfg.ContractAddresses.Custody)
-				assert.Equal(t, "0x0000000000000000000000000000000000000002", sepoliaCfg.ContractAddresses.Adjudicator)
-				assert.Equal(t, "0x0000000000000000000000000000000000000003", sepoliaCfg.ContractAddresses.BalanceChecker)
+				assert.Equal(t, "0x0000000000000000000000000000000000000001", sepoliaCfg.ContractAddress)
 				assert.False(t, sepoliaCfg.Disabled)
 				assert.Equal(t, defaultBlockStep, sepoliaCfg.BlockStep)
 			},
@@ -88,11 +77,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 		{
 			name: "disabled blockchain",
 			cfg: BlockchainsConfig{
-				DefaultContractAddresses: ContractAddressesConfig{
-					Custody:        "0x0000000000000000000000000000000000000001",
-					Adjudicator:    "0x0000000000000000000000000000000000000002",
-					BalanceChecker: "0x0000000000000000000000000000000000000003",
-				},
+				DefaultContractAddress: "0x0000000000000000000000000000000000000001",
 				Blockchains: []BlockchainConfig{
 					{
 						ID:       1,
@@ -122,135 +107,41 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 		{
 			name: "invalid default custody address",
 			cfg: BlockchainsConfig{
-				DefaultContractAddresses: ContractAddressesConfig{
-					Custody:        "0x0000s00000000000000000000000000000000001",
-					Adjudicator:    "0x0000s00000000000000000000000000000000002",
-					BalanceChecker: "0x0000s00000000000000000000000000000000003",
-				},
+				DefaultContractAddress: "0x0000s00000000000000000000000000000000001",
 			},
-			expectedErrorStr: "invalid default custody contract address '0x0000s00000000000000000000000000000000001'",
-		},
-		{
-			name: "invalid default adjudicator address",
-			cfg: BlockchainsConfig{
-				DefaultContractAddresses: ContractAddressesConfig{
-					Custody:        "0x0000000000000000000000000000000000000001",
-					Adjudicator:    "0x0000s00000000000000000000000000000000002",
-					BalanceChecker: "0x0000s00000000000000000000000000000000003",
-				},
-			},
-			expectedErrorStr: "invalid default adjudicator contract address '0x0000s00000000000000000000000000000000002'",
-		},
-		{
-			name: "invalid default balance checker address",
-			cfg: BlockchainsConfig{
-				DefaultContractAddresses: ContractAddressesConfig{
-					Custody:        "",
-					Adjudicator:    "",
-					BalanceChecker: "0x0000s00000000000000000000000000000000003",
-				},
-			},
-			expectedErrorStr: "invalid default balance checker contract address '0x0000s00000000000000000000000000000000003'",
+			expectedErrorStr: "invalid default contract address '0x0000s00000000000000000000000000000000001'",
 		},
 		{
 			name: "missing custody address",
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:                1,
-						Name:              "ethereum",
-						ContractAddresses: ContractAddressesConfig{},
+						ID:              1,
+						Name:            "ethereum",
+						ContractAddress: "",
 					},
 				},
 			},
 			expectedErrorStr: "missing default and blockchain-specific custody contract address for blockchain 'ethereum'",
 		},
 		{
-			name: "missing adjudicator address",
-			cfg: BlockchainsConfig{
-				Blockchains: []BlockchainConfig{
-					{
-						ID:   1,
-						Name: "ethereum",
-						ContractAddresses: ContractAddressesConfig{
-							Custody: "0x1111111111111111111111111111111111111111"},
-					},
-				},
-			},
-			expectedErrorStr: "missing default and blockchain-specific adjudicator contract address for blockchain 'ethereum'",
-		},
-		{
-			name: "missing balance checker address",
-			cfg: BlockchainsConfig{
-				Blockchains: []BlockchainConfig{
-					{
-						ID:   1,
-						Name: "ethereum",
-						ContractAddresses: ContractAddressesConfig{
-							Custody:     "0x1111111111111111111111111111111111111111",
-							Adjudicator: "0x2222222222222222222222222222222222222222",
-						},
-					},
-				},
-			},
-			expectedErrorStr: "missing default and blockchain-specific balance checker contract address for blockchain 'ethereum'",
-		},
-		{
 			name: "invalid custody address",
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:   1,
-						Name: "ethereum",
-						ContractAddresses: ContractAddressesConfig{
-							Custody:        "0x0000s00000000000000000000000000000000001",
-							Adjudicator:    "0x0000s00000000000000000000000000000000002",
-							BalanceChecker: "0x0000s00000000000000000000000000000000003",
-						},
+						ID:              1,
+						Name:            "ethereum",
+						ContractAddress: "0x0000s00000000000000000000000000000000001",
 					},
 				},
 			},
 			expectedErrorStr: "invalid custody contract address '0x0000s00000000000000000000000000000000001' for blockchain 'ethereum'",
 		},
-		{
-			name: "invalid adjudicator address",
-			cfg: BlockchainsConfig{
-				Blockchains: []BlockchainConfig{
-					{
-						ID:   1,
-						Name: "ethereum",
-						ContractAddresses: ContractAddressesConfig{
-							Custody:        "0x0000000000000000000000000000000000000001",
-							Adjudicator:    "0x0000s00000000000000000000000000000000002",
-							BalanceChecker: "0x0000s00000000000000000000000000000000003",
-						},
-					},
-				},
-			},
-			expectedErrorStr: "invalid adjudicator contract address '0x0000s00000000000000000000000000000000002' for blockchain 'ethereum'",
-		},
-		{
-			name: "invalid balance checker address",
-			cfg: BlockchainsConfig{
-				Blockchains: []BlockchainConfig{
-					{
-						ID:   1,
-						Name: "ethereum",
-						ContractAddresses: ContractAddressesConfig{
-							Custody:        "0x0000000000000000000000000000000000000001",
-							Adjudicator:    "0x0000000000000000000000000000000000000002",
-							BalanceChecker: "0x0000s00000000000000000000000000000000003",
-						},
-					},
-				},
-			},
-			expectedErrorStr: "invalid balance checker contract address '0x0000s00000000000000000000000000000000003' for blockchain 'ethereum'",
-		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.cfg.verifyVariables()
+			err := verifyBlockchainsConfig(&tc.cfg, false)
 			if tc.expectedErrorStr != "" {
 				require.Error(t, err)
 				assert.Equal(t, tc.expectedErrorStr, err.Error())

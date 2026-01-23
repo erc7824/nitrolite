@@ -19,7 +19,7 @@ func TestGetLatestState_Success(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
-	minChallenge := uint64(3600)
+	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
@@ -118,7 +118,7 @@ func TestGetLatestState_OnlySigned(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
-	minChallenge := uint64(3600)
+	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{

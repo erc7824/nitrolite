@@ -26,12 +26,10 @@ func TestHandleHomeChannelCreated_Success(t *testing.T) {
 	// Test data
 	channelID := "0xHomeChannel123"
 	userWallet := "0x1234567890123456789012345678901234567890"
-	nodeWallet := "0x0987654321098765432109876543210987654321"
 
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
-		NodeWallet:   nodeWallet,
 		Type:         core.ChannelTypeHome,
 		Status:       core.ChannelStatusVoid,
 		StateVersion: 0,
@@ -302,7 +300,7 @@ func TestHandleEscrowDepositChallenged_Success(t *testing.T) {
 			ch.ChallengeExpiresAt != nil
 	})).Return(nil)
 	mockStore.On("GetLastStateByChannelID", channelID, true).Return(state, nil)
-	mockStore.On("ScheduleCheckpointEscrowDeposit", "state123").Return(nil)
+	mockStore.On("ScheduleFinalizeEscrowDeposit", "state123").Return(nil)
 
 	// Execute
 	err := service.HandleEscrowDepositChallenged(event)
@@ -447,7 +445,7 @@ func TestHandleEscrowWithdrawalChallenged_Success(t *testing.T) {
 			ch.ChallengeExpiresAt != nil
 	})).Return(nil)
 	mockStore.On("GetLastStateByChannelID", channelID, true).Return(state, nil)
-	mockStore.On("ScheduleCheckpointEscrowWithdrawal", "state123").Return(nil)
+	mockStore.On("ScheduleFinalizeEscrowWithdrawal", "state123").Return(nil)
 
 	// Execute
 	err := service.HandleEscrowWithdrawalChallenged(event)

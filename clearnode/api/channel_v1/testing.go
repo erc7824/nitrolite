@@ -38,8 +38,8 @@ func (m *MockStore) StoreUserState(state core.State) error {
 	return args.Error(0)
 }
 
-func (m *MockStore) EnsureNoOngoingStateTransitions(wallet, asset string) error {
-	args := m.Called(wallet, asset)
+func (m *MockStore) EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error {
+	args := m.Called(wallet, asset, prevTransitionType)
 	return args.Error(0)
 }
 
@@ -96,7 +96,7 @@ type MockMemoryStore struct {
 	mock.Mock
 }
 
-func (m *MockMemoryStore) IsAssetSupported(asset, tokenAddress string, blockchainID uint32) (bool, error) {
+func (m *MockMemoryStore) IsAssetSupported(asset, tokenAddress string, blockchainID uint64) (bool, error) {
 	args := m.Called(asset, tokenAddress, blockchainID)
 	return args.Bool(0), args.Error(1)
 }
@@ -106,7 +106,7 @@ func (m *MockMemoryStore) GetAssetDecimals(asset string) (uint8, error) {
 	return args.Get(0).(uint8), args.Error(1)
 }
 
-func (m *MockMemoryStore) GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error) {
+func (m *MockMemoryStore) GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error) {
 	args := m.Called(blockchainID, tokenAddress)
 	return args.Get(0).(uint8), args.Error(1)
 }
@@ -121,7 +121,7 @@ func (m *MockAssetStore) GetAssetDecimals(asset string) (uint8, error) {
 	return args.Get(0).(uint8), args.Error(1)
 }
 
-func (m *MockAssetStore) GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error) {
+func (m *MockAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error) {
 	args := m.Called(blockchainID, tokenAddress)
 	return args.Get(0).(uint8), args.Error(1)
 }

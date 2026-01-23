@@ -16,7 +16,7 @@ var (
 	testCtxV1      = context.Background()
 	testWalletV1   = "0x1234"
 	testWallet2V1  = "0x5678"
-	testChainIDV1  = uint32(1)
+	testChainIDV1  = uint64(1)
 	testTokenV1    = "0xUSDC"
 	testSymbolV1   = "USDC"
 	testAssetV1    = "usdc"
@@ -133,16 +133,15 @@ func TestClientV1_ChannelsV1GetHomeChannel(t *testing.T) {
 
 	channel := rpc.ChannelsV1GetHomeChannelResponse{
 		Channel: rpc.ChannelV1{
-			ChannelID:    testChannelID,
-			UserWallet:   testWalletV1,
-			NodeWallet:   testWallet2V1,
-			Type:         "home",
-			BlockchainID: testChainIDV1,
-			TokenAddress: testTokenV1,
-			Challenge:    "3600",
-			Nonce:        "1",
-			Status:       "open",
-			StateVersion: "1",
+			ChannelID:         testChannelID,
+			UserWallet:        testWalletV1,
+			Type:              "home",
+			BlockchainID:      testChainIDV1,
+			TokenAddress:      testTokenV1,
+			ChallengeDuration: 3600,
+			Nonce:             1,
+			Status:            "open",
+			StateVersion:      "1",
 		},
 	}
 
@@ -289,8 +288,8 @@ func TestClientV1_ChannelsV1RequestCreation(t *testing.T) {
 			Asset:      testAssetV1,
 		},
 		ChannelDefinition: rpc.ChannelDefinitionV1{
-			Nonce:     "1",
-			Challenge: "3600",
+			Nonce:     1,
+			Challenge: 3600,
 		},
 	})
 	require.NoError(t, err)
@@ -391,7 +390,7 @@ func TestClientV1_AppSessionsV1CreateAppSession(t *testing.T) {
 	response := rpc.AppSessionsV1CreateAppSessionResponse{
 		AppSessionID: testAppSession,
 		Version:      "1",
-		IsClosed:     false,
+		Status:       "open",
 	}
 
 	registerSimpleHandlerV1(dialer, "app_sessions.v1.create_app_session", response)
@@ -408,7 +407,7 @@ func TestClientV1_AppSessionsV1CreateAppSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, testAppSession, resp.AppSessionID)
-	assert.False(t, resp.IsClosed)
+	assert.Equal(t, "open", resp.Status)
 }
 
 func TestClientV1_AppSessionsV1CloseAppSession(t *testing.T) {
@@ -452,7 +451,6 @@ func TestClientV1_AppSessionsV1SubmitDepositState(t *testing.T) {
 			Intent:       app.AppStateUpdateIntentDeposit,
 			Version:      2,
 		},
-		SigQuorum: 2,
 		UserState: rpc.StateV1{ID: "state123"},
 	})
 	require.NoError(t, err)

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
@@ -99,7 +100,7 @@ func TestCreateAppSession_Success(t *testing.T) {
 	// Verify response fields
 	assert.NotEmpty(t, resp.AppSessionID)
 	assert.Equal(t, "1", resp.Version)
-	assert.False(t, resp.IsClosed)
+	assert.Equal(t, app.AppSessionStatusOpen.String(), resp.Status)
 
 	// Verify all mocks were called
 	mockStore.AssertExpectations(t)

@@ -17,7 +17,7 @@ type Store interface {
 	GetParticipantAllocations(sessionID string) (map[string]map[string]decimal.Decimal, error)
 
 	// Ledger operations
-	RecordLedgerEntry(accountID, asset string, amount decimal.Decimal, sessionKey *string) error
+	RecordLedgerEntry(userWallet, accountID, asset string, amount decimal.Decimal) error
 
 	RecordTransaction(tx core.Transaction) error
 
@@ -27,7 +27,7 @@ type Store interface {
 	CheckOpenChannel(wallet, asset string) (bool, error)
 	GetLastUserState(wallet, asset string, signed bool) (*core.State, error)
 	StoreUserState(state core.State) error
-	EnsureNoOngoingStateTransitions(wallet, asset string) error
+	EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error
 
 	// TODO: add session keys support
 	// Session key operations

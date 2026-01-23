@@ -144,7 +144,6 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	mockStore.On("CheckOpenChannel", participant1, asset).Return(true, nil).Once()
 	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
-	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
 
@@ -158,7 +157,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	).Once()
 
 	// Mock ledger entry recording
-	mockStore.On("RecordLedgerEntry", appSessionID, asset, depositAmount, (*string)(nil)).Return(nil).Once()
+	mockStore.On("RecordLedgerEntry", participant1, appSessionID, asset, depositAmount).Return(nil).Once()
 
 	// Mock app session update
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
@@ -469,7 +468,6 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	mockStore.On("CheckOpenChannel", participant1, asset).Return(true, nil).Once()
 	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
-	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()

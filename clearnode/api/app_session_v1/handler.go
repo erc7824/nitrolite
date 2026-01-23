@@ -120,6 +120,7 @@ func (h *Handler) issueReleaseReceiverState(ctx context.Context, tx Store, recei
 		return rpc.Errorf("failed to get last signed state: %v", err)
 	}
 
+	// TODO: move to DB query
 	shouldSign := true
 	if lastSignedState != nil {
 		lastStateTransition := lastSignedState.GetLastTransition()

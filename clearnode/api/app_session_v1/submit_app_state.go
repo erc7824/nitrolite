@@ -215,7 +215,7 @@ func (h *Handler) handleOperateIntent(
 			// Calculate the difference and record ledger entry if changed
 			diff := incomingAmount.Sub(currentAmount)
 			if !diff.IsZero() {
-				if err := tx.RecordLedgerEntry(appStateUpd.AppSessionID, asset, diff, nil); err != nil {
+				if err := tx.RecordLedgerEntry(participant, appStateUpd.AppSessionID, asset, diff); err != nil {
 					return rpc.Errorf("failed to record operate ledger entry: %v", err)
 				}
 			}
@@ -317,7 +317,7 @@ func (h *Handler) handleWithdrawIntent(
 			if incomingAmount.LessThan(currentAmount) {
 				// Record the withdrawal (negative ledger entry for the session)
 				withdrawAmount := currentAmount.Sub(incomingAmount)
-				if err := tx.RecordLedgerEntry(appStateUpd.AppSessionID, asset, withdrawAmount.Neg(), nil); err != nil {
+				if err := tx.RecordLedgerEntry(participant, appStateUpd.AppSessionID, asset, withdrawAmount.Neg()); err != nil {
 					return rpc.Errorf("failed to record withdrawal ledger entry: %v", err)
 				}
 
@@ -414,7 +414,7 @@ func (h *Handler) handleCloseIntent(
 			}
 
 			// Record negative ledger entry (funds leaving the session)
-			if err := tx.RecordLedgerEntry(appStateUpd.AppSessionID, asset, amount.Neg(), nil); err != nil {
+			if err := tx.RecordLedgerEntry(participant, appStateUpd.AppSessionID, asset, amount.Neg()); err != nil {
 				return rpc.Errorf("failed to record close ledger entry: %v", err)
 			}
 

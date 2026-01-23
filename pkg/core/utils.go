@@ -43,26 +43,25 @@ func DecimalToBigInt(amount decimal.Decimal, decimals uint8) (*big.Int, error) {
 }
 
 // GetHomeChannelID generates a unique identifier for a primary channel between a node and a user.
-func GetHomeChannelID(nodeAddress, userAddress, tokenAddress string, nonce, challenge uint64) (string, error) {
+func GetHomeChannelID(nodeAddress, userAddress, asset string, nonce uint64, challenge uint32) (string, error) {
 	nodeAddr := common.HexToAddress(nodeAddress)
 	userAddr := common.HexToAddress(userAddress)
 
-	tokenAddr := common.HexToAddress(tokenAddress)
-	// TODO: decide token or asset
+	assetHash := crypto.Keccak256Hash([]byte(asset))
+	assetID := assetHash[:8] // Use first 8 bytes as asset identifier
+
+	metadata := make([]byte, 32)
+	copy(metadata[:8], assetID)
 
 	args := abi.Arguments{
-		{Type: abi.Type{T: abi.AddressTy}}, // node
-		{Type: abi.Type{T: abi.AddressTy}}, // user
-		{Type: abi.Type{T: abi.AddressTy}}, // asset
-		{Type: uint32Type},                 // challenge
-		{Type: uint256Type},                // nonce
+		{Type: abi.Type{T: abi.AddressTy}},              // node
+		{Type: abi.Type{T: abi.AddressTy}},              // user
+		{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // metadata
+		{Type: uint32Type},                              // challenge
+		{Type: uint64Type},                              // nonce
 	}
 
-	// Convert challenge to uint32 and nonce to big.Int for ABI packing
-	challenge32 := uint32(challenge)
-	nonceBI := new(big.Int).SetUint64(nonce)
-
-	packed, err := args.Pack(nodeAddr, userAddr, tokenAddr, challenge32, nonceBI)
+	packed, err := args.Pack(nodeAddr, userAddr, metadata, challenge, nonce)
 	if err != nil {
 		return "", err
 	}

@@ -61,7 +61,7 @@ func TestGetAssets_Success(t *testing.T) {
 	}
 
 	// Mock expectations
-	var nilBlockchainID *uint32
+	var nilBlockchainID *uint64
 	mockMemoryStore.On("GetAssets", nilBlockchainID).Return(assets, nil)
 
 	// Create RPC request
@@ -99,10 +99,10 @@ func TestGetAssets_Success(t *testing.T) {
 	assert.Equal(t, "USDC on Ethereum", response.Assets[0].Tokens[0].Name)
 	assert.Equal(t, "USDC", response.Assets[0].Tokens[0].Symbol)
 	assert.Equal(t, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", response.Assets[0].Tokens[0].Address)
-	assert.Equal(t, uint32(1), response.Assets[0].Tokens[0].BlockchainID)
+	assert.Equal(t, uint64(1), response.Assets[0].Tokens[0].BlockchainID)
 	assert.Equal(t, uint8(6), response.Assets[0].Tokens[0].Decimals)
 	assert.Equal(t, "USDC on Polygon", response.Assets[0].Tokens[1].Name)
-	assert.Equal(t, uint32(137), response.Assets[0].Tokens[1].BlockchainID)
+	assert.Equal(t, uint64(137), response.Assets[0].Tokens[1].BlockchainID)
 
 	// Verify USDT asset
 	assert.Equal(t, "Tether", response.Assets[1].Name)

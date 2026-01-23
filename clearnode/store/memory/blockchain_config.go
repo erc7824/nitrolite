@@ -1,22 +1,18 @@
 package memory
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	checkChainIdCallTimeout = 5 * time.Second
-	defaultBlockStep        = uint64(10000)
-	blockchainsFileName     = "blockchains.yaml"
+	defaultBlockStep    = uint64(10000)
+	blockchainsFileName = "blockchains.yaml"
 )
 
 var (
@@ -28,8 +24,8 @@ var (
 // It contains default contract addresses that apply to all blockchains unless overridden,
 // and a list of individual blockchain configurations.
 type BlockchainsConfig struct {
-	DefaultContractAddresses ContractAddressesConfig `yaml:"default_contract_addresses"`
-	Blockchains              []BlockchainConfig      `yaml:"blockchains"`
+	DefaultContractAddress string             `yaml:"default_contract_address"`
+	Blockchains            []BlockchainConfig `yaml:"blockchains"`
 }
 
 // BlockchainConfig represents configuration for a single blockchain.
@@ -39,26 +35,18 @@ type BlockchainConfig struct {
 	// Must match pattern: lowercase letters and underscores only
 	Name string `yaml:"name"`
 	// ID is the chain ID used for RPC validation
-	ID uint32 `yaml:"id"`
+	ID uint64 `yaml:"id"`
 	// Disabled determines if this blockchain should be connected
 	Disabled bool `yaml:"disabled"`
 	// BlockchainRPC is populated from environment variable <NAME>_BLOCKCHAIN_RPC
 	BlockchainRPC string
 	// BlockStep defines the block range for scanning (default: 10000)
 	BlockStep uint64 `yaml:"block_step"`
-	// ContractAddresses can override the default addresses
-	ContractAddresses ContractAddressesConfig `yaml:"contract_addresses"`
+	// ContractAddress can override the default addresses
+	ContractAddress string `yaml:"contract_address"`
 }
 
-// ContractAddressesConfig holds Ethereum contract addresses for blockchain operations.
-// All addresses must be valid Ethereum addresses (0x followed by 40 hex characters).
-type ContractAddressesConfig struct {
-	Custody        string `yaml:"custody"`
-	Adjudicator    string `yaml:"adjudicator"`
-	BalanceChecker string `yaml:"balance_checker"`
-}
-
-// LoadBlockchains loads and validates blockchain configurations from a YAML file.
+// LoadEnabledBlockchains loads and validates blockchain configurations from a YAML file.
 // It reads from <configDirPath>/blockchains.yaml, validates all settings,
 // verifies RPC connections, and returns a map of enabled blockchains indexed by chain ID.
 //
@@ -67,7 +55,7 @@ type ContractAddressesConfig struct {
 // - Blockchain names (lowercase with underscores)
 // - RPC endpoint availability and chain ID matching
 // - Required contract addresses (using defaults when not specified)
-func LoadBlockchains(configDirPath string) (map[uint32]BlockchainConfig, error) {
+func LoadEnabledBlockchains(configDirPath string) (map[uint64]BlockchainConfig, error) {
 	blockchainsPath := filepath.Join(configDirPath, blockchainsFileName)
 	f, err := os.Open(blockchainsPath)
 	if err != nil {
@@ -80,31 +68,16 @@ func LoadBlockchains(configDirPath string) (map[uint32]BlockchainConfig, error) 
 		return nil, err
 	}
 
-	if err := cfg.verifyVariables(); err != nil {
+	if err := verifyBlockchainsConfig(&cfg, true); err != nil {
 		return nil, err
 	}
 
-	if err := cfg.verifyRPCs(); err != nil {
-		return nil, err
-	}
-
-	enabledBlockchains := cfg.getEnabled()
-	return enabledBlockchains, nil
+	return getEnabledBlockchains(&cfg), nil
 }
 
-// verifyVariables validates the configuration structure and applies defaults.
-// It ensures all contract addresses are valid, applies default addresses where needed,
-// and sets default block step values. This method modifies the config in place.
-func (cfg *BlockchainsConfig) verifyVariables() error {
-	defaults := cfg.DefaultContractAddresses
-	if !contractAddressRegex.MatchString(defaults.Custody) && defaults.Custody != "" {
-		return fmt.Errorf("invalid default custody contract address '%s'", defaults.Custody)
-	}
-	if !contractAddressRegex.MatchString(defaults.Adjudicator) && defaults.Adjudicator != "" {
-		return fmt.Errorf("invalid default adjudicator contract address '%s'", defaults.Adjudicator)
-	}
-	if !contractAddressRegex.MatchString(defaults.BalanceChecker) && defaults.BalanceChecker != "" {
-		return fmt.Errorf("invalid default balance checker contract address '%s'", defaults.BalanceChecker)
+func verifyBlockchainsConfig(cfg *BlockchainsConfig, checkRPC bool) error {
+	if !contractAddressRegex.MatchString(cfg.DefaultContractAddress) && cfg.DefaultContractAddress != "" {
+		return fmt.Errorf("invalid default contract address '%s'", cfg.DefaultContractAddress)
 	}
 
 	for i, bc := range cfg.Blockchains {
@@ -116,34 +89,24 @@ func (cfg *BlockchainsConfig) verifyVariables() error {
 			return fmt.Errorf("invalid blockchain name '%s', should match snake_case format", bc.Name)
 		}
 
-		if bc.ContractAddresses.Custody == "" {
-			if defaults.Custody == "" {
-				return fmt.Errorf("missing default and blockchain-specific custody contract address for blockchain '%s'", bc.Name)
+		if bc.ContractAddress == "" {
+			if cfg.DefaultContractAddress == "" {
+				return fmt.Errorf("missing default and blockchain-specific contract address for blockchain '%s'", bc.Name)
 			} else {
-				cfg.Blockchains[i].ContractAddresses.Custody = defaults.Custody
+				cfg.Blockchains[i].ContractAddress = cfg.DefaultContractAddress
 			}
-		} else if !contractAddressRegex.MatchString(bc.ContractAddresses.Custody) {
-			return fmt.Errorf("invalid custody contract address '%s' for blockchain '%s'", bc.ContractAddresses.Custody, bc.Name)
+		} else if !contractAddressRegex.MatchString(bc.ContractAddress) {
+			return fmt.Errorf("invalid contract address '%s' for blockchain '%s'", bc.ContractAddress, bc.Name)
 		}
 
-		if bc.ContractAddresses.Adjudicator == "" {
-			if defaults.Adjudicator == "" {
-				return fmt.Errorf("missing default and blockchain-specific adjudicator contract address for blockchain '%s'", bc.Name)
-			} else {
-				cfg.Blockchains[i].ContractAddresses.Adjudicator = defaults.Adjudicator
+		// It reads RPC URLs from environment variables following the pattern:
+		// <BLOCKCHAIN_NAME_UPPERCASE>_BLOCKCHAIN_RPC and verifies that each endpoint returns the expected chain ID.
+		if checkRPC {
+			blockchainRPC := os.Getenv(fmt.Sprintf("%s_BLOCKCHAIN_RPC", strings.ToUpper(bc.Name)))
+			if blockchainRPC == "" {
+				return fmt.Errorf("missing blockchain RPC for blockchain '%s'", bc.Name)
 			}
-		} else if !contractAddressRegex.MatchString(bc.ContractAddresses.Adjudicator) {
-			return fmt.Errorf("invalid adjudicator contract address '%s' for blockchain '%s'", bc.ContractAddresses.Adjudicator, bc.Name)
-		}
-
-		if bc.ContractAddresses.BalanceChecker == "" {
-			if defaults.BalanceChecker == "" {
-				return fmt.Errorf("missing default and blockchain-specific balance checker contract address for blockchain '%s'", bc.Name)
-			} else {
-				cfg.Blockchains[i].ContractAddresses.BalanceChecker = defaults.BalanceChecker
-			}
-		} else if !contractAddressRegex.MatchString(bc.ContractAddresses.BalanceChecker) {
-			return fmt.Errorf("invalid balance checker contract address '%s' for blockchain '%s'", bc.ContractAddresses.BalanceChecker, bc.Name)
+			cfg.Blockchains[i].BlockchainRPC = blockchainRPC
 		}
 
 		if bc.BlockStep == 0 {
@@ -154,64 +117,14 @@ func (cfg *BlockchainsConfig) verifyVariables() error {
 	return nil
 }
 
-// verifyRPCs validates RPC endpoints for all enabled blockchains.
-// It reads RPC URLs from environment variables following the pattern:
-// <BLOCKCHAIN_NAME_UPPERCASE>_BLOCKCHAIN_RPC
-// and verifies that each endpoint returns the expected chain ID.
-func (cfg *BlockchainsConfig) verifyRPCs() error {
-	for i, bc := range cfg.Blockchains {
-		if bc.Disabled {
-			continue
-		}
-
-		blockchainRPC := os.Getenv(fmt.Sprintf("%s_BLOCKCHAIN_RPC", strings.ToUpper(bc.Name)))
-		if blockchainRPC == "" {
-			return fmt.Errorf("missing blockchain RPC for blockchain '%s'", bc.Name)
-		}
-
-		if err := checkChainId(blockchainRPC, bc.ID); err != nil {
-			return fmt.Errorf("blockchain '%s' ChainID check failed: %w", bc.Name, err)
-		}
-
-		cfg.Blockchains[i].BlockchainRPC = blockchainRPC
-	}
-
-	return nil
-}
-
-// getEnabled returns a map of enabled blockchains indexed by their chain ID.
+// getEnabledBlockchains returns a map of enabled blockchains indexed by their chain ID.
 // Only blockchains with enabled=true are included in the result.
-func (cfg *BlockchainsConfig) getEnabled() map[uint32]BlockchainConfig {
-	enabledBlockchains := make(map[uint32]BlockchainConfig)
+func getEnabledBlockchains(cfg *BlockchainsConfig) map[uint64]BlockchainConfig {
+	enabledBlockchains := make(map[uint64]BlockchainConfig)
 	for _, bc := range cfg.Blockchains {
 		if !bc.Disabled {
 			enabledBlockchains[bc.ID] = bc
 		}
 	}
 	return enabledBlockchains
-}
-
-// checkChainId connects to an RPC endpoint and verifies it returns the expected chain ID.
-// This ensures the RPC URL points to the correct blockchain network.
-// The function uses a 5-second timeout for the connection and chain ID query.
-func checkChainId(blockchainRPC string, expectedChainID uint32) error {
-	ctx, cancel := context.WithTimeout(context.Background(), checkChainIdCallTimeout)
-	defer cancel()
-
-	client, err := ethclient.DialContext(ctx, blockchainRPC)
-	if err != nil {
-		return fmt.Errorf("failed to connect to blockchain RPC: %w", err)
-	}
-	defer client.Close()
-
-	chainID, err := client.ChainID(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get chain ID from blockchain RPC: %w", err)
-	}
-
-	if uint32(chainID.Uint64()) != expectedChainID {
-		return fmt.Errorf("unexpected chain ID from blockchain RPC: got %d, want %d", chainID.Uint64(), expectedChainID)
-	}
-
-	return nil
 }

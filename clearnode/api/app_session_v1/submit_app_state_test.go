@@ -194,8 +194,8 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	// Expect ledger entries for the redistribution
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
-	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-25), (*string)(nil)).Return(nil).Once()
-	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(25), (*string)(nil)).Return(nil).Once()
+	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", decimal.NewFromInt(-25)).Return(nil).Once()
+	mockStore.On("RecordLedgerEntry", participant2, appSessionID, "USDC", decimal.NewFromInt(25)).Return(nil).Once()
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
 		return session.Version == 2 && session.Status == app.AppSessionStatusOpen
 	})).Return(nil)
@@ -287,7 +287,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
-	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-40), (*string)(nil)).Return(nil)
+	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", decimal.NewFromInt(-40)).Return(nil)
 
 	// Mock expectations for channel state issuance (issueReleaseReceiverState)
 	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil)
@@ -396,7 +396,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 
 	// Mock expectations for fund release and channel state issuance on close
 	// Participant 1: 100 USDC
-	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-100), (*string)(nil)).Return(nil)
+	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", decimal.NewFromInt(-100)).Return(nil)
 	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil)
 	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil)
 	mockStatePacker.On("PackState", mock.Anything).Return([]byte("packed"), nil)
@@ -404,7 +404,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	mockStore.On("StoreUserState", mock.Anything).Return(nil).Once()
 
 	// Participant 2: 50 USDC
-	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-50), (*string)(nil)).Return(nil)
+	mockStore.On("RecordLedgerEntry", participant2, appSessionID, "USDC", decimal.NewFromInt(-50)).Return(nil)
 	mockStore.On("GetLastUserState", participant2, "USDC", false).Return(nil, nil)
 	mockStore.On("GetLastUserState", participant2, "USDC", true).Return(nil, nil)
 	mockStore.On("StoreUserState", mock.Anything).Return(nil).Once()
@@ -599,7 +599,7 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil).Maybe()
 
 	// Map iteration order is non-deterministic, so participant1 might be processed before the participant2 missing error
-	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(50), (*string)(nil)).Return(nil).Maybe()
+	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", decimal.NewFromInt(50)).Return(nil).Maybe()
 
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
@@ -692,11 +692,11 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 	mockStatePacker.On("PackState", mock.Anything).Return([]byte("packed"), nil).Maybe()
 
 	// Map iteration order is non-deterministic, so USDC might be processed before the DAI missing error
-	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-40), (*string)(nil)).Return(nil).Maybe()
+	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", decimal.NewFromInt(-40)).Return(nil).Maybe()
 	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil).Maybe()
 	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil).Maybe()
-	mockStore.On("RecordTransaction", mock.Anything).Return(nil)
 	mockStore.On("StoreUserState", mock.Anything).Return(nil).Maybe()
+	mockStore.On("RecordTransaction", mock.Anything).Return(nil)
 
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
@@ -1126,7 +1126,7 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
 	// RecordLedgerEntry will be called before validation, but then validation will fail
-	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", mock.Anything, (*string)(nil)).Return(nil).Maybe()
+	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", mock.Anything).Return(nil).Maybe()
 
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)

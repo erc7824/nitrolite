@@ -32,7 +32,6 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 	incomingTransition := incomingState.GetLastTransition()
 	err = h.useStoreInTx(func(tx Store) error {
 		if incomingTransition == nil {
-			// TODO: add support for final states without transitions
 			return rpc.Errorf("incoming state has no transitions")
 		}
 		if incomingTransition.Type.RequiresOpenChannel() {
@@ -83,8 +82,10 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 				currentState = core.NewVoidState(incomingState.Asset, incomingState.UserWallet)
 			}
 		}
-		if err := tx.EnsureNoOngoingStateTransitions(incomingState.UserWallet, incomingState.Asset); err != nil {
-			return rpc.Errorf("ongoing state transitions check failed: %v", err)
+		if prevTransition := currentState.GetLastTransition(); prevTransition != nil {
+			if err := tx.EnsureNoOngoingStateTransitions(currentState.UserWallet, currentState.Asset, prevTransition.Type); err != nil {
+				return rpc.Errorf("ongoing state transitions check failed: %v", err)
+			}
 		}
 
 		if err := h.stateAdvancer.ValidateAdvancement(*currentState, incomingState); err != nil {
@@ -216,6 +217,8 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 			return rpc.Errorf("failed to store user state: %v", err)
 		}
 
+		// TODO: consider state checkpoint if channel is challenged
+
 		return nil
 	})
 	if err != nil {
@@ -275,12 +278,11 @@ func (h *Handler) createEscrowChannel(tx Store, incomingState core.State) error 
 	newEscrowChannel := core.NewChannel(
 		escrowChannelID,
 		incomingState.UserWallet,
-		h.nodeAddress,
 		core.ChannelTypeEscrow,
 		incomingState.EscrowLedger.BlockchainID,
 		incomingState.EscrowLedger.TokenAddress,
 		homeChannel.Nonce,
-		homeChannel.Challenge,
+		homeChannel.ChallengeDuration,
 	)
 
 	// Create the escrow channel entity

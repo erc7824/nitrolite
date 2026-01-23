@@ -50,14 +50,14 @@ func (m *MockStore) ScheduleCheckpoint(stateID string) error {
 	return args.Error(0)
 }
 
-// ScheduleCheckpointEscrowDeposit mocks scheduling an escrow deposit checkpoint
-func (m *MockStore) ScheduleCheckpointEscrowDeposit(stateID string) error {
+// ScheduleFinalizeEscrowDeposit mocks scheduling an escrow deposit checkpoint
+func (m *MockStore) ScheduleFinalizeEscrowDeposit(stateID string) error {
 	args := m.Called(stateID)
 	return args.Error(0)
 }
 
-// ScheduleCheckpointEscrowWithdrawal mocks scheduling an escrow withdrawal checkpoint
-func (m *MockStore) ScheduleCheckpointEscrowWithdrawal(stateID string) error {
+// ScheduleFinalizeEscrowWithdrawal mocks scheduling an escrow withdrawal checkpoint
+func (m *MockStore) ScheduleFinalizeEscrowWithdrawal(stateID string) error {
 	args := m.Called(stateID)
 	return args.Error(0)
 }

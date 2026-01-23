@@ -70,10 +70,10 @@ func TestGetConfig_Success(t *testing.T) {
 	assert.Equal(t, nodeVersion, response.NodeVersion)
 	assert.Len(t, response.Blockchains, 2)
 	assert.Equal(t, "Ethereum", response.Blockchains[0].Name)
-	assert.Equal(t, uint32(1), response.Blockchains[0].BlockchainID)
+	assert.Equal(t, uint64(1), response.Blockchains[0].BlockchainID)
 	assert.Equal(t, "0xContract1", response.Blockchains[0].ContractAddress)
 	assert.Equal(t, "Polygon", response.Blockchains[1].Name)
-	assert.Equal(t, uint32(137), response.Blockchains[1].BlockchainID)
+	assert.Equal(t, uint64(137), response.Blockchains[1].BlockchainID)
 	assert.Equal(t, "0xContract137", response.Blockchains[1].ContractAddress)
 
 	// Verify all mock expectations

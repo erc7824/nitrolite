@@ -1,177 +1,511 @@
 package database
 
 import (
-	"encoding/json"
 	"testing"
-	"time"
 
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCreateCheckpoint(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		db, cleanup := SetupTestDB(t)
-		defer cleanup()
-
-		state := UnsignedState{
-			Intent:  StateIntent(1),
-			Version: 5,
-			Data:    "test-data",
-			Allocations: []Allocation{{
-				Participant:  "0xUser123",
-				TokenAddress: "0xToken456",
-				RawAmount:    decimal.NewFromInt(1000),
-			}},
-		}
-		userSig := Signature{1, 2, 3}
-		serverSig := Signature{4, 5, 6}
-		channelId := common.HexToHash("0xchannel1")
-
-		err := ScheduleCheckpoint(db, channelId, 1, state, userSig, serverSig)
-		require.NoError(t, err)
-
-		var action BlockchainAction
-		err = db.Where("channel_id = ?", channelId).First(&action).Error
-		require.NoError(t, err)
-
-		assert.Equal(t, ActionTypeCheckpoint, action.Type)
-		assert.Equal(t, channelId, action.ChannelID)
-		assert.Equal(t, uint32(1), action.ChainID)
-		assert.Equal(t, StatusPending, action.Status)
-		assert.Equal(t, 0, action.Retries)
-		assert.Empty(t, action.Error)
-		assert.Empty(t, action.TxHash)
-		assert.False(t, action.CreatedAt.IsZero())
-		assert.False(t, action.UpdatedAt.IsZero())
-
-		var data CheckpointData
-		err = json.Unmarshal([]byte(action.Data), &data)
-		require.NoError(t, err)
-		assert.Equal(t, state, data.State)
-		assert.Equal(t, userSig, data.UserSig)
-		assert.Equal(t, serverSig, data.ServerSig)
-	})
-
-	t.Run("Database error", func(t *testing.T) {
-		channelId := common.HexToHash("0xchannel1")
-
-		db, cleanup := SetupTestDB(t)
-		defer cleanup()
-
-		sqlDB, err := db.DB()
-		require.NoError(t, err)
-		sqlDB.Close()
-
-		err = ScheduleCheckpoint(db, channelId, 1, UnsignedState{}, Signature{}, Signature{})
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "database is closed")
-	})
-}
-
-func TestBlockchainAction_Fail(t *testing.T) {
-	channelId := common.HexToHash("0xchannel1")
-
-	db, cleanup := SetupTestDB(t)
-	defer cleanup()
-
-	action := &BlockchainAction{
-		Type:      ActionTypeCheckpoint,
-		ChannelID: channelId,
-		ChainID:   1,
-		Data:      []byte{1},
-		Status:    StatusPending,
-		Retries:   2,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	require.NoError(t, db.Create(action).Error)
-
-	err := action.Fail(db, "test error")
-	require.NoError(t, err)
-
-	assert.Equal(t, StatusFailed, action.Status)
-	assert.Equal(t, "test error", action.Error)
-	assert.Equal(t, 3, action.Retries)
-
-	var dbAction BlockchainAction
-	err = db.First(&dbAction, action.ID).Error
-	require.NoError(t, err)
-	assert.Equal(t, StatusFailed, dbAction.Status)
-	assert.Equal(t, "test error", dbAction.Error)
-	assert.Equal(t, 3, dbAction.Retries)
-}
-
-func TestBlockchainAction_Complete(t *testing.T) {
-	channelId := common.HexToHash("0xchannel1")
-
-	db, cleanup := SetupTestDB(t)
-	defer cleanup()
-
-	action := &BlockchainAction{
-		Type:      ActionTypeCheckpoint,
-		ChannelID: channelId,
-		ChainID:   1,
-		Data:      []byte{1},
-		Status:    StatusPending,
-		Error:     "previous error",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	require.NoError(t, db.Create(action).Error)
-
-	txHash := common.HexToHash("0xabcdef1234567890")
-	err := action.Complete(db, txHash)
-	require.NoError(t, err)
-
-	assert.Equal(t, StatusCompleted, action.Status)
-	assert.Equal(t, txHash, action.TxHash)
-	assert.Empty(t, action.Error)
-
-	var dbAction BlockchainAction
-	err = db.First(&dbAction, action.ID).Error
-	require.NoError(t, err)
-	assert.Equal(t, StatusCompleted, dbAction.Status)
-	assert.Equal(t, txHash, dbAction.TxHash)
-	assert.Empty(t, dbAction.Error)
-}
-
 func TestBlockchainAction_TableName(t *testing.T) {
 	action := BlockchainAction{}
 	assert.Equal(t, "blockchain_actions", action.TableName())
 }
 
-func TestCheckpointData_Serialization(t *testing.T) {
-	original := CheckpointData{
-		State: UnsignedState{
-			Intent:  StateIntent(2),
-			Version: 10,
-			Data:    "test-data",
-			Allocations: []Allocation{{
-				Participant:  "0xUser1",
-				TokenAddress: "0xToken1",
-				RawAmount:    decimal.NewFromInt(5000),
-			}},
-		},
-		UserSig:   Signature{0x11, 0x22, 0x33},
-		ServerSig: Signature{0x44, 0x55, 0x66},
-	}
+func TestDBStore_ScheduleCheckpoint(t *testing.T) {
+	t.Run("Success - Schedule checkpoint action", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
 
-	bytes, err := json.Marshal(original)
-	require.NoError(t, err)
+		store := NewDBStore(db)
 
-	var unmarshaled CheckpointData
-	err = json.Unmarshal(bytes, &unmarshaled)
-	require.NoError(t, err)
+		// First create a state to reference
+		state := core.State{
+			ID:          "0x1234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "USDC",
+			UserWallet:  "0x1234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger: core.Ledger{
+				UserBalance: decimal.NewFromInt(1000),
+			},
+		}
+		require.NoError(t, store.StoreUserState(state))
 
-	assert.Equal(t, original, unmarshaled)
+		err := store.ScheduleCheckpoint(state.ID)
+		require.NoError(t, err)
+
+		// Verify action was created
+		var action BlockchainAction
+		err = db.Where("state_id = ?", state.ID).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, ActionTypeCheckpoint, action.Type)
+		assert.Equal(t, state.ID, action.StateID)
+		assert.Equal(t, BlockchainActionStatusPending, action.Status)
+		assert.Equal(t, uint8(0), action.Retries)
+		assert.Empty(t, action.Error)
+		assert.False(t, action.CreatedAt.IsZero())
+		assert.False(t, action.UpdatedAt.IsZero())
+	})
 }
 
-func TestConstants(t *testing.T) {
-	assert.Equal(t, BlockchainActionType("checkpoint"), ActionTypeCheckpoint)
-	assert.Equal(t, BlockchainActionStatus("pending"), StatusPending)
-	assert.Equal(t, BlockchainActionStatus("completed"), StatusCompleted)
-	assert.Equal(t, BlockchainActionStatus("failed"), StatusFailed)
+func TestDBStore_ScheduleInitiateEscrowWithdrawal(t *testing.T) {
+	t.Run("Success - Schedule initiate escrow withdrawal", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		// Create a state
+		state := core.State{
+			ID:          "0x2234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "USDC",
+			UserWallet:  "0x2234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger: core.Ledger{
+				UserBalance: decimal.NewFromInt(500),
+			},
+		}
+		require.NoError(t, store.StoreUserState(state))
+
+		err := store.ScheduleInitiateEscrowWithdrawal(state.ID)
+		require.NoError(t, err)
+
+		// Verify action was created
+		var action BlockchainAction
+		err = db.Where("state_id = ?", state.ID).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, ActionTypeInitiateEscrowWithdrawal, action.Type)
+		assert.Equal(t, state.ID, action.StateID)
+		assert.Equal(t, BlockchainActionStatusPending, action.Status)
+	})
+}
+
+func TestDBStore_ScheduleFinalizeEscrowDeposit(t *testing.T) {
+	t.Run("Success - Schedule finalize escrow deposit", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		state := core.State{
+			ID:          "0x3234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "ETH",
+			UserWallet:  "0x3234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger: core.Ledger{
+				UserBalance: decimal.NewFromInt(100),
+			},
+		}
+		require.NoError(t, store.StoreUserState(state))
+
+		err := store.ScheduleFinalizeEscrowDeposit(state.ID)
+		require.NoError(t, err)
+
+		var action BlockchainAction
+		err = db.Where("state_id = ?", state.ID).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, ActionTypeFinalizeEscrowDeposit, action.Type)
+		assert.Equal(t, state.ID, action.StateID)
+	})
+}
+
+func TestDBStore_ScheduleFinalizeEscrowWithdrawal(t *testing.T) {
+	t.Run("Success - Schedule finalize escrow withdrawal", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		state := core.State{
+			ID:          "0x4234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "ETH",
+			UserWallet:  "0x4234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger: core.Ledger{
+				UserBalance: decimal.NewFromInt(200),
+			},
+		}
+		require.NoError(t, store.StoreUserState(state))
+
+		err := store.ScheduleFinalizeEscrowWithdrawal(state.ID)
+		require.NoError(t, err)
+
+		var action BlockchainAction
+		err = db.Where("state_id = ?", state.ID).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, ActionTypeFinalizeEscrowWithdrawal, action.Type)
+		assert.Equal(t, state.ID, action.StateID)
+	})
+}
+
+func TestDBStore_Fail(t *testing.T) {
+	t.Run("Success - Mark action as failed and increment retry count", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		state := core.State{
+			ID:          "0x5234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "USDC",
+			UserWallet:  "0x5234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger: core.Ledger{
+				UserBalance: decimal.NewFromInt(300),
+			},
+		}
+		require.NoError(t, store.StoreUserState(state))
+		require.NoError(t, store.ScheduleCheckpoint(state.ID))
+
+		var action BlockchainAction
+		err := db.Where("state_id = ?", state.ID).First(&action).Error
+		require.NoError(t, err)
+
+		initialRetries := action.Retries
+
+		err = store.Fail(action.ID, "test error message")
+		require.NoError(t, err)
+
+		// Verify action was updated
+		err = db.Where("id = ?", action.ID).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, BlockchainActionStatusFailed, action.Status)
+		assert.Equal(t, "test error message", action.Error)
+		assert.Equal(t, initialRetries+1, action.Retries)
+	})
+}
+
+func TestDBStore_FailNoRetry(t *testing.T) {
+	t.Run("Success - Mark action as failed without incrementing retry count", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		state := core.State{
+			ID:          "0x6234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "USDC",
+			UserWallet:  "0x6234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger: core.Ledger{
+				UserBalance: decimal.NewFromInt(400),
+			},
+		}
+		require.NoError(t, store.StoreUserState(state))
+		require.NoError(t, store.ScheduleCheckpoint(state.ID))
+
+		var action BlockchainAction
+		err := db.Where("state_id = ?", state.ID).First(&action).Error
+		require.NoError(t, err)
+
+		initialRetries := action.Retries
+
+		err = store.FailNoRetry(action.ID, "fatal error")
+		require.NoError(t, err)
+
+		// Verify action was updated
+		err = db.Where("id = ?", action.ID).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, BlockchainActionStatusFailed, action.Status)
+		assert.Equal(t, "fatal error", action.Error)
+		assert.Equal(t, initialRetries, action.Retries) // Should not increment
+	})
+}
+
+func TestDBStore_RecordAttempt(t *testing.T) {
+	t.Run("Success - Record attempt and increment retry count", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		state := core.State{
+			ID:          "0x7234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "ETH",
+			UserWallet:  "0x7234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger: core.Ledger{
+				UserBalance: decimal.NewFromInt(150),
+			},
+		}
+		require.NoError(t, store.StoreUserState(state))
+		require.NoError(t, store.ScheduleCheckpoint(state.ID))
+
+		var action BlockchainAction
+		err := db.Where("state_id = ?", state.ID).First(&action).Error
+		require.NoError(t, err)
+
+		initialRetries := action.Retries
+
+		err = store.RecordAttempt(action.ID, "temporary network error")
+		require.NoError(t, err)
+
+		// Verify action was updated
+		err = db.Where("id = ?", action.ID).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, BlockchainActionStatusPending, action.Status) // Still pending
+		assert.Equal(t, "temporary network error", action.Error)
+		assert.Equal(t, initialRetries+1, action.Retries)
+	})
+}
+
+func TestDBStore_Complete(t *testing.T) {
+	t.Run("Success - Mark action as completed with transaction hash", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		state := core.State{
+			ID:          "0x8234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "USDC",
+			UserWallet:  "0x8234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger: core.Ledger{
+				UserBalance: decimal.NewFromInt(600),
+			},
+		}
+		require.NoError(t, store.StoreUserState(state))
+		require.NoError(t, store.ScheduleCheckpoint(state.ID))
+
+		var action BlockchainAction
+		err := db.Where("state_id = ?", state.ID).First(&action).Error
+		require.NoError(t, err)
+
+		txHash := "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+
+		err = store.Complete(action.ID, txHash)
+		require.NoError(t, err)
+
+		// Verify action was updated
+		err = db.Where("id = ?", action.ID).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, BlockchainActionStatusCompleted, action.Status)
+		assert.Equal(t, txHash, action.TxHash)
+		assert.Empty(t, action.Error) // Error should be cleared
+	})
+
+	t.Run("Success - Clears previous error on completion", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		state := core.State{
+			ID:          "0x9234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "ETH",
+			UserWallet:  "0x9234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger: core.Ledger{
+				UserBalance: decimal.NewFromInt(250),
+			},
+		}
+		require.NoError(t, store.StoreUserState(state))
+		require.NoError(t, store.ScheduleCheckpoint(state.ID))
+
+		var action BlockchainAction
+		err := db.Where("state_id = ?", state.ID).First(&action).Error
+		require.NoError(t, err)
+
+		// First record an error
+		err = store.RecordAttempt(action.ID, "some error")
+		require.NoError(t, err)
+
+		// Then complete it
+		txHash := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+		err = store.Complete(action.ID, txHash)
+		require.NoError(t, err)
+
+		// Verify error was cleared
+		err = db.Where("id = ?", action.ID).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, BlockchainActionStatusCompleted, action.Status)
+		assert.Empty(t, action.Error)
+	})
+}
+
+func TestDBStore_GetActions(t *testing.T) {
+	t.Run("Success - Get pending actions ordered by creation time", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		// Create multiple states and actions
+		state1 := core.State{
+			ID:          "0xa234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "USDC",
+			UserWallet:  "0xa234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(100)},
+		}
+		state2 := core.State{
+			ID:          "0xb234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "ETH",
+			UserWallet:  "0xb234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(200)},
+		}
+		state3 := core.State{
+			ID:          "0xc234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "USDC",
+			UserWallet:  "0xc234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(300)},
+		}
+
+		require.NoError(t, store.StoreUserState(state1))
+		require.NoError(t, store.StoreUserState(state2))
+		require.NoError(t, store.StoreUserState(state3))
+
+		require.NoError(t, store.ScheduleCheckpoint(state1.ID))
+		require.NoError(t, store.ScheduleInitiateEscrowWithdrawal(state2.ID))
+		require.NoError(t, store.ScheduleFinalizeEscrowDeposit(state3.ID))
+
+		// Get all pending actions
+		actions, err := store.GetActions(0)
+		require.NoError(t, err)
+
+		assert.Len(t, actions, 3)
+		// Verify they're ordered by created_at ASC
+		assert.True(t, actions[0].CreatedAt.Before(actions[1].CreatedAt) || actions[0].CreatedAt.Equal(actions[1].CreatedAt))
+		assert.True(t, actions[1].CreatedAt.Before(actions[2].CreatedAt) || actions[1].CreatedAt.Equal(actions[2].CreatedAt))
+	})
+
+	t.Run("Success - Limit results", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		// Create 5 states and actions
+		for i := 0; i < 5; i++ {
+			state := core.State{
+				ID:          common.BigToHash(common.Big1).Hex() + string(rune('0'+i)),
+				Asset:       "USDC",
+				UserWallet:  "0xd234567890123456789012345678901234567890",
+				Epoch:       uint64(i + 1),
+				Version:     1,
+				Transitions: []core.Transition{},
+				HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(int64(100 * (i + 1)))},
+			}
+			require.NoError(t, store.StoreUserState(state))
+			require.NoError(t, store.ScheduleCheckpoint(state.ID))
+		}
+
+		// Get only 2 actions
+		actions, err := store.GetActions(2)
+		require.NoError(t, err)
+
+		assert.Len(t, actions, 2)
+	})
+
+	t.Run("Success - Excludes completed and failed actions", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		// Create states
+		state1 := core.State{
+			ID:          "0xe234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "USDC",
+			UserWallet:  "0xe234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(100)},
+		}
+		state2 := core.State{
+			ID:          "0xf234567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "ETH",
+			UserWallet:  "0xf234567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(200)},
+		}
+		state3 := core.State{
+			ID:          "0x0334567890123456789012345678901234567890123456789012345678901234",
+			Asset:       "USDC",
+			UserWallet:  "0x0334567890123456789012345678901234567890",
+			Epoch:       1,
+			Version:     1,
+			Transitions: []core.Transition{},
+			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(300)},
+		}
+
+		require.NoError(t, store.StoreUserState(state1))
+		require.NoError(t, store.StoreUserState(state2))
+		require.NoError(t, store.StoreUserState(state3))
+
+		require.NoError(t, store.ScheduleCheckpoint(state1.ID))
+		require.NoError(t, store.ScheduleCheckpoint(state2.ID))
+		require.NoError(t, store.ScheduleCheckpoint(state3.ID))
+
+		// Get action IDs
+		var action1, action2 BlockchainAction
+		require.NoError(t, db.Where("state_id = ?", state1.ID).First(&action1).Error)
+		require.NoError(t, db.Where("state_id = ?", state2.ID).First(&action2).Error)
+
+		// Mark first as completed and second as failed
+		require.NoError(t, store.Complete(action1.ID, "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"))
+		require.NoError(t, store.Fail(action2.ID, "some error"))
+
+		// Get pending actions - should only return the third one
+		actions, err := store.GetActions(0)
+		require.NoError(t, err)
+
+		assert.Len(t, actions, 1)
+		assert.Equal(t, state3.ID, actions[0].StateID)
+		assert.Equal(t, BlockchainActionStatusPending, actions[0].Status)
+	})
+
+	t.Run("Success - Empty result when no pending actions", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		actions, err := store.GetActions(0)
+		require.NoError(t, err)
+
+		assert.Empty(t, actions)
+	})
 }

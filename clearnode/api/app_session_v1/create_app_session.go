@@ -117,7 +117,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 	resp := rpc.AppSessionsV1CreateAppSessionResponse{
 		AppSessionID: appSessionID,
 		Version:      fmt.Sprintf("%d", appSession.Version),
-		IsClosed:     false,
+		Status:       app.AppSessionStatusOpen.String(),
 	}
 
 	payload, err := rpc.NewPayload(resp)

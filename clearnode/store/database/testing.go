@@ -27,7 +27,6 @@ func SetupTestDB(t testing.TB) (*gorm.DB, func()) {
 
 	switch os.Getenv("TEST_DB_DRIVER") {
 	case "postgres":
-		log.Println("Using PostgreSQL for testing")
 		var pgContainer testcontainers.Container
 		database, pgContainer = setupTestPostgres(ctx, t)
 		cleanup = func() {
@@ -38,7 +37,6 @@ func SetupTestDB(t testing.TB) (*gorm.DB, func()) {
 			}
 		}
 	default:
-		log.Println("Using SQLite for testing (default)")
 		database = setupTestSqlite(t)
 		cleanup = func() {}
 	}
@@ -56,7 +54,7 @@ func setupTestSqlite(t testing.TB) *gorm.DB {
 		t.Fatalf("Failed to open SQLite database: %v", err)
 	}
 
-	err = database.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &ContractEvent{}, &LedgerTransaction{}, &BlockchainAction{}, &SessionKey{})
+	err = database.AutoMigrate(&AppLedgerEntryV1{}, &AppSessionV1{}, &AppParticipantV1{}, &BlockchainAction{}, &Channel{}, &ContractEvent{}, &SessionKey{}, &State{}, &Transaction{})
 	if err != nil {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
@@ -101,7 +99,7 @@ func setupTestPostgres(ctx context.Context, t testing.TB) (*gorm.DB, testcontain
 		t.Fatalf("Failed to open PostgreSQL database: %v", err)
 	}
 
-	err = database.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &ContractEvent{}, &LedgerTransaction{}, &BlockchainAction{}, &SessionKey{})
+	err = database.AutoMigrate(&AppLedgerEntryV1{}, &Channel{}, &AppSessionV1{}, &ContractEvent{}, &Transaction{}, &BlockchainAction{}, &SessionKey{})
 	if err != nil {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}

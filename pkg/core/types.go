@@ -27,36 +27,34 @@ var (
 type Channel struct {
 	ChannelID          string        `json:"channel_id"`                     // Unique identifier for the channel
 	UserWallet         string        `json:"user_wallet"`                    // User wallet address
-	NodeWallet         string        `json:"node_wallet"`                    // Node wallet address
 	Type               ChannelType   `json:"type"`                           // Type of the channel (home, escrow)
-	BlockchainID       uint32        `json:"blockchain_id"`                  // Unique identifier for the blockchain
+	BlockchainID       uint64        `json:"blockchain_id"`                  // Unique identifier for the blockchain
 	TokenAddress       string        `json:"token_address"`                  // Address of the token used in the channel
-	Challenge          uint64        `json:"challenge"`                      // Challenge period for the channel in seconds
+	ChallengeDuration  uint32        `json:"challenge_duration"`             // Challenge period for the channel in seconds
 	ChallengeExpiresAt *time.Time    `json:"challenge_expires_at,omitempty"` // Timestamp when the challenge period elapses
 	Nonce              uint64        `json:"nonce"`                          // Nonce for the channel
 	Status             ChannelStatus `json:"status"`                         // Current status of the channel (void, open, challenged, closed)
 	StateVersion       uint64        `json:"state_version"`                  // On-chain state version of the channel
 }
 
-func NewChannel(channelID, userWallet, nodeWallet string, ChType ChannelType, blockchainID uint32, tokenAddress string, nonce, challenge uint64) *Channel {
+func NewChannel(channelID, userWallet string, ChType ChannelType, blockchainID uint64, tokenAddress string, nonce uint64, challenge uint32) *Channel {
 	return &Channel{
-		ChannelID:    channelID,
-		UserWallet:   userWallet,
-		NodeWallet:   nodeWallet,
-		Type:         ChType,
-		BlockchainID: blockchainID,
-		TokenAddress: tokenAddress,
-		Nonce:        nonce,
-		Challenge:    challenge,
-		Status:       ChannelStatusVoid,
-		StateVersion: 0,
+		ChannelID:         channelID,
+		UserWallet:        userWallet,
+		Type:              ChType,
+		BlockchainID:      blockchainID,
+		TokenAddress:      tokenAddress,
+		Nonce:             nonce,
+		ChallengeDuration: challenge,
+		Status:            ChannelStatusVoid,
+		StateVersion:      0,
 	}
 }
 
 // ChannelDefinition represents configuration for creating a channel
 type ChannelDefinition struct {
 	Nonce     uint64 `json:"nonce"`     // A unique number to prevent replay attacks
-	Challenge uint64 `json:"challenge"` // Challenge period for the channel in seconds
+	Challenge uint32 `json:"challenge"` // Challenge period for the channel in seconds
 }
 
 // State represents the current state of the user stored on Node
@@ -276,7 +274,7 @@ func (state *State) ApplyReleaseTransition(accountID string, amount decimal.Deci
 	return *newTransition, nil
 }
 
-func (state *State) ApplyMutualLockTransition(blockchainID uint32, tokenAddress string, amount decimal.Decimal) (Transition, error) {
+func (state *State) ApplyMutualLockTransition(blockchainID uint64, tokenAddress string, amount decimal.Decimal) (Transition, error) {
 	if state.HomeChannelID == nil {
 		return Transition{}, fmt.Errorf("missing home channel ID")
 	}
@@ -343,7 +341,7 @@ func (state *State) ApplyEscrowDepositTransition(amount decimal.Decimal) (Transi
 	return *newTransition, nil
 }
 
-func (state *State) ApplyEscrowLockTransition(blockchainID uint32, tokenAddress string, amount decimal.Decimal) (Transition, error) {
+func (state *State) ApplyEscrowLockTransition(blockchainID uint64, tokenAddress string, amount decimal.Decimal) (Transition, error) {
 	if state.HomeChannelID == nil {
 		return Transition{}, fmt.Errorf("missing home channel ID")
 	}
@@ -435,7 +433,7 @@ func (state *State) ApplyFinalizeTransition() (Transition, error) {
 // Ledger represents ledger balances
 type Ledger struct {
 	TokenAddress string          `json:"token_address"` // Address of the token used in this channel
-	BlockchainID uint32          `json:"blockchain_id"` // Unique identifier for the blockchain
+	BlockchainID uint64          `json:"blockchain_id"` // Unique identifier for the blockchain
 	UserBalance  decimal.Decimal `json:"user_balance"`  // User balance in the channel
 	UserNetFlow  decimal.Decimal `json:"user_net_flow"` // User net flow in the channel
 	NodeBalance  decimal.Decimal `json:"node_balance"`  // Node balance in the channel
@@ -709,23 +707,23 @@ func NewTransactionFromTransition(senderState *State, receiverState *State, tran
 type TransitionType uint8
 
 const (
-	TransitionTypeHomeDeposit    = 10 // AccountID: HomeChannelID
-	TransitionTypeHomeWithdrawal = 11 // AccountID: HomeChannelID
+	TransitionTypeHomeDeposit    TransitionType = 10 // AccountID: HomeChannelID
+	TransitionTypeHomeWithdrawal TransitionType = 11 // AccountID: HomeChannelID
 
-	TransitionTypeEscrowDeposit  = 20 // AccountID: EscrowChannelID
-	TransitionTypeEscrowWithdraw = 21 // AccountID: EscrowChannelID
+	TransitionTypeEscrowDeposit  TransitionType = 20 // AccountID: EscrowChannelID
+	TransitionTypeEscrowWithdraw TransitionType = 21 // AccountID: EscrowChannelID
 
 	TransitionTypeTransferSend    TransitionType = 30 // AccountID: Receiver's UserWallet
 	TransitionTypeTransferReceive TransitionType = 31 // AccountID: Sender's UserWallet
 
-	TransitionTypeCommit  = 40 // AccountID: AppSessionID
-	TransitionTypeRelease = 41 // AccountID: AppSessionID
+	TransitionTypeCommit  TransitionType = 40 // AccountID: AppSessionID
+	TransitionTypeRelease TransitionType = 41 // AccountID: AppSessionID
 
-	TransitionTypeMigrate    = 100 // AccountID: EscrowChannelID
-	TransitionTypeEscrowLock = 110 // AccountID: EscrowChannelID
-	TransitionTypeMutualLock = 120 // AccountID: EscrowChannelID
+	TransitionTypeMigrate    TransitionType = 100 // AccountID: EscrowChannelID
+	TransitionTypeEscrowLock TransitionType = 110 // AccountID: EscrowChannelID
+	TransitionTypeMutualLock TransitionType = 120 // AccountID: EscrowChannelID
 
-	TransitionTypeFinalize = 200
+	TransitionTypeFinalize TransitionType = 200 // AccountID: HomeChannelID
 )
 
 // String returns the human-readable name of the transition type
@@ -818,7 +816,7 @@ func (t1 Transition) Equal(t2 Transition) error {
 // Blockchain represents information about a supported blockchain network
 type Blockchain struct {
 	Name            string `json:"name"`             // Blockchain name
-	ID              uint32 `json:"id"`               // Blockchain network ID
+	ID              uint64 `json:"id"`               // Blockchain network ID
 	ContractAddress string `json:"contract_address"` // Address of the main contract on this blockchain
 }
 
@@ -835,7 +833,7 @@ type Token struct {
 	Name         string `json:"name"`          // Token name
 	Symbol       string `json:"symbol"`        // Token symbol
 	Address      string `json:"address"`       // Token contract address
-	BlockchainID uint32 `json:"blockchain_id"` // Blockchain network ID
+	BlockchainID uint64 `json:"blockchain_id"` // Blockchain network ID
 	Decimals     uint8  `json:"decimals"`      // Number of decimal places
 }
 
@@ -896,6 +894,23 @@ type PaginationParams struct {
 	Offset *uint32
 	Limit  *uint32
 	Sort   *string
+}
+
+// GetOffsetAndLimit extracts offset and limit from pagination params with defaults and max limit enforcement.
+func (p *PaginationParams) GetOffsetAndLimit(defaultLimit, maxLimit uint32) (offset, limit uint32) {
+	offset = 0
+	limit = defaultLimit
+
+	if p != nil {
+		if p.Offset != nil {
+			offset = *p.Offset
+		}
+		if p.Limit != nil {
+			limit = min(*p.Limit, maxLimit)
+		}
+	}
+
+	return offset, limit
 }
 
 // PaginationMetadata contains pagination information for list responses.

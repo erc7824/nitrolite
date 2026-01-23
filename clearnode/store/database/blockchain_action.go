@@ -1,39 +1,39 @@
 package database
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/erc7824/nitrolite/pkg/sign"
-	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-type BlockchainActionType string
-type BlockchainActionStatus string
+type BlockchainActionType uint8
 
 const (
-	ActionTypeCheckpoint BlockchainActionType = "checkpoint"
+	ActionTypeCheckpoint               BlockchainActionType = 1
+	ActionTypeInitiateEscrowWithdrawal BlockchainActionType = 21
+	ActionTypeFinalizeEscrowDeposit    BlockchainActionType = 12
+	ActionTypeFinalizeEscrowWithdrawal BlockchainActionType = 22
 )
 
+type BlockchainActionStatus uint8
+
 const (
-	StatusPending   BlockchainActionStatus = "pending"
-	StatusCompleted BlockchainActionStatus = "completed"
-	StatusFailed    BlockchainActionStatus = "failed"
+	BlockchainActionStatusPending BlockchainActionStatus = iota
+	BlockchainActionStatusCompleted
+	BlockchainActionStatusFailed
 )
 
 type BlockchainAction struct {
 	ID        int64                  `gorm:"primary_key"`
 	Type      BlockchainActionType   `gorm:"column:action_type;not null"`
-	ChannelID common.Hash            `gorm:"column:channel_id;not null"`
-	ChainID   uint32                 `gorm:"column:chain_id;not null"`
-	Data      datatypes.JSON         `gorm:"column:action_data;type:text;not null"`
+	StateID   string                 `gorm:"column:state_id;size:66"`
+	Data      datatypes.JSON         `gorm:"column:action_data;type:text"`
 	Status    BlockchainActionStatus `gorm:"column:status;not null"`
-	Retries   int                    `gorm:"column:retry_count;default:0"`
+	Retries   uint8                  `gorm:"column:retry_count;default:0"`
 	Error     string                 `gorm:"column:last_error;type:text"`
-	TxHash    common.Hash            `gorm:"column:transaction_hash"`
+	TxHash    string                 `gorm:"column:transaction_hash;size:66"`
 	CreatedAt time.Time              `gorm:"column:created_at"`
 	UpdatedAt time.Time              `gorm:"column:updated_at"`
 }
@@ -42,78 +42,84 @@ func (BlockchainAction) TableName() string {
 	return "blockchain_actions"
 }
 
-// Type alias for signature compatibility
-type Signature = sign.Signature
-
-type CheckpointData struct {
-	State     UnsignedState `json:"state"`
-	UserSig   Signature     `json:"user_sig"`
-	ServerSig Signature     `json:"server_sig"`
+// ScheduleCheckpoint queues a blockchain action to checkpoint a state on home blockchain.
+func (s *DBStore) ScheduleCheckpoint(stateID string) error {
+	return s.scheduleStateEnforcement(stateID, ActionTypeCheckpoint)
 }
 
-func ScheduleCheckpoint(tx *gorm.DB, channel common.Hash, chainID uint32, state UnsignedState, userSig, serverSig Signature) error {
-	data := CheckpointData{
-		State:     state,
-		UserSig:   userSig,
-		ServerSig: serverSig,
-	}
+// ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate withdrawal on non-home blockchain.
+func (s *DBStore) ScheduleInitiateEscrowWithdrawal(stateID string) error {
+	return s.scheduleStateEnforcement(stateID, ActionTypeInitiateEscrowWithdrawal)
+}
 
-	bytes, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("marshal checkpoint data: %w", err)
-	}
+// ScheduleFinalizeEscrowDeposit schedules a finalize for an escrow deposit operation on non-home blockchain.
+func (s *DBStore) ScheduleFinalizeEscrowDeposit(stateID string) error {
+	return s.scheduleStateEnforcement(stateID, ActionTypeFinalizeEscrowDeposit)
+}
 
+// ScheduleFinalizeEscrowWithdrawal schedules a finalize for an escrow withdrawal operation on non-home blockchain.
+func (s *DBStore) ScheduleFinalizeEscrowWithdrawal(stateID string) error {
+	return s.scheduleStateEnforcement(stateID, ActionTypeFinalizeEscrowWithdrawal)
+}
+
+// scheduleStateEnforcement is a helper to create a blockchain action for state enforcement.
+func (s *DBStore) scheduleStateEnforcement(stateID string, actionType BlockchainActionType) error {
 	action := &BlockchainAction{
-		Type:      ActionTypeCheckpoint,
-		ChannelID: channel,
-		ChainID:   chainID,
-		Data:      bytes,
-		Status:    StatusPending,
+		Type:      actionType,
+		StateID:   stateID,
+		Status:    BlockchainActionStatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
 
-	return tx.Create(action).Error
+	return s.db.Create(action).Error
 }
 
-func (a *BlockchainAction) Fail(tx *gorm.DB, err string) error {
-	a.Status = StatusFailed
-	a.Error = err
-	a.Retries++
-	a.UpdatedAt = time.Now()
-	return tx.Save(a).Error
+func (s *DBStore) Fail(actionID int64, err string) error {
+	return s.updateAction(actionID, BlockchainActionStatusFailed, "", err, true)
 }
 
-func (a *BlockchainAction) FailNoRetry(tx *gorm.DB, err string) error {
-	a.Status = StatusFailed
-	a.Error = err
-	a.UpdatedAt = time.Now()
-	return tx.Save(a).Error
+func (s *DBStore) FailNoRetry(actionID int64, err string) error {
+	return s.updateAction(actionID, BlockchainActionStatusFailed, "", err, false)
 }
 
-func (a *BlockchainAction) RecordAttempt(tx *gorm.DB, attemptErr string) error {
-	a.Retries++
-	a.Error = attemptErr
-	a.UpdatedAt = time.Now()
-	return tx.Save(a).Error
+func (s *DBStore) RecordAttempt(actionID int64, err string) error {
+	return s.updateAction(actionID, BlockchainActionStatusPending, "", err, true)
 }
 
-func (a *BlockchainAction) Complete(tx *gorm.DB, txHash common.Hash) error {
-	a.Status = StatusCompleted
-	a.TxHash = txHash
-	a.Error = ""
-	a.UpdatedAt = time.Now()
-	return tx.Save(a).Error
+func (s *DBStore) Complete(actionID int64, txHash string) error {
+	return s.updateAction(actionID, BlockchainActionStatusCompleted, txHash, "", false)
 }
 
-func GetActionsForChain(db *gorm.DB, chainID uint32, limit int) ([]BlockchainAction, error) {
+func (s *DBStore) updateAction(actionID int64, status BlockchainActionStatus, txHash, err string, increaseRetryCounter bool) error {
+	updates := map[string]any{
+		"status":     status,
+		"last_error": err,
+		"updated_at": time.Now(),
+	}
+
+	if txHash != "" {
+		updates["transaction_hash"] = txHash
+	}
+	if increaseRetryCounter {
+		updates["retry_count"] = gorm.Expr("retry_count + ?", 1)
+	}
+
+	if err := s.db.Model(&BlockchainAction{}).Where("id = ?", actionID).Updates(updates).Error; err != nil {
+		return fmt.Errorf("failed to update blockchain action: %w", err)
+	}
+
+	return nil
+}
+
+func (s *DBStore) GetActions(limit uint8) ([]BlockchainAction, error) {
 	var actions []BlockchainAction
-	query := db.Where("status = ? AND chain_id = ?", StatusPending, chainID).Order("created_at ASC")
+	query := s.db.Where("status = ?", BlockchainActionStatusPending).Order("created_at ASC")
 	if limit > 0 {
-		query = query.Limit(limit)
+		query = query.Limit(int(limit))
 	}
 	if err := query.Find(&actions).Error; err != nil {
-		return nil, fmt.Errorf("query pending actions for chain %d: %w", chainID, err)
+		return nil, fmt.Errorf("failed to get blockchain actions: %w", err)
 	}
 	return actions, nil
 }

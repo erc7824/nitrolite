@@ -1,4 +1,4 @@
-package node_v1
+package memory
 
 import (
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -13,4 +13,13 @@ type MemoryStore interface {
 	// GetAssets retrieves the list of supported assets.
 	// If blockchainID is provided, filters assets to only include tokens on that blockchain.
 	GetAssets(blockchainID *uint64) ([]core.Asset, error)
+
+	// IsAssetSupported checks if a given asset (token) is supported on the specified blockchain.
+	IsAssetSupported(asset, tokenAddress string, blockchainID uint64) (bool, error)
+
+	// GetAssetDecimals checks if an asset exists and returns its decimals in YN
+	GetAssetDecimals(asset string) (uint8, error)
+
+	// GetTokenDecimals returns the decimals for a token on a specific blockchain
+	GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error)
 }

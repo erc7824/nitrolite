@@ -19,7 +19,7 @@ func (m *MockMemoryStore) GetBlockchains() ([]core.Blockchain, error) {
 	return args.Get(0).([]core.Blockchain), args.Error(1)
 }
 
-func (m *MockMemoryStore) GetAssets(blockchainID *uint32) ([]core.Asset, error) {
+func (m *MockMemoryStore) GetAssets(blockchainID *uint64) ([]core.Asset, error) {
 	args := m.Called(blockchainID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

@@ -70,7 +70,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		homeChannelID, err := core.GetHomeChannelID(
 			h.nodeAddress,
 			incomingState.UserWallet,
-			incomingState.HomeLedger.TokenAddress,
+			incomingState.Asset,
 			channelDef.Nonce,
 			channelDef.Challenge,
 		)
@@ -127,7 +127,6 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		newHomeChannel := core.NewChannel(
 			homeChannelID,
 			incomingState.UserWallet,
-			h.nodeAddress,
 			core.ChannelTypeHome,
 			incomingState.HomeLedger.BlockchainID,
 			incomingState.HomeLedger.TokenAddress,

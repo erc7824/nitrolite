@@ -29,8 +29,7 @@ type Store interface {
 
 	// EnsureNoOngoingStateTransitions validates that no blockchain operations are pending
 	// that would conflict with submitting a new state transition.
-	// See implementation notes below for validation rules by transition type.
-	EnsureNoOngoingStateTransitions(wallet, asset string) error
+	EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error
 
 	// ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate
 	// withdrawal from an escrow channel (triggered by escrow_lock transition).
@@ -54,23 +53,6 @@ type Store interface {
 	GetActiveHomeChannel(wallet, asset string) (*core.Channel, error)
 }
 
-// EnsureNoOngoingStateTransitions Implementation Notes
-// -----------------------------------------------------
-// This method prevents race conditions by ensuring blockchain state versions
-// match the user's last signed state version before accepting new transitions.
-//
-// Validation logic by transition type:
-//   - home_deposit: Verify last_state.version == home_channel.state_version
-//   - mutual_lock: Verify last_state.version == home_channel.state_version == escrow_channel.state_version
-//                  AND next transition must be escrow_deposit
-//   - escrow_lock: Verify last_state.version == escrow_channel.state_version
-//                  AND next transition must be escrow_withdraw or migrate
-//   - escrow_withdraw: Verify last_state.version == escrow_channel.state_version
-//   - migrate: Verify last_state.version == home_channel.state_version
-//
-// For channel creation: Verify home_channel.state_version != 0
-// TODO: Consider challenged channels
-
 // SigValidator validates cryptographic signatures on state transitions.
 type SigValidator interface {
 	// Verify checks that the signature is valid for the given data and wallet address.
@@ -87,11 +69,11 @@ const EcdsaSigValidatorType SigValidatorType = "ecdsa"
 
 type MemoryStore interface {
 	// IsAssetSupported checks if a given asset (token) is supported on the specified blockchain.
-	IsAssetSupported(asset, tokenAddress string, blockchainID uint32) (bool, error)
+	IsAssetSupported(asset, tokenAddress string, blockchainID uint64) (bool, error)
 
 	// GetAssetDecimals checks if an asset exists and returns its decimals in YN
 	GetAssetDecimals(asset string) (uint8, error)
 
 	// GetTokenDecimals returns the decimals for a token on a specific blockchain
-	GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error)
+	GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error)
 }

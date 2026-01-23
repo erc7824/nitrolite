@@ -468,27 +468,27 @@ All functions accept the same intents (INITIATE_MIGRATION or FINALIZE_MIGRATION)
 
 **2. Selective State Swapping (only where needed):**
 
-* **`INITIATE_MIGRATION_IN`**: Swap `homeState` ↔ `nonHomeState` before storing
+* **`INITIATE_MIGRATION` (on new home chain)**: Swap `homeState` ↔ `nonHomeState` before storing
   * Incoming state has actions in `nonHomeState` (new home = current chain)
   * After swap, stored state has actions in `homeState` (current chain)
   * Result: Next operation calculates deltas correctly from `homeState`
 
-* **`FINALIZE_MIGRATION_OUT`**: Swap `homeState` ↔ `nonHomeState` before validation
+* **`FINALIZE_MIGRATION` (on old home chain)**: Swap `homeState` ↔ `nonHomeState` before validation
   * Incoming state (after user swaps) has old home actions in `nonHomeState` (current chain)
   * After swap, validation sees actions in `homeState` (current chain)
   * Result: Validation and fund release logic work correctly
 
-* **No swap needed** for `INITIATE_MIGRATION_OUT` and `FINALIZE_MIGRATION_IN` (homeState already represents current chain)
+* **No swap needed** for `INITIATE_MIGRATION` (on old home chain) and `FINALIZE_MIGRATION` (on new home chain) (homeState already represents current chain)
 
-**3. Special Delta Calculation for `FINALIZE_MIGRATION_IN`:**
+**3. Special Delta Calculation for `FINALIZE_MIGRATION` (on new home chain):**
 
-When finalizing migration on the new home chain, the previous state (from `INITIATE_MIGRATION_IN`) has allocations in `nonHomeState` (before swap) but was swapped when stored. Delta calculation must account for this:
+When finalizing migration on the new home chain, the previous state (from `INITIATE_MIGRATION`) has allocations in `nonHomeState` (before swap) but was swapped when stored. Delta calculation must account for this:
 
 ```solidity
 delta = candidate.homeState.netFlow - prevStoredState.homeState.netFlow
 ```
 
-This works because `prevStoredState` was swapped during `INITIATE_MIGRATION_IN`.
+This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
 
 #### Implementation Notes
 

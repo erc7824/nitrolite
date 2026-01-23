@@ -13,9 +13,9 @@ type Channel struct {
 	ChannelID          string             `gorm:"column:channel_id;primaryKey;"`
 	UserWallet         string             `gorm:"column:user_wallet;not null"`
 	Type               core.ChannelType   `gorm:"column:type;not null"`
-	BlockchainID       uint32             `gorm:"column:blockchain_id;not null"`
+	BlockchainID       uint64             `gorm:"column:blockchain_id;not null"`
 	Token              string             `gorm:"column:token;not null"`
-	ChallengeDuration  uint64             `gorm:"column:challenge_duration;not null"`
+	ChallengeDuration  uint32             `gorm:"column:challenge_duration;not null"`
 	ChallengeExpiresAt *time.Time         `gorm:"column:challenge_expires_at;default:null"`
 	Nonce              uint64             `gorm:"column:nonce;not null;"`
 	Status             core.ChannelStatus `gorm:"column:status;not null;"`

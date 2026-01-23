@@ -63,8 +63,8 @@ func TestDBStore_StoreUserState(t *testing.T) {
 		assert.Equal(t, uint64(1), dbState.Epoch)
 		assert.Equal(t, uint64(1), dbState.Version)
 		assert.Equal(t, &homeChannelID, dbState.HomeChannelID)
-		assert.Equal(t, decimal.NewFromInt(1000), dbState.HomeUserBalance)
-		assert.Equal(t, int64(1000), dbState.HomeUserNetFlow)
+		assert.True(t, dbState.HomeUserBalance.Equal(decimal.NewFromInt(1000)))
+		assert.True(t, dbState.HomeUserNetFlow.Equal(decimal.NewFromInt(1000)))
 		assert.NotNil(t, dbState.UserSig)
 		assert.NotNil(t, dbState.NodeSig)
 	})
@@ -121,8 +121,8 @@ func TestDBStore_StoreUserState(t *testing.T) {
 
 		assert.Equal(t, "state456", dbState.ID)
 		assert.Equal(t, &escrowChannelID, dbState.EscrowChannelID)
-		assert.Equal(t, decimal.NewFromInt(500), dbState.EscrowUserBalance)
-		assert.Equal(t, int64(500), dbState.EscrowUserNetFlow)
+		assert.True(t, dbState.EscrowUserBalance.Equal(decimal.NewFromInt(500)))
+		assert.True(t, dbState.EscrowUserNetFlow.Equal(decimal.NewFromInt(500)))
 	})
 
 	t.Run("Error - Duplicate state ID", func(t *testing.T) {

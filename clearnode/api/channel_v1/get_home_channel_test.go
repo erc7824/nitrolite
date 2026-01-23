@@ -18,7 +18,7 @@ func TestGetHomeChannel_Success(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
-	minChallenge := uint64(3600)
+	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
@@ -91,7 +91,7 @@ func TestGetHomeChannel_Success(t *testing.T) {
 	assert.Equal(t, homeChannelID, response.Channel.ChannelID)
 	assert.Equal(t, userWallet, response.Channel.UserWallet)
 	assert.Equal(t, "home", response.Channel.Type)
-	assert.Equal(t, uint32(1), response.Channel.BlockchainID)
+	assert.Equal(t, uint64(1), response.Channel.BlockchainID)
 	assert.Equal(t, "open", response.Channel.Status)
 
 	// Verify all mock expectations
@@ -105,7 +105,7 @@ func TestGetHomeChannel_NotFound(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
-	minChallenge := uint64(3600)
+	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{

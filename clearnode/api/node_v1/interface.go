@@ -12,5 +12,5 @@ type MemoryStore interface {
 
 	// GetAssets retrieves the list of supported assets.
 	// If blockchainID is provided, filters assets to only include tokens on that blockchain.
-	GetAssets(blockchainID *uint32) ([]core.Asset, error)
+	GetAssets(blockchainID *uint64) ([]core.Asset, error)
 }

@@ -87,5 +87,5 @@ type AssetStore interface {
 	GetAssetDecimals(asset string) (uint8, error)
 
 	// GetTokenDecimals returns the decimals for a token on a specific blockchain
-	GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error)
+	GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error)
 }

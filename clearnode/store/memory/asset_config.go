@@ -46,7 +46,7 @@ type TokenConfig struct {
 	// If empty, it will inherit from the parent asset's Symbol
 	Symbol string `yaml:"symbol"`
 	// BlockchainID is the chain ID where this token is deployed
-	BlockchainID uint32 `yaml:"blockchain_id"`
+	BlockchainID uint64 `yaml:"blockchain_id"`
 	// Disabled determines if this token should be processed
 	Disabled bool `yaml:"disabled"`
 	// Address is the token's contract address on the blockchain

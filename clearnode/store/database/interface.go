@@ -62,17 +62,20 @@ type DatabaseStore interface {
 	EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error
 
 	// ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate withdrawal.
+	// This queues the state to be submitted on-chain to initiate an escrow withdrawal.
 	ScheduleInitiateEscrowWithdrawal(stateID string) error
 
+	// ScheduleCheckpoint schedules a checkpoint operation for a home channel state.
+	// This queues the state to be submitted on-chain to update the channel's on-chain state.
 	ScheduleCheckpoint(stateID string) error
 
-	// ScheduleCheckpointEscrowDeposit schedules a checkpoint for an escrow deposit operation.
+	// ScheduleFinalizeEscrowDeposit schedules a checkpoint for an escrow deposit operation.
 	// This queues the state to be submitted on-chain to finalize an escrow deposit.
-	ScheduleCheckpointEscrowDeposit(stateID string) error
+	ScheduleFinalizeEscrowDeposit(stateID string) error
 
-	// ScheduleCheckpointEscrowWithdrawal schedules a checkpoint for an escrow withdrawal operation.
+	// ScheduleFinalizeEscrowWithdrawal schedules a checkpoint for an escrow withdrawal operation.
 	// This queues the state to be submitted on-chain to finalize an escrow withdrawal.
-	ScheduleCheckpointEscrowWithdrawal(stateID string) error
+	ScheduleFinalizeEscrowWithdrawal(stateID string) error
 
 	// --- App Session Operations ---
 

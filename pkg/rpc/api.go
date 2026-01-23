@@ -141,8 +141,6 @@ type AppSessionsV1SubmitDepositStateRequest struct {
 	AppStateUpdate AppStateUpdateV1 `json:"app_state_update"`
 	// AppStateSignatures is the list of participant signatures for the app state update
 	AppStateSignatures []string `json:"app_state_signatures"`
-	// SigQuorum is the signature quorum for the application session
-	SigQuorum uint64 `json:"sig_quorum"`
 	// UserState is the user state associated with the application session update
 	UserState StateV1 `json:"user_state"`
 }
@@ -215,8 +213,8 @@ type AppSessionsV1CreateAppSessionResponse struct {
 	AppSessionID string `json:"app_session_id"`
 	// Version is the initial version of the session
 	Version string `json:"version"`
-	// IsClosed is the status of the session (open)
-	IsClosed bool `json:"is_closed"`
+	// Status is the status of the session (closed)
+	Status string `json:"status"`
 }
 
 // AppSessionsV1CloseAppSessionRequest closes an application session and redistributes funds.
@@ -352,8 +350,8 @@ type NodeV1GetConfigResponse struct {
 
 // NodeV1GetAssetsRequest retrieves all supported assets with optional chain filter.
 type NodeV1GetAssetsRequest struct {
-	// ChainID filters by blockchain network ID
-	ChainID *uint32 `json:"chain_id,omitempty"`
+	// BlockchainID filters by blockchain network ID
+	BlockchainID *uint64 `json:"blockchain_id,omitempty"`
 }
 
 // NodeV1GetAssetsResponse returns the list of supported assets.

@@ -196,7 +196,7 @@ func mapAppSessionInfoV1(session app.AppSessionV1, allocations map[string]map[st
 		Status:       session.Status.String(),
 		Participants: participants,
 		SessionData:  sessionData,
-		Quorum:       uint64(session.Quorum),
+		Quorum:       session.Quorum,
 		Version:      session.Version,
 		Nonce:        session.Nonce,
 		Allocations:  rpcAllocations,

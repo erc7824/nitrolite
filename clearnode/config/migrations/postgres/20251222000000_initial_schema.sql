@@ -141,10 +141,10 @@ CREATE INDEX idx_contract_events_block ON contract_events(chain_id, block_number
 -- Blockchain actions table: Pending blockchain operations
 CREATE TABLE blockchain_actions (
     id BIGSERIAL PRIMARY KEY,
-    action_type VARCHAR(50) NOT NULL,
+    action_type SMALLINT NOT NULL,
     state_id CHAR(66) NOT NULL,
     action_data TEXT NOT NULL, -- JSON
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    status SMALLINT NOT NULL DEFAULT 0,
     retry_count INTEGER NOT NULL DEFAULT 0,
     last_error TEXT,
     transaction_hash CHAR(66),

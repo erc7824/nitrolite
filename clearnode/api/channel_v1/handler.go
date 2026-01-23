@@ -20,7 +20,7 @@ type Handler struct {
 	signer        sign.Signer
 	sigValidators map[SigValidatorType]SigValidator
 	nodeAddress   string // Node's wallet address for channel ID calculation
-	minChallenge  uint64
+	minChallenge  uint32
 }
 
 // NewHandler creates a new Handler instance with the provided dependencies.
@@ -31,7 +31,7 @@ func NewHandler(
 	signer sign.Signer,
 	sigValidators map[SigValidatorType]SigValidator,
 	nodeAddress string,
-	minChallenge uint64,
+	minChallenge uint32,
 ) *Handler {
 	return &Handler{
 		stateAdvancer: core.NewStateAdvancerV1(memoryStore),

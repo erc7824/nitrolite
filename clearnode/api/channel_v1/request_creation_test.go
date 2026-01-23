@@ -22,7 +22,7 @@ func TestRequestCreation_Success(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
-	minChallenge := uint64(3600) // 1 hour
+	minChallenge := uint32(3600) // 1 hour
 	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
@@ -48,9 +48,9 @@ func TestRequestCreation_Success(t *testing.T) {
 	userWallet := "0x1234567890123456789012345678901234567890"
 	asset := "USDC"
 	tokenAddress := "0xTokenAddress"
-	blockchainID := uint32(1)
+	blockchainID := uint64(1)
 	nonce := uint64(12345)
-	challenge := uint64(86400)
+	challenge := uint32(86400)
 	depositAmount := decimal.NewFromInt(1000)
 
 	// Create void state (starting point)
@@ -63,7 +63,7 @@ func TestRequestCreation_Success(t *testing.T) {
 	homeChannelID, err := core.GetHomeChannelID(
 		nodeAddress,
 		userWallet,
-		tokenAddress,
+		asset,
 		nonce,
 		challenge,
 	)
@@ -124,8 +124,8 @@ func TestRequestCreation_Success(t *testing.T) {
 	reqPayload := rpc.ChannelsV1RequestCreationRequest{
 		State: rpcState,
 		ChannelDefinition: rpc.ChannelDefinitionV1{
-			Nonce:     decimal.NewFromInt(int64(nonce)).String(),
-			Challenge: decimal.NewFromInt(int64(challenge)).String(),
+			Nonce:     nonce,
+			Challenge: challenge,
 		},
 	}
 
@@ -176,7 +176,7 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
-	minChallenge := uint64(3600) // 1 hour
+	minChallenge := uint32(3600) // 1 hour
 	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
@@ -199,19 +199,19 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 	asset := "USDC"
 	tokenAddress := "0xToken"
 	nonce := uint64(12345)
-	lowChallenge := uint64(1800) // 30 minutes - below minimum
+	lowChallenge := uint32(1800) // 30 minutes - below minimum
 
 	// Calculate home channel ID
 	homeChannelID, err := core.GetHomeChannelID(
 		nodeAddress,
 		userWallet,
-		tokenAddress,
+		asset,
 		nonce,
 		lowChallenge,
 	)
 	require.NoError(t, err)
 
-	mockMemoryStore.On("IsAssetSupported", asset, tokenAddress, uint32(1)).Return(true, nil).Once()
+	mockMemoryStore.On("IsAssetSupported", asset, tokenAddress, uint64(1)).Return(true, nil).Once()
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil).Once()
 
 	// Create RPC request with challenge below minimum
@@ -234,8 +234,8 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 			IsFinal: false,
 		},
 		ChannelDefinition: rpc.ChannelDefinitionV1{
-			Nonce:     decimal.NewFromInt(int64(nonce)).String(),
-			Challenge: decimal.NewFromInt(int64(lowChallenge)).String(),
+			Nonce:     nonce,
+			Challenge: lowChallenge,
 		},
 	}
 

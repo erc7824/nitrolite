@@ -18,7 +18,7 @@ func TestGetEscrowChannel_Success(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
-	minChallenge := uint64(3600)
+	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
@@ -89,7 +89,7 @@ func TestGetEscrowChannel_Success(t *testing.T) {
 	assert.Equal(t, escrowChannelID, response.Channel.ChannelID)
 	assert.Equal(t, userWallet, response.Channel.UserWallet)
 	assert.Equal(t, "escrow", response.Channel.Type)
-	assert.Equal(t, uint32(2), response.Channel.BlockchainID)
+	assert.Equal(t, uint64(2), response.Channel.BlockchainID)
 	assert.Equal(t, "open", response.Channel.Status)
 
 	// Verify all mock expectations

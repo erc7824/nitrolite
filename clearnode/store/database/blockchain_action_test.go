@@ -79,7 +79,7 @@ func TestBlockchainAction_Fail(t *testing.T) {
 		StateID: stateId,
 		// ChainID:   1,
 		Data:      []byte{1},
-		Status:    StatusPending,
+		Status:    BlockchainActionStatusPending,
 		Retries:   2,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -89,14 +89,14 @@ func TestBlockchainAction_Fail(t *testing.T) {
 	err := action.Fail(db, "test error")
 	require.NoError(t, err)
 
-	assert.Equal(t, StatusFailed, action.Status)
+	assert.Equal(t, BlockchainActionStatusFailed, action.Status)
 	assert.Equal(t, "test error", action.Error)
 	assert.Equal(t, 3, action.Retries)
 
 	var dbAction BlockchainAction
 	err = db.First(&dbAction, action.ID).Error
 	require.NoError(t, err)
-	assert.Equal(t, StatusFailed, dbAction.Status)
+	assert.Equal(t, BlockchainActionStatusFailed, dbAction.Status)
 	assert.Equal(t, "test error", dbAction.Error)
 	assert.Equal(t, 3, dbAction.Retries)
 }
@@ -112,7 +112,7 @@ func TestBlockchainAction_Complete(t *testing.T) {
 		StateID: stateId,
 		// ChainID:   1,
 		Data:      []byte{1},
-		Status:    StatusPending,
+		Status:    BlockchainActionStatusPending,
 		Error:     "previous error",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -123,14 +123,14 @@ func TestBlockchainAction_Complete(t *testing.T) {
 	err := action.Complete(db, txHash)
 	require.NoError(t, err)
 
-	assert.Equal(t, StatusCompleted, action.Status)
+	assert.Equal(t, BlockchainActionStatusCompleted, action.Status)
 	assert.Equal(t, txHash, action.TxHash)
 	assert.Empty(t, action.Error)
 
 	var dbAction BlockchainAction
 	err = db.First(&dbAction, action.ID).Error
 	require.NoError(t, err)
-	assert.Equal(t, StatusCompleted, dbAction.Status)
+	assert.Equal(t, BlockchainActionStatusCompleted, dbAction.Status)
 	assert.Equal(t, txHash, dbAction.TxHash)
 	assert.Empty(t, dbAction.Error)
 }
@@ -165,10 +165,3 @@ func TestBlockchainAction_TableName(t *testing.T) {
 
 // 	assert.Equal(t, original, unmarshaled)
 // }
-
-func TestConstants(t *testing.T) {
-	assert.Equal(t, BlockchainActionType("checkpoint"), ActionTypeCheckpoint)
-	assert.Equal(t, BlockchainActionStatus("pending"), StatusPending)
-	assert.Equal(t, BlockchainActionStatus("completed"), StatusCompleted)
-	assert.Equal(t, BlockchainActionStatus("failed"), StatusFailed)
-}

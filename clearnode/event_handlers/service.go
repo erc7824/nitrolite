@@ -268,7 +268,7 @@ func (s *EventHandlerService) HandleEscrowDepositChallenged(event *core.EscrowDe
 		} else if lastSignedState.Version <= event.StateVersion {
 			s.logger.Warn("last signed state version is not greater than challenged state version", "channelId", chanID, "lastSignedStateVersion", lastSignedState.Version, "challengedStateVersion", event.StateVersion)
 		} else {
-			if err := tx.ScheduleCheckpointEscrowDeposit(lastSignedState.ID); err != nil {
+			if err := tx.ScheduleFinalizeEscrowDeposit(lastSignedState.ID); err != nil {
 				return err
 			}
 		}
@@ -382,7 +382,7 @@ func (s *EventHandlerService) HandleEscrowWithdrawalChallenged(event *core.Escro
 		} else if lastSignedState.Version <= event.StateVersion {
 			s.logger.Warn("last signed state version is not greater than challenged state version", "channelId", chanID, "lastSignedStateVersion", lastSignedState.Version, "challengedStateVersion", event.StateVersion)
 		} else {
-			if err := tx.ScheduleCheckpointEscrowWithdrawal(lastSignedState.ID); err != nil {
+			if err := tx.ScheduleFinalizeEscrowWithdrawal(lastSignedState.ID); err != nil {
 				return err
 			}
 		}

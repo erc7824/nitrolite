@@ -9,20 +9,21 @@ import (
 	"gorm.io/gorm"
 )
 
-type BlockchainActionType string
-type BlockchainActionStatus string
+type BlockchainActionType uint8
 
 const (
-	ActionTypeCheckpoint                 BlockchainActionType = "cp"
-	ActionTypeEscrowWithdrawal           BlockchainActionType = "escrow_withdrawal"
-	ActionTypeCheckpointEscrowDeposit    BlockchainActionType = "cp_escrow_deposit"
-	ActionTypeCheckpointEscrowWithdrawal BlockchainActionType = "cp_escrow_withdrawal"
+	ActionTypeCheckpoint               BlockchainActionType = 1
+	ActionTypeInitiateEscrowWithdrawal BlockchainActionType = 21
+	ActionTypeFinalizeEscrowDeposit    BlockchainActionType = 12
+	ActionTypeFinalizeEscrowWithdrawal BlockchainActionType = 22
 )
 
+type BlockchainActionStatus uint8
+
 const (
-	StatusPending   BlockchainActionStatus = "pending"
-	StatusCompleted BlockchainActionStatus = "completed"
-	StatusFailed    BlockchainActionStatus = "failed"
+	BlockchainActionStatusPending BlockchainActionStatus = iota
+	BlockchainActionStatusCompleted
+	BlockchainActionStatusFailed
 )
 
 type BlockchainAction struct {
@@ -51,11 +52,11 @@ func (s *DBStore) ScheduleInitiateEscrowWithdrawal(stateID string) error {
 	// }
 
 	action := &BlockchainAction{
-		Type:    ActionTypeCheckpoint,
+		Type:    ActionTypeInitiateEscrowWithdrawal,
 		StateID: stateID,
 		// ChainID: 1,
 		// Data:      bytes,
-		Status:    StatusPending,
+		Status:    BlockchainActionStatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -73,7 +74,7 @@ func (s *DBStore) ScheduleCheckpoint(stateID string) error {
 		Type:    ActionTypeCheckpoint,
 		StateID: stateID,
 		// Data:      bytes,
-		Status:    StatusPending,
+		Status:    BlockchainActionStatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -81,18 +82,18 @@ func (s *DBStore) ScheduleCheckpoint(stateID string) error {
 	return s.db.Create(action).Error
 }
 
-// ScheduleCheckpointEscrowDeposit schedules a checkpoint for an escrow deposit operation.
-func (s *DBStore) ScheduleCheckpointEscrowDeposit(stateID string) error {
+// ScheduleFinalizeEscrowDeposit schedules a finalize for an escrow deposit operation.
+func (s *DBStore) ScheduleFinalizeEscrowDeposit(stateID string) error {
 	// bytes, err := json.Marshal(data)
 	// if err != nil {
 	// 	return fmt.Errorf("marshal checkpoint data: %w", err)
 	// }
 
 	action := &BlockchainAction{
-		Type:    ActionTypeCheckpoint,
+		Type:    ActionTypeFinalizeEscrowDeposit,
 		StateID: stateID,
 		// Data:      bytes,
-		Status:    StatusPending,
+		Status:    BlockchainActionStatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -100,18 +101,18 @@ func (s *DBStore) ScheduleCheckpointEscrowDeposit(stateID string) error {
 	return s.db.Create(action).Error
 }
 
-// ScheduleCheckpointEscrowWithdrawal schedules a checkpoint for an escrow withdrawal operation.
-func (s *DBStore) ScheduleCheckpointEscrowWithdrawal(stateID string) error {
+// ScheduleFinalizeEscrowWithdrawal schedules a finalize for an escrow withdrawal operation.
+func (s *DBStore) ScheduleFinalizeEscrowWithdrawal(stateID string) error {
 	// bytes, err := json.Marshal(data)
 	// if err != nil {
 	// 	return fmt.Errorf("marshal checkpoint data: %w", err)
 	// }
 
 	action := &BlockchainAction{
-		Type:    ActionTypeCheckpoint,
+		Type:    ActionTypeFinalizeEscrowWithdrawal,
 		StateID: stateID,
 		// Data:      bytes,
-		Status:    StatusPending,
+		Status:    BlockchainActionStatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -120,7 +121,7 @@ func (s *DBStore) ScheduleCheckpointEscrowWithdrawal(stateID string) error {
 }
 
 func (a *BlockchainAction) Fail(tx *gorm.DB, err string) error {
-	a.Status = StatusFailed
+	a.Status = BlockchainActionStatusFailed
 	a.Error = err
 	a.Retries++
 	a.UpdatedAt = time.Now()
@@ -128,7 +129,7 @@ func (a *BlockchainAction) Fail(tx *gorm.DB, err string) error {
 }
 
 func (a *BlockchainAction) FailNoRetry(tx *gorm.DB, err string) error {
-	a.Status = StatusFailed
+	a.Status = BlockchainActionStatusFailed
 	a.Error = err
 	a.UpdatedAt = time.Now()
 	return tx.Save(a).Error
@@ -142,7 +143,7 @@ func (a *BlockchainAction) RecordAttempt(tx *gorm.DB, attemptErr string) error {
 }
 
 func (a *BlockchainAction) Complete(tx *gorm.DB, txHash common.Hash) error {
-	a.Status = StatusCompleted
+	a.Status = BlockchainActionStatusCompleted
 	a.TxHash = txHash
 	a.Error = ""
 	a.UpdatedAt = time.Now()
@@ -151,7 +152,7 @@ func (a *BlockchainAction) Complete(tx *gorm.DB, txHash common.Hash) error {
 
 func GetActionsForChain(db *gorm.DB, chainID uint32, limit int) ([]BlockchainAction, error) {
 	var actions []BlockchainAction
-	query := db.Where("status = ? AND chain_id = ?", StatusPending, chainID).Order("created_at ASC")
+	query := db.Where("status = ? AND chain_id = ?", BlockchainActionStatusPending, chainID).Order("created_at ASC")
 	if limit > 0 {
 		query = query.Limit(limit)
 	}

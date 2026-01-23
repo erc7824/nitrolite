@@ -45,9 +45,9 @@ func TestDBStore_CreateChannel(t *testing.T) {
 		assert.Equal(t, "0xhomechannel123", dbChannel.ChannelID)
 		assert.Equal(t, "0xuser123", dbChannel.UserWallet)
 		assert.Equal(t, core.ChannelTypeHome, dbChannel.Type)
-		assert.Equal(t, uint32(1), dbChannel.BlockchainID)
+		assert.Equal(t, uint64(1), dbChannel.BlockchainID)
 		assert.Equal(t, "0xtoken123", dbChannel.Token)
-		assert.Equal(t, uint64(86400), dbChannel.ChallengeDuration)
+		assert.Equal(t, uint32(86400), dbChannel.ChallengeDuration)
 		assert.Equal(t, uint64(1), dbChannel.Nonce)
 		assert.Equal(t, core.ChannelStatusOpen, dbChannel.Status)
 		assert.Equal(t, uint64(0), dbChannel.StateVersion)
@@ -82,7 +82,7 @@ func TestDBStore_CreateChannel(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, core.ChannelTypeEscrow, dbChannel.Type)
-		assert.Equal(t, uint32(137), dbChannel.BlockchainID)
+		assert.Equal(t, uint64(137), dbChannel.BlockchainID)
 	})
 
 	t.Run("Error - Duplicate channel ID", func(t *testing.T) {
@@ -172,7 +172,7 @@ func TestDBStore_GetChannelByID(t *testing.T) {
 		assert.Equal(t, "0xhomechannel123", result.ChannelID)
 		assert.Equal(t, "0xuser123", result.UserWallet)
 		assert.Equal(t, core.ChannelTypeHome, result.Type)
-		assert.Equal(t, uint32(1), result.BlockchainID)
+		assert.Equal(t, uint64(1), result.BlockchainID)
 		assert.Equal(t, "0xtoken123", result.TokenAddress)
 	})
 
@@ -620,7 +620,7 @@ func TestDBStore_UpdateChannel(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		assert.Equal(t, uint32(137), result.BlockchainID)
+		assert.Equal(t, uint64(137), result.BlockchainID)
 		assert.Equal(t, "0xnewtoken456", result.TokenAddress)
 	})
 

@@ -10,13 +10,13 @@ import (
 type MemoryStoreV1 struct {
 	blockchains     []core.Blockchain
 	assets          []core.Asset
-	supportedAssets map[string]map[uint32]map[string]struct{} // map[asset]map[blockchain_id]map[token_address]struct{}
-	tokenDecimals   map[uint32]map[string]uint8               // map[blockchain_id]map[token_address]decimals
+	supportedAssets map[string]map[uint64]map[string]struct{} // map[asset]map[blockchain_id]map[token_address]struct{}
+	tokenDecimals   map[uint64]map[string]uint8               // map[blockchain_id]map[token_address]decimals
 	assetDecimals   map[string]uint8                          // map[asset]decimals
 }
 
-func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint32]BlockchainConfig) MemoryStore {
-	supportedBlockchainIDs := make(map[uint32]struct{})
+func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]BlockchainConfig) MemoryStore {
+	supportedBlockchainIDs := make(map[uint64]struct{})
 	blockchains := make([]core.Blockchain, 0, len(blockchainsConfig))
 	for _, bc := range blockchainsConfig {
 		if bc.Disabled {
@@ -39,8 +39,8 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint32]Bl
 		return 0
 	})
 
-	supportedAssets := make(map[string]map[uint32]map[string]struct{})
-	tokenDecimals := make(map[uint32]map[string]uint8)
+	supportedAssets := make(map[string]map[uint64]map[string]struct{})
+	tokenDecimals := make(map[uint64]map[string]uint8)
 	assetDecimals := make(map[string]uint8)
 	assets := make([]core.Asset, 0, len(assetsConfig.Assets))
 	for _, asset := range assetsConfig.Assets {
@@ -66,7 +66,7 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint32]Bl
 			})
 
 			if _, ok := supportedAssets[asset.Symbol]; !ok {
-				supportedAssets[asset.Symbol] = make(map[uint32]map[string]struct{})
+				supportedAssets[asset.Symbol] = make(map[uint64]map[string]struct{})
 			}
 			if _, ok := supportedAssets[asset.Symbol][token.BlockchainID]; !ok {
 				supportedAssets[asset.Symbol][token.BlockchainID] = make(map[string]struct{})
@@ -138,7 +138,7 @@ func (ms *MemoryStoreV1) GetBlockchains() ([]core.Blockchain, error) {
 
 // GetAssets retrieves the list of supported assets.
 // If blockchainID is provided, filters assets to only include tokens on that blockchain.
-func (ms *MemoryStoreV1) GetAssets(blockchainID *uint32) ([]core.Asset, error) {
+func (ms *MemoryStoreV1) GetAssets(blockchainID *uint64) ([]core.Asset, error) {
 	if blockchainID == nil {
 		return ms.assets, nil
 	}
@@ -163,7 +163,7 @@ func (ms *MemoryStoreV1) GetAssets(blockchainID *uint32) ([]core.Asset, error) {
 }
 
 // IsAssetSupported checks if a given asset (token) is supported on the specified blockchain.
-func (ms *MemoryStoreV1) IsAssetSupported(asset, tokenAddress string, blockchainID uint32) (bool, error) {
+func (ms *MemoryStoreV1) IsAssetSupported(asset, tokenAddress string, blockchainID uint64) (bool, error) {
 	assetsOnChain, ok := ms.supportedAssets[asset]
 	if !ok {
 		return false, nil
@@ -186,7 +186,7 @@ func (ms *MemoryStoreV1) GetAssetDecimals(asset string) (uint8, error) {
 }
 
 // GetTokenDecimals returns the decimals for a token on a specific blockchain
-func (ms *MemoryStoreV1) GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error) {
+func (ms *MemoryStoreV1) GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error) {
 	decimalsOnChain, ok := ms.tokenDecimals[blockchainID]
 	if !ok {
 		return 0, fmt.Errorf("blockchain with ID '%d' is not supported", blockchainID)

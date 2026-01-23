@@ -27,7 +27,6 @@ func SetupTestDB(t testing.TB) (*gorm.DB, func()) {
 
 	switch os.Getenv("TEST_DB_DRIVER") {
 	case "postgres":
-		log.Println("Using PostgreSQL for testing")
 		var pgContainer testcontainers.Container
 		database, pgContainer = setupTestPostgres(ctx, t)
 		cleanup = func() {
@@ -38,7 +37,6 @@ func SetupTestDB(t testing.TB) (*gorm.DB, func()) {
 			}
 		}
 	default:
-		log.Println("Using SQLite for testing (default)")
 		database = setupTestSqlite(t)
 		cleanup = func() {}
 	}

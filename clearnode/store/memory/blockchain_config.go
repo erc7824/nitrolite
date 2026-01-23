@@ -35,7 +35,7 @@ type BlockchainConfig struct {
 	// Must match pattern: lowercase letters and underscores only
 	Name string `yaml:"name"`
 	// ID is the chain ID used for RPC validation
-	ID uint32 `yaml:"id"`
+	ID uint64 `yaml:"id"`
 	// Disabled determines if this blockchain should be connected
 	Disabled bool `yaml:"disabled"`
 	// BlockchainRPC is populated from environment variable <NAME>_BLOCKCHAIN_RPC
@@ -55,7 +55,7 @@ type BlockchainConfig struct {
 // - Blockchain names (lowercase with underscores)
 // - RPC endpoint availability and chain ID matching
 // - Required contract addresses (using defaults when not specified)
-func LoadEnabledBlockchains(configDirPath string) (map[uint32]BlockchainConfig, error) {
+func LoadEnabledBlockchains(configDirPath string) (map[uint64]BlockchainConfig, error) {
 	blockchainsPath := filepath.Join(configDirPath, blockchainsFileName)
 	f, err := os.Open(blockchainsPath)
 	if err != nil {
@@ -119,8 +119,8 @@ func verifyBlockchainsConfig(cfg *BlockchainsConfig, checkRPC bool) error {
 
 // getEnabledBlockchains returns a map of enabled blockchains indexed by their chain ID.
 // Only blockchains with enabled=true are included in the result.
-func getEnabledBlockchains(cfg *BlockchainsConfig) map[uint32]BlockchainConfig {
-	enabledBlockchains := make(map[uint32]BlockchainConfig)
+func getEnabledBlockchains(cfg *BlockchainsConfig) map[uint64]BlockchainConfig {
+	enabledBlockchains := make(map[uint64]BlockchainConfig)
 	for _, bc := range cfg.Blockchains {
 		if !bc.Disabled {
 			enabledBlockchains[bc.ID] = bc

@@ -100,19 +100,9 @@ func toCoreLedger(ledger *rpc.LedgerV1) (*core.Ledger, error) {
 
 // toCoreChannelDefinition converts RPC channel definition to core type.
 func toCoreChannelDefinition(def rpc.ChannelDefinitionV1) (core.ChannelDefinition, error) {
-	nonce, err := strconv.ParseUint(def.Nonce, 10, 64)
-	if err != nil {
-		return core.ChannelDefinition{}, fmt.Errorf("failed to parse nonce: %w", err)
-	}
-
-	challenge, err := strconv.ParseUint(def.Challenge, 10, 64)
-	if err != nil {
-		return core.ChannelDefinition{}, fmt.Errorf("failed to parse challenge: %w", err)
-	}
-
 	return core.ChannelDefinition{
-		Nonce:     nonce,
-		Challenge: challenge,
+		Nonce:     def.Nonce,
+		Challenge: def.Challenge,
 	}, nil
 }
 
@@ -152,9 +142,9 @@ func coreChannelToRPC(channel core.Channel) rpc.ChannelV1 {
 		Type:               channelTypeToString(channel.Type),
 		BlockchainID:       channel.BlockchainID,
 		TokenAddress:       channel.TokenAddress,
-		ChallengeDuration:  strconv.FormatUint(channel.ChallengeDuration, 10),
+		ChallengeDuration:  channel.ChallengeDuration,
 		ChallengeExpiresAt: channel.ChallengeExpiresAt,
-		Nonce:              strconv.FormatUint(channel.Nonce, 10),
+		Nonce:              channel.Nonce,
 		Status:             channelStatusToString(channel.Status),
 		StateVersion:       strconv.FormatUint(channel.StateVersion, 10),
 	}

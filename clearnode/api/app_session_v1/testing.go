@@ -132,7 +132,7 @@ func (m *MockAssetStore) GetAssetDecimals(asset string) (uint8, error) {
 	return args.Get(0).(uint8), args.Error(1)
 }
 
-func (m *MockAssetStore) GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error) {
+func (m *MockAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error) {
 	args := m.Called(blockchainID, tokenAddress)
 	return args.Get(0).(uint8), args.Error(1)
 }

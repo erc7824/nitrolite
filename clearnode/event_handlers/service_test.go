@@ -300,7 +300,7 @@ func TestHandleEscrowDepositChallenged_Success(t *testing.T) {
 			ch.ChallengeExpiresAt != nil
 	})).Return(nil)
 	mockStore.On("GetLastStateByChannelID", channelID, true).Return(state, nil)
-	mockStore.On("ScheduleCheckpointEscrowDeposit", "state123").Return(nil)
+	mockStore.On("ScheduleFinalizeEscrowDeposit", "state123").Return(nil)
 
 	// Execute
 	err := service.HandleEscrowDepositChallenged(event)
@@ -445,7 +445,7 @@ func TestHandleEscrowWithdrawalChallenged_Success(t *testing.T) {
 			ch.ChallengeExpiresAt != nil
 	})).Return(nil)
 	mockStore.On("GetLastStateByChannelID", channelID, true).Return(state, nil)
-	mockStore.On("ScheduleCheckpointEscrowWithdrawal", "state123").Return(nil)
+	mockStore.On("ScheduleFinalizeEscrowWithdrawal", "state123").Return(nil)
 
 	// Execute
 	err := service.HandleEscrowWithdrawalChallenged(event)

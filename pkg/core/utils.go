@@ -47,8 +47,7 @@ func GetHomeChannelID(nodeAddress, userAddress, tokenAddress string, nonce, chal
 	nodeAddr := common.HexToAddress(nodeAddress)
 	userAddr := common.HexToAddress(userAddress)
 
-	tokenAddr := common.HexToAddress(tokenAddress)
-	// TODO: decide token or asset
+	tokenAddr := common.HexToAddress(tokenAddress) // FIXME: replace with asset
 
 	args := abi.Arguments{
 		{Type: abi.Type{T: abi.AddressTy}}, // node

@@ -91,12 +91,12 @@ func verifyBlockchainsConfig(cfg *BlockchainsConfig, checkRPC bool) error {
 
 		if bc.ContractAddress == "" {
 			if cfg.DefaultContractAddress == "" {
-				return fmt.Errorf("missing default and blockchain-specific custody contract address for blockchain '%s'", bc.Name)
+				return fmt.Errorf("missing default and blockchain-specific contract address for blockchain '%s'", bc.Name)
 			} else {
 				cfg.Blockchains[i].ContractAddress = cfg.DefaultContractAddress
 			}
 		} else if !contractAddressRegex.MatchString(bc.ContractAddress) {
-			return fmt.Errorf("invalid custody contract address '%s' for blockchain '%s'", bc.ContractAddress, bc.Name)
+			return fmt.Errorf("invalid contract address '%s' for blockchain '%s'", bc.ContractAddress, bc.Name)
 		}
 
 		// It reads RPC URLs from environment variables following the pattern:

@@ -59,7 +59,7 @@ type DatabaseStore interface {
 	StoreUserState(state core.State) error
 
 	// EnsureNoOngoingStateTransitions validates that no conflicting blockchain operations are pending.
-	EnsureNoOngoingStateTransitions(wallet, asset string) error
+	EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error
 
 	// ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate withdrawal.
 	ScheduleInitiateEscrowWithdrawal(stateID string) error
@@ -83,7 +83,7 @@ type DatabaseStore interface {
 	GetAppSession(sessionID string) (*app.AppSessionV1, error)
 
 	// GetAppSessions retrieves filtered sessions with pagination.
-	GetAppSessions(appSessionID *string, participant *string, status *string, pagination *core.PaginationParams) ([]app.AppSessionV1, core.PaginationMetadata, error)
+	GetAppSessions(appSessionID *string, participant *string, status app.AppSessionStatus, pagination *core.PaginationParams) ([]app.AppSessionV1, core.PaginationMetadata, error)
 
 	// UpdateAppSession updates existing session data.
 	UpdateAppSession(session app.AppSessionV1) error
@@ -97,5 +97,5 @@ type DatabaseStore interface {
 	GetParticipantAllocations(sessionID string) (map[string]map[string]decimal.Decimal, error)
 
 	// RecordLedgerEntry logs a movement of funds within the internal ledger.
-	RecordLedgerEntry(accountID, asset string, amount decimal.Decimal) error
+	RecordLedgerEntry(userWallet, accountID, asset string, amount decimal.Decimal) error
 }

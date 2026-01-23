@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
@@ -16,7 +15,7 @@ const (
 
 // AppLedgerEntryV1 represents a ledger entry in the database
 type AppLedgerEntryV1 struct {
-	ID          uuid.UUID       `gorm:"type:uuid;default:uuid_generate_v4()"`
+	ID          uuid.UUID       `gorm:"type:char(36);primaryKey"`
 	AccountID   string          `gorm:"column:account_id;not null;index:idx_account_asset_symbol;index:idx_account_wallet"`
 	AssetSymbol string          `gorm:"column:asset_symbol;not null;index:idx_account_asset_symbol"`
 	Wallet      string          `gorm:"column:wallet;not null;index:idx_account_wallet"`
@@ -30,12 +29,11 @@ func (AppLedgerEntryV1) TableName() string {
 }
 
 // RecordLedgerEntry logs a movement of funds within the internal ledger.
-func (s *DBStore) RecordLedgerEntry(accountID, asset string, amount decimal.Decimal) error {
-	wallet := common.HexToAddress(accountID)
-
+func (s *DBStore) RecordLedgerEntry(userWallet, accountID, asset string, amount decimal.Decimal) error {
 	entry := &AppLedgerEntryV1{
+		ID:          uuid.New(),
 		AccountID:   accountID,
-		Wallet:      wallet.Hex(),
+		Wallet:      userWallet,
 		AssetSymbol: asset,
 		Credit:      decimal.Zero,
 		Debit:       decimal.Zero,
@@ -99,7 +97,7 @@ func (s *DBStore) GetParticipantAllocations(appSessionID string) (map[string]map
 		FROM app_ledger_v1 l
 		WHERE l.wallet IN (
 			SELECT wallet_address
-			FROM app_session_participants
+			FROM app_session_participants_v1
 			WHERE app_session_id = ?
 		)
 		GROUP BY l.wallet, l.asset_symbol

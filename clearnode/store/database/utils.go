@@ -7,7 +7,6 @@ import (
 
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
-	"github.com/shopspring/decimal"
 )
 
 // databaseChannelToCore converts database.Channel to core.Channel
@@ -68,18 +67,18 @@ func databaseStateToCore(dbState *State) (*core.State, error) {
 		EscrowChannelID: dbState.EscrowChannelID,
 		HomeLedger: core.Ledger{
 			UserBalance: dbState.HomeUserBalance,
-			UserNetFlow: decimal.NewFromInt(dbState.HomeUserNetFlow),
+			UserNetFlow: dbState.HomeUserNetFlow,
 			NodeBalance: dbState.HomeNodeBalance,
-			NodeNetFlow: decimal.NewFromInt(dbState.HomeNodeNetFlow),
+			NodeNetFlow: dbState.HomeNodeNetFlow,
 		},
 	}
 
 	if dbState.EscrowChannelID != nil {
 		state.EscrowLedger = &core.Ledger{
 			UserBalance: dbState.EscrowUserBalance,
-			UserNetFlow: decimal.NewFromInt(dbState.EscrowUserNetFlow),
+			UserNetFlow: dbState.EscrowUserNetFlow,
 			NodeBalance: dbState.EscrowNodeBalance,
-			NodeNetFlow: decimal.NewFromInt(dbState.EscrowNodeNetFlow),
+			NodeNetFlow: dbState.EscrowNodeNetFlow,
 		}
 	}
 
@@ -110,17 +109,17 @@ func coreStateToDB(state *core.State) (*State, error) {
 		HomeChannelID:   state.HomeChannelID,
 		EscrowChannelID: state.EscrowChannelID,
 		HomeUserBalance: state.HomeLedger.UserBalance,
-		HomeUserNetFlow: state.HomeLedger.UserNetFlow.IntPart(),
+		HomeUserNetFlow: state.HomeLedger.UserNetFlow,
 		HomeNodeBalance: state.HomeLedger.NodeBalance,
-		HomeNodeNetFlow: state.HomeLedger.NodeNetFlow.IntPart(),
+		HomeNodeNetFlow: state.HomeLedger.NodeNetFlow,
 		CreatedAt:       time.Now(),
 	}
 
 	if state.EscrowLedger != nil {
 		dbState.EscrowUserBalance = state.EscrowLedger.UserBalance
-		dbState.EscrowUserNetFlow = state.EscrowLedger.UserNetFlow.IntPart()
+		dbState.EscrowUserNetFlow = state.EscrowLedger.UserNetFlow
 		dbState.EscrowNodeBalance = state.EscrowLedger.NodeBalance
-		dbState.EscrowNodeNetFlow = state.EscrowLedger.NodeNetFlow.IntPart()
+		dbState.EscrowNodeNetFlow = state.EscrowLedger.NodeNetFlow
 	}
 
 	if state.UserSig != nil {

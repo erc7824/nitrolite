@@ -87,7 +87,7 @@ func (s *DBStore) GetAppSession(sessionID string) (*app.AppSessionV1, error) {
 }
 
 // GetAppSessions retrieves filtered sessions with pagination.
-func (s *DBStore) GetAppSessions(appSessionID *string, participant *string, status *string, pagination *core.PaginationParams) ([]app.AppSessionV1, core.PaginationMetadata, error) {
+func (s *DBStore) GetAppSessions(appSessionID *string, participant *string, status app.AppSessionStatus, pagination *core.PaginationParams) ([]app.AppSessionV1, core.PaginationMetadata, error) {
 	query := s.db.Model(&AppSessionV1{})
 
 	if appSessionID != nil && *appSessionID != "" {
@@ -96,12 +96,12 @@ func (s *DBStore) GetAppSessions(appSessionID *string, participant *string, stat
 
 	if participant != nil && *participant != "" {
 		// Join with participants table to filter by participant
-		query = query.Joins("JOIN app_session_participants ON app_sessions.id = app_session_participants.app_session_id").
-			Where("app_session_participants.wallet_address = ?", *participant)
+		query = query.Joins("JOIN app_session_participants_v1 ON app_sessions_v1.id = app_session_participants_v1.app_session_id").
+			Where("app_session_participants_v1.wallet_address = ?", *participant)
 	}
 
-	if status != nil && *status != "" {
-		query = query.Where("status = ?", *status)
+	if status != app.AppSessionStatusVoid {
+		query = query.Where("status = ?", status)
 	}
 
 	var totalCount int64

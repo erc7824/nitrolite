@@ -40,9 +40,9 @@ type Store interface {
 
 	// ScheduleCheckpointEscrowDeposit schedules a checkpoint for an escrow deposit operation.
 	// This queues the state to be submitted on-chain to finalize an escrow deposit.
-	ScheduleCheckpointEscrowDeposit(stateID string) error
+	ScheduleCheckpointEscrowDeposit(stateID string) error // FIXME: FinalizeEscrowDeposit
 
 	// ScheduleCheckpointEscrowWithdrawal schedules a checkpoint for an escrow withdrawal operation.
 	// This queues the state to be submitted on-chain to finalize an escrow withdrawal.
-	ScheduleCheckpointEscrowWithdrawal(stateID string) error
+	ScheduleCheckpointEscrowWithdrawal(stateID string) error // FIXME: FinalizeEscrowWithdrawal
 }

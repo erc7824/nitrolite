@@ -90,9 +90,10 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		}
 		if currentState == nil {
 			currentState = core.NewVoidState(userState.Asset, userState.UserWallet)
-		}
-		if err := tx.EnsureNoOngoingStateTransitions(userState.UserWallet, userState.Asset); err != nil {
-			return rpc.Errorf("ongoing state transitions check failed: %v", err)
+		} else if prevTransition := currentState.GetLastTransition(); prevTransition != nil {
+			if err := tx.EnsureNoOngoingStateTransitions(userState.UserWallet, userState.Asset, prevTransition.Type); err != nil {
+				return rpc.Errorf("ongoing state transitions check failed: %v", err)
+			}
 		}
 
 		if err := h.stateAdvancer.ValidateAdvancement(*currentState, userState); err != nil {
@@ -173,7 +174,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 				// Accumulate total deposit amount
 				totalDepositAmount = totalDepositAmount.Add(depositAmount)
 
-				if err := tx.RecordLedgerEntry(appSession.SessionID, alloc.Asset, depositAmount); err != nil {
+				if err := tx.RecordLedgerEntry(alloc.Participant, appSession.SessionID, alloc.Asset, depositAmount); err != nil {
 					return rpc.Errorf("failed to record ledger entry: %v", err)
 				}
 			}

@@ -90,7 +90,6 @@ func TestGetHomeChannel_Success(t *testing.T) {
 
 	assert.Equal(t, homeChannelID, response.Channel.ChannelID)
 	assert.Equal(t, userWallet, response.Channel.UserWallet)
-	assert.Equal(t, nodeAddress, response.Channel.NodeWallet)
 	assert.Equal(t, "home", response.Channel.Type)
 	assert.Equal(t, uint32(1), response.Channel.BlockchainID)
 	assert.Equal(t, "open", response.Channel.Status)

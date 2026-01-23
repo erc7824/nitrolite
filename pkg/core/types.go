@@ -28,9 +28,9 @@ type Channel struct {
 	ChannelID          string        `json:"channel_id"`                     // Unique identifier for the channel
 	UserWallet         string        `json:"user_wallet"`                    // User wallet address
 	Type               ChannelType   `json:"type"`                           // Type of the channel (home, escrow)
-	BlockchainID       uint32        `json:"blockchain_id"`                  // Unique identifier for the blockchain
+	BlockchainID       uint32        `json:"blockchain_id"`                  // Unique identifier for the blockchain // FIXME: uint64
 	TokenAddress       string        `json:"token_address"`                  // Address of the token used in the channel
-	ChallengeDuration  uint64        `json:"challenge_duration"`             // Challenge period for the channel in seconds
+	ChallengeDuration  uint64        `json:"challenge_duration"`             // Challenge period for the channel in seconds // FIXME: uint32
 	ChallengeExpiresAt *time.Time    `json:"challenge_expires_at,omitempty"` // Timestamp when the challenge period elapses
 	Nonce              uint64        `json:"nonce"`                          // Nonce for the channel
 	Status             ChannelStatus `json:"status"`                         // Current status of the channel (void, open, challenged, closed)
@@ -707,23 +707,23 @@ func NewTransactionFromTransition(senderState *State, receiverState *State, tran
 type TransitionType uint8
 
 const (
-	TransitionTypeHomeDeposit    = 10 // AccountID: HomeChannelID
-	TransitionTypeHomeWithdrawal = 11 // AccountID: HomeChannelID
+	TransitionTypeHomeDeposit    TransitionType = 10 // AccountID: HomeChannelID
+	TransitionTypeHomeWithdrawal TransitionType = 11 // AccountID: HomeChannelID
 
-	TransitionTypeEscrowDeposit  = 20 // AccountID: EscrowChannelID
-	TransitionTypeEscrowWithdraw = 21 // AccountID: EscrowChannelID
+	TransitionTypeEscrowDeposit  TransitionType = 20 // AccountID: EscrowChannelID
+	TransitionTypeEscrowWithdraw TransitionType = 21 // AccountID: EscrowChannelID
 
 	TransitionTypeTransferSend    TransitionType = 30 // AccountID: Receiver's UserWallet
 	TransitionTypeTransferReceive TransitionType = 31 // AccountID: Sender's UserWallet
 
-	TransitionTypeCommit  = 40 // AccountID: AppSessionID
-	TransitionTypeRelease = 41 // AccountID: AppSessionID
+	TransitionTypeCommit  TransitionType = 40 // AccountID: AppSessionID
+	TransitionTypeRelease TransitionType = 41 // AccountID: AppSessionID
 
-	TransitionTypeMigrate    = 100 // AccountID: EscrowChannelID
-	TransitionTypeEscrowLock = 110 // AccountID: EscrowChannelID
-	TransitionTypeMutualLock = 120 // AccountID: EscrowChannelID
+	TransitionTypeMigrate    TransitionType = 100 // AccountID: EscrowChannelID
+	TransitionTypeEscrowLock TransitionType = 110 // AccountID: EscrowChannelID
+	TransitionTypeMutualLock TransitionType = 120 // AccountID: EscrowChannelID
 
-	TransitionTypeFinalize = 200
+	TransitionTypeFinalize TransitionType = 200 // AccountID: HomeChannelID
 )
 
 // String returns the human-readable name of the transition type

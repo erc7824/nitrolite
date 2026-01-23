@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -12,7 +13,7 @@ import (
 // This ensures the RPC URL points to the correct blockchain network.
 // The function uses a 5-second timeout for the connection and chain ID query.
 func checkChainId(blockchainRPC string, expectedChainID uint32) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5000)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	client, err := ethclient.DialContext(ctx, blockchainRPC)

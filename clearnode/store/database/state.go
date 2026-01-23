@@ -35,15 +35,15 @@ type State struct {
 	// Home Channel balances and flows
 	// Using decimal.Decimal for int256 values and int64 for flow values
 	HomeUserBalance decimal.Decimal `gorm:"column:home_user_balance;type:varchar(78)"`
-	HomeUserNetFlow int64           `gorm:"column:home_user_net_flow;default:0"`
+	HomeUserNetFlow decimal.Decimal `gorm:"column:home_user_net_flow;default:0"`
 	HomeNodeBalance decimal.Decimal `gorm:"column:home_node_balance;type:varchar(78)"`
-	HomeNodeNetFlow int64           `gorm:"column:home_node_net_flow;default:0"`
+	HomeNodeNetFlow decimal.Decimal `gorm:"column:home_node_net_flow;default:0"`
 
 	// Escrow Channel balances and flows
 	EscrowUserBalance decimal.Decimal `gorm:"column:escrow_user_balance;type:varchar(78)"`
-	EscrowUserNetFlow int64           `gorm:"column:escrow_user_net_flow;default:0"`
+	EscrowUserNetFlow decimal.Decimal `gorm:"column:escrow_user_net_flow;default:0"`
 	EscrowNodeBalance decimal.Decimal `gorm:"column:escrow_node_balance;type:varchar(78)"`
-	EscrowNodeNetFlow int64           `gorm:"column:escrow_node_net_flow;default:0"`
+	EscrowNodeNetFlow decimal.Decimal `gorm:"column:escrow_node_net_flow;default:0"`
 
 	UserSig *string `gorm:"column:user_sig;type:text"`
 	NodeSig *string `gorm:"column:node_sig;type:text"`

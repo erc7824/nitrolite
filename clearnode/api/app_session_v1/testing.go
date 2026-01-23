@@ -63,19 +63,14 @@ func (m *MockStore) GetParticipantAllocations(sessionID string) (map[string]map[
 	return args.Get(0).(map[string]map[string]decimal.Decimal), args.Error(1)
 }
 
-func (m *MockStore) RecordLedgerEntry(accountID, asset string, amount decimal.Decimal) error {
-	args := m.Called(accountID, asset, amount)
+func (m *MockStore) RecordLedgerEntry(userWallet, accountID, asset string, amount decimal.Decimal) error {
+	args := m.Called(userWallet, accountID, asset, amount)
 	return args.Error(0)
 }
 
 func (m *MockStore) GetAccountBalance(accountID, asset string) (decimal.Decimal, error) {
 	args := m.Called(accountID, asset)
 	return args.Get(0).(decimal.Decimal), args.Error(1)
-}
-
-func (m *MockStore) RecordChannelTransaction(tx core.Transaction) error {
-	args := m.Called(tx)
-	return args.Error(0)
 }
 
 func (m *MockStore) RecordTransaction(tx core.Transaction) error {
@@ -102,13 +97,8 @@ func (m *MockStore) StoreUserState(state core.State) error {
 	return args.Error(0)
 }
 
-func (m *MockStore) EnsureNoOngoingStateTransitions(wallet, asset string) error {
-	args := m.Called(wallet, asset)
-	return args.Error(0)
-}
-
-func (m *MockStore) CheckChallengedChannels(wallet string) error {
-	args := m.Called(wallet)
+func (m *MockStore) EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error {
+	args := m.Called(wallet, asset, prevTransitionType)
 	return args.Error(0)
 }
 

@@ -345,7 +345,7 @@ library ChannelEngine {
         );
 
         // Calculate effects - no immediate fund movement
-        effects.userFundsDelta = nodeNfDelta; // Only node balance adjustments
+        effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
         effects.newStatus = ChannelStatus.OPERATING;
         effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
 
@@ -370,10 +370,10 @@ library ChannelEngine {
         require(candidate.homeState.nodeAllocation == 0, "node allocation must be zero");
 
         // Check home - non-home state consistency
-        require(candidate.nonHomeState.userNetFlow == 0, "withdrawal user net flow must be zero");
+        require(candidate.nonHomeState.userAllocation == 0, "withdrawal user allocation must be zero");
         require(candidate.nonHomeState.nodeAllocation == 0, "withdrawal node allocation must be zero");
         require(
-            candidate.nonHomeState.userAllocation.toInt256() == candidate.nonHomeState.nodeNetFlow,
+            candidate.nonHomeState.userNetFlow == -candidate.nonHomeState.nodeNetFlow,
             "invalid non-home user net flow"
         );
 

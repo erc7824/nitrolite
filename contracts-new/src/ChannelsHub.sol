@@ -80,7 +80,9 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
     uint32 public constant ESCROW_DEPOSIT_UNLOCK_DELAY = 12 hours;
 
-    uint32 public constant MAX_DEPOSIT_ESCROW_PURGE = type(uint32).max;
+    // NOTE: this value should not be small, so that as much escrow deposits as possible can be purged in one tx
+    // but also not too large, to avoid hitting block gas limit during purge and incurring Denial-Of-Service attacks
+    uint32 public constant MAX_DEPOSIT_ESCROW_PURGE = 64;
 
     mapping(bytes32 channelId => ChannelMeta meta) internal _channels;
     mapping(address user => EnumerableSet.Bytes32Set channelIds) internal _userChannels;
@@ -118,20 +120,22 @@ contract ChannelsHub is IVault, ReentrancyGuard {
     // filter only non-closed and non-migrated-out channels
     function getOpenChannels(address user) external view returns (bytes32[] memory) {
         bytes32[] memory allChannels = _userChannels[user].values();
-        bytes32[] memory openChannelsTemp = new bytes32[](allChannels.length);
-        uint256 count = 0;
+        uint256 openChannelCount = 0;
         for (uint256 i = 0; i < allChannels.length; i++) {
-            bytes32 channelId = allChannels[i];
-            ChannelMeta memory meta = _channels[channelId];
-            if (meta.status != ChannelStatus.CLOSED && meta.status != ChannelStatus.MIGRATED_OUT) {
-                openChannelsTemp[count] = channelId;
-                count++;
+            if (_channels[allChannels[i]].status != ChannelStatus.CLOSED && _channels[allChannels[i]].status != ChannelStatus.MIGRATED_OUT) {
+                openChannelCount++;
             }
         }
-        bytes32[] memory openChannels = new bytes32[](count);
-        for (uint256 i = 0; i < count; i++) {
-            openChannels[i] = openChannelsTemp[i];
+
+        bytes32[] memory openChannels = new bytes32[](openChannelCount);
+        uint256 openChannelIndex = 0;
+        for (uint256 i = 0; i < allChannels.length; i++) {
+            if (_channels[allChannels[i]].status != ChannelStatus.CLOSED && _channels[allChannels[i]].status != ChannelStatus.MIGRATED_OUT) {
+                openChannels[openChannelIndex] = allChannels[i];
+                openChannelIndex++;
+            }
         }
+
         return openChannels;
     }
 

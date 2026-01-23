@@ -34,12 +34,10 @@ library Utils {
     }
 
     // supports only EIP-191 signatures for now
-    function validateSignatures(
-        CrossChainState memory ccs,
-        bytes32 channelId,
-        address user,
-        address node
-    ) internal pure {
+    function validateSignatures(CrossChainState memory ccs, bytes32 channelId, address user, address node)
+        internal
+        pure
+    {
         bytes32 ethSignedHash = pack(ccs, channelId).toEthSignedMessageHash();
 
         address recoveredUser = ethSignedHash.recover(ccs.userSig);
@@ -50,11 +48,7 @@ library Utils {
     }
 
     // supports only EIP-191 signatures for now
-    function validateNodeSignature(
-        CrossChainState memory ccs,
-        bytes32 channelId,
-        address node
-    ) internal pure {
+    function validateNodeSignature(CrossChainState memory ccs, bytes32 channelId, address node) internal pure {
         bytes32 ethSignedHash = pack(ccs, channelId).toEthSignedMessageHash();
         address recoveredNode = ethSignedHash.recover(ccs.nodeSig);
         require(recoveredNode == node, "invalid node signature");
@@ -80,5 +74,4 @@ library Utils {
     function isEmpty(State memory state) internal pure returns (bool) {
         return state.chainId == 0;
     }
-
 }

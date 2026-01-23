@@ -46,10 +46,11 @@ library EscrowDepositEngine {
      * @param candidate New state to transition to
      * @return effects The calculated effects to apply
      */
-    function validateTransition(
-        TransitionContext memory ctx,
-        CrossChainState memory candidate
-    ) external view returns (TransitionEffects memory effects) {
+    function validateTransition(TransitionContext memory ctx, CrossChainState memory candidate)
+        external
+        view
+        returns (TransitionEffects memory effects)
+    {
         // Phase 1: Universal validation
         _validateUniversal(ctx, candidate);
 
@@ -67,9 +68,7 @@ library EscrowDepositEngine {
      * @param ctx Current escrow context
      * @return effects The calculated effects to apply
      */
-    function validateChallenge(
-        TransitionContext memory ctx
-    ) external view returns (TransitionEffects memory effects) {
+    function validateChallenge(TransitionContext memory ctx) external view returns (TransitionEffects memory effects) {
         require(ctx.status == EscrowStatus.INITIALIZED, "invalid status for challenge");
         require(block.timestamp < ctx.unlockAt, "unlock period has passed");
 
@@ -82,10 +81,7 @@ library EscrowDepositEngine {
 
     // ========== Internal: Phase 1 - Universal Validation ==========
 
-    function _validateUniversal(
-        TransitionContext memory ctx,
-        CrossChainState memory candidate
-    ) internal view {
+    function _validateUniversal(TransitionContext memory ctx, CrossChainState memory candidate) internal view {
         require(ctx.status != EscrowStatus.FINALIZED, "escrow already finalized");
         uint64 blockchainId = uint64(block.chainid);
         require(candidate.homeState.chainId != blockchainId, "must not be on home chain");
@@ -102,10 +98,11 @@ library EscrowDepositEngine {
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========
 
-    function _calculateEffectsByIntent(
-        TransitionContext memory ctx,
-        CrossChainState memory candidate
-    ) internal view returns (TransitionEffects memory effects) {
+    function _calculateEffectsByIntent(TransitionContext memory ctx, CrossChainState memory candidate)
+        internal
+        view
+        returns (TransitionEffects memory effects)
+    {
         StateIntent intent = candidate.intent;
 
         if (intent == StateIntent.INITIATE_ESCROW_DEPOSIT) {
@@ -119,10 +116,11 @@ library EscrowDepositEngine {
         return effects;
     }
 
-    function _calculateInitiateEffects(
-        TransitionContext memory ctx,
-        CrossChainState memory candidate
-    ) internal view returns (TransitionEffects memory effects) {
+    function _calculateInitiateEffects(TransitionContext memory ctx, CrossChainState memory candidate)
+        internal
+        view
+        returns (TransitionEffects memory effects)
+    {
         // INITIATE: User deposits on non-home, node locks on home
         require(ctx.status == EscrowStatus.VOID, "escrow already exists");
         uint256 depositAmount = candidate.nonHomeState.userAllocation;
@@ -134,7 +132,7 @@ library EscrowDepositEngine {
         require(candidate.homeState.nodeAllocation == depositAmount, "home node alloc must match non-home user deposit");
 
         // Calculate effects
-        effects.userFundsDelta = depositAmount.toInt256();  // Pull from user
+        effects.userFundsDelta = depositAmount.toInt256(); // Pull from user
         effects.newStatus = EscrowStatus.INITIALIZED;
         effects.newUnlockAt = uint64(block.timestamp) + UNLOCK_DELAY;
         effects.updateInitState = true;
@@ -142,12 +140,15 @@ library EscrowDepositEngine {
         return effects;
     }
 
-    function _calculateFinalizeEffects(
-        TransitionContext memory ctx,
-        CrossChainState memory candidate
-    ) internal pure returns (TransitionEffects memory effects) {
+    function _calculateFinalizeEffects(TransitionContext memory ctx, CrossChainState memory candidate)
+        internal
+        pure
+        returns (TransitionEffects memory effects)
+    {
         // FINALIZE: Node claims with finalization proof
-        require(ctx.status == EscrowStatus.INITIALIZED || ctx.status == EscrowStatus.DISPUTED, "invalid status for finalize");
+        require(
+            ctx.status == EscrowStatus.INITIALIZED || ctx.status == EscrowStatus.DISPUTED, "invalid status for finalize"
+        );
 
         // Must be immediate successor
         require(candidate.version == ctx.initState.version + 1, "candidate must be immediate successor");
@@ -167,7 +168,7 @@ library EscrowDepositEngine {
         require(userHomeNfDelta == 0, "home user net flow must not change");
 
         // Calculate effects
-        effects.nodeFundsDelta = -int256(ctx.lockedAmount);  // Release to node vault
+        effects.nodeFundsDelta = -int256(ctx.lockedAmount); // Release to node vault
         effects.newStatus = EscrowStatus.FINALIZED;
         effects.updateInitState = false;
 
@@ -191,7 +192,9 @@ library EscrowDepositEngine {
         } else if (candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT) {
             // On finalize: funds released (negative delta)
             require(totalDelta == effects.nodeFundsDelta, "fund conservation on finalize");
-            require((-effects.nodeFundsDelta).toUint256() == ctx.lockedAmount, "released amount must equal locked amount");
+            require(
+                (-effects.nodeFundsDelta).toUint256() == ctx.lockedAmount, "released amount must equal locked amount"
+            );
         }
     }
 }

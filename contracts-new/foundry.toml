@@ -4,4 +4,6 @@ out = "out"
 libs = ["lib"]
 
 via_ir = true
-optimizer_runs = 1000000
+
+# empirically picked not to overflow contract code size limit
+optimizer_runs = 7500

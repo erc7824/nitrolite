@@ -29,7 +29,11 @@ contract ChannelsHub is IVault, ReentrancyGuard {
     using SafeCast for uint256;
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
-    using {Utils.validateSignatures, Utils.validateNodeSignature, Utils.validateChallengerSignature} for CrossChainState;
+    using {
+        Utils.validateSignatures,
+        Utils.validateNodeSignature,
+        Utils.validateChallengerSignature
+    } for CrossChainState;
     using {Utils.isEmpty} for State;
 
     error InvalidAddress();
@@ -72,11 +76,11 @@ contract ChannelsHub is IVault, ReentrancyGuard {
     // ======== Contract Storage ==========
 
     // TODO: estimate these values better
-    uint32 constant public MIN_CHALLENGE_DURATION = 1 days;
+    uint32 public constant MIN_CHALLENGE_DURATION = 1 days;
 
-    uint32 constant public ESCROW_DEPOSIT_UNLOCK_DELAY = 12 hours;
+    uint32 public constant ESCROW_DEPOSIT_UNLOCK_DELAY = 12 hours;
 
-    uint32 constant public MAX_DEPOSIT_ESCROW_PURGE = type(uint32).max;
+    uint32 public constant MAX_DEPOSIT_ESCROW_PURGE = type(uint32).max;
 
     mapping(bytes32 channelId => ChannelMeta meta) internal _channels;
     mapping(address user => EnumerableSet.Bytes32Set channelIds) internal _userChannels;
@@ -98,7 +102,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
     function getAccountsBalances(address[] calldata accounts, address[] calldata tokens)
         external
         view
-        returns (uint256[][] memory) {}
+        returns (uint256[][] memory)
+    {}
 
     // ******
 
@@ -139,7 +144,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             CrossChainState memory lastState,
             uint256 challengeExpiry,
             uint256 lockedFunds
-        ) {
+        )
+    {
         ChannelMeta memory meta = _channels[channelId];
         status = meta.status;
         definition = meta.definition;
@@ -157,7 +163,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             uint64 challengeExpiry,
             uint256 lockedAmount,
             CrossChainState memory initState
-        ) {
+        )
+    {
         EscrowDepositMeta memory meta = _escrowDeposits[escrowId];
         status = meta.status;
         unlockAt = meta.unlockAt;
@@ -169,12 +176,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
     function getEscrowWithdrawalData(bytes32 escrowId)
         external
         view
-        returns (
-            EscrowStatus status,
-            uint64 challengeExpiry,
-            uint256 lockedAmount,
-            CrossChainState memory initState
-        ) {
+        returns (EscrowStatus status, uint64 challengeExpiry, uint256 lockedAmount, CrossChainState memory initState)
+    {
         EscrowWithdrawalMeta memory meta = _escrowWithdrawals[escrowId];
         status = meta.status;
         challengeExpiry = meta.challengeExpireAt;
@@ -309,7 +312,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
         _requireValidDefinition(def);
 
-        ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[def.node][initCCS.homeState.token]);
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[def.node][initCCS.homeState.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, initCCS);
 
         initCCS.validateSignatures(channelId, def.user, def.node);
@@ -320,14 +324,21 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         emit ChannelCreated(channelId, def.user, def.node, def, initCCS);
     }
 
-    event ChannelCreated(bytes32 indexed channelId, address indexed user, address indexed node, Definition definition, CrossChainState initialState);
+    event ChannelCreated(
+        bytes32 indexed channelId,
+        address indexed user,
+        address indexed node,
+        Definition definition,
+        CrossChainState initialState
+    );
 
     function depositToChannel(bytes32 channelId, CrossChainState calldata candidate) public payable {
         require(candidate.intent == StateIntent.DEPOSIT, "invalid state intent");
 
         ChannelMeta storage meta = _channels[channelId];
 
-        ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
         candidate.validateSignatures(channelId, meta.definition.user, meta.definition.node);
@@ -344,7 +355,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
         ChannelMeta storage meta = _channels[channelId];
 
-        ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
         candidate.validateSignatures(channelId, meta.definition.user, meta.definition.node);
@@ -356,12 +368,16 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
     event ChannelWithdrawn(bytes32 indexed channelId, CrossChainState candidate);
 
-    function checkpointChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {
+    function checkpointChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof)
+        external
+        payable
+    {
         require(candidate.intent == StateIntent.OPERATE, "can only checkpoint operate states");
 
         ChannelMeta storage meta = _channels[channelId];
 
-        ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
         candidate.validateSignatures(channelId, meta.definition.user, meta.definition.node);
@@ -373,7 +389,12 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
     event ChannelCheckpointed(bytes32 indexed channelId, CrossChainState candidate);
 
-    function challengeChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof, bytes calldata challengerSig) external payable {
+    function challengeChannel(
+        bytes32 channelId,
+        CrossChainState calldata candidate,
+        CrossChainState[] calldata proof,
+        bytes calldata challengerSig
+    ) external payable {
         ChannelMeta storage meta = _channels[channelId];
 
         require(meta.status == ChannelStatus.OPERATING, "invalid channel status");
@@ -388,7 +409,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         if (candidate.version > prevState.version) {
             require(candidate.intent == StateIntent.OPERATE, "invalid intent");
 
-            ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
+            ChannelEngine.TransitionContext memory ctx =
+                _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
             ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
             candidate.validateSignatures(channelId, user, node);
@@ -408,7 +430,10 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
     event ChannelChallenged(bytes32 indexed channelId, CrossChainState candidate, uint256 challengeExpiry);
 
-    function closeChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {
+    function closeChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof)
+        external
+        payable
+    {
         require(candidate.intent == StateIntent.CLOSE, "invalid state intent");
 
         ChannelMeta storage meta = _channels[channelId];
@@ -436,7 +461,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         }
 
         // Path 2: Cooperative closure with signed CLOSE state
-        ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
         candidate.validateSignatures(channelId, user, node);
@@ -466,10 +492,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
     event MigrationInitiated(bytes32 indexed channelId, CrossChainState state);
     event MigrationFinalized(bytes32 indexed channelId, CrossChainState state);
 
-    function initiateEscrowDeposit(
-        Definition calldata def,
-        CrossChainState calldata candidate
-    ) external payable {
+    function initiateEscrowDeposit(Definition calldata def, CrossChainState calldata candidate) external payable {
         require(candidate.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, "invalid intent");
         bytes32 channelId = Utils.getChannelId(def);
         candidate.validateSignatures(channelId, def.user, def.node);
@@ -478,7 +501,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             // HOME CHAIN: Update channel via ChannelEngine
             ChannelMeta storage meta = _channels[channelId];
 
-            ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
+            ChannelEngine.TransitionContext memory ctx =
+                _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
             ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
             _applyEffects(channelId, meta.definition, candidate, effects);
@@ -489,7 +513,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             bytes32 escrowId = Utils.getEscrowId(channelId, candidate);
 
             EscrowDepositEngine.TransitionContext memory ctx = _buildEscrowDepositContext(escrowId, 0);
-            EscrowDepositEngine.TransitionEffects memory effects = EscrowDepositEngine.validateTransition(ctx, candidate);
+            EscrowDepositEngine.TransitionEffects memory effects =
+                EscrowDepositEngine.validateTransition(ctx, candidate);
 
             _applyEscrowDepositEffects(escrowId, channelId, candidate, effects, def.user, def.node);
             _escrowDepositIds.push(escrowId);
@@ -498,10 +523,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         }
     }
 
-    function challengeEscrowDeposit(
-        bytes32 escrowId,
-        bytes calldata challengerSig
-    ) external {
+    function challengeEscrowDeposit(bytes32 escrowId, bytes calldata challengerSig) external {
         EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
         require(!_isHomeChain(meta.channelId), "only non-home escrows can be challenged");
 
@@ -516,10 +538,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         emit EscrowDepositChallenged(escrowId, meta.initState);
     }
 
-    function finalizeEscrowDeposit(
-        bytes32 escrowId,
-        CrossChainState calldata candidate
-    ) external {
+    function finalizeEscrowDeposit(bytes32 escrowId, CrossChainState calldata candidate) external {
         require(candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT, "invalid intent");
 
         EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
@@ -531,7 +550,9 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         if (_isHomeChain(meta.channelId)) {
             // HOME CHAIN: Update channel via ChannelEngine
             ChannelMeta storage channelMeta = _channels[meta.channelId];
-            ChannelEngine.TransitionContext memory ctx = _buildChannelContext(meta.channelId, _nodeBalances[channelMeta.definition.node][candidate.homeState.token]);
+            ChannelEngine.TransitionContext memory ctx = _buildChannelContext(
+                meta.channelId, _nodeBalances[channelMeta.definition.node][candidate.homeState.token]
+            );
             ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
             _applyEffects(meta.channelId, channelMeta.definition, candidate, effects);
@@ -540,8 +561,10 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             return;
         } else {
             // NON-HOME CHAIN: Update via EscrowDepositEngine
-            EscrowDepositEngine.TransitionContext memory ctx = _buildEscrowDepositContext(escrowId, _nodeBalances[node][candidate.nonHomeState.token]);
-            EscrowDepositEngine.TransitionEffects memory effects = EscrowDepositEngine.validateTransition(ctx, candidate);
+            EscrowDepositEngine.TransitionContext memory ctx =
+                _buildEscrowDepositContext(escrowId, _nodeBalances[node][candidate.nonHomeState.token]);
+            EscrowDepositEngine.TransitionEffects memory effects =
+                EscrowDepositEngine.validateTransition(ctx, candidate);
 
             _applyEscrowDepositEffects(escrowId, meta.channelId, candidate, effects, user, node);
 
@@ -549,10 +572,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         }
     }
 
-    function initiateEscrowWithdrawal(
-        Definition calldata def,
-        CrossChainState calldata candidate
-    ) external {
+    function initiateEscrowWithdrawal(Definition calldata def, CrossChainState calldata candidate) external {
         require(candidate.intent == StateIntent.INITIATE_ESCROW_WITHDRAWAL, "invalid intent");
 
         bytes32 channelId = Utils.getChannelId(def);
@@ -563,7 +583,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
             ChannelMeta storage meta = _channels[channelId];
 
-            ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
+            ChannelEngine.TransitionContext memory ctx =
+                _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeState.token]);
             ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
             _applyEffects(channelId, meta.definition, candidate, effects);
@@ -576,7 +597,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             bytes32 escrowId = Utils.getEscrowId(channelId, candidate);
 
             EscrowWithdrawalEngine.TransitionContext memory ctx = _buildEscrowWithdrawalContext(escrowId, def.node);
-            EscrowWithdrawalEngine.TransitionEffects memory effects = EscrowWithdrawalEngine.validateTransition(ctx, candidate);
+            EscrowWithdrawalEngine.TransitionEffects memory effects =
+                EscrowWithdrawalEngine.validateTransition(ctx, candidate);
 
             _applyEscrowWithdrawalEffects(escrowId, channelId, candidate, effects, def.user, def.node);
 
@@ -584,10 +606,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         }
     }
 
-    function challengeEscrowWithdrawal(
-        bytes32 escrowId,
-        bytes calldata challengerSig
-    ) external {
+    function challengeEscrowWithdrawal(bytes32 escrowId, bytes calldata challengerSig) external {
         EscrowWithdrawalMeta storage meta = _escrowWithdrawals[escrowId];
         require(!_isHomeChain(meta.channelId), "only non-home escrows can be challenged");
 
@@ -605,10 +624,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         emit EscrowWithdrawalChallenged(escrowId, meta.initState);
     }
 
-    function finalizeEscrowWithdrawal(
-        bytes32 escrowId,
-        CrossChainState calldata candidate
-    ) external {
+    function finalizeEscrowWithdrawal(bytes32 escrowId, CrossChainState calldata candidate) external {
         require(candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL, "invalid intent");
 
         EscrowWithdrawalMeta storage meta = _escrowWithdrawals[escrowId];
@@ -621,7 +637,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         if (_isHomeChain(channelId)) {
             // HOME CHAIN: Update channel via ChannelEngine
             ChannelMeta storage channelMeta = _channels[channelId];
-            ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[channelMeta.definition.node][candidate.homeState.token]);
+            ChannelEngine.TransitionContext memory ctx =
+                _buildChannelContext(channelId, _nodeBalances[channelMeta.definition.node][candidate.homeState.token]);
             ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
             _applyEffects(channelId, channelMeta.definition, candidate, effects);
@@ -630,7 +647,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         } else {
             // Non-Home chain: Update via
             EscrowWithdrawalEngine.TransitionContext memory ctx = _buildEscrowWithdrawalContext(escrowId, node);
-            EscrowWithdrawalEngine.TransitionEffects memory effects = EscrowWithdrawalEngine.validateTransition(ctx, candidate);
+            EscrowWithdrawalEngine.TransitionEffects memory effects =
+                EscrowWithdrawalEngine.validateTransition(ctx, candidate);
 
             _applyEscrowWithdrawalEffects(escrowId, channelId, candidate, effects, user, node);
 
@@ -638,10 +656,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         }
     }
 
-    function initiateMigration(
-        Definition calldata def,
-        CrossChainState calldata candidate
-    ) external {
+    function initiateMigration(Definition calldata def, CrossChainState calldata candidate) external {
         require(candidate.intent == StateIntent.INITIATE_MIGRATION, "invalid intent");
 
         bytes32 channelId = Utils.getChannelId(def);
@@ -662,7 +677,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             _userChannels[def.user].add(channelId);
         }
 
-        ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[def.node][targetCandidate.homeState.token]);
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[def.node][targetCandidate.homeState.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, targetCandidate);
 
         _applyEffects(channelId, def, targetCandidate, effects);
@@ -671,10 +687,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         emit MigrationInitiated(channelId, candidate);
     }
 
-    function finalizeMigration(
-        bytes32 channelId,
-        CrossChainState calldata candidate
-    ) external {
+    function finalizeMigration(bytes32 channelId, CrossChainState calldata candidate) external {
         require(candidate.intent == StateIntent.FINALIZE_MIGRATION, "invalid intent");
 
         ChannelMeta storage meta = _channels[channelId];
@@ -697,7 +710,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             _userChannels[user].remove(channelId);
         }
 
-        ChannelEngine.TransitionContext memory ctx = _buildChannelContext(channelId, _nodeBalances[meta.definition.node][targetCandidate.homeState.token]);
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[meta.definition.node][targetCandidate.homeState.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, targetCandidate);
 
         _applyEffects(channelId, meta.definition, targetCandidate, effects);
@@ -707,10 +721,11 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
     // ========= Internal ==========
 
-    function _buildChannelContext(
-        bytes32 channelId,
-        uint256 nodeBalance
-    ) internal view returns (ChannelEngine.TransitionContext memory ctx) {
+    function _buildChannelContext(bytes32 channelId, uint256 nodeBalance)
+        internal
+        view
+        returns (ChannelEngine.TransitionContext memory ctx)
+    {
         ChannelMeta storage meta = _channels[channelId];
 
         ctx.status = meta.status;
@@ -722,10 +737,11 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         return ctx;
     }
 
-    function _buildEscrowDepositContext(
-        bytes32 escrowId,
-        uint256 nodeAvailableFunds
-    ) internal view returns (EscrowDepositEngine.TransitionContext memory ctx) {
+    function _buildEscrowDepositContext(bytes32 escrowId, uint256 nodeAvailableFunds)
+        internal
+        view
+        returns (EscrowDepositEngine.TransitionContext memory ctx)
+    {
         EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
 
         ctx.status = meta.status;
@@ -738,10 +754,11 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         return ctx;
     }
 
-    function _buildEscrowWithdrawalContext(
-        bytes32 escrowId,
-        address node
-    ) internal view returns (EscrowWithdrawalEngine.TransitionContext memory ctx) {
+    function _buildEscrowWithdrawalContext(bytes32 escrowId, address node)
+        internal
+        view
+        returns (EscrowWithdrawalEngine.TransitionContext memory ctx)
+    {
         EscrowWithdrawalMeta storage meta = _escrowWithdrawals[escrowId];
 
         ctx.status = meta.status;

@@ -27,8 +27,8 @@ library ChannelEngine {
 
     struct TransitionEffects {
         // Fund movements (positive = pull/lock, negative = push/release)
-        int256 userFundsDelta;         // Funds to pull from user (>0) or push to user (<0)
-        int256 nodeFundsDelta;         // Funds to lock from node vault (>0) or release (<0)
+        int256 userFundsDelta; // Funds to pull from user (>0) or push to user (<0)
+        int256 nodeFundsDelta; // Funds to lock from node vault (>0) or release (<0)
 
         // State updates
         ChannelStatus newStatus;
@@ -47,10 +47,11 @@ library ChannelEngine {
      * @param candidate New state to transition to
      * @return effects The calculated effects to apply
      */
-    function validateTransition(
-        TransitionContext memory ctx,
-        CrossChainState memory candidate
-    ) external view returns (TransitionEffects memory effects) {
+    function validateTransition(TransitionContext memory ctx, CrossChainState memory candidate)
+        external
+        view
+        returns (TransitionEffects memory effects)
+    {
         // Phase 1: Universal validation
         _validateUniversal(ctx, candidate);
 
@@ -65,21 +66,20 @@ library ChannelEngine {
 
     // ========== Internal: Phase 1 - Universal Validation ==========
 
-    function _validateUniversal(
-        TransitionContext memory ctx,
-        CrossChainState memory candidate
-    ) internal view {
+    function _validateUniversal(TransitionContext memory ctx, CrossChainState memory candidate) internal view {
         // homeState always represents current chain
         require(candidate.homeState.chainId == block.chainid, "invalid chain id");
         require(candidate.version > ctx.prevState.version || ctx.prevState.version == 0, "invalid version");
 
         // Cross-chain escrow and migration operations require nonHomeState
-        if (candidate.intent == StateIntent.INITIATE_ESCROW_DEPOSIT ||
-            candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT ||
-            candidate.intent == StateIntent.INITIATE_ESCROW_WITHDRAWAL ||
-            candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL ||
-            candidate.intent == StateIntent.INITIATE_MIGRATION ||
-            candidate.intent == StateIntent.FINALIZE_MIGRATION) {
+        if (
+            candidate.intent == StateIntent.INITIATE_ESCROW_DEPOSIT
+                || candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT
+                || candidate.intent == StateIntent.INITIATE_ESCROW_WITHDRAWAL
+                || candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL
+                || candidate.intent == StateIntent.INITIATE_MIGRATION
+                || candidate.intent == StateIntent.FINALIZE_MIGRATION
+        ) {
             require(!candidate.nonHomeState.isEmpty(), "non-home state required for cross-chain operations");
             require(candidate.nonHomeState.chainId != block.chainid, "invalid non-home chain id");
         }
@@ -93,10 +93,11 @@ library ChannelEngine {
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========
 
-    function _calculateEffectsByIntent(
-        TransitionContext memory ctx,
-        CrossChainState memory candidate
-    ) internal view returns (TransitionEffects memory effects) {
+    function _calculateEffectsByIntent(TransitionContext memory ctx, CrossChainState memory candidate)
+        internal
+        view
+        returns (TransitionEffects memory effects)
+    {
         int256 userNfDelta = candidate.homeState.userNetFlow - ctx.prevState.homeState.userNetFlow;
         int256 nodeNfDelta = candidate.homeState.nodeNetFlow - ctx.prevState.homeState.nodeNetFlow;
 
@@ -132,11 +133,11 @@ library ChannelEngine {
         return effects;
     }
 
-    function _calculateCreateEffects(
-        TransitionContext memory ctx,
-        CrossChainState memory candidate,
-        int256 userNfDelta
-    ) internal pure returns (TransitionEffects memory effects) {
+    function _calculateCreateEffects(TransitionContext memory ctx, CrossChainState memory candidate, int256 userNfDelta)
+        internal
+        pure
+        returns (TransitionEffects memory effects)
+    {
         // CREATE-specific validations
         require(candidate.version == 0, "invalid version");
         require(ctx.status == ChannelStatus.VOID, "invalid status");
@@ -158,7 +159,11 @@ library ChannelEngine {
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
         // DEPOSIT-specific validations
-        require(ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN, "invalid status");
+        require(
+            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
+                || ctx.status == ChannelStatus.MIGRATING_IN,
+            "invalid status"
+        );
         require(userNfDelta > 0, "invalid user delta");
 
         // Calculate effects
@@ -177,7 +182,11 @@ library ChannelEngine {
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
         // WITHDRAW-specific validations
-        require(ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN, "invalid status");
+        require(
+            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
+                || ctx.status == ChannelStatus.MIGRATING_IN,
+            "invalid status"
+        );
         require(userNfDelta < 0, "invalid user delta");
 
         // Calculate effects
@@ -196,7 +205,11 @@ library ChannelEngine {
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
         // OPERATE-specific validations (checkpoint)
-        require(ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN, "invalid status");
+        require(
+            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
+                || ctx.status == ChannelStatus.MIGRATING_IN,
+            "invalid status"
+        );
         require(userNfDelta == 0, "invalid user delta");
         require(candidate.homeState.nodeAllocation == 0, "node allocation must be zero");
 
@@ -215,7 +228,11 @@ library ChannelEngine {
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
         // CLOSE-specific validations
-        require(ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN, "invalid status");
+        require(
+            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
+                || ctx.status == ChannelStatus.MIGRATING_IN,
+            "invalid status"
+        );
 
         uint256 allocsSum = candidate.homeState.userAllocation + candidate.homeState.nodeAllocation;
         require(allocsSum <= ctx.lockedFunds, "allocation exceeds locked funds");
@@ -238,7 +255,11 @@ library ChannelEngine {
     ) internal pure returns (TransitionEffects memory effects) {
         // INITIATE_ESCROW_DEPOSIT-specific validations (Home Chain)
         // Node locks liquidity in channel for cross-chain deposit
-        require(ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN, "invalid status");
+        require(
+            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
+                || ctx.status == ChannelStatus.MIGRATING_IN,
+            "invalid status"
+        );
         require(userNfDelta == 0, "user delta must be zero"); // no user funds movement
         // node fund movement may accommodate transfers, thus it can be both positive or negative
         // node allocation may not have changed if previous operation is also initiate escrow deposit
@@ -266,7 +287,11 @@ library ChannelEngine {
         // FINALIZE_ESCROW_DEPOSIT-specific validations (Home Chain)
         // Previous on-chain state MUST be INITIATE_ESCROW_DEPOSIT
         // Funds stay in channel, just move from node allocation to user allocation
-        require(ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN, "invalid status");
+        require(
+            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
+                || ctx.status == ChannelStatus.MIGRATING_IN,
+            "invalid status"
+        );
         require(candidate.homeState.nodeAllocation == 0, "node allocation must be zero");
         // nothing changes from initiate escrow deposit state
         require(userNfDelta == 0, "user delta must be 0");
@@ -303,14 +328,21 @@ library ChannelEngine {
         // INITIATE_ESCROW_WITHDRAWAL-specific validations (Home Chain)
         // Previous on-chain state can be anything, so validate like an OPERATE state + non-home State
         // Prepare for cross-chain withdrawal (state validation only)
-        require(ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN, "invalid status");
+        require(
+            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
+                || ctx.status == ChannelStatus.MIGRATING_IN,
+            "invalid status"
+        );
         require(userNfDelta == 0, "user delta must be zero"); // no user funds movement
         require(candidate.homeState.nodeAllocation == 0, "node allocation must be zero");
 
         // Check home - non-home state consistency
         require(candidate.nonHomeState.userNetFlow == 0, "withdrawal user net flow must be zero");
         require(candidate.nonHomeState.userAllocation == 0, "withdrawal user allocation must be zero");
-        require(candidate.nonHomeState.nodeAllocation.toInt256() == candidate.nonHomeState.nodeNetFlow, "invalid non-home node net flow");
+        require(
+            candidate.nonHomeState.nodeAllocation.toInt256() == candidate.nonHomeState.nodeNetFlow,
+            "invalid non-home node net flow"
+        );
 
         // Calculate effects - no immediate fund movement
         effects.userFundsDelta = nodeNfDelta; // Only node balance adjustments
@@ -329,14 +361,21 @@ library ChannelEngine {
         // FINALIZE_ESCROW_WITHDRAWAL-specific validations (Home Chain)
         // Previous on-chain state can be anything, so validate like an OPERATE state + non-home State
         // Decrease user allocation after cross-chain withdrawal completes
-        require(ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN, "invalid status");
+        require(
+            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
+                || ctx.status == ChannelStatus.MIGRATING_IN,
+            "invalid status"
+        );
         require(userNfDelta == 0, "user delta must be zero"); // no user funds movement
         require(candidate.homeState.nodeAllocation == 0, "node allocation must be zero");
 
         // Check home - non-home state consistency
         require(candidate.nonHomeState.userNetFlow == 0, "withdrawal user net flow must be zero");
         require(candidate.nonHomeState.nodeAllocation == 0, "withdrawal node allocation must be zero");
-        require(candidate.nonHomeState.userAllocation.toInt256() == candidate.nonHomeState.nodeNetFlow, "invalid non-home user net flow");
+        require(
+            candidate.nonHomeState.userAllocation.toInt256() == candidate.nonHomeState.nodeNetFlow,
+            "invalid non-home user net flow"
+        );
 
         // TODO: provide V-1 state (INITIATE_ESCROW_WITHDRAWAL) to validate against?
 
@@ -373,7 +412,6 @@ library ChannelEngine {
             // No delta calculation needed - creating fresh channel
             effects.nodeFundsDelta = candidate.homeState.nodeAllocation.toInt256();
             effects.newStatus = ChannelStatus.MIGRATING_IN;
-
         } else if (ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED) {
             // HOME CHAIN (OUT): Update state
             require(candidate.homeState.chainId == block.chainid, "invalid chain id");
@@ -394,7 +432,6 @@ library ChannelEngine {
             // Calculate effects - may adjust node vault based on net flow delta
             effects.nodeFundsDelta = nodeNfDelta;
             effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
-
         } else {
             revert("invalid status for initiate migration");
         }
@@ -420,7 +457,9 @@ library ChannelEngine {
             uint256 userMigratedAlloc = ctx.prevState.homeState.userAllocation;
 
             // Validate that this completes the migration
-            require(candidate.homeState.userAllocation == userMigratedAlloc, "user allocation must match migrated amount");
+            require(
+                candidate.homeState.userAllocation == userMigratedAlloc, "user allocation must match migrated amount"
+            );
             require(candidate.homeState.nodeAllocation == 0, "node allocation must be zero");
             require(candidate.nonHomeState.userAllocation == 0, "old home user allocation must be zero");
             require(candidate.nonHomeState.nodeAllocation == 0, "old home node allocation must be zero");
@@ -433,7 +472,6 @@ library ChannelEngine {
 
             // Calculate effects - just status change
             effects.newStatus = ChannelStatus.OPERATING;
-
         } else if (ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED) {
             // OLD HOME CHAIN (OUT): Release funds and move to MIGRATED_OUT
             // HomeState represents old home (current chain)
@@ -451,7 +489,6 @@ library ChannelEngine {
             effects.newStatus = ChannelStatus.MIGRATED_OUT;
             effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
             effects.closeChannel = true;
-
         } else {
             revert("invalid status for finalize migration");
         }
@@ -466,7 +503,8 @@ library ChannelEngine {
         CrossChainState memory candidate,
         TransitionEffects memory effects
     ) internal pure {
-        int256 expectedLocked = int256(ctx.lockedFunds) + effects.userFundsDelta + effects.nodeFundsDelta;
+        int256 expectedLocked =
+            int256(ctx.lockedFunds) + effects.userFundsDelta + effects.nodeFundsDelta;
         require(expectedLocked >= 0, "negative locked funds");
 
         // Check that allocations equal expected locked funds (unless deleting)

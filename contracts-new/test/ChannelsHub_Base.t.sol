@@ -70,12 +70,7 @@ contract ChannelsHubTest_Base is Test {
                 nodeNetFlow: netFlows[1]
             }),
             nonHomeState: State({
-                chainId: 0,
-                token: address(0),
-                userAllocation: 0,
-                userNetFlow: 0,
-                nodeAllocation: 0,
-                nodeNetFlow: 0
+                chainId: 0, token: address(0), userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
             }),
             userSig: "",
             nodeSig: ""
@@ -116,7 +111,11 @@ contract ChannelsHubTest_Base is Test {
         });
     }
 
-    function signStateWithBothParties(CrossChainState memory state, bytes32 channelId, uint256 userPK) internal pure returns (CrossChainState memory) {
+    function signStateWithBothParties(CrossChainState memory state, bytes32 channelId, uint256 userPK)
+        internal
+        pure
+        returns (CrossChainState memory)
+    {
         state.userSig = TestUtils.signStateEIP191(vm, channelId, state, userPK);
         state.nodeSig = TestUtils.signStateEIP191(vm, channelId, state, nodePK);
         return state;
@@ -131,9 +130,13 @@ contract ChannelsHubTest_Base is Test {
         string memory description
     ) internal view {
         (,, CrossChainState memory latestState,,) = cHub.getChannelData(channelId);
-        assertEq(latestState.homeState.userAllocation, expectedUserAllocation, string.concat("User allocation ", description));
+        assertEq(
+            latestState.homeState.userAllocation, expectedUserAllocation, string.concat("User allocation ", description)
+        );
         assertEq(latestState.homeState.userNetFlow, expectedUserNetFlow, string.concat("User net flow ", description));
-        assertEq(latestState.homeState.nodeAllocation, expectedNodeAllocation, string.concat("Node allocation ", description));
+        assertEq(
+            latestState.homeState.nodeAllocation, expectedNodeAllocation, string.concat("Node allocation ", description)
+        );
         assertEq(latestState.homeState.nodeNetFlow, expectedNodeNetFlow, string.concat("Node net flow ", description));
 
         uint256 nodeBalance = cHub.getVaultBalance(node, address(token));

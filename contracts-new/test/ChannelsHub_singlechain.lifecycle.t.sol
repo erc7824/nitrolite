@@ -15,11 +15,7 @@ import {CrossChainState, Definition, StateIntent, State, ChannelStatus} from "..
 contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
     function test_happyPath() public {
         Definition memory def = Definition({
-            challengeDuration: CHALLENGE_DURATION,
-            user: alice,
-            node: node,
-            nonce: NONCE,
-            metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def);
@@ -45,12 +41,7 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
                 nodeNetFlow: 0
             }),
             nonHomeState: State({
-                chainId: 0,
-                token: address(0),
-                userAllocation: 0,
-                userNetFlow: 0,
-                nodeAllocation: 0,
-                nodeNetFlow: 0
+                chainId: 0, token: address(0), userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
             }),
             userSig: "",
             nodeSig: ""

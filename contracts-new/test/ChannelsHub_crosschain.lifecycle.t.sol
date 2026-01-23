@@ -10,7 +10,14 @@ import {TestUtils} from "./TestUtils.sol";
 
 import {ChannelsHub} from "../src/ChannelsHub.sol";
 import {Utils} from "../src/Utils.sol";
-import {CrossChainState, Definition, StateIntent, State, ChannelStatus, EscrowStatus} from "../src/interfaces/Types.sol";
+import {
+    CrossChainState,
+    Definition,
+    StateIntent,
+    State,
+    ChannelStatus,
+    EscrowStatus
+} from "../src/interfaces/Types.sol";
 
 contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
     bytes32 bobChannelId;
@@ -20,11 +27,7 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
         super.setUp();
 
         bobDef = Definition({
-            challengeDuration: CHALLENGE_DURATION,
-            user: bob,
-            node: node,
-            nonce: NONCE,
-            metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION, user: bob, node: node, nonce: NONCE, metadata: bytes32(0)
         });
 
         bobChannelId = Utils.getChannelId(bobDef);
@@ -32,11 +35,7 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
 
     function test_happyPath_homeChain() public {
         Definition memory def = Definition({
-            challengeDuration: CHALLENGE_DURATION,
-            user: alice,
-            node: node,
-            nonce: NONCE,
-            metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def);
@@ -62,12 +61,7 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
                 nodeNetFlow: 0
             }),
             nonHomeState: State({
-                chainId: 0,
-                token: address(0),
-                userAllocation: 0,
-                userNetFlow: 0,
-                nodeAllocation: 0,
-                nodeNetFlow: 0
+                chainId: 0, token: address(0), userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
             }),
             userSig: "",
             nodeSig: ""
@@ -90,10 +84,13 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
             state,
             StateIntent.INITIATE_ESCROW_DEPOSIT,
             // user amounts stay the same, node amounts increase by 500
-            [uint256(958), uint256(500)], [int256(1000), int256(458)],
-            42, address(42), // chainId 42, token address 42 for simplicity
+            [uint256(958), uint256(500)],
+            [int256(1000), int256(458)],
+            42,
+            address(42), // chainId 42, token address 42 for simplicity
             // user deposit amount appear in allocation and net flow on non-home side
-            [uint256(500), uint256(0)], [int256(500), int256(0)]
+            [uint256(500), uint256(0)],
+            [int256(500), int256(0)]
         );
         state = signStateWithBothParties(state, channelId, alicePK);
 
@@ -112,10 +109,13 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
             state,
             StateIntent.FINALIZE_ESCROW_DEPOSIT,
             // user allocation amount increases by cross-chain deposit, node allocation goes to 0
-            [uint256(1458), uint256(0)], [int256(1000), int256(458)],
-            42, address(42),
+            [uint256(1458), uint256(0)],
+            [int256(1000), int256(458)],
+            42,
+            address(42),
             // user deposit amount is zeroed, and withdrawn (unlocked) by node via net flow on non-home side
-            [uint256(0), uint256(0)], [int256(500), int256(-500)]
+            [uint256(0), uint256(0)],
+            [int256(500), int256(-500)]
         );
         state = signStateWithBothParties(state, channelId, alicePK);
 
@@ -156,10 +156,13 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
             state,
             StateIntent.INITIATE_ESCROW_WITHDRAWAL,
             // home chain stays the same
-            [uint256(1217), uint256(0)], [int256(750), int256(467)],
-            42, address(42), // chainId 42, token address 42 for simplicity
+            [uint256(1217), uint256(0)],
+            [int256(750), int256(467)],
+            42,
+            address(42), // chainId 42, token address 42 for simplicity
             // node deposits withdrawal amount
-            [uint256(0), uint256(750)], [int256(0), int256(750)]
+            [uint256(0), uint256(750)],
+            [int256(0), int256(750)]
         );
         state.nodeSig = TestUtils.signStateEIP191(vm, channelId, state, nodePK);
 
@@ -172,10 +175,13 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
             state,
             StateIntent.FINALIZE_ESCROW_WITHDRAWAL,
             // user allocation decreases by withdrawal amount, node allocation stays 0, node net flow decreases by withdrawal amount
-            [uint256(467), uint256(0)], [int256(750), int256(-283)],
-            42, address(42), // chainId 42, token address 42 for simplicity
+            [uint256(467), uint256(0)],
+            [int256(750), int256(-283)],
+            42,
+            address(42), // chainId 42, token address 42 for simplicity
             // user withdraws the amount (negative net flow)
-            [uint256(0), uint256(0)], [int256(-750), int256(750)]
+            [uint256(0), uint256(0)],
+            [int256(-750), int256(750)]
         );
         state = signStateWithBothParties(state, channelId, alicePK);
 
@@ -208,10 +214,13 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
             state,
             StateIntent.INITIATE_MIGRATION,
             // home chain stays the same
-            [uint256(469), uint256(0)], [int256(750), int256(-281)],
-            42, address(42), // chainId 42, token address 42 for simplicity
+            [uint256(469), uint256(0)],
+            [int256(750), int256(-281)],
+            42,
+            address(42), // chainId 42, token address 42 for simplicity
             // node deposits full user allocation amount
-            [uint256(0), uint256(469)], [int256(0), int256(469)]
+            [uint256(0), uint256(469)],
+            [int256(0), int256(469)]
         );
         state.nodeSig = TestUtils.signStateEIP191(vm, channelId, state, nodePK);
 
@@ -224,10 +233,13 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
             state,
             StateIntent.FINALIZE_MIGRATION,
             // channel closes on old home chain, allocations go to 0, net flows balance out
-            [uint256(0), uint256(0)], [int256(750), int256(-750)],
-            42, address(42), // chainId 42, token address 42 for simplicity
+            [uint256(0), uint256(0)],
+            [int256(750), int256(-750)],
+            42,
+            address(42), // chainId 42, token address 42 for simplicity
             // user receives allocation on new home chain
-            [uint256(469), uint256(0)], [int256(0), int256(469)]
+            [uint256(469), uint256(0)],
+            [int256(0), int256(469)]
         );
         // home state and non-home state are swapped
         State memory temp = state.homeState;
@@ -246,7 +258,9 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
 
         // Check MIGRATED_OUT status after channel was migrated
         (ChannelStatus finalStatus,,,,) = cHub.getChannelData(channelId);
-        assertEq(uint8(finalStatus), uint8(ChannelStatus.MIGRATED_OUT), "Channel should be MIGRATED_OUT after migration");
+        assertEq(
+            uint8(finalStatus), uint8(ChannelStatus.MIGRATED_OUT), "Channel should be MIGRATED_OUT after migration"
+        );
     }
 
     function test_depositEscrow_nonHomeChain() public {
@@ -295,7 +309,13 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
         assertEq(token.balanceOf(bob), INITIAL_BALANCE - 500, "User balance after escrow deposit");
 
         // Verify escrow struct is updated on ChannelsHub
-        (EscrowStatus finalEscrowStatus, uint64 unlockAt, uint64 challengeExpiresAt, uint256 lockedAmount, CrossChainState memory initState) = cHub.getEscrowDepositData(escrowId);
+        (
+            EscrowStatus finalEscrowStatus,
+            uint64 unlockAt,
+            uint64 challengeExpiresAt,
+            uint256 lockedAmount,
+            CrossChainState memory initState
+        ) = cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.INITIALIZED), "Escrow should be INITIALIZED");
         uint64 expectedUnlockAt = uint64(block.timestamp + cHub.ESCROW_DEPOSIT_UNLOCK_DELAY());
         assertEq(unlockAt, expectedUnlockAt, "Escrow unlockAt is incorrect");
@@ -399,7 +419,12 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
         assertEq(nodeBalanceAfter, nodeBalanceBefore - 750, "Node balance after escrow withdrawal");
 
         // Verify escrow struct is updated on ChannelsHub: escrow data exists, `locked` equals to withdrawalAmount
-        (EscrowStatus finalEscrowStatus, uint64 challengeExpireAt, uint256 lockedAmount, CrossChainState memory initState) = cHub.getEscrowWithdrawalData(escrowId);
+        (
+            EscrowStatus finalEscrowStatus,
+            uint64 challengeExpireAt,
+            uint256 lockedAmount,
+            CrossChainState memory initState
+        ) = cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.INITIALIZED), "Escrow should be INITIALIZED");
         assertEq(challengeExpireAt, 0, "Escrow challengeExpireAt should be zero");
         assertEq(lockedAmount, 750, "Escrow locked amount is incorrect");
@@ -411,9 +436,12 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
         state = nextCrossChainState(
             state,
             StateIntent.FINALIZE_ESCROW_WITHDRAWAL,
-            [uint256(467), uint256(0)], [int256(750), int256(-283)],
-            uint64(block.chainid), address(token),
-            [uint256(0), uint256(0)], [int256(-750), int256(750)]
+            [uint256(467), uint256(0)],
+            [int256(750), int256(-283)],
+            uint64(block.chainid),
+            address(token),
+            [uint256(0), uint256(0)],
+            [int256(-750), int256(750)]
         );
         state = signStateWithBothParties(state, bobChannelId, bobPK);
 

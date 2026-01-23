@@ -61,6 +61,8 @@ type DatabaseStore interface {
 	// EnsureNoOngoingStateTransitions validates that no conflicting blockchain operations are pending.
 	EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error
 
+	// --- Blockchain Action Operations ---
+
 	// ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate withdrawal.
 	// This queues the state to be submitted on-chain to initiate an escrow withdrawal.
 	ScheduleInitiateEscrowWithdrawal(stateID string) error
@@ -76,6 +78,22 @@ type DatabaseStore interface {
 	// ScheduleFinalizeEscrowWithdrawal schedules a checkpoint for an escrow withdrawal operation.
 	// This queues the state to be submitted on-chain to finalize an escrow withdrawal.
 	ScheduleFinalizeEscrowWithdrawal(stateID string) error
+
+	// Fail marks a blockchain action as failed and increments the retry counter.
+	Fail(actionID int64, err string) error
+
+	// FailNoRetry marks a blockchain action as failed without incrementing the retry counter.
+	FailNoRetry(actionID int64, err string) error
+
+	// RecordAttempt records a failed attempt for a blockchain action and increments the retry counter.
+	// The action remains in pending status.
+	RecordAttempt(actionID int64, err string) error
+
+	// Complete marks a blockchain action as completed with the given transaction hash.
+	Complete(actionID int64, txHash string) error
+
+	// GetActions retrieves pending blockchain actions, optionally limited by count.
+	GetActions(limit uint8) ([]BlockchainAction, error)
 
 	// --- App Session Operations ---
 

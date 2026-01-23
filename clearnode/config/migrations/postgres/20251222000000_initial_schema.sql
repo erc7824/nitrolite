@@ -142,8 +142,8 @@ CREATE INDEX idx_contract_events_block ON contract_events(chain_id, block_number
 CREATE TABLE blockchain_actions (
     id BIGSERIAL PRIMARY KEY,
     action_type SMALLINT NOT NULL,
-    state_id CHAR(66) NOT NULL,
-    action_data TEXT NOT NULL, -- JSON
+    state_id CHAR(66),
+    action_data TEXT, -- JSON
     status SMALLINT NOT NULL DEFAULT 0,
     retry_count INTEGER NOT NULL DEFAULT 0,
     last_error TEXT,
@@ -153,7 +153,7 @@ CREATE TABLE blockchain_actions (
     FOREIGN KEY (state_id) REFERENCES channel_states(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_blockchain_actions_pending ON blockchain_actions(status, created_at) WHERE status = 'pending';
+CREATE INDEX idx_blockchain_actions_pending ON blockchain_actions(status, created_at) WHERE status = 0;
 CREATE INDEX idx_blockchain_actions_state_id ON blockchain_actions(state_id);
 
 -- Session keys table (LEGACY): Session keys with spending caps

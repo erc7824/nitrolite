@@ -351,16 +351,152 @@ If enforcement stalls:
 
 ## Home chain migration
 
-Migration is a special case of escrow withdrawal:
+Migration enables moving the channel's "home" security chain from one blockchain to another, preserving allocations and cumulative accounting.
 
-* User changes which chain is the “home” security chain.
-* Node locks liquidity on the target chain.
-* Final execution state:
+Like other cross-chain operations, migration is **two-phase** and **optimistic**.
 
+---
+
+### Preparation phase (INITIATE_MIGRATION)
+
+The preparation phase establishes the channel on the target (non-home) chain:
+
+* A preparation state is constructed with:
+  * intent = INITIATE_MIGRATION,
+  * non-home state where Node deposits liquidity equal to User's allocation on the home chain.
+
+**On the non-home chain:**
+
+* This state is submitted via `initiateMigrationIn()`.
+* Effect:
+  * creates a channel on the non-home chain with status `MIGRATING_IN`,
+  * locks Node's funds on the non-home chain.
+* Implementation note: States are swapped before storing to maintain the invariant that `homeState` represents the current chain.
+
+**On the home chain:**
+
+* The preparation state **can be submitted** via `initiateMigrationOut()`:
+  * updates the channel's latest state,
+  * keeps the channel in `OPERATING` status,
+  * can clear a challenge (following standard challenge resolution flow).
+* The preparation state **cannot be checkpointed** via `checkpoint()`:
+  * `checkpoint()` explicitly rejects states with migration intents.
+* The home-chain channel **can be challenged** with a preparation state:
+  * this enables dispute resolution if something goes wrong,
+  * a valid FINALIZE_MIGRATION execution state can move the channel from `DISPUTED` to `MIGRATED_OUT`,
+  * otherwise, after `challengeExpireAt`, funds may be withdrawn according to standard challenge rules.
+
+---
+
+### Execution phase (FINALIZE_MIGRATION)
+
+The execution phase completes the migration by swapping home and non-home roles:
+
+* An execution state is constructed that:
+  * swaps the `homeState` and `nonHomeState` from the preparation phase,
+  * swaps allocations between User and Node in each state,
+  * intent = FINALIZE_MIGRATION.
+
+**On the old home chain:**
+
+* This state is submitted via `finalizeMigrationOut()`:
   * releases Node liquidity on the old home chain,
-  * establishes allocations and net flows on the new home chain.
+  * moves the channel to `MIGRATED_OUT` status,
+  * can clear a challenge (moving from `DISPUTED` to `MIGRATED_OUT`).
+* Implementation note: States are swapped before validation to maintain the invariant that `homeState` represents the current chain.
 
-This state may need to be enforced to clear challenges.
+**On the new home chain** (old non-home chain):
+
+* The execution state **may be submitted explicitly** via `finalizeMigrationIn()`:
+  * moves the channel from `MIGRATING_IN` to `OPERATING`.
+* However, the **intended usage** is to combine the execution phase with a subsequent operation:
+  * any on-chain call (deposit, withdrawal, checkpoint, escrow initiate/finalize, or close) can be applied **on top of** the execution phase state,
+  * this implicitly completes the migration and transitions the channel to `OPERATING`.
+* The new home chain can be challenged with the execution state (or any newer valid state), triggering normal challenge resolution.
+
+---
+
+### Migrating back
+
+A channel on a chain with status `MIGRATED_OUT` can be migrated back:
+
+* Submitting a new preparation phase state via `initiateMigrationIn()` on that chain:
+  * moves the channel from `MIGRATED_OUT` to `MIGRATING_IN`,
+  * initiates a reverse migration flow.
+
+This enables round-trip migration as needed.
+
+---
+
+### Implementation: State Representation and Delta Calculation
+
+Migration presents a unique challenge for on-chain implementation: **which state represents the current chain changes during migration**.
+
+#### The Problem
+
+The protocol describes migration as swapping `homeState` and `nonHomeState` roles, but this creates semantic ambiguity for on-chain validation:
+
+1. **Preparation phase on non-home chain**: Actions (node deposits liquidity) are encoded in `nonHomeState`, but after the channel is created, subsequent operations must calculate deltas from this state—even though validation logic assumes `homeState` represents the current chain.
+
+2. **Execution phase on old home chain**: After the user swaps states in the execution phase state, `nonHomeState` represents the old home (current chain), but validation logic expects `homeState` to represent the current chain.
+
+3. **Delta calculation inconsistency**: After `INITIATE_MIGRATION` on the non-home chain creates a `MIGRATING_IN` channel, the next operation (e.g., deposit) cannot correctly calculate deltas because the previous state's allocations are in `nonHomeState`, not `homeState`.
+
+#### The Solution: Context-Based Validation + Selective State Swapping
+
+To maintain the invariant that **homeState always represents the chain where execution happens**, the implementation uses:
+
+**1. Two Migration Intents with Context-Based Behavior:**
+
+* `INITIATE_MIGRATION`: Single intent used on both home and non-home chains
+* `FINALIZE_MIGRATION`: Single intent used on both old home and new home chains
+
+The same signed state can be submitted on both chains. The contract determines the correct behavior based on the channel status:
+* INITIATE_MIGRATION + status VOID/MIGRATED_OUT → non-home chain behavior (create MIGRATING_IN)
+* INITIATE_MIGRATION + status OPERATING/DISPUTED → home chain behavior (update state)
+* FINALIZE_MIGRATION + status MIGRATING_IN → new home chain behavior (move to OPERATING)
+* FINALIZE_MIGRATION + status OPERATING/DISPUTED → old home chain behavior (move to MIGRATED_OUT)
+
+**2. Four ChannelsHub Functions:**
+
+* `initiateMigrationIn()`: Called on non-home chain to create `MIGRATING_IN` channel
+* `initiateMigrationOut()`: Called on home chain to update state
+* `finalizeMigrationIn()`: Called on new home chain to move `MIGRATING_IN` → `OPERATING`
+* `finalizeMigrationOut()`: Called on old home chain to release funds and move to `MIGRATED_OUT`
+
+All functions accept the same intents (INITIATE_MIGRATION or FINALIZE_MIGRATION), allowing the same signed state to be used on both chains.
+
+**2. Selective State Swapping (only where needed):**
+
+* **`INITIATE_MIGRATION_IN`**: Swap `homeState` ↔ `nonHomeState` before storing
+  * Incoming state has actions in `nonHomeState` (new home = current chain)
+  * After swap, stored state has actions in `homeState` (current chain)
+  * Result: Next operation calculates deltas correctly from `homeState`
+
+* **`FINALIZE_MIGRATION_OUT`**: Swap `homeState` ↔ `nonHomeState` before validation
+  * Incoming state (after user swaps) has old home actions in `nonHomeState` (current chain)
+  * After swap, validation sees actions in `homeState` (current chain)
+  * Result: Validation and fund release logic work correctly
+
+* **No swap needed** for `INITIATE_MIGRATION_OUT` and `FINALIZE_MIGRATION_IN` (homeState already represents current chain)
+
+**3. Special Delta Calculation for `FINALIZE_MIGRATION_IN`:**
+
+When finalizing migration on the new home chain, the previous state (from `INITIATE_MIGRATION_IN`) has allocations in `nonHomeState` (before swap) but was swapped when stored. Delta calculation must account for this:
+
+```
+delta = candidate.homeState.netFlow - prevStoredState.homeState.netFlow
+```
+
+This works because `prevStoredState` was swapped during `INITIATE_MIGRATION_IN`.
+
+#### Implementation Notes
+
+* Signatures are validated **before** swapping (using the original signed state)
+* After swapping, signatures are invalidated (`userSig = ""`, `nodeSig = ""`) to prevent misuse
+* The swapped state is only used internally for storage and validation
+* Events emit the original signed state (before swap) for off-chain observability
+* This approach maintains the critical invariant: **ChannelEngine always sees homeState as the current chain**
 
 ---
 

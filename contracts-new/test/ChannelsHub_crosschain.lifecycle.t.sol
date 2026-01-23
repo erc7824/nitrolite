@@ -216,18 +216,18 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
         state.nodeSig = TestUtils.signStateEIP191(vm, channelId, state, nodePK);
 
         // on chainId 42:
-        // channelsHub.initiateMigration(channelId, state)
+        // channelsHub.initiateMigrationIn(channelId, state)
         // NOTE: see a `test_migration_nonHomeChain` test for that
 
-        // finalize migration on home chain
+        // finalize migration on old home chain
         state = nextCrossChainState(
             state,
             StateIntent.FINALIZE_MIGRATION,
-            // channel closes on home chain, allocations go to 0, net flows balance out
+            // channel closes on old home chain, allocations go to 0, net flows balance out
             [uint256(0), uint256(0)], [int256(750), int256(-750)],
             42, address(42), // chainId 42, token address 42 for simplicity
             // user receives allocation on new home chain
-            [uint256(469), uint256(0)], [int256(469), int256(-469)]
+            [uint256(469), uint256(0)], [int256(0), int256(469)]
         );
         // home state and non-home state are swapped
         State memory temp = state.homeState;
@@ -235,18 +235,18 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
         state.nonHomeState = temp;
         state = signStateWithBothParties(state, channelId, alicePK);
 
-        // vm.prank(node);
-        // cHub.finalizeMigration(channelId, state);
+        vm.prank(node);
+        cHub.finalizeMigration(channelId, state);
 
-        // // Verify channel is migrated out
-        // verifyChannelState(channelId, 0, 750, 0, -750, "after migration");
+        // Verify channel is migrated out
+        verifyChannelState(channelId, 0, 750, 0, -750, "after migration");
 
-        // // Verify user balance hasn't changed (migration doesn't move funds on home chain)
-        // assertEq(token.balanceOf(alice), INITIAL_BALANCE - DEPOSIT_AMOUNT, "User balance after migration");
+        // Verify user balance hasn't changed (migration doesn't move funds on home chain)
+        assertEq(token.balanceOf(alice), INITIAL_BALANCE - 750, "User balance after migration");
 
-        // // Check MIGRATED_OUT status after channel was migrated
-        // (ChannelStatus finalStatus,,,,) = cHub.getChannelData(channelId);
-        // assertEq(uint8(finalStatus), uint8(ChannelStatus.MIGRATED_OUT), "Channel should be MIGRATED_OUT after migration");
+        // Check MIGRATED_OUT status after channel was migrated
+        (ChannelStatus finalStatus,,,,) = cHub.getChannelData(channelId);
+        assertEq(uint8(finalStatus), uint8(ChannelStatus.MIGRATED_OUT), "Channel should be MIGRATED_OUT after migration");
     }
 
     function test_depositEscrow_nonHomeChain() public {
@@ -433,19 +433,17 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
     }
 
     function test_migration_nonHomeChain() public {
-        vm.skip(true);
-
         // Check VOID status
         (ChannelStatus status,,,,) = cHub.getChannelData(bobChannelId);
         assertEq(uint8(status), uint8(ChannelStatus.VOID), "Channel should be VOID on non-home chain");
 
         uint256 nodeBalanceBefore = cHub.getVaultBalance(node, address(token));
-        uint256 userBalanceBefore = cHub.getVaultBalance(bob, address(token));
+        uint256 userBalanceBefore = token.balanceOf(bob);
 
-        // state from the "happyPath" test, but with home and nonHome states swapped
+        // state from the "happyPath" test
         CrossChainState memory state = CrossChainState({
             version: 42,
-            intent: StateIntent.INITIATE_ESCROW_DEPOSIT,
+            intent: StateIntent.INITIATE_MIGRATION,
             homeState: State({
                 chainId: 42,
                 token: address(42),
@@ -471,13 +469,13 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
         cHub.initiateMigration(bobDef, state);
         // TODO: in ChannelEngine it should be checked that no channel exists with such channelId, and that nonHomeState only includes the same `userAllocation` as in the homeState
 
-        // Verify user node's after migration (should have deposited 469)
+        // Verify node's balance after migration (should have locked 469)
         uint256 nodeBalanceAfter = cHub.getVaultBalance(node, address(token));
-        assertEq(nodeBalanceAfter, nodeBalanceBefore - 750, "Node balance after escrow withdrawal");
+        assertEq(nodeBalanceAfter, nodeBalanceBefore - 469, "Node balance after migration initiation");
 
         // user balance should not have changed
         uint256 userBalanceAfter = token.balanceOf(bob);
-        assertEq(userBalanceAfter, userBalanceBefore, "User balance after escrow withdrawal");
+        assertEq(userBalanceAfter, userBalanceBefore, "User balance after migration initiation");
 
         // Check MIGRATING_IN status
         (status,,,,) = cHub.getChannelData(bobChannelId);
@@ -485,15 +483,15 @@ contract ChannelsHubTest_CrossChain_Lifecycle is ChannelsHubTest_Base {
 
         // sign finalize migration state by swapping homeState and nonHomeState, and swapping allocations
         state = CrossChainState({
-            version: 42,
-            intent: StateIntent.INITIATE_ESCROW_DEPOSIT,
+            version: 43,
+            intent: StateIntent.FINALIZE_MIGRATION,
             nonHomeState: State({
                 chainId: 42,
                 token: address(42),
                 userAllocation: 0,
                 userNetFlow: 750,
-                nodeAllocation: 469,
-                nodeNetFlow: -281
+                nodeAllocation: 0,
+                nodeNetFlow: -750
             }),
             homeState: State({
                 chainId: uint64(block.chainid),

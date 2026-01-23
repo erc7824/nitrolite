@@ -1,6 +1,6 @@
-# Suggested Contract Design for Nitrolite Protocol v2
+# Suggested Contract Design for Nitrolite Protocol v1
 
-## Context: What Changed from v1
+## Context: What Changed from v0.5
 
 The Custody.sol implementation handles a relatively simple protocol: channels can be created, funded, checkpointed, challenged, resized, and closed. All operations happen on a single chain, and the adjudicator is responsible for validating state transitions.
 
@@ -40,7 +40,7 @@ Instead of scattering this logic across many functions, you can centralize it in
 
 ### High-Level Structure
 
-The main contract, `ChannelsHub.sol`, remains the single source of storage and fund transfers. It contains:
+The main contract, `ChannelHub.sol`, remains the single source of storage and fund transfers. It contains:
 
 - All storage mappings (channels, escrow deposits, escrow withdrawals, node balances)
 - All public entrypoints (thin wrappers of 10-15 lines each)
@@ -187,7 +187,7 @@ When using libraries in Solidity, there's an important distinction between inter
 
 For the Nitrolite protocol, you should use **external functions** in your engine libraries. Here's why:
 
-The cross-chain validation logic will be extensive (hundreds of lines for channel operations, escrow deposits, and escrow withdrawals). If you embedded this as internal functions, you would quickly hit the 24KB limit. By using external functions, the engine logic lives in separate library contracts and doesn't bloat your main `ChannelsHub` contract.
+The cross-chain validation logic will be extensive (hundreds of lines for channel operations, escrow deposits, and escrow withdrawals). If you embedded this as internal functions, you would quickly hit the 24KB limit. By using external functions, the engine logic lives in separate library contracts and doesn't bloat your main `ChannelHub` contract.
 
 The gas overhead of approximately 700 gas per DELEGATECALL is negligible compared to:
 - The cost of fund transfers (21,000+ gas for ETH transfers)
@@ -197,33 +197,6 @@ The gas overhead of approximately 700 gas per DELEGATECALL is negligible compare
 The benefits of avoiding contract size issues, maintaining testability, and enabling code reuse far outweigh the minor gas cost increase.
 
 **Important**: When implementing the engine libraries, make sure to declare the `validateTransition()` functions as `external` or `public`, not `internal`. This ensures they're deployed separately and don't count toward your main contract's size limit.
-
-### Summary: Internal vs External Library Functions
-
-| Aspect | Internal Functions | External/Public Functions |
-|--------|-------------------|---------------------------|
-| **Deployment** | Embedded in calling contract | Separate contract deployment |
-| **Contract size impact** | ❌ COUNTS toward 24KB limit | ✅ DOESN'T count toward limit |
-| **Gas cost per call** | ✅ Lower (~100-200 gas) | ❌ Higher (~700 gas DELEGATECALL) |
-| **Code reuse** | ❌ Embedded per contract | ✅ One deployment, many users |
-| **Call mechanism** | JUMP instruction | DELEGATECALL |
-| **When to use** | Small utilities, frequently called | Large business logic, size-constrained |
-
-For the Nitrolite protocol with extensive cross-chain validation logic, external library functions are the correct choice.
-
-## Implementation Strategy
-
-You can implement this incrementally:
-
-**Step 1**: Implement `ChannelEngine.validateTransition()` covering all single-chain operations (CREATE, DEPOSIT, WITHDRAW, OPERATE, CLOSE). Refactor your existing channel functions to use this engine. This proves the pattern works without adding cross-chain complexity yet.
-
-**Step 2**: Implement `EscrowDepositEngine.validateTransition()` for bridging-in (INITIATE_ESCROW_DEPOSIT, challenge, finalize). Add the corresponding public functions as thin wrappers.
-
-**Step 3**: Implement `EscrowWithdrawalEngine.validateTransition()` for bridging-out, following the same pattern.
-
-**Step 4**: Add migration support, which can reuse the escrow patterns.
-
-Each step can be developed, tested, and audited independently.
 
 ## Testing Strategy
 

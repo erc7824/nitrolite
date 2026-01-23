@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 // ========= Channel Types ==========
 
-struct Definition {
+struct ChannelDefinition {
     uint32 challengeDuration;
     address user;
     address node;
@@ -16,10 +16,10 @@ struct Definition {
 
 enum ChannelStatus {
     VOID,
-    MIGRATING_IN,
     OPERATING,
     DISPUTED,
     CLOSED,
+    MIGRATING_IN,
     MIGRATED_OUT
 }
 
@@ -32,40 +32,38 @@ enum EscrowStatus {
 
 enum StateIntent {
     OPERATE,
-    CREATE,
+    CREATE, // FIXME: to be removed (?) when "create channel from non-zero state" is added
     CLOSE,
     DEPOSIT,
+    WITHDRAW,
     INITIATE_ESCROW_DEPOSIT,
     FINALIZE_ESCROW_DEPOSIT,
-    WITHDRAW,
     INITIATE_ESCROW_WITHDRAWAL,
     FINALIZE_ESCROW_WITHDRAWAL,
     INITIATE_MIGRATION,
-    FINALIZE_MIGRATION,
-    LOCK,
-    UNLOCK
+    FINALIZE_MIGRATION
 }
 
-struct CrossChainState {
+struct State {
     uint64 version;
-
     StateIntent intent;
+    bytes32 metadata;
 
     // to be added for fees logic:
     // bytes data;
 
-    State homeState;
-    State nonHomeState;
+    Ledger homeState;
+    Ledger nonHomeState;
 
     bytes userSig;
     bytes nodeSig;
 }
 
-struct State {
+struct Ledger {
     uint64 chainId;
     address token;
 
-    uint256 userAllocation;
+    uint256 userAllocation; // FIXME: investigate whether naming the same thing differently in different components is good
     int256 userNetFlow; // can be negative as user can withdraw funds without depositing them (e.g., on a non-home chain)
 
     uint256 nodeAllocation;

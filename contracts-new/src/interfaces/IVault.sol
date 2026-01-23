@@ -26,14 +26,14 @@ interface IVault {
     /**
      * @notice Gets the balances of multiple accounts for multiple tokens
      * @dev Returns a 2D array where each inner array corresponds to the balances of the tokens for each account
-     * @param accounts Array of account addresses to check balances for
-     * @param tokens Array of token addresses to check balances for (use address(0) for native tokens)
-     * @return A 2D array of balances, where each inner array corresponds to the balances of the tokens for each account
+     * @param account Address of the account to check balance for
+     * @param token Token address to check balance for (use address(0) for native tokens)
+     * @return The balance of the specified token for the specified account
      */
-    function getAccountsBalances(address[] calldata accounts, address[] calldata tokens)
+    function getAccountBalance(address account, address token)
         external
         view
-        returns (uint256[][] memory);
+        returns (uint256);
 
     /**
      * @notice Deposits tokens into the contract

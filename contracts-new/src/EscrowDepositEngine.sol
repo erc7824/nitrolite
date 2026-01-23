@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import {EscrowStatus, CrossChainState, StateIntent} from "./interfaces/Types.sol";
+import {EscrowStatus, State, StateIntent} from "./interfaces/Types.sol";
 
 /**
  * @title EscrowDepositEngine
@@ -14,14 +14,14 @@ library EscrowDepositEngine {
 
     // ========== Constants ==========
 
-    uint64 constant UNLOCK_DELAY = 12 hours;
+    uint64 constant UNLOCK_DELAY = 3 hours;
     uint64 constant CHALLENGE_DURATION = 1 days;
 
     // ========== Structs ==========
 
     struct TransitionContext {
         EscrowStatus status;
-        CrossChainState initState;
+        State initState;
         uint256 lockedAmount;
         uint64 unlockAt;
         uint64 challengeExpiry;
@@ -46,7 +46,7 @@ library EscrowDepositEngine {
      * @param candidate New state to transition to
      * @return effects The calculated effects to apply
      */
-    function validateTransition(TransitionContext memory ctx, CrossChainState memory candidate)
+    function validateTransition(TransitionContext memory ctx, State memory candidate)
         external
         view
         returns (TransitionEffects memory effects)
@@ -81,7 +81,7 @@ library EscrowDepositEngine {
 
     // ========== Internal: Phase 1 - Universal Validation ==========
 
-    function _validateUniversal(TransitionContext memory ctx, CrossChainState memory candidate) internal view {
+    function _validateUniversal(TransitionContext memory ctx, State memory candidate) internal view {
         require(ctx.status != EscrowStatus.FINALIZED, "escrow already finalized");
         uint64 blockchainId = uint64(block.chainid);
         require(candidate.homeState.chainId != blockchainId, "must not be on home chain");
@@ -98,7 +98,7 @@ library EscrowDepositEngine {
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========
 
-    function _calculateEffectsByIntent(TransitionContext memory ctx, CrossChainState memory candidate)
+    function _calculateEffectsByIntent(TransitionContext memory ctx, State memory candidate)
         internal
         view
         returns (TransitionEffects memory effects)
@@ -116,7 +116,7 @@ library EscrowDepositEngine {
         return effects;
     }
 
-    function _calculateInitiateEffects(TransitionContext memory ctx, CrossChainState memory candidate)
+    function _calculateInitiateEffects(TransitionContext memory ctx, State memory candidate)
         internal
         view
         returns (TransitionEffects memory effects)
@@ -140,7 +140,7 @@ library EscrowDepositEngine {
         return effects;
     }
 
-    function _calculateFinalizeEffects(TransitionContext memory ctx, CrossChainState memory candidate)
+    function _calculateFinalizeEffects(TransitionContext memory ctx, State memory candidate)
         internal
         pure
         returns (TransitionEffects memory effects)
@@ -179,7 +179,7 @@ library EscrowDepositEngine {
 
     function _validateInvariants(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         TransitionEffects memory effects
     ) internal pure {
         require(effects.userFundsDelta != 0 || effects.nodeFundsDelta != 0, "no fund movement");

@@ -60,7 +60,7 @@ The off-chain protocol is responsible for:
      * off-chain transfers,
      * app-session lock/unlock events,
      * pending on-chain actions.
-   * These are netted into a new `CrossChainState` by updating per-chain allocations and cumulative net flows.
+   * These are netted into a new `State` by updating per-chain allocations and cumulative net flows.
 
 2. **State authorization**
 
@@ -367,7 +367,7 @@ The preparation phase establishes the channel on the target (non-home) chain:
 
 **On the non-home chain:**
 
-* This state is submitted via `initiateMigrationIn()`.
+* This state is submitted via `initiateMigration()`.
 * Effect:
   * creates a channel on the non-home chain with status `MIGRATING_IN`,
   * locks Node's funds on the non-home chain.
@@ -375,7 +375,7 @@ The preparation phase establishes the channel on the target (non-home) chain:
 
 **On the home chain:**
 
-* The preparation state **can be submitted** via `initiateMigrationOut()`:
+* The preparation state **can be submitted** via `initiateMigration()`:
   * updates the channel's latest state,
   * keeps the channel in `OPERATING` status,
   * can clear a challenge (following standard challenge resolution flow).
@@ -399,7 +399,7 @@ The execution phase completes the migration by swapping home and non-home roles:
 
 **On the old home chain:**
 
-* This state is submitted via `finalizeMigrationOut()`:
+* This state is submitted via `finalizeMigration()`:
   * releases Node liquidity on the old home chain,
   * moves the channel to `MIGRATED_OUT` status,
   * can clear a challenge (moving from `DISPUTED` to `MIGRATED_OUT`).
@@ -407,7 +407,7 @@ The execution phase completes the migration by swapping home and non-home roles:
 
 **On the new home chain** (old non-home chain):
 
-* The execution state **may be submitted explicitly** via `finalizeMigrationIn()`:
+* The execution state **may be submitted explicitly** via `finalizeMigration()`:
   * moves the channel from `MIGRATING_IN` to `OPERATING`.
 * However, the **intended usage** is to combine the execution phase with a subsequent operation:
   * any on-chain call (deposit, withdrawal, checkpoint, escrow initiate/finalize, or close) can be applied **on top of** the execution phase state,
@@ -420,7 +420,7 @@ The execution phase completes the migration by swapping home and non-home roles:
 
 A channel on a chain with status `MIGRATED_OUT` can be migrated back:
 
-* Submitting a new preparation phase state via `initiateMigrationIn()` on that chain:
+* Submitting a new preparation phase state via `initiateMigration()` on that chain:
   * moves the channel from `MIGRATED_OUT` to `MIGRATING_IN`,
   * initiates a reverse migration flow.
 
@@ -459,10 +459,10 @@ The same signed state can be submitted on both chains. The contract determines t
 
 **2. Four ChannelsHub Functions:**
 
-* `initiateMigrationIn()`: Called on non-home chain to create `MIGRATING_IN` channel
-* `initiateMigrationOut()`: Called on home chain to update state
-* `finalizeMigrationIn()`: Called on new home chain to move `MIGRATING_IN` → `OPERATING`
-* `finalizeMigrationOut()`: Called on old home chain to release funds and move to `MIGRATED_OUT`
+* `initiateMigration()`: Called on non-home chain to create `MIGRATING_IN` channel
+* `initiateMigration()`: Called on home chain to update state
+* `finalizeMigration()`: Called on new home chain to move `MIGRATING_IN` → `OPERATING`
+* `finalizeMigration()`: Called on old home chain to release funds and move to `MIGRATED_OUT`
 
 All functions accept the same intents (INITIATE_MIGRATION or FINALIZE_MIGRATION), allowing the same signed state to be used on both chains.
 
@@ -484,7 +484,7 @@ All functions accept the same intents (INITIATE_MIGRATION or FINALIZE_MIGRATION)
 
 When finalizing migration on the new home chain, the previous state (from `INITIATE_MIGRATION_IN`) has allocations in `nonHomeState` (before swap) but was swapped when stored. Delta calculation must account for this:
 
-```
+```solidity
 delta = candidate.homeState.netFlow - prevStoredState.homeState.netFlow
 ```
 

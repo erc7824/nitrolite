@@ -4,29 +4,29 @@ pragma solidity 0.8.30;
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
-import {Definition, CrossChainState, State} from "./interfaces/Types.sol";
+import {ChannelDefinition, State, Ledger} from "./interfaces/Types.sol";
 
 library Utils {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
 
-    function getChannelId(Definition memory def) internal pure returns (bytes32) {
+    function getChannelId(ChannelDefinition memory def) internal pure returns (bytes32) {
         return keccak256(abi.encode(def));
     }
 
-    function getEscrowId(bytes32 channelId, CrossChainState memory ccs) internal pure returns (bytes32) {
-        // NOTE: `escrowId` is basically a hashed packed state, which equals to signed data in pre-EIP-191 signing.
-        // Should this invoke any problems, some text may be appended to the packed data to differentiate it, e.g. "escrow".
-        return keccak256(pack(ccs, channelId));
+    function getEscrowId(bytes32 channelId, uint64 version) internal pure returns (bytes32) {
+        // "channelId, (state-)version" pair is unique as long as participants do not reuse versions
+        return keccak256(abi.encode(channelId, version));
     }
 
     // ========== Cross-Chain State ==========
 
-    function pack(CrossChainState memory ccs, bytes32 channelId) internal pure returns (bytes memory) {
+    function pack(State memory ccs, bytes32 channelId) internal pure returns (bytes memory) {
         return abi.encode(
             channelId,
             ccs.version,
             ccs.intent,
+            ccs.metadata,
             ccs.homeState,
             ccs.nonHomeState
             // omit signatures
@@ -34,7 +34,7 @@ library Utils {
     }
 
     // supports only EIP-191 signatures for now
-    function validateSignatures(CrossChainState memory ccs, bytes32 channelId, address user, address node)
+    function validateSignatures(State memory ccs, bytes32 channelId, address user, address node)
         internal
         pure
     {
@@ -48,14 +48,14 @@ library Utils {
     }
 
     // supports only EIP-191 signatures for now
-    function validateNodeSignature(CrossChainState memory ccs, bytes32 channelId, address node) internal pure {
+    function validateNodeSignature(State memory ccs, bytes32 channelId, address node) internal pure {
         bytes32 ethSignedHash = pack(ccs, channelId).toEthSignedMessageHash();
         address recoveredNode = ethSignedHash.recover(ccs.nodeSig);
         require(recoveredNode == node, "invalid node signature");
     }
 
     function validateChallengerSignature(
-        CrossChainState memory ccs,
+        State memory ccs,
         bytes32 channelId,
         bytes memory challengerSig,
         address user,
@@ -69,9 +69,9 @@ library Utils {
         require(recoveredChallenger == user || recoveredChallenger == node, "challenger must be node or user");
     }
 
-    // ========== State ==========
+    // ========== Ledger ==========
 
-    function isEmpty(State memory state) internal pure returns (bool) {
+    function isEmpty(Ledger memory state) internal pure returns (bool) {
         return state.chainId == 0;
     }
 }

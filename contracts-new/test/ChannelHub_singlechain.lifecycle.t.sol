@@ -4,17 +4,17 @@ pragma solidity 0.8.30;
 import {Vm} from "lib/forge-std/src/Vm.sol";
 import {Test} from "lib/forge-std/src/Test.sol";
 
-import {ChannelsHubTest_Base} from "./ChannelsHub_Base.t.sol";
+import {ChannelHubTest_Base} from "./ChannelHub_Base.t.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {TestUtils} from "./TestUtils.sol";
 
-import {ChannelsHub} from "../src/ChannelsHub.sol";
+import {ChannelHub} from "../src/ChannelHub.sol";
 import {Utils} from "../src/Utils.sol";
-import {CrossChainState, Definition, StateIntent, State, ChannelStatus} from "../src/interfaces/Types.sol";
+import {State, ChannelDefinition, StateIntent, Ledger, ChannelStatus} from "../src/interfaces/Types.sol";
 
-contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
+contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
     function test_happyPath() public {
-        Definition memory def = Definition({
+        ChannelDefinition memory def = ChannelDefinition({
             challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
         });
 
@@ -29,10 +29,11 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
 
         // Initial state: alice deposits 1000
         // Expected: user allocation = 1000, user net flow = 1000, node allocation = 0, node net flow = 0
-        CrossChainState memory state = CrossChainState({
+        State memory state = State({
             version: 0,
             intent: StateIntent.CREATE,
-            homeState: State({
+            metadata: bytes32(0),
+            homeState: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token),
                 userAllocation: 1000,
@@ -40,7 +41,7 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: 0
             }),
-            nonHomeState: State({
+            nonHomeState: Ledger({
                 chainId: 0, token: address(0), userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
             }),
             userSig: "",
@@ -62,7 +63,7 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
         // invoke a checkpoint
         // Expected: user allocation = 958, user net flow = 1000, node allocation = 0, node net flow = -42
         vm.prank(alice);
-        cHub.checkpointChannel(channelId, state, new CrossChainState[](0));
+        cHub.checkpointChannel(channelId, state, new State[](0));
         verifyChannelState(channelId, 958, 1000, 0, -42, "after checkpoint");
 
         // receive 24 (allocation increases by 24, node net flow increases by 24)
@@ -174,7 +175,7 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
         state = signStateWithBothParties(state, channelId, alicePK);
 
         vm.prank(alice);
-        cHub.closeChannel(channelId, state, new CrossChainState[](0));
+        cHub.closeChannel(channelId, state, new State[](0));
 
         // Check CLOSED status after channel closure
         (ChannelStatus finalStatus,,,,) = cHub.getChannelData(channelId);

@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import {ChannelStatus, CrossChainState, StateIntent, State} from "./interfaces/Types.sol";
+import {ChannelStatus, State, StateIntent, Ledger} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 
 /**
@@ -13,13 +13,13 @@ import {Utils} from "./Utils.sol";
 library ChannelEngine {
     using SafeCast for int256;
     using SafeCast for uint256;
-    using {Utils.isEmpty} for State;
+    using {Utils.isEmpty} for Ledger;
 
     // ========== Structs ==========
 
     struct TransitionContext {
         ChannelStatus status;
-        CrossChainState prevState;
+        State prevState;
         uint256 lockedFunds;
         uint256 nodeAvailableFunds;
         uint64 challengeExpiry;
@@ -47,7 +47,7 @@ library ChannelEngine {
      * @param candidate New state to transition to
      * @return effects The calculated effects to apply
      */
-    function validateTransition(TransitionContext memory ctx, CrossChainState memory candidate)
+    function validateTransition(TransitionContext memory ctx, State memory candidate)
         external
         view
         returns (TransitionEffects memory effects)
@@ -66,7 +66,7 @@ library ChannelEngine {
 
     // ========== Internal: Phase 1 - Universal Validation ==========
 
-    function _validateUniversal(TransitionContext memory ctx, CrossChainState memory candidate) internal view {
+    function _validateUniversal(TransitionContext memory ctx, State memory candidate) internal view {
         // homeState always represents current chain
         require(candidate.homeState.chainId == block.chainid, "invalid chain id");
         require(candidate.version > ctx.prevState.version || ctx.prevState.version == 0, "invalid version");
@@ -93,7 +93,7 @@ library ChannelEngine {
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========
 
-    function _calculateEffectsByIntent(TransitionContext memory ctx, CrossChainState memory candidate)
+    function _calculateEffectsByIntent(TransitionContext memory ctx, State memory candidate)
         internal
         view
         returns (TransitionEffects memory effects)
@@ -133,7 +133,7 @@ library ChannelEngine {
         return effects;
     }
 
-    function _calculateCreateEffects(TransitionContext memory ctx, CrossChainState memory candidate, int256 userNfDelta)
+    function _calculateCreateEffects(TransitionContext memory ctx, State memory candidate, int256 userNfDelta)
         internal
         pure
         returns (TransitionEffects memory effects)
@@ -154,7 +154,7 @@ library ChannelEngine {
 
     function _calculateDepositEffects(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
@@ -177,7 +177,7 @@ library ChannelEngine {
 
     function _calculateWithdrawEffects(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
@@ -200,7 +200,7 @@ library ChannelEngine {
 
     function _calculateOperateEffects(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
@@ -223,7 +223,7 @@ library ChannelEngine {
 
     function _calculateCloseEffects(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
@@ -249,7 +249,7 @@ library ChannelEngine {
 
     function _calculateInitiateEscrowDepositEffects(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
@@ -280,7 +280,7 @@ library ChannelEngine {
 
     function _calculateFinalizeEscrowDepositEffects(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
@@ -321,7 +321,7 @@ library ChannelEngine {
 
     function _calculateInitiateEscrowWithdrawalEffects(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
@@ -354,7 +354,7 @@ library ChannelEngine {
 
     function _calculateFinalizeEscrowWithdrawalEffects(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
     ) internal pure returns (TransitionEffects memory effects) {
@@ -389,7 +389,7 @@ library ChannelEngine {
 
     function _calculateInitiateMigrationEffects(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
     ) internal view returns (TransitionEffects memory effects) {
@@ -441,7 +441,7 @@ library ChannelEngine {
 
     function _calculateFinalizeMigrationEffects(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
     ) internal view returns (TransitionEffects memory effects) {
@@ -500,7 +500,7 @@ library ChannelEngine {
 
     function _validateInvariants(
         TransitionContext memory ctx,
-        CrossChainState memory candidate,
+        State memory candidate,
         TransitionEffects memory effects
     ) internal pure {
         int256 expectedLocked =

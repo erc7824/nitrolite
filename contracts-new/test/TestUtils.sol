@@ -4,7 +4,7 @@ pragma solidity ^0.8.30;
 import {Vm} from "lib/forge-std/src/Vm.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
-import {CrossChainState, Definition} from "../src/interfaces/Types.sol";
+import {State} from "../src/interfaces/Types.sol";
 import {Utils} from "../src/Utils.sol";
 
 library TestUtils {
@@ -15,7 +15,7 @@ library TestUtils {
         return abi.encodePacked(r, s, v);
     }
 
-    function signStateEIP191(Vm vm, bytes32 channelId, CrossChainState memory state, uint256 privateKey)
+    function signStateEIP191(Vm vm, bytes32 channelId, State memory state, uint256 privateKey)
         internal
         pure
         returns (bytes memory)

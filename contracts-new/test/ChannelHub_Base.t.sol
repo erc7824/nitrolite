@@ -7,11 +7,11 @@ import {Test} from "lib/forge-std/src/Test.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {TestUtils} from "./TestUtils.sol";
 
-import {ChannelsHub} from "../src/ChannelsHub.sol";
-import {CrossChainState, StateIntent, State} from "../src/interfaces/Types.sol";
+import {ChannelHub} from "../src/ChannelHub.sol";
+import {State, StateIntent, Ledger} from "../src/interfaces/Types.sol";
 
-contract ChannelsHubTest_Base is Test {
-    ChannelsHub public cHub;
+contract ChannelHubTest_Base is Test {
+    ChannelHub public cHub;
     MockERC20 public token;
 
     uint256 constant nodePK = 1;
@@ -29,7 +29,7 @@ contract ChannelsHubTest_Base is Test {
 
     function setUp() public virtual {
         // Deploy contracts
-        cHub = new ChannelsHub();
+        cHub = new ChannelHub();
         token = new MockERC20("Test Token", "TST", 18);
 
         node = vm.addr(nodePK);
@@ -53,15 +53,16 @@ contract ChannelsHubTest_Base is Test {
     }
 
     function nextState(
-        CrossChainState memory state,
+        State memory state,
         StateIntent intent,
         uint256[2] memory allocations,
         int256[2] memory netFlows
-    ) internal pure returns (CrossChainState memory) {
-        return CrossChainState({
+    ) internal pure returns (State memory) {
+        return State({
             version: state.version + 1,
             intent: intent,
-            homeState: State({
+            metadata: state.metadata,
+            homeState: Ledger({
                 chainId: state.homeState.chainId,
                 token: state.homeState.token,
                 userAllocation: allocations[0],
@@ -69,7 +70,7 @@ contract ChannelsHubTest_Base is Test {
                 nodeAllocation: allocations[1],
                 nodeNetFlow: netFlows[1]
             }),
-            nonHomeState: State({
+            nonHomeState: Ledger({
                 chainId: 0, token: address(0), userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
             }),
             userSig: "",
@@ -77,8 +78,8 @@ contract ChannelsHubTest_Base is Test {
         });
     }
 
-    function nextCrossChainState(
-        CrossChainState memory state,
+    function nextState(
+        State memory state,
         StateIntent intent,
         uint256[2] memory allocations,
         int256[2] memory netFlows,
@@ -86,11 +87,12 @@ contract ChannelsHubTest_Base is Test {
         address nonHomeChainToken,
         uint256[2] memory nonHomeAllocations,
         int256[2] memory nonHomeNetFlows
-    ) internal pure returns (CrossChainState memory) {
-        return CrossChainState({
+    ) internal pure returns (State memory) {
+        return State({
             version: state.version + 1,
             intent: intent,
-            homeState: State({
+            metadata: state.metadata,
+            homeState: Ledger({
                 chainId: state.homeState.chainId,
                 token: state.homeState.token,
                 userAllocation: allocations[0],
@@ -98,7 +100,7 @@ contract ChannelsHubTest_Base is Test {
                 nodeAllocation: allocations[1],
                 nodeNetFlow: netFlows[1]
             }),
-            nonHomeState: State({
+            nonHomeState: Ledger({
                 chainId: nonHomeChainId,
                 token: nonHomeChainToken,
                 userAllocation: nonHomeAllocations[0],
@@ -111,10 +113,10 @@ contract ChannelsHubTest_Base is Test {
         });
     }
 
-    function signStateWithBothParties(CrossChainState memory state, bytes32 channelId, uint256 userPK)
+    function signStateWithBothParties(State memory state, bytes32 channelId, uint256 userPK)
         internal
         pure
-        returns (CrossChainState memory)
+        returns (State memory)
     {
         state.userSig = TestUtils.signStateEIP191(vm, channelId, state, userPK);
         state.nodeSig = TestUtils.signStateEIP191(vm, channelId, state, nodePK);
@@ -129,7 +131,7 @@ contract ChannelsHubTest_Base is Test {
         int256 expectedNodeNetFlow,
         string memory description
     ) internal view {
-        (,, CrossChainState memory latestState,,) = cHub.getChannelData(channelId);
+        (,, State memory latestState,,) = cHub.getChannelData(channelId);
         assertEq(
             latestState.homeState.userAllocation, expectedUserAllocation, string.concat("User allocation ", description)
         );
@@ -139,7 +141,7 @@ contract ChannelsHubTest_Base is Test {
         );
         assertEq(latestState.homeState.nodeNetFlow, expectedNodeNetFlow, string.concat("Node net flow ", description));
 
-        uint256 nodeBalance = cHub.getVaultBalance(node, address(token));
+        uint256 nodeBalance = cHub.getAccountBalance(node, address(token));
         uint256 expectedNodeBalance = expectedNodeNetFlow < 0
             ? INITIAL_BALANCE + uint256(-expectedNodeNetFlow)
             : INITIAL_BALANCE - uint256(expectedNodeNetFlow);

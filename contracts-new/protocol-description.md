@@ -349,6 +349,22 @@ If enforcement stalls:
 
 ---
 
+## Escrow Challenge Resolution
+
+If an escrow process is challenged (status becomes `DISPUTED`) and the challenge period expires (`challengeExpireAt` passed) without a resolution:
+
+*   The `finalize` function handles this case explicitly.
+*   If called when `DISPUTED` and expired:
+    1.  Do **not** invoke the channel engine.
+    2.  Manually **unlock the locked funds to the Node**.
+    3.  Zero out `lockedFunds` and `challengeExpireAt`.
+    4.  Set status to `FINALIZED`.
+    5.  Emit a finalization event.
+
+This logic mirrors the channel closure mechanism: if a challenge is not substantiated by a newer state within the timeout, the system defaults to a finalized state that releases locked resources.
+
+---
+
 ## Home chain migration
 
 Migration enables moving the channel's "home" security chain from one blockchain to another, preserving allocations and cumulative accounting.

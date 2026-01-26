@@ -44,23 +44,25 @@ contract ChannelHub is IVault, ReentrancyGuard {
     event ChannelDeposited(bytes32 indexed channelId, State candidate);
     event ChannelWithdrawn(bytes32 indexed channelId, State candidate);
     event ChannelCheckpointed(bytes32 indexed channelId, State candidate);
-    event ChannelChallenged(bytes32 indexed channelId, State candidate, uint256 challengeExpiry);
+    event ChannelChallenged(bytes32 indexed channelId, State candidate, uint64 challengeExpireAt);
     event ChannelClosed(bytes32 indexed channelId, State finalState);
 
     event EscrowDepositInitiated(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
-    event EscrowDepositInitiatedOnHome(bytes32 indexed channelId, State state);
+    event EscrowDepositInitiatedOnHome(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
     event EscrowDepositChallenged(bytes32 indexed escrowId, State state, uint64 challengeExpireAt);
     event EscrowDepositFinalized(bytes32 indexed escrowId, State state);
     event EscrowDepositFinalizedOnHome(bytes32 indexed escrowId, State state);
 
     event EscrowWithdrawalInitiated(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
-    event EscrowWithdrawalInitiatedOnHome(bytes32 indexed channelId, State state);
+    event EscrowWithdrawalInitiatedOnHome(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
     event EscrowWithdrawalChallenged(bytes32 indexed escrowId, State state, uint64 challengeExpireAt);
     event EscrowWithdrawalFinalized(bytes32 indexed escrowId, State state);
     event EscrowWithdrawalFinalizedOnHome(bytes32 indexed escrowId, State state);
 
-    event MigrationInitiated(bytes32 indexed channelId, State state);
-    event MigrationFinalized(bytes32 indexed channelId, State state);
+    event MigrationOutInitiated(bytes32 indexed channelId, State state);
+    event MigrationInInitiated(bytes32 indexed channelId, State state);
+    event MigrationOutFinalized(bytes32 indexed channelId, State state);
+    event MigrationInFinalized(bytes32 indexed channelId, State state);
 
     error InvalidAddress();
     error InvalidAmount();
@@ -483,8 +485,12 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
     function initiateEscrowDeposit(ChannelDefinition calldata def, State calldata candidate) external payable {
         require(candidate.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, "invalid intent");
+
         bytes32 channelId = Utils.getChannelId(def);
+
         candidate.validateSignatures(channelId, def.user, def.node);
+
+        bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
         if (_isHomeChain(channelId)) {
             // HOME CHAIN: Update channel via ChannelEngine
@@ -496,11 +502,9 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             _applyEffects(channelId, meta.definition, candidate, effects);
 
-            emit EscrowDepositInitiatedOnHome(channelId, candidate);
+            emit EscrowDepositInitiatedOnHome(escrowId, channelId, candidate);
         } else {
             // NON-HOME CHAIN: Create escrow record - recover addresses from signatures
-            bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
-
             EscrowDepositEngine.TransitionContext memory ctx = _buildEscrowDepositContext(escrowId, 0);
             EscrowDepositEngine.TransitionEffects memory effects =
                 EscrowDepositEngine.validateTransition(ctx, candidate);
@@ -581,6 +585,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         require(candidate.intent == StateIntent.INITIATE_ESCROW_WITHDRAWAL, "invalid intent");
 
         bytes32 channelId = Utils.getChannelId(def);
+        bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
         if (_isHomeChain(channelId)) {
             // HOME CHAIN: Both parties must sign
@@ -594,12 +599,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             _applyEffects(channelId, meta.definition, candidate, effects);
 
-            emit EscrowWithdrawalInitiatedOnHome(channelId, candidate);
+            emit EscrowWithdrawalInitiatedOnHome(escrowId, channelId, candidate);
         } else {
             // NON-HOME CHAIN: Only node signs for withdrawal initiation
             candidate.validateNodeSignature(channelId, def.node);
-
-            bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
             EscrowWithdrawalEngine.TransitionContext memory ctx = _buildEscrowWithdrawalContext(escrowId, def.node);
             EscrowWithdrawalEngine.TransitionEffects memory effects =
@@ -684,8 +687,9 @@ contract ChannelHub is IVault, ReentrancyGuard {
         candidate.validateNodeSignature(channelId, def.node);
 
         State memory targetCandidate = candidate;
+        bool isHomeChain = _isHomeChain(channelId);
 
-        if (!_isHomeChain(channelId)) {
+        if (!isHomeChain) {
             // Initiate migration IN (on new home chain)
             _requireValidDefinition(def);
 
@@ -705,7 +709,11 @@ contract ChannelHub is IVault, ReentrancyGuard {
         _applyEffects(channelId, def, targetCandidate, effects);
 
         // event with the correct candidate state
-        emit MigrationInitiated(channelId, candidate);
+        if (isHomeChain) {
+            emit MigrationOutInitiated(channelId, candidate);
+        } else {
+            emit MigrationInInitiated(channelId, candidate);
+        }
     }
 
     function finalizeMigration(bytes32 channelId, State calldata candidate) external {
@@ -718,9 +726,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
         candidate.validateSignatures(channelId, user, node);
 
         State memory targetCandidate = candidate;
-
         // `_isHomeChain` cannot be used here as channel exists on both chains
-        if (candidate.nonHomeState.chainId == block.chainid) {
+        bool isHomeChain = candidate.nonHomeState.chainId == block.chainid;
+
+        if (isHomeChain) {
             // Finalize migration OUT (on old home chain)
             // Swap states before validation to maintain invariant, so that homeState = current chain
             targetCandidate.homeState = candidate.nonHomeState;
@@ -737,7 +746,12 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         _applyEffects(channelId, meta.definition, targetCandidate, effects);
 
-        emit MigrationFinalized(channelId, candidate);
+        // event with the correct candidate state
+        if (isHomeChain) {
+            emit MigrationOutFinalized(channelId, candidate);
+        } else {
+            emit MigrationInFinalized(channelId, candidate);
+        }
     }
 
     // ========= Internal ==========

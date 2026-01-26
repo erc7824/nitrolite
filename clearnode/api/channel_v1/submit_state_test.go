@@ -295,8 +295,8 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 			channel.Type == core.ChannelTypeEscrow &&
 			channel.UserWallet == userWallet
 	})).Return(nil)
-	mockTxStore.On("ScheduleInitiateEscrowWithdrawal", mock.MatchedBy(func(stateID string) bool {
-		return stateID == incomingState.ID
+	mockTxStore.On("ScheduleInitiateEscrowWithdrawal", mock.MatchedBy(func(stateID string, chainID uint64) bool {
+		return stateID == incomingState.ID && chainID == 2
 	})).Return(nil)
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeEscrowLock &&

@@ -143,6 +143,7 @@ CREATE TABLE blockchain_actions (
     id BIGSERIAL PRIMARY KEY,
     action_type SMALLINT NOT NULL,
     state_id CHAR(66),
+    chain_id INTEGER NOT NULL,
     action_data JSONB,
     status SMALLINT NOT NULL DEFAULT 0,
     retry_count INTEGER NOT NULL DEFAULT 0,

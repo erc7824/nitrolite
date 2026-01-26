@@ -1,6 +1,8 @@
 package core
 
 import (
+	"context"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -9,24 +11,7 @@ import (
 // Listener defines the interface for listening to channel events
 type Listener interface {
 	// Listen starts listening for events
-	Listen() error
-
-	// Channel lifecycle event handlers
-	RegisterChannelCreated(handler func(HomeChannelCreatedEvent) error)
-	RegisterChannelMigrated(handler func(HomeChannelMigratedEvent) error)
-	RegisterChannelCheckpointed(handler func(HomeChannelCheckpointedEvent) error)
-	RegisterChannelChallenged(handler func(HomeChannelChallengedEvent) error)
-	RegisterChannelClosed(handler func(HomeChannelClosedEvent) error)
-
-	// Escrow deposit event handlers
-	RegisterEscrowDepositInitiated(handler func(EscrowDepositInitiatedEvent) error)
-	RegisterEscrowDepositChallenged(handler func(EscrowDepositChallengedEvent) error)
-	RegisterEscrowDepositFinalized(handler func(EscrowDepositFinalizedEvent) error)
-
-	// Escrow withdrawal event handlers
-	RegisterEscrowWithdrawalInitiated(handler func(EscrowWithdrawalInitiatedEvent) error)
-	RegisterEscrowWithdrawalChallenged(handler func(EscrowWithdrawalChallengedEvent) error)
-	RegisterEscrowWithdrawalFinalized(handler func(EscrowWithdrawalFinalizedEvent) error)
+	Listen(context.Context) error
 }
 
 // ========= Client Interface =========
@@ -57,12 +42,12 @@ type Client interface {
 
 	// Escrow deposit
 	InitiateEscrowDeposit(def ChannelDefinition, initCCS State) (string, error)
-	ChallengeEscrowDeposit(candidate State, proof []State) (string, error)
+	ChallengeEscrowDeposit(candidate State, proof []State, challengerSig []byte) (string, error)
 	FinalizeEscrowDeposit(candidate State, proof [2]State) (string, error)
 
 	// Escrow withdrawal
 	InitiateEscrowWithdrawal(def ChannelDefinition, initCCS State) (string, error)
-	ChallengeEscrowWithdrawal(candidate State, proof []State) (string, error)
+	ChallengeEscrowWithdrawal(candidate State, proof []State, challengerSig []byte) (string, error)
 	FinalizeEscrowWithdrawal(candidate State) (string, error)
 }
 
@@ -88,4 +73,29 @@ type AssetStore interface {
 
 	// GetTokenDecimals returns the decimals for a token on a specific blockchain
 	GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error)
+}
+
+// Channel lifecycle event handlers
+type BlockchainEventHandler interface {
+	HandleHomeChannelCreated(context.Context, *HomeChannelCreatedEvent) error
+
+	HandleHomeChannelMigrated(context.Context, *HomeChannelMigratedEvent) error
+
+	HandleHomeChannelCheckpointed(context.Context, *HomeChannelCheckpointedEvent) error
+
+	HandleHomeChannelChallenged(context.Context, *HomeChannelChallengedEvent) error
+
+	HandleHomeChannelClosed(context.Context, *HomeChannelClosedEvent) error
+
+	HandleEscrowDepositInitiated(context.Context, *EscrowDepositInitiatedEvent) error
+
+	HandleEscrowDepositChallenged(context.Context, *EscrowDepositChallengedEvent) error
+
+	HandleEscrowDepositFinalized(context.Context, *EscrowDepositFinalizedEvent) error
+
+	HandleEscrowWithdrawalInitiated(context.Context, *EscrowWithdrawalInitiatedEvent) error
+
+	HandleEscrowWithdrawalChallenged(context.Context, *EscrowWithdrawalChallengedEvent) error
+
+	HandleEscrowWithdrawalFinalized(context.Context, *EscrowWithdrawalFinalizedEvent) error
 }

@@ -36,13 +36,17 @@ type Store interface {
 
 	// ScheduleCheckpoint schedules a checkpoint operation for a home channel state.
 	// This queues the state to be submitted on-chain to update the channel's on-chain state.
-	ScheduleCheckpoint(stateID string) error
+	ScheduleCheckpoint(stateID string, chainID uint64) error
 
-	// ScheduleFinalizeEscrowDeposit schedules a checkpoint for an escrow deposit operation.
+	// ScheduleInitiateEscrowDeposit schedules an initiate for an escrow deposit operation.
 	// This queues the state to be submitted on-chain to finalize an escrow deposit.
-	ScheduleFinalizeEscrowDeposit(stateID string) error
+	ScheduleInitiateEscrowDeposit(stateID string, chainID uint64) error
+
+	// ScheduleFinalizeEscrowDeposit schedules a finalize for an escrow deposit operation.
+	// This queues the state to be submitted on-chain to finalize an escrow deposit.
+	ScheduleFinalizeEscrowDeposit(stateID string, chainID uint64) error
 
 	// ScheduleFinalizeEscrowWithdrawal schedules a checkpoint for an escrow withdrawal operation.
 	// This queues the state to be submitted on-chain to finalize an escrow withdrawal.
-	ScheduleFinalizeEscrowWithdrawal(stateID string) error
+	ScheduleFinalizeEscrowWithdrawal(stateID string, chainID uint64) error
 }

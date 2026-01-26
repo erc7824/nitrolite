@@ -65,19 +65,23 @@ type DatabaseStore interface {
 
 	// ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate withdrawal.
 	// This queues the state to be submitted on-chain to initiate an escrow withdrawal.
-	ScheduleInitiateEscrowWithdrawal(stateID string) error
+	ScheduleInitiateEscrowWithdrawal(stateID string, chainID uint64) error
 
 	// ScheduleCheckpoint schedules a checkpoint operation for a home channel state.
 	// This queues the state to be submitted on-chain to update the channel's on-chain state.
-	ScheduleCheckpoint(stateID string) error
+	ScheduleCheckpoint(stateID string, chainID uint64) error
 
 	// ScheduleFinalizeEscrowDeposit schedules a checkpoint for an escrow deposit operation.
 	// This queues the state to be submitted on-chain to finalize an escrow deposit.
-	ScheduleFinalizeEscrowDeposit(stateID string) error
+	ScheduleFinalizeEscrowDeposit(stateID string, chainID uint64) error
 
 	// ScheduleFinalizeEscrowWithdrawal schedules a checkpoint for an escrow withdrawal operation.
 	// This queues the state to be submitted on-chain to finalize an escrow withdrawal.
-	ScheduleFinalizeEscrowWithdrawal(stateID string) error
+	ScheduleFinalizeEscrowWithdrawal(stateID string, chainID uint64) error
+
+	// ScheduleInitiateEscrowDeposit schedules a checkpoint for an escrow deposit operation.
+	// This queues the state to be submitted on-chain for an escrow deposit on home chain.
+	ScheduleInitiateEscrowDeposit(stateID string, chainID uint64) error
 
 	// Fail marks a blockchain action as failed and increments the retry counter.
 	Fail(actionID int64, err string) error
@@ -93,7 +97,7 @@ type DatabaseStore interface {
 	Complete(actionID int64, txHash string) error
 
 	// GetActions retrieves pending blockchain actions, optionally limited by count.
-	GetActions(limit uint8) ([]BlockchainAction, error)
+	GetActions(limit uint8, chainID uint64) ([]BlockchainAction, error)
 
 	// --- App Session Operations ---
 

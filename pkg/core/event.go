@@ -45,3 +45,12 @@ type channelChallengedEvent struct {
 	StateVersion    uint64 `json:"state_version"`
 	ChallengeExpiry uint64 `json:"challenge_expiry"`
 }
+
+type BlockchainEvent struct {
+	ContractAddress string `json:"contract_address"`
+	ChainID         uint64 `json:"chain_id"`
+	Name            string `json:"name"`
+	BlockNumber     uint64 `json:"block_number"`
+	TransactionHash string `json:"transaction_hash"`
+	LogIndex        uint32 `json:"log_index"`
+}

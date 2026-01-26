@@ -867,18 +867,18 @@ type HomeChannelDataResponse struct {
 
 // EscrowDepositDataResponse represents the response from getEscrowDepositData
 type EscrowDepositDataResponse struct {
-	Definition      ChannelDefinition `json:"definition"`
-	Node            string            `json:"node"`
-	LastState       State             `json:"last_state"`
-	UnlockExpiry    uint64            `json:"unlock_expiry"`
-	ChallengeExpiry uint64            `json:"challenge_expiry"`
+	EscrowChannelID string `json:"escrow_channel_id"`
+	Node            string `json:"node"`
+	LastState       State  `json:"last_state"`
+	UnlockExpiry    uint64 `json:"unlock_expiry"`
+	ChallengeExpiry uint64 `json:"challenge_expiry"`
 }
 
 // EscrowWithdrawalDataResponse represents the response from getEscrowWithdrawalData
 type EscrowWithdrawalDataResponse struct {
-	Definition ChannelDefinition `json:"definition"`
-	Node       string            `json:"node"`
-	LastState  State             `json:"last_state"`
+	EscrowChannelID string `json:"escrow_channel_id"`
+	Node            string `json:"node"`
+	LastState       State  `json:"last_state"`
 }
 
 // ========= Storage Related Types =========

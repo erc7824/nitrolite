@@ -109,6 +109,50 @@ func GetStateID(userWallet, asset string, epoch, version uint64) string {
 	return crypto.Keccak256Hash(packed).Hex()
 }
 
+func GetStateTransitionsHash(transitions []Transition) ([32]byte, error) {
+	hash := [32]byte{}
+	type contractTransition struct {
+		Type      uint8
+		TxId      string
+		AccountId string
+		Amount    string
+	}
+	transitionType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{Name: "type", Type: "uint8"},
+		{Name: "txId", Type: "string"},
+		{Name: "accountId", Type: "string"},
+		{Name: "amount", Type: "string"},
+	})
+	if err != nil {
+		return hash, fmt.Errorf("failed to create transition type: %w", err)
+	}
+
+	args := abi.Arguments{
+		{Type: abi.Type{T: abi.SliceTy, Elem: &transitionType}},
+	}
+
+	contractsTransitions := make([]contractTransition, len(transitions))
+
+	for i, t := range transitions {
+		contractsTransitions[i] = contractTransition{
+			Type:      uint8(t.Type),
+			TxId:      t.TxID,
+			AccountId: t.AccountID,
+			Amount:    t.Amount.String(),
+		}
+	}
+
+	packed, err := args.Pack(
+		contractsTransitions,
+	)
+	if err != nil {
+		return hash, fmt.Errorf("failed to pack app state update: %w", err)
+	}
+
+	hash = crypto.Keccak256Hash(packed)
+	return hash, nil
+}
+
 // GetSenderTransactionID calculates and returns a unique transaction ID reference for actions initiated by user.
 func GetSenderTransactionID(toAccount string, senderNewStateID string) (string, error) {
 	return getTransactionID(toAccount, senderNewStateID)
@@ -133,3 +177,5 @@ func getTransactionID(account, newStateID string) (string, error) {
 
 	return crypto.Keccak256Hash(packed).Hex(), nil
 }
+
+// TODO: add get transition hash func([]core.transition)hash

@@ -29,29 +29,40 @@ func (ContractEvent) TableName() string {
 	return "contract_events"
 }
 
+// saveContractEvent saves a contract event to the database if it has not been processed before.
+// It returns ErrCustodyEventAlreadyProcessed if the event was already processed.
+// func saveContractEvent(tx *gorm.DB, name string, event any, rawLog types.Log) error {
+// 	alreadyProcessed, err := IsContractEventPresent(tx, c.chainID, rawLog.TxHash.Hex(), uint32(rawLog.Index))
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	if alreadyProcessed {
+// 		c.logger.Debug("event already processed", "name", name, "txHash", rawLog.TxHash.Hex(), "logIndex", rawLog.Index)
+// 		return ErrCustodyEventAlreadyProcessed
+// 	}
+
+// 	eventData, err := database.MarshalEvent(event)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to marshal event data for %s: %w", name, err)
+// 	}
+
+// 	contractEvent := &ContractEvent{
+// 		ContractAddress: c.custodyAddr.Hex(),
+// 		ChainID:         c.chainID,
+// 		Name:            name,
+// 		BlockNumber:     rawLog.BlockNumber,
+// 		TransactionHash: rawLog.TxHash.Hex(),
+// 		LogIndex:        uint32(rawLog.Index),
+// 		Data:            eventData,
+// 		CreatedAt:       time.Now(),
+// 	}
+
+// 	return StoreContractEvent(tx, contractEvent)
+// }
+
 func StoreContractEvent(tx *gorm.DB, event *ContractEvent) error {
 	return tx.Create(event).Error
-}
-
-func MarshalEvent[T any](event T) ([]byte, error) {
-	val := reflect.ValueOf(event)
-	if val.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("input must be a struct, but got %T", event)
-	}
-
-	copyVal := reflect.New(val.Type()).Elem()
-	copyVal.Set(val)
-
-	// This is equivalent to `eventCopy.Raw = types.Log{}`.
-	rawField := copyVal.FieldByName("Raw")
-	if rawField.IsValid() {
-		if !rawField.CanSet() {
-			return nil, fmt.Errorf("cannot set 'Raw' field on type %s", val.Type())
-		}
-		zeroValue := reflect.Zero(rawField.Type())
-		rawField.Set(zeroValue)
-	}
-	return json.Marshal(copyVal.Interface())
 }
 
 func GetLatestContractEvent(db *gorm.DB, contractAddress string, networkID uint32) (*ContractEvent, error) {
@@ -77,4 +88,25 @@ func IsContractEventPresent(db *gorm.DB, chainID uint32, txHash string, logIndex
 		return true, nil
 	}
 	return false, nil
+}
+
+func MarshalEvent[T any](event T) ([]byte, error) {
+	val := reflect.ValueOf(event)
+	if val.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("input must be a struct, but got %T", event)
+	}
+
+	copyVal := reflect.New(val.Type()).Elem()
+	copyVal.Set(val)
+
+	// This is equivalent to `eventCopy.Raw = types.Log{}`.
+	rawField := copyVal.FieldByName("Raw")
+	if rawField.IsValid() {
+		if !rawField.CanSet() {
+			return nil, fmt.Errorf("cannot set 'Raw' field on type %s", val.Type())
+		}
+		zeroValue := reflect.Zero(rawField.Type())
+		rawField.Set(zeroValue)
+	}
+	return json.Marshal(copyVal.Interface())
 }

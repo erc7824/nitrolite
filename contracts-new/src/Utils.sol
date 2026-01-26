@@ -5,13 +5,12 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import {WadMath} from "./WadMath.sol";
 import {ChannelDefinition, State, Ledger} from "./interfaces/Types.sol";
 
 library Utils {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
-
-    uint8 constant MAX_PRECISION = 18;
 
     function getChannelId(ChannelDefinition memory def) internal pure returns (bytes32) {
         return keccak256(abi.encode(def));
@@ -70,7 +69,7 @@ library Utils {
      * @param ledger The ledger to validate
      */
     function validateTokenDecimals(Ledger memory ledger) internal view {
-        if (ledger.decimals > MAX_PRECISION) {
+        if (ledger.decimals > WadMath.MAX_PRECISION) {
             revert("decimals exceed max precision");
         }
 

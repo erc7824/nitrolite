@@ -4,23 +4,29 @@ pragma solidity 0.8.30;
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
-import {Definition, CrossChainState, State} from "./interfaces/Types.sol";
+import {ChannelDefinition, State, Ledger} from "./interfaces/Types.sol";
 
 library Utils {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
 
-    function getChannelId(Definition memory def) internal pure returns (bytes32) {
+    function getChannelId(ChannelDefinition memory def) internal pure returns (bytes32) {
         return keccak256(abi.encode(def));
+    }
+
+    function getEscrowId(bytes32 channelId, uint64 version) internal pure returns (bytes32) {
+        // "channelId, (state-)version" pair is unique as long as participants do not reuse versions
+        return keccak256(abi.encode(channelId, version));
     }
 
     // ========== Cross-Chain State ==========
 
-    function pack(CrossChainState memory ccs, bytes32 channelId) internal pure returns (bytes memory) {
+    function pack(State memory ccs, bytes32 channelId) internal pure returns (bytes memory) {
         return abi.encode(
             channelId,
             ccs.version,
             ccs.intent,
+            ccs.metadata,
             ccs.homeState,
             ccs.nonHomeState
             // omit signatures
@@ -28,12 +34,7 @@ library Utils {
     }
 
     // supports only EIP-191 signatures for now
-    function validateSignatures(
-        CrossChainState memory ccs,
-        bytes32 channelId,
-        address user,
-        address node
-    ) internal pure {
+    function validateSignatures(State memory ccs, bytes32 channelId, address user, address node) internal pure {
         bytes32 ethSignedHash = pack(ccs, channelId).toEthSignedMessageHash();
 
         address recoveredUser = ethSignedHash.recover(ccs.userSig);
@@ -44,7 +45,7 @@ library Utils {
     }
 
     function validateChallengerSignature(
-        CrossChainState memory ccs,
+        State memory ccs,
         bytes32 channelId,
         bytes memory challengerSig,
         address user,
@@ -58,10 +59,9 @@ library Utils {
         require(recoveredChallenger == user || recoveredChallenger == node, "challenger must be node or user");
     }
 
-    // ========== State ==========
+    // ========== Ledger ==========
 
-    function isEmpty(State memory state) internal pure returns (bool) {
+    function isEmpty(Ledger memory state) internal pure returns (bool) {
         return state.chainId == 0;
     }
-
 }

@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {ChannelStatus, State, StateIntent, Ledger} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
+import {WadMath} from "./WadMath.sol";
 
 /**
  * @title ChannelEngine
@@ -14,6 +15,8 @@ library ChannelEngine {
     using SafeCast for int256;
     using SafeCast for uint256;
     using {Utils.isEmpty} for Ledger;
+    using WadMath for uint256;
+    using WadMath for int256;
 
     // ========== Structs ==========
 
@@ -70,6 +73,9 @@ library ChannelEngine {
         // homeState always represents current chain
         require(candidate.homeState.chainId == block.chainid, "invalid chain id");
         require(candidate.version > ctx.prevState.version || ctx.prevState.version == 0, "invalid version");
+
+        // Validate token decimals for homeState
+        Utils.validateTokenDecimals(candidate.homeState);
 
         // Cross-chain escrow and migration operations require nonHomeState
         if (
@@ -252,7 +258,7 @@ library ChannelEngine {
         State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
-    ) internal pure returns (TransitionEffects memory effects) {
+    ) internal view returns (TransitionEffects memory effects) {
         // INITIATE_ESCROW_DEPOSIT-specific validations (Home Chain)
         // Node locks liquidity in channel for cross-chain deposit
         require(
@@ -267,7 +273,11 @@ library ChannelEngine {
         // Check home - non-home state consistency
         uint256 depositAmount = candidate.nonHomeState.userAllocation;
         require(depositAmount > 0, "deposit amount must be positive");
-        require(candidate.homeState.nodeAllocation == depositAmount, "invalid home node allocation");
+        require(
+            candidate.homeState.nodeAllocation.toWad(candidate.homeState.decimals)
+                == depositAmount.toWad(candidate.nonHomeState.decimals),
+            "invalid home node allocation"
+        );
         require(candidate.nonHomeState.userNetFlow == depositAmount.toInt256(), "invalid non-home user net flow");
 
         // Calculate effects
@@ -283,7 +293,7 @@ library ChannelEngine {
         State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
-    ) internal pure returns (TransitionEffects memory effects) {
+    ) internal view returns (TransitionEffects memory effects) {
         // FINALIZE_ESCROW_DEPOSIT-specific validations (Home Chain)
         // Previous on-chain state MUST be INITIATE_ESCROW_DEPOSIT
         // Funds stay in channel, just move from node allocation to user allocation
@@ -308,7 +318,10 @@ library ChannelEngine {
         require(candidate.nonHomeState.nodeNetFlow == -depositAmount.toInt256(), "invalid non-home node net flow");
 
         uint256 userAllocDelta = candidate.homeState.userAllocation - ctx.prevState.homeState.userAllocation;
-        require(userAllocDelta == depositAmount, "user allocation delta mismatch");
+        require(
+            userAllocDelta.toWad(candidate.homeState.decimals) == depositAmount.toWad(ctx.prevState.nonHomeState.decimals),
+            "user allocation delta mismatch"
+        );
 
         // Calculate effects - funds stay in channel, no external movement
         effects.userFundsDelta = 0;
@@ -403,8 +416,16 @@ library ChannelEngine {
             require(candidate.nonHomeState.nodeAllocation == 0, "old home node allocation must be zero");
 
             require(candidate.homeState.userAllocation == 0, "new home user allocation must be zero");
-            require(candidate.homeState.nodeAllocation == userNonHomeAlloc, "node must deposit user allocation amount");
-            require(candidate.homeState.nodeNetFlow == userNonHomeAlloc.toInt256(), "invalid new home node net flow");
+            require(
+                candidate.homeState.nodeAllocation.toWad(candidate.homeState.decimals)
+                    == userNonHomeAlloc.toWad(candidate.nonHomeState.decimals),
+                "node must deposit user allocation amount"
+            );
+            require(
+                candidate.homeState.nodeNetFlow.toWad(candidate.homeState.decimals)
+                    == userNonHomeAlloc.toInt256().toWad(candidate.nonHomeState.decimals),
+                "invalid new home node net flow"
+            );
             require(candidate.homeState.userNetFlow == 0, "new home user net flow must be zero");
 
             // Calculate effects - lock node funds
@@ -424,8 +445,16 @@ library ChannelEngine {
 
             // Validate nonHomeState (target chain)
             require(candidate.nonHomeState.userAllocation == 0, "new home user allocation must be zero");
-            require(candidate.nonHomeState.nodeAllocation == userHomeAlloc, "node must deposit user allocation amount");
-            require(candidate.nonHomeState.nodeNetFlow == userHomeAlloc.toInt256(), "invalid new home node net flow");
+            require(
+                candidate.nonHomeState.nodeAllocation.toWad(candidate.nonHomeState.decimals)
+                    == userHomeAlloc.toWad(candidate.homeState.decimals),
+                "node must deposit user allocation amount"
+            );
+            require(
+                candidate.nonHomeState.nodeNetFlow.toWad(candidate.nonHomeState.decimals)
+                    == userHomeAlloc.toInt256().toWad(candidate.homeState.decimals),
+                "invalid new home node net flow"
+            );
             require(candidate.nonHomeState.userNetFlow == 0, "new home user net flow must be zero");
 
             // Calculate effects - may adjust node vault based on net flow delta
@@ -501,18 +530,18 @@ library ChannelEngine {
         internal
         pure
     {
-        int256 expectedLocked = int256(ctx.lockedFunds) + effects.userFundsDelta + effects.nodeFundsDelta;
+        int256 expectedLocked = ctx.lockedFunds.toInt256() + effects.userFundsDelta + effects.nodeFundsDelta;
         require(expectedLocked >= 0, "negative locked funds");
 
         // Check that allocations equal expected locked funds (unless deleting)
         if (!effects.closeChannel) {
             uint256 allocsSum = candidate.homeState.userAllocation + candidate.homeState.nodeAllocation;
-            require(allocsSum == uint256(expectedLocked), "locked funds consistency violation");
+            require(allocsSum == expectedLocked.toUint256(), "locked funds consistency violation");
         }
 
         // Check node has sufficient funds for positive nodeNfDelta
         if (effects.nodeFundsDelta > 0) {
-            require(ctx.nodeAvailableFunds >= uint256(effects.nodeFundsDelta), "insufficient node balance");
+            require(ctx.nodeAvailableFunds >= effects.nodeFundsDelta.toUint256(), "insufficient node balance");
         }
     }
 }

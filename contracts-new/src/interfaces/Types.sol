@@ -62,6 +62,7 @@ struct State {
 struct Ledger {
     uint64 chainId;
     address token;
+    uint8 decimals;
 
     uint256 userAllocation; // FIXME: investigate whether naming the same thing differently in different components is good
     int256 userNetFlow; // can be negative as user can withdraw funds without depositing them (e.g., on a non-home chain)

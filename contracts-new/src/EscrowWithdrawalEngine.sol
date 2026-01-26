@@ -3,6 +3,8 @@ pragma solidity 0.8.30;
 
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {EscrowStatus, State, StateIntent} from "./interfaces/Types.sol";
+import {Utils} from "./Utils.sol";
+import {WadMath} from "./WadMath.sol";
 
 /**
  * @title EscrowWithdrawalEngine
@@ -11,6 +13,8 @@ import {EscrowStatus, State, StateIntent} from "./interfaces/Types.sol";
 library EscrowWithdrawalEngine {
     using SafeCast for int256;
     using SafeCast for uint256;
+    using WadMath for uint256;
+    using WadMath for int256;
 
     // ========== Constants ==========
 
@@ -84,6 +88,9 @@ library EscrowWithdrawalEngine {
         require(candidate.nonHomeState.chainId == blockchainId, "must be on non-home chain");
         require(candidate.version > 0, "invalid version");
 
+        // Validate token decimals for nonHomeState (current chain)
+        Utils.validateTokenDecimals(candidate.nonHomeState);
+
         // Validate allocations equal net flows
         uint256 allocsSum = candidate.nonHomeState.userAllocation + candidate.nonHomeState.nodeAllocation;
         int256 netFlowsSum = candidate.nonHomeState.userNetFlow + candidate.nonHomeState.nodeNetFlow;
@@ -96,7 +103,7 @@ library EscrowWithdrawalEngine {
 
     function _calculateEffectsByIntent(TransitionContext memory ctx, State memory candidate)
         internal
-        pure
+        view
         returns (TransitionEffects memory effects)
     {
         StateIntent intent = candidate.intent;
@@ -114,7 +121,7 @@ library EscrowWithdrawalEngine {
 
     function _calculateInitiateEffects(TransitionContext memory ctx, State memory candidate)
         internal
-        pure
+        view
         returns (TransitionEffects memory effects)
     {
         // INITIATE: Node locks funds for user withdrawal
@@ -131,7 +138,11 @@ library EscrowWithdrawalEngine {
         );
 
         // Validate that home state shows user has allocation to withdraw
-        require(candidate.homeState.userAllocation >= withdrawalAmount, "home user allocation must be sufficient");
+        require(
+            candidate.homeState.userAllocation.toWad(candidate.homeState.decimals)
+                >= withdrawalAmount.toWad(candidate.nonHomeState.decimals),
+            "home user allocation must be sufficient"
+        );
         require(candidate.homeState.nodeAllocation == 0, "home node allocation must be zero");
 
         // Calculate effects
@@ -144,7 +155,7 @@ library EscrowWithdrawalEngine {
 
     function _calculateFinalizeEffects(TransitionContext memory ctx, State memory candidate)
         internal
-        pure
+        view
         returns (TransitionEffects memory effects)
     {
         // FINALIZE: Release to user with finalization proof
@@ -168,13 +179,19 @@ library EscrowWithdrawalEngine {
             "home user allocation must decrease"
         );
         uint256 homeUserAllocDelta = ctx.initState.homeState.userAllocation - candidate.homeState.userAllocation;
-        require(homeUserAllocDelta == withdrawalAmount, "home user alloc delta must equal withdrawal amount");
+        require(
+            homeUserAllocDelta.toWad(candidate.homeState.decimals)
+                == withdrawalAmount.toWad(ctx.initState.nonHomeState.decimals),
+            "home user alloc delta must equal withdrawal amount"
+        );
 
         // Node net flow decreases (becomes more negative) by withdrawal amount
         int256 homeNodeNfDelta = candidate.homeState.nodeNetFlow - ctx.initState.homeState.nodeNetFlow;
         require(homeNodeNfDelta < 0, "home node net flow must decrease");
         require(
-            (-homeNodeNfDelta).toUint256() == withdrawalAmount, "home node net flow delta must equal withdrawal amount"
+            (-homeNodeNfDelta).toWad(candidate.homeState.decimals)
+                == withdrawalAmount.toInt256().toWad(ctx.initState.nonHomeState.decimals),
+            "home node net flow delta must equal withdrawal amount"
         );
 
         // Calculate effects

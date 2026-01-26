@@ -29,7 +29,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     using SafeCast for uint256;
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
-    using {Utils.validateSignatures, Utils.validateNodeSignature, Utils.validateChallengerSignature} for State;
+    using {Utils.validateSignatures, Utils.validateChallengerSignature} for State;
     using {Utils.isEmpty} for Ledger;
 
     event EscrowDepositsPurged(uint256 purgedCount);
@@ -585,12 +585,12 @@ contract ChannelHub is IVault, ReentrancyGuard {
         require(candidate.intent == StateIntent.INITIATE_ESCROW_WITHDRAWAL, "invalid intent");
 
         bytes32 channelId = Utils.getChannelId(def);
+        candidate.validateSignatures(channelId, def.user, def.node);
+
         bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
         if (_isHomeChain(channelId)) {
-            // HOME CHAIN: Both parties must sign
-            candidate.validateSignatures(channelId, def.user, def.node);
-
+            // HOME CHAIN
             ChannelMeta storage meta = _channels[channelId];
 
             ChannelEngine.TransitionContext memory ctx =
@@ -601,9 +601,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             emit EscrowWithdrawalInitiatedOnHome(escrowId, channelId, candidate);
         } else {
-            // NON-HOME CHAIN: Only node signs for withdrawal initiation
-            candidate.validateNodeSignature(channelId, def.node);
-
+            // NON-HOME CHAIN
             EscrowWithdrawalEngine.TransitionContext memory ctx = _buildEscrowWithdrawalContext(escrowId, def.node);
             EscrowWithdrawalEngine.TransitionEffects memory effects =
                 EscrowWithdrawalEngine.validateTransition(ctx, candidate);
@@ -684,7 +682,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         require(candidate.intent == StateIntent.INITIATE_MIGRATION, "invalid intent");
 
         bytes32 channelId = Utils.getChannelId(def);
-        candidate.validateNodeSignature(channelId, def.node);
+        candidate.validateSignatures(channelId, def.user, def.node);
 
         State memory targetCandidate = candidate;
         bool isHomeChain = _isHomeChain(channelId);

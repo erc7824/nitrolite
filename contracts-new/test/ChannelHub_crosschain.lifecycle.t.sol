@@ -158,7 +158,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(750)],
             [int256(0), int256(750)]
         );
-        state.nodeSig = TestUtils.signStateEIP191(vm, channelId, state, nodePK);
+        state = signStateWithBothParties(state, bobChannelId, bobPK);
 
         // on chainId 42:
         // channelsHub.initiateEscrowWithdrawal(channelId, state)
@@ -216,7 +216,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(469)],
             [int256(0), int256(469)]
         );
-        state.nodeSig = TestUtils.signStateEIP191(vm, channelId, state, nodePK);
+        state = signStateWithBothParties(state, bobChannelId, bobPK);
 
         // on chainId 42:
         // channelsHub.initiateMigrationIn(channelId, state)
@@ -400,7 +400,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state.nodeSig = TestUtils.signStateEIP191(vm, bobChannelId, state, nodePK);
+        state = signStateWithBothParties(state, bobChannelId, bobPK);
 
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
@@ -485,7 +485,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state.nodeSig = TestUtils.signStateEIP191(vm, bobChannelId, state, nodePK);
+        state = signStateWithBothParties(state, bobChannelId, bobPK);
 
         vm.prank(bob);
         cHub.initiateMigration(bobDef, state);

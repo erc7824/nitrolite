@@ -29,11 +29,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     using SafeCast for uint256;
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
-    using {
-        Utils.validateSignatures,
-        Utils.validateNodeSignature,
-        Utils.validateChallengerSignature
-    } for State;
+    using {Utils.validateSignatures, Utils.validateNodeSignature, Utils.validateChallengerSignature} for State;
     using {Utils.isEmpty} for Ledger;
 
     event EscrowDepositsPurged(uint256 purgedCount);
@@ -141,7 +137,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
         bytes32[] memory allChannels = _userChannels[user].values();
         uint256 openChannelCount = 0;
         for (uint256 i = 0; i < allChannels.length; i++) {
-            if (_channels[allChannels[i]].status != ChannelStatus.CLOSED && _channels[allChannels[i]].status != ChannelStatus.MIGRATED_OUT) {
+            if (
+                _channels[allChannels[i]].status != ChannelStatus.CLOSED
+                    && _channels[allChannels[i]].status != ChannelStatus.MIGRATED_OUT
+            ) {
                 openChannelCount++;
             }
         }
@@ -149,7 +148,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
         bytes32[] memory openChannels = new bytes32[](openChannelCount);
         uint256 openChannelIndex = 0;
         for (uint256 i = 0; i < allChannels.length; i++) {
-            if (_channels[allChannels[i]].status != ChannelStatus.CLOSED && _channels[allChannels[i]].status != ChannelStatus.MIGRATED_OUT) {
+            if (
+                _channels[allChannels[i]].status != ChannelStatus.CLOSED
+                    && _channels[allChannels[i]].status != ChannelStatus.MIGRATED_OUT
+            ) {
                 openChannels[openChannelIndex] = allChannels[i];
                 openChannelIndex++;
             }
@@ -319,10 +321,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
                 purgedCount++;
                 escrowHeadTemp++;
                 continue;
-             } else {
-                 break;
-             }
-         }
+            } else {
+                break;
+            }
+        }
 
         escrowHead = escrowHeadTemp;
 
@@ -382,10 +384,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         emit ChannelWithdrawn(channelId, candidate);
     }
 
-    function checkpointChannel(bytes32 channelId, State calldata candidate, State[] calldata proof)
-        external
-        payable
-    {
+    function checkpointChannel(bytes32 channelId, State calldata candidate, State[] calldata proof) external payable {
         require(candidate.intent == StateIntent.OPERATE, "can only checkpoint operate states");
 
         ChannelMeta storage meta = _channels[channelId];
@@ -440,10 +439,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         emit ChannelChallenged(channelId, candidate, challengeExpiry);
     }
 
-    function closeChannel(bytes32 channelId, State calldata candidate, State[] calldata proof)
-        external
-        payable
-    {
+    function closeChannel(bytes32 channelId, State calldata candidate, State[] calldata proof) external payable {
         require(candidate.intent == StateIntent.CLOSE, "invalid state intent");
 
         ChannelMeta storage meta = _channels[channelId];
@@ -532,15 +528,31 @@ contract ChannelHub is IVault, ReentrancyGuard {
     }
 
     function finalizeEscrowDeposit(bytes32 escrowId, State calldata candidate) external {
-        require(candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT, "invalid intent");
-
         EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
         address user = meta.user;
         address node = meta.node;
 
+        bool isHomeChain = _isHomeChain(meta.channelId);
+        EscrowStatus status = meta.status;
+
+        if (!isHomeChain && status == EscrowStatus.DISPUTED && block.timestamp > meta.challengeExpireAt) {
+            // NON-HOME CHAIN: Unilateral finalization after challenge timeout
+            meta.status = EscrowStatus.FINALIZED;
+            uint256 lockedAmount = meta.lockedAmount;
+            meta.lockedAmount = 0;
+            meta.challengeExpireAt = 0;
+
+            _pushFunds(node, meta.initState.nonHomeState.token, lockedAmount);
+
+            emit EscrowDepositFinalized(escrowId, candidate);
+            return;
+        }
+
+        require(candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT, "invalid intent");
+
         candidate.validateSignatures(meta.channelId, user, node);
 
-        if (_isHomeChain(meta.channelId)) {
+        if (isHomeChain) {
             // HOME CHAIN: Update channel via ChannelEngine
             ChannelMeta storage channelMeta = _channels[meta.channelId];
             ChannelEngine.TransitionContext memory ctx = _buildChannelContext(
@@ -618,16 +630,32 @@ contract ChannelHub is IVault, ReentrancyGuard {
     }
 
     function finalizeEscrowWithdrawal(bytes32 escrowId, State calldata candidate) external {
-        require(candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL, "invalid intent");
-
         EscrowWithdrawalMeta storage meta = _escrowWithdrawals[escrowId];
         bytes32 channelId = meta.channelId;
         address user = meta.user;
         address node = meta.node;
 
+        bool isHomeChain = _isHomeChain(channelId);
+        EscrowStatus status = meta.status;
+
+        if (!isHomeChain && status == EscrowStatus.DISPUTED && block.timestamp > meta.challengeExpireAt) {
+            // NON-HOME CHAIN: Unilateral finalization after challenge timeout
+            meta.status = EscrowStatus.FINALIZED;
+            uint256 lockedAmount = meta.lockedAmount;
+            meta.lockedAmount = 0;
+            meta.challengeExpireAt = 0;
+
+            _pushFunds(node, meta.initState.nonHomeState.token, lockedAmount);
+
+            emit EscrowWithdrawalFinalized(escrowId, candidate);
+            return;
+        }
+
+        require(candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL, "invalid intent");
+
         candidate.validateSignatures(channelId, user, node);
 
-        if (_isHomeChain(channelId)) {
+        if (isHomeChain) {
             // HOME CHAIN: Update channel via ChannelEngine
             ChannelMeta storage channelMeta = _channels[channelId];
             ChannelEngine.TransitionContext memory ctx =
@@ -638,7 +666,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             emit EscrowWithdrawalFinalizedOnHome(channelId, candidate);
         } else {
-            // Non-Home chain: Update via
+            // Non-Home chain: Update via EscrowWithdrawalEngine
             EscrowWithdrawalEngine.TransitionContext memory ctx = _buildEscrowWithdrawalContext(escrowId, node);
             EscrowWithdrawalEngine.TransitionEffects memory effects =
                 EscrowWithdrawalEngine.validateTransition(ctx, candidate);

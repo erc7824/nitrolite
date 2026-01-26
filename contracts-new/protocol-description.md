@@ -473,7 +473,7 @@ The same signed state can be submitted on both chains. The contract determines t
 * FINALIZE_MIGRATION + status MIGRATING_IN → new home chain behavior (move to OPERATING)
 * FINALIZE_MIGRATION + status OPERATING/DISPUTED → old home chain behavior (move to MIGRATED_OUT)
 
-**2. Four ChannelsHub Functions:**
+**2. Four ChannelHub Functions:**
 
 * `initiateMigration()`: Called on non-home chain to create `MIGRATING_IN` channel
 * `initiateMigration()`: Called on home chain to update state

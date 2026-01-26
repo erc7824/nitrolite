@@ -187,11 +187,10 @@ library EscrowWithdrawalEngine {
 
     // ========== Internal: Phase 3 - Universal Invariants ==========
 
-    function _validateInvariants(
-        TransitionContext memory ctx,
-        State memory candidate,
-        TransitionEffects memory effects
-    ) internal pure {
+    function _validateInvariants(TransitionContext memory ctx, State memory candidate, TransitionEffects memory effects)
+        internal
+        pure
+    {
         require(effects.userFundsDelta != 0 || effects.nodeFundsDelta != 0, "no fund movement");
 
         int256 totalDelta = effects.userFundsDelta + effects.nodeFundsDelta;

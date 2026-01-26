@@ -30,10 +30,7 @@ interface IVault {
      * @param token Token address to check balance for (use address(0) for native tokens)
      * @return The balance of the specified token for the specified account
      */
-    function getAccountBalance(address account, address token)
-        external
-        view
-        returns (uint256);
+    function getAccountBalance(address account, address token) external view returns (uint256);
 
     /**
      * @notice Deposits tokens into the contract

@@ -52,12 +52,11 @@ contract ChannelHubTest_Base is Test {
         token.approve(address(cHub), INITIAL_BALANCE);
     }
 
-    function nextState(
-        State memory state,
-        StateIntent intent,
-        uint256[2] memory allocations,
-        int256[2] memory netFlows
-    ) internal pure returns (State memory) {
+    function nextState(State memory state, StateIntent intent, uint256[2] memory allocations, int256[2] memory netFlows)
+        internal
+        pure
+        returns (State memory)
+    {
         return State({
             version: state.version + 1,
             intent: intent,

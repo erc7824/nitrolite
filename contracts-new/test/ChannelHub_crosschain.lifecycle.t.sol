@@ -10,14 +10,7 @@ import {TestUtils} from "./TestUtils.sol";
 
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {Utils} from "../src/Utils.sol";
-import {
-    State,
-    ChannelDefinition,
-    StateIntent,
-    Ledger,
-    ChannelStatus,
-    EscrowStatus
-} from "../src/interfaces/Types.sol";
+import {State, ChannelDefinition, StateIntent, Ledger, ChannelStatus, EscrowStatus} from "../src/interfaces/Types.sol";
 
 contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
     bytes32 bobChannelId;
@@ -423,12 +416,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(nodeBalanceAfter, nodeBalanceBefore - 750, "Node balance after escrow withdrawal");
 
         // Verify escrow struct is updated on ChannelsHub: escrow data exists, `locked` equals to withdrawalAmount
-        (
-            EscrowStatus finalEscrowStatus,
-            uint64 challengeExpireAt,
-            uint256 lockedAmount,
-            State memory initState
-        ) = cHub.getEscrowWithdrawalData(escrowId);
+        (EscrowStatus finalEscrowStatus, uint64 challengeExpireAt, uint256 lockedAmount, State memory initState) =
+            cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.INITIALIZED), "Escrow should be INITIALIZED");
         assertEq(challengeExpireAt, 0, "Escrow challengeExpireAt should be zero");
         assertEq(lockedAmount, 750, "Escrow locked amount is incorrect");

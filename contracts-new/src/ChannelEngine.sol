@@ -373,8 +373,7 @@ library ChannelEngine {
         require(candidate.nonHomeState.userAllocation == 0, "withdrawal user allocation must be zero");
         require(candidate.nonHomeState.nodeAllocation == 0, "withdrawal node allocation must be zero");
         require(
-            candidate.nonHomeState.userNetFlow == -candidate.nonHomeState.nodeNetFlow,
-            "invalid non-home user net flow"
+            candidate.nonHomeState.userNetFlow == -candidate.nonHomeState.nodeNetFlow, "invalid non-home user net flow"
         );
 
         // TODO: provide V-1 state (INITIATE_ESCROW_WITHDRAWAL) to validate against?
@@ -498,13 +497,11 @@ library ChannelEngine {
 
     // ========== Internal: Phase 3 - Universal Invariants ==========
 
-    function _validateInvariants(
-        TransitionContext memory ctx,
-        State memory candidate,
-        TransitionEffects memory effects
-    ) internal pure {
-        int256 expectedLocked =
-            int256(ctx.lockedFunds) + effects.userFundsDelta + effects.nodeFundsDelta;
+    function _validateInvariants(TransitionContext memory ctx, State memory candidate, TransitionEffects memory effects)
+        internal
+        pure
+    {
+        int256 expectedLocked = int256(ctx.lockedFunds) + effects.userFundsDelta + effects.nodeFundsDelta;
         require(expectedLocked >= 0, "negative locked funds");
 
         // Check that allocations equal expected locked funds (unless deleting)

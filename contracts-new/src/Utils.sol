@@ -34,10 +34,7 @@ library Utils {
     }
 
     // supports only EIP-191 signatures for now
-    function validateSignatures(State memory ccs, bytes32 channelId, address user, address node)
-        internal
-        pure
-    {
+    function validateSignatures(State memory ccs, bytes32 channelId, address user, address node) internal pure {
         bytes32 ethSignedHash = pack(ccs, channelId).toEthSignedMessageHash();
 
         address recoveredUser = ethSignedHash.recover(ccs.userSig);

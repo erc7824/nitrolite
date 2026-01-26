@@ -50,14 +50,14 @@ contract ChannelHub is IVault, ReentrancyGuard {
     event EscrowDepositInitiated(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
     event EscrowDepositInitiatedOnHome(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
     event EscrowDepositChallenged(bytes32 indexed escrowId, State state, uint64 challengeExpireAt);
-    event EscrowDepositFinalized(bytes32 indexed escrowId, State state);
-    event EscrowDepositFinalizedOnHome(bytes32 indexed escrowId, State state);
+    event EscrowDepositFinalized(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
+    event EscrowDepositFinalizedOnHome(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
 
     event EscrowWithdrawalInitiated(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
     event EscrowWithdrawalInitiatedOnHome(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
     event EscrowWithdrawalChallenged(bytes32 indexed escrowId, State state, uint64 challengeExpireAt);
-    event EscrowWithdrawalFinalized(bytes32 indexed escrowId, State state);
-    event EscrowWithdrawalFinalizedOnHome(bytes32 indexed escrowId, State state);
+    event EscrowWithdrawalFinalized(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
+    event EscrowWithdrawalFinalizedOnHome(bytes32 indexed escrowId, bytes32 indexed channelId, State state);
 
     event MigrationOutInitiated(bytes32 indexed channelId, State state);
     event MigrationInInitiated(bytes32 indexed channelId, State state);
@@ -548,7 +548,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             _pushFunds(node, meta.initState.nonHomeState.token, lockedAmount);
 
-            emit EscrowDepositFinalized(escrowId, candidate);
+            emit EscrowDepositFinalized(escrowId, meta.channelId, candidate);
             return;
         }
 
@@ -566,7 +566,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             _applyEffects(meta.channelId, channelMeta.definition, candidate, effects);
 
-            emit EscrowDepositFinalizedOnHome(meta.channelId, candidate);
+            emit EscrowDepositFinalizedOnHome(escrowId, meta.channelId, candidate);
             return;
         } else {
             // NON-HOME CHAIN: Update via EscrowDepositEngine
@@ -577,7 +577,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             _applyEscrowDepositEffects(escrowId, meta.channelId, candidate, effects, user, node);
 
-            emit EscrowDepositFinalized(escrowId, candidate);
+            emit EscrowDepositFinalized(escrowId, meta.channelId, candidate);
         }
     }
 
@@ -648,7 +648,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             _pushFunds(node, meta.initState.nonHomeState.token, lockedAmount);
 
-            emit EscrowWithdrawalFinalized(escrowId, candidate);
+            emit EscrowWithdrawalFinalized(escrowId, meta.channelId, candidate);
             return;
         }
 
@@ -665,7 +665,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             _applyEffects(channelId, channelMeta.definition, candidate, effects);
 
-            emit EscrowWithdrawalFinalizedOnHome(channelId, candidate);
+            emit EscrowWithdrawalFinalizedOnHome(escrowId, channelId, candidate);
         } else {
             // Non-Home chain: Update via EscrowWithdrawalEngine
             EscrowWithdrawalEngine.TransitionContext memory ctx = _buildEscrowWithdrawalContext(escrowId, node);
@@ -674,7 +674,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             _applyEscrowWithdrawalEffects(escrowId, channelId, candidate, effects, user, node);
 
-            emit EscrowWithdrawalFinalized(escrowId, candidate);
+            emit EscrowWithdrawalFinalized(escrowId, channelId, candidate);
         }
     }
 

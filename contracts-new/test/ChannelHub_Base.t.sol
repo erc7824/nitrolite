@@ -64,13 +64,14 @@ contract ChannelHubTest_Base is Test {
             homeState: Ledger({
                 chainId: state.homeState.chainId,
                 token: state.homeState.token,
+                decimals: state.homeState.decimals,
                 userAllocation: allocations[0],
                 userNetFlow: netFlows[0],
                 nodeAllocation: allocations[1],
                 nodeNetFlow: netFlows[1]
             }),
             nonHomeState: Ledger({
-                chainId: 0, token: address(0), userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
+                chainId: 0, token: address(0), decimals: 0, userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
             }),
             userSig: "",
             nodeSig: ""
@@ -94,6 +95,7 @@ contract ChannelHubTest_Base is Test {
             homeState: Ledger({
                 chainId: state.homeState.chainId,
                 token: state.homeState.token,
+                decimals: state.homeState.decimals,
                 userAllocation: allocations[0],
                 userNetFlow: netFlows[0],
                 nodeAllocation: allocations[1],
@@ -102,6 +104,45 @@ contract ChannelHubTest_Base is Test {
             nonHomeState: Ledger({
                 chainId: nonHomeChainId,
                 token: nonHomeChainToken,
+                decimals: 18,
+                userAllocation: nonHomeAllocations[0],
+                userNetFlow: nonHomeNetFlows[0],
+                nodeAllocation: nonHomeAllocations[1],
+                nodeNetFlow: nonHomeNetFlows[1]
+            }),
+            userSig: "",
+            nodeSig: ""
+        });
+    }
+
+    function nextState(
+        State memory state,
+        StateIntent intent,
+        uint256[2] memory allocations,
+        int256[2] memory netFlows,
+        uint64 nonHomeChainId,
+        address nonHomeChainToken,
+        uint8 nonHomeDecimals,
+        uint256[2] memory nonHomeAllocations,
+        int256[2] memory nonHomeNetFlows
+    ) internal pure returns (State memory) {
+        return State({
+            version: state.version + 1,
+            intent: intent,
+            metadata: state.metadata,
+            homeState: Ledger({
+                chainId: state.homeState.chainId,
+                token: state.homeState.token,
+                decimals: state.homeState.decimals,
+                userAllocation: allocations[0],
+                userNetFlow: netFlows[0],
+                nodeAllocation: allocations[1],
+                nodeNetFlow: netFlows[1]
+            }),
+            nonHomeState: Ledger({
+                chainId: nonHomeChainId,
+                token: nonHomeChainToken,
+                decimals: nonHomeDecimals,
                 userAllocation: nonHomeAllocations[0],
                 userNetFlow: nonHomeNetFlows[0],
                 nodeAllocation: nonHomeAllocations[1],

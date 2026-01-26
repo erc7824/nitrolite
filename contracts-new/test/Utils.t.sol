@@ -10,6 +10,7 @@ contract UtilsTest is Test {
         Ledger memory homeLedger = Ledger({
             chainId: 42,
             token: 0x90b7E285ab6cf4e3A2487669dba3E339dB8a3320,
+            decimals: 8,
             userAllocation: 1042,
             userNetFlow: 11334,
             nodeAllocation: 40424,
@@ -19,6 +20,7 @@ contract UtilsTest is Test {
         Ledger memory nonHomeLedger = Ledger({
             chainId: 4242,
             token: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
+            decimals: 14,
             userAllocation: 1234,
             userNetFlow: -543,
             nodeAllocation: 567,

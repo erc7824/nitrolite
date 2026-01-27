@@ -344,8 +344,16 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
     // ========== Channel lifecycle ==========
 
+    // Create channel with DEPOSIT, WITHDRAW, or OPERATE intent
+    // This enables users who already have off-chain virtual states with non-zero version
+    // to create a channel and perform initial operation simultaneously
     function createChannel(ChannelDefinition calldata def, State calldata initCCS) external payable {
-        require(initCCS.intent == StateIntent.CREATE, "invalid state intent");
+        require(
+            initCCS.intent == StateIntent.DEPOSIT ||
+            initCCS.intent == StateIntent.WITHDRAW ||
+            initCCS.intent == StateIntent.OPERATE,
+            "invalid state intent for channel creation"
+        );
 
         bytes32 channelId = Utils.getChannelId(def);
 
@@ -359,6 +367,15 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         _applyEffects(channelId, def, initCCS, effects);
         _userChannels[def.user].add(channelId);
+
+        // Emit appropriate event based on intent
+        if (initCCS.intent == StateIntent.DEPOSIT) {
+            emit ChannelDeposited(channelId, initCCS);
+        } else if (initCCS.intent == StateIntent.WITHDRAW) {
+            emit ChannelWithdrawn(channelId, initCCS);
+        } else {
+            emit ChannelCheckpointed(channelId, initCCS);
+        }
 
         emit ChannelCreated(channelId, def.user, def.node, def, initCCS);
     }
@@ -864,21 +881,27 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         address token = candidate.homeState.token;
 
+        // Process POSITIVE deltas first (additions to lockedFunds) to prevent underflow
         if (effects.userFundsDelta > 0) {
             uint256 amount = uint256(effects.userFundsDelta);
             _pullFunds(def.user, token, amount);
             meta.lockedFunds += amount;
-        } else if (effects.userFundsDelta < 0) {
-            uint256 amount = uint256(-effects.userFundsDelta);
-            _pushFunds(def.user, token, amount);
-            meta.lockedFunds -= amount;
         }
 
         if (effects.nodeFundsDelta > 0) {
             uint256 amount = uint256(effects.nodeFundsDelta);
             _nodeBalances[def.node][token] -= amount;
             meta.lockedFunds += amount;
-        } else if (effects.nodeFundsDelta < 0) {
+        }
+
+        // Then process NEGATIVE deltas (subtractions from lockedFunds)
+        if (effects.userFundsDelta < 0) {
+            uint256 amount = uint256(-effects.userFundsDelta);
+            _pushFunds(def.user, token, amount);
+            meta.lockedFunds -= amount;
+        }
+
+        if (effects.nodeFundsDelta < 0) {
             uint256 amount = uint256(-effects.nodeFundsDelta);
             _nodeBalances[def.node][token] += amount;
             meta.lockedFunds -= amount;

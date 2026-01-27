@@ -109,9 +109,7 @@ library ChannelEngine {
 
         StateIntent intent = candidate.intent;
 
-        if (intent == StateIntent.CREATE) {
-            effects = _calculateCreateEffects(ctx, candidate, userNfDelta);
-        } else if (intent == StateIntent.DEPOSIT) {
+        if (intent == StateIntent.DEPOSIT) {
             effects = _calculateDepositEffects(ctx, candidate, userNfDelta, nodeNfDelta);
         } else if (intent == StateIntent.WITHDRAW) {
             effects = _calculateWithdrawEffects(ctx, candidate, userNfDelta, nodeNfDelta);
@@ -139,25 +137,6 @@ library ChannelEngine {
         return effects;
     }
 
-    function _calculateCreateEffects(TransitionContext memory ctx, State memory candidate, int256 userNfDelta)
-        internal
-        pure
-        returns (TransitionEffects memory effects)
-    {
-        // CREATE-specific validations
-        require(candidate.version == 0, "invalid version");
-        require(ctx.status == ChannelStatus.VOID, "invalid status");
-        require(candidate.homeState.nodeAllocation == 0, "node allocation must be zero");
-        require(candidate.nonHomeState.isEmpty(), "non-home state must be empty");
-
-        // Calculate effects
-        effects.userFundsDelta = userNfDelta; // Pull user's initial deposit
-        effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = false;
-
-        return effects;
-    }
-
     function _calculateDepositEffects(
         TransitionContext memory ctx,
         State memory candidate,
@@ -166,8 +145,10 @@ library ChannelEngine {
     ) internal pure returns (TransitionEffects memory effects) {
         // DEPOSIT-specific validations
         require(
-            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
-                || ctx.status == ChannelStatus.MIGRATING_IN,
+            ctx.status == ChannelStatus.VOID ||
+            ctx.status == ChannelStatus.OPERATING ||
+            ctx.status == ChannelStatus.DISPUTED ||
+            ctx.status == ChannelStatus.MIGRATING_IN,
             "invalid status"
         );
         require(userNfDelta > 0, "invalid user delta");
@@ -189,8 +170,10 @@ library ChannelEngine {
     ) internal pure returns (TransitionEffects memory effects) {
         // WITHDRAW-specific validations
         require(
-            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
-                || ctx.status == ChannelStatus.MIGRATING_IN,
+            ctx.status == ChannelStatus.VOID ||
+            ctx.status == ChannelStatus.OPERATING ||
+            ctx.status == ChannelStatus.DISPUTED ||
+            ctx.status == ChannelStatus.MIGRATING_IN,
             "invalid status"
         );
         require(userNfDelta < 0, "invalid user delta");
@@ -212,8 +195,10 @@ library ChannelEngine {
     ) internal pure returns (TransitionEffects memory effects) {
         // OPERATE-specific validations (checkpoint)
         require(
-            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
-                || ctx.status == ChannelStatus.MIGRATING_IN,
+            ctx.status == ChannelStatus.VOID ||
+            ctx.status == ChannelStatus.OPERATING ||
+            ctx.status == ChannelStatus.DISPUTED ||
+            ctx.status == ChannelStatus.MIGRATING_IN,
             "invalid status"
         );
         require(userNfDelta == 0, "invalid user delta");

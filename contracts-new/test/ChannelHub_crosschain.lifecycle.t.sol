@@ -44,7 +44,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         // Expected: user allocation = 1000, user net flow = 1000, node allocation = 0, node net flow = 0
         State memory state = State({
             version: 0,
-            intent: StateIntent.CREATE,
+            intent: StateIntent.DEPOSIT,
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: uint64(block.chainid),
@@ -779,7 +779,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         // Bob deposits 50 tokens (50e10)
         State memory state = State({
             version: 0,
-            intent: StateIntent.CREATE,
+            intent: StateIntent.DEPOSIT,
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: uint64(block.chainid),

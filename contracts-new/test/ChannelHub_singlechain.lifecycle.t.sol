@@ -31,7 +31,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
         // Expected: user allocation = 1000, user net flow = 1000, node allocation = 0, node net flow = 0
         State memory state = State({
             version: 0,
-            intent: StateIntent.CREATE,
+            intent: StateIntent.DEPOSIT,
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: uint64(block.chainid),
@@ -183,5 +183,158 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
         // Verify user balance after channel closure (received back 1287)
         assertEq(token.balanceOf(alice), INITIAL_BALANCE - 1300 + 1287, "User balance after channel closure");
+    }
+
+    function test_create_withOperateIntent() public {
+        ChannelDefinition memory def = ChannelDefinition({
+            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+        });
+
+        bytes32 channelId = Utils.getChannelId(def);
+
+        // Check VOID status before channel creation
+        (ChannelStatus statusBefore,,,,) = cHub.getChannelData(channelId);
+        assertEq(uint8(statusBefore), uint8(ChannelStatus.VOID), "Channel should be VOID before creation");
+
+        // Verify user balance before channel creation
+        assertEq(token.balanceOf(alice), INITIAL_BALANCE, "User balance before channel creation");
+
+        // Non-initial state: imagine Alice has received some funds off-chain before channel creation
+        State memory state = State({
+            version: 16,
+            intent: StateIntent.OPERATE,
+            metadata: bytes32(0),
+            homeState: Ledger({
+                chainId: uint64(block.chainid),
+                token: address(token), decimals: 18,
+                userAllocation: 1000,
+                userNetFlow: 0,
+                nodeAllocation: 0,
+                nodeNetFlow: 1000
+            }),
+            nonHomeState: Ledger({
+                chainId: 0, token: address(0), decimals: 0, userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
+            }),
+            userSig: "",
+            nodeSig: ""
+        });
+        state = signStateWithBothParties(state, channelId, alicePK);
+
+        vm.prank(alice);
+        cHub.createChannel(def, state);
+
+        assertEq(token.balanceOf(alice), INITIAL_BALANCE, "User balance after OPERATE creation stays the same");
+        verifyChannelState(channelId, 1000, 0, 0, 1000, "after create with OPERATE intent");
+        (ChannelStatus status,, State memory latestState,,uint256 lockedFunds) = cHub.getChannelData(channelId);
+        assertEq(uint8(status), uint8(ChannelStatus.OPERATING), "Channel created with OPERATE intent should be OPERATING");
+        assertEq(latestState.version, 16, "Channel created with OPERATE intent should have correct version");
+        assertEq(
+            uint8(latestState.intent),
+            uint8(StateIntent.OPERATE),
+            "Channel created with OPERATE intent should have correct intent"
+        );
+        assertEq(lockedFunds, 1000, "Channel created with OPERATE intent should have correct locked funds");
+    }
+
+    function test_create_withDepositIntent() public {
+        ChannelDefinition memory def = ChannelDefinition({
+            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+        });
+
+        bytes32 channelId = Utils.getChannelId(def);
+
+        // Check VOID status before channel creation
+        (ChannelStatus statusBefore,,,,) = cHub.getChannelData(channelId);
+        assertEq(uint8(statusBefore), uint8(ChannelStatus.VOID), "Channel should be VOID before creation");
+
+        // Verify user balance before channel creation
+        assertEq(token.balanceOf(alice), INITIAL_BALANCE, "User balance before channel creation");
+
+        // Non-initial state: imagine Alice has received some funds off-chain before channel creation
+        State memory state = State({
+            version: 42,
+            intent: StateIntent.DEPOSIT,
+            metadata: bytes32(0),
+            homeState: Ledger({
+                chainId: uint64(block.chainid),
+                token: address(token), decimals: 18,
+                userAllocation: 1500,
+                userNetFlow: 500,
+                nodeAllocation: 0,
+                nodeNetFlow: 1000
+            }),
+            nonHomeState: Ledger({
+                chainId: 0, token: address(0), decimals: 0, userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
+            }),
+            userSig: "",
+            nodeSig: ""
+        });
+        state = signStateWithBothParties(state, channelId, alicePK);
+
+        vm.prank(alice);
+        cHub.createChannel(def, state);
+
+        assertEq(token.balanceOf(alice), INITIAL_BALANCE - 500, "User balance after DEPOSIT creation decreases");
+        verifyChannelState(channelId, 1500, 500, 0, 1000, "after create with DEPOSIT intent");
+        (ChannelStatus status,, State memory latestState,,uint256 lockedFunds) = cHub.getChannelData(channelId);
+        assertEq(uint8(status), uint8(ChannelStatus.OPERATING), "Channel created with DEPOSIT intent should be OPERATING");
+        assertEq(latestState.version, 42, "Channel created with DEPOSIT intent should have correct version");
+        assertEq(
+            uint8(latestState.intent),
+            uint8(StateIntent.DEPOSIT),
+            "Channel created with DEPOSIT intent should have correct intent"
+        );
+        assertEq(lockedFunds, 1500, "Channel created with DEPOSIT intent should have correct locked funds");
+    }
+
+    function test_create_withWithdrawIntent() public {
+ChannelDefinition memory def = ChannelDefinition({
+            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+        });
+
+        bytes32 channelId = Utils.getChannelId(def);
+
+        // Check VOID status before channel creation
+        (ChannelStatus statusBefore,,,,) = cHub.getChannelData(channelId);
+        assertEq(uint8(statusBefore), uint8(ChannelStatus.VOID), "Channel should be VOID before creation");
+
+        // Verify user balance before channel creation
+        assertEq(token.balanceOf(alice), INITIAL_BALANCE, "User balance before channel creation");
+
+        // Non-initial state: imagine Alice has received some funds off-chain before channel creation
+        State memory state = State({
+            version: 24,
+            intent: StateIntent.WITHDRAW,
+            metadata: bytes32(0),
+            homeState: Ledger({
+                chainId: uint64(block.chainid),
+                token: address(token), decimals: 18,
+                userAllocation: 500,
+                userNetFlow: -500,
+                nodeAllocation: 0,
+                nodeNetFlow: 1000
+            }),
+            nonHomeState: Ledger({
+                chainId: 0, token: address(0), decimals: 0, userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
+            }),
+            userSig: "",
+            nodeSig: ""
+        });
+        state = signStateWithBothParties(state, channelId, alicePK);
+
+        vm.prank(alice);
+        cHub.createChannel(def, state);
+
+        assertEq(token.balanceOf(alice), INITIAL_BALANCE + 500, "User balance after WITHDRAW creation increases");
+        verifyChannelState(channelId, 500, -500, 0, 1000, "after create with WITHDRAW intent");
+        (ChannelStatus status,, State memory latestState,,uint256 lockedFunds) = cHub.getChannelData(channelId);
+        assertEq(uint8(status), uint8(ChannelStatus.OPERATING), "Channel created with WITHDRAW intent should be OPERATING");
+        assertEq(latestState.version, 24, "Channel created with WITHDRAW intent should have correct version");
+        assertEq(
+            uint8(latestState.intent),
+            uint8(StateIntent.WITHDRAW),
+            "Channel created with WITHDRAW intent should have correct intent"
+        );
+        assertEq(lockedFunds, 500, "Channel created with WITHDRAW intent should have correct locked funds");
     }
 }

@@ -185,6 +185,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         external
         view
         returns (
+            bytes32 channelId,
             EscrowStatus status,
             uint64 unlockAt,
             uint64 challengeExpiry,
@@ -193,6 +194,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         )
     {
         EscrowDepositMeta memory meta = _escrowDeposits[escrowId];
+        channelId = meta.channelId;
         status = meta.status;
         unlockAt = meta.unlockAt;
         challengeExpiry = meta.challengeExpireAt;
@@ -203,9 +205,16 @@ contract ChannelHub is IVault, ReentrancyGuard {
     function getEscrowWithdrawalData(bytes32 escrowId)
         external
         view
-        returns (EscrowStatus status, uint64 challengeExpiry, uint256 lockedAmount, State memory initState)
+        returns (
+            bytes32 channelId,
+            EscrowStatus status,
+            uint64 challengeExpiry,
+            uint256 lockedAmount,
+            State memory initState
+        )
     {
         EscrowWithdrawalMeta memory meta = _escrowWithdrawals[escrowId];
+        channelId = meta.channelId;
         status = meta.status;
         challengeExpiry = meta.challengeExpireAt;
         lockedAmount = meta.lockedAmount;

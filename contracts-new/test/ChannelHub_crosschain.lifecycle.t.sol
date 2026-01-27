@@ -294,7 +294,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
         // verify no escrow struct exists yet
-        (EscrowStatus escrowStatus,,,,) = cHub.getEscrowDepositData(escrowId);
+        (,EscrowStatus escrowStatus,,,,) = cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(escrowStatus), uint8(EscrowStatus.VOID), "Escrow should be VOID");
 
         vm.prank(bob);
@@ -305,6 +305,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         // Verify escrow struct is updated on ChannelsHub
         (
+            ,
             EscrowStatus finalEscrowStatus,
             uint64 unlockAt,
             uint64 challengeExpiresAt,
@@ -349,7 +350,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(nodeBalanceAfter, nodeBalanceBefore + 500, "Node balance after escrow deposit finalized");
 
         // Verify escrow struct is updated on ChannelsHub
-        (finalEscrowStatus, unlockAt, challengeExpiresAt, lockedAmount, initState) = cHub.getEscrowDepositData(escrowId);
+        (,finalEscrowStatus, unlockAt, challengeExpiresAt, lockedAmount, initState) = cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.FINALIZED), "Escrow should be FINALIZED");
         assertEq(unlockAt, expectedUnlockAt, "Escrow unlockAt should remain unchanged");
         assertEq(challengeExpiresAt, 0, "Escrow challengeExpiresAt should be zero");
@@ -406,7 +407,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
         // Verify no escrow struct exists yet
-        (EscrowStatus escrowStatus,,,,) = cHub.getEscrowDepositData(escrowId);
+        (,EscrowStatus escrowStatus,,,,) = cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(escrowStatus), uint8(EscrowStatus.VOID), "Escrow should be VOID");
 
         // Initiate escrow deposit on non-home chain
@@ -418,6 +419,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         // Verify escrow struct is updated on ChannelsHub
         (
+            ,
             EscrowStatus finalEscrowStatus,
             uint64 unlockAt,
             uint64 challengeExpiresAt,
@@ -461,7 +463,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(nodeBalanceAfter, nodeBalanceBefore + 10 * 1e14, "Node balance after escrow deposit finalized");
 
         // Verify escrow struct is updated on ChannelsHub
-        (finalEscrowStatus, unlockAt, challengeExpiresAt, lockedAmount, initState) = cHub.getEscrowDepositData(escrowId);
+        (,finalEscrowStatus, unlockAt, challengeExpiresAt, lockedAmount, initState) = cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.FINALIZED), "Escrow should be FINALIZED");
         assertEq(unlockAt, expectedUnlockAt, "Escrow unlockAt should remain unchanged");
         assertEq(challengeExpiresAt, 0, "Escrow challengeExpiresAt should be zero");
@@ -505,7 +507,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
         // verify no escrow struct exists yet
-        (EscrowStatus escrowStatus,,,) = cHub.getEscrowWithdrawalData(escrowId);
+        (,EscrowStatus escrowStatus,,,) = cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(escrowStatus), uint8(EscrowStatus.VOID), "Escrow should be VOID");
 
         vm.prank(bob);
@@ -516,7 +518,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(nodeBalanceAfter, nodeBalanceBefore - 750, "Node balance after escrow withdrawal");
 
         // Verify escrow struct is updated on ChannelsHub: escrow data exists, `locked` equals to withdrawalAmount
-        (EscrowStatus finalEscrowStatus, uint64 challengeExpireAt, uint256 lockedAmount, State memory initState) =
+        (,EscrowStatus finalEscrowStatus, uint64 challengeExpireAt, uint256 lockedAmount, State memory initState) =
             cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.INITIALIZED), "Escrow should be INITIALIZED");
         assertEq(challengeExpireAt, 0, "Escrow challengeExpireAt should be zero");
@@ -546,7 +548,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(bobBalanceAfter, bobBalanceBefore + 750, "User balance after escrow withdrawal");
 
         // Verify escrow struct is updated on ChannelsHub: escrow data exists, has status "finalized", `locked` equals to 0
-        (finalEscrowStatus, challengeExpireAt, lockedAmount, initState) = cHub.getEscrowWithdrawalData(escrowId);
+        (,finalEscrowStatus, challengeExpireAt, lockedAmount, initState) = cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.FINALIZED), "Escrow should be FINALIZED");
         assertEq(challengeExpireAt, 0, "Escrow challengeExpireAt should be zero");
         assertEq(lockedAmount, 0, "Escrow locked amount is incorrect");
@@ -602,7 +604,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
         // Verify no escrow exists yet
-        (EscrowStatus escrowStatus,,,) = cHub.getEscrowWithdrawalData(escrowId);
+        (,EscrowStatus escrowStatus,,,) = cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(escrowStatus), uint8(EscrowStatus.VOID), "Escrow should be VOID");
 
         // Initiate escrow withdrawal on non-home chain
@@ -614,7 +616,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(nodeBalanceAfter, nodeBalanceBefore - 5 * 1e8, "Node balance after escrow withdrawal initiation");
 
         // Verify escrow struct is created
-        (EscrowStatus finalEscrowStatus, uint64 challengeExpireAt, uint256 lockedAmount, State memory initState) =
+        (,EscrowStatus finalEscrowStatus, uint64 challengeExpireAt, uint256 lockedAmount, State memory initState) =
             cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.INITIALIZED), "Escrow should be INITIALIZED");
         assertEq(challengeExpireAt, 0, "Escrow challengeExpireAt should be zero");
@@ -646,7 +648,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(bobBalanceAfter, bobBalanceBefore + 5 * 1e8, "User balance after withdrawal");
 
         // Verify escrow is finalized
-        (finalEscrowStatus, challengeExpireAt, lockedAmount, initState) = cHub.getEscrowWithdrawalData(escrowId);
+        (,finalEscrowStatus, challengeExpireAt, lockedAmount, initState) = cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.FINALIZED), "Escrow should be FINALIZED");
         assertEq(challengeExpireAt, 0, "Escrow challengeExpireAt should be zero");
         assertEq(lockedAmount, 0, "Escrow locked amount should be zero");

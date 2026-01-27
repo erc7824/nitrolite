@@ -139,9 +139,9 @@ type ChannelsV1HomeChannelCreatedEvent struct {
 type AppSessionsV1SubmitDepositStateRequest struct {
 	// AppStateUpdate is the application session state update to be submitted
 	AppStateUpdate AppStateUpdateV1 `json:"app_state_update"`
-	// AppStateSignatures is the list of participant signatures for the app state update
-	AppStateSignatures []string `json:"app_state_signatures"`
-	// UserState is the user state associated with the application session update
+	// QuorumSigs is the list of participant signatures for the app state update
+	QuorumSigs []string `json:"quorum_sigs"`
+	// SigQuorum is the signature quorum for the application session
 	UserState StateV1 `json:"user_state"`
 }
 
@@ -155,14 +155,31 @@ type AppSessionsV1SubmitDepositStateResponse struct {
 type AppSessionsV1SubmitAppStateRequest struct {
 	// AppStateUpdate is the application session state update to be submitted
 	AppStateUpdate AppStateUpdateV1 `json:"app_state_update"`
-	// Signatures is the signature quorum for the application session
-	Signatures []string `json:"signatures"`
+	// QuorumSigs is the signature quorum for the application session
+	QuorumSigs []string `json:"quorum_sigs"`
 }
 
 // AppSessionsV1SubmitAppStateResponse returns the Node's signature for the new User state.
-type AppSessionsV1SubmitAppStateResponse struct {
-	// Signature is the Node's signature for the new User state
-	Signature string `json:"signature"`
+type AppSessionsV1SubmitAppStateResponse struct{}
+
+// SignedAppStateUpdateV1 represents a signed application session state update.
+type SignedAppStateUpdateV1 struct {
+	// AppStateUpdate is the application session state update
+	AppStateUpdate AppStateUpdateV1 `json:"app_state_update"`
+	// QuorumSigs is the signature quorum for the application session
+	QuorumSigs []string `json:"quorum_sigs"`
+}
+
+// AppSessionsV1RebalanceAppSessionsRequest rebalances multiple application sessions atomically.
+type AppSessionsV1RebalanceAppSessionsRequest struct {
+	// SignedUpdates is the list of signed application session state updates
+	SignedUpdates []SignedAppStateUpdateV1 `json:"signed_updates"`
+}
+
+// AppSessionsV1RebalanceAppSessionsResponse returns the batch ID for the rebalancing operation.
+type AppSessionsV1RebalanceAppSessionsResponse struct {
+	// BatchID is the unique identifier for this rebalancing operation
+	BatchID string `json:"batch_id"`
 }
 
 // AppSessionsV1GetAppDefinitionRequest retrieves the application definition for a specific app session.
@@ -204,7 +221,7 @@ type AppSessionsV1CreateAppSessionRequest struct {
 	// SessionData is the optional JSON stringified session data
 	SessionData string `json:"session_data"`
 
-	Signatures []string `json:"signatures,omitempty"` // Participant signatures for the app session creation
+	QuorumSigs []string `json:"quorum_sigs,omitempty"` // Participant signatures for the app session creation
 }
 
 // AppSessionsV1CreateAppSessionResponse returns the created application session information.

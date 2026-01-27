@@ -62,7 +62,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 	}
 
 	// Validate signatures and quorum
-	if len(reqPayload.Signatures) == 0 {
+	if len(reqPayload.QuorumSigs) == 0 {
 		c.Fail(nil, "no signatures provided")
 		return
 	}
@@ -74,7 +74,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		return
 	}
 
-	if err := h.verifyQuorum(participantWeights, appDef.Quorum, packedRequest, reqPayload.Signatures); err != nil {
+	if err := h.verifyQuorum(participantWeights, appDef.Quorum, packedRequest, reqPayload.QuorumSigs); err != nil {
 		c.Fail(err, "failed to verify quorum")
 		return
 	}

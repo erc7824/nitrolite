@@ -185,9 +185,9 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	// Create RPC request
 	rpcState := toRPCState(*incomingUserState)
 	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
-		AppStateUpdate:     appStateUpdate,
-		AppStateSignatures: []string{appSigHex},
-		UserState:          rpcState,
+		AppStateUpdate: appStateUpdate,
+		QuorumSigs:     []string{appSigHex},
+		UserState:      rpcState,
 	}
 
 	payload, err := rpc.NewPayload(reqPayload)
@@ -321,9 +321,9 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 	// Create RPC request
 	rpcState := toRPCState(userState)
 	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
-		AppStateUpdate:     appStateUpdate,
-		AppStateSignatures: []string{appSigHex},
-		UserState:          rpcState,
+		AppStateUpdate: appStateUpdate,
+		QuorumSigs:     []string{appSigHex},
+		UserState:      rpcState,
 	}
 
 	payload, err := rpc.NewPayload(reqPayload)
@@ -475,9 +475,9 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	// Create RPC request
 	rpcState := toRPCState(*incomingUserState)
 	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
-		AppStateUpdate:     appStateUpdate,
-		AppStateSignatures: []string{appSigHex},
-		UserState:          rpcState,
+		AppStateUpdate: appStateUpdate,
+		QuorumSigs:     []string{appSigHex},
+		UserState:      rpcState,
 	}
 
 	payload, err := rpc.NewPayload(reqPayload)

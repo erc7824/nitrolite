@@ -120,7 +120,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 
 		participantWeights := getParticipantWeights(appSession.Participants)
 
-		if len(reqPayload.AppStateSignatures) == 0 {
+		if len(reqPayload.QuorumSigs) == 0 {
 			return rpc.Errorf("no signatures provided")
 		}
 
@@ -130,7 +130,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("failed to pack app state update: %v", err)
 		}
 
-		if err := h.verifyQuorum(participantWeights, appSession.Quorum, packedStateUpdate, reqPayload.AppStateSignatures); err != nil {
+		if err := h.verifyQuorum(participantWeights, appSession.Quorum, packedStateUpdate, reqPayload.QuorumSigs); err != nil {
 			return err
 		}
 
@@ -251,13 +251,13 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		if err := tx.RecordTransaction(*transaction); err != nil {
 			return rpc.Errorf("failed to record transaction: %v", err)
 		}
-
-		logger.Info("processed deposit state",
-			"appSessionID", appSession.SessionID,
-			"appSessionVersion", appSession.Version,
-			"userWallet", userState.UserWallet,
-			"userStateVersion", userState.Version,
-			"channelTransition", lastTransition.Type.String())
+		logger.Info("recorded transaction",
+			"txID", transaction.ID,
+			"txType", transaction.TxType.String(),
+			"from", transaction.FromAccount,
+			"to", transaction.ToAccount,
+			"asset", transaction.Asset,
+			"amount", transaction.Amount.String())
 
 		return nil
 	})
@@ -281,6 +281,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 	c.Succeed(c.Request.Method, payload)
 	logger.Info("successfully processed deposit state",
 		"appSessionID", reqPayload.AppStateUpdate.AppSessionID,
+		"appSessionVersion", appStateUpd.Version,
 		"userWallet", userState.UserWallet,
 		"userStateVersion", userState.Version,
 		"asset", userState.Asset,

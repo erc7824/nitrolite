@@ -208,6 +208,18 @@ types:
           type: string
           description: JSON stringified session data
 
+  - signed_app_state_update:
+      description: Represents a signed application session state update
+      fields:
+        - name: app_state_update
+          type: app_state_update
+          description: The application session state update
+        - name: quorum_sigs
+          type: array
+          items:
+            type: string
+          description: The signature quorum for the application session
+
   - session_key:
       description: Represents a session key with spending allowances
       fields:
@@ -604,7 +616,7 @@ api:
                 - field_name: app_state_update
                   type: app_state_update
                   description: The application session state update to be submitted
-                - name: app_state_signatures
+                - name: quorum_sigs
                   type: array
                   description: App Session State Update signatures
                   items:
@@ -629,15 +641,12 @@ api:
                 - field_name: app_state_update
                   type: app_state_update
                   description: The application session state update to be submitted
-                - name: signatures
+                - name: quorum_sigs
                   type: array
                   description: App Session State Update signatures required for quorum
                   items:
                     type: string
-              response:
-                - field_name: signature
-                  type: string
-                  description: Node's signature for the new User state
+              response: []
               errors:
                 - message: invalid_app_state
                   description: The application session state is invalid
@@ -645,6 +654,20 @@ api:
                   description: The signature quorum requirement is not satisfied
                 - message: ongoing_transition
                   description: There is an ongoing transition that must be resolved first
+            - name: rebalance_app_sessions
+              description: Rebalance multiple application sessions atomically
+              request:
+                - field_name: signed_updates
+                  type: array
+                  description: List of signed application session state updates to be submitted (each update must have intent 'rebalance')
+                  items:
+                    type: signed_app_state_update
+              response: 
+                - field_name: batch_id
+                  type: string
+                  description: A unitque identifier of executed rebalance operation
+              
+              errors: []
             - name: get_app_definition
               description: Retrieve the application definition for a specific app session
               request:
@@ -700,7 +723,7 @@ api:
                   type: string
                   description: Optional JSON stringified session data
                   optional: true
-                - name: signatures
+                - name: quorum_sigs
                   type: array
                   description: App Session creation signatures
                   items:

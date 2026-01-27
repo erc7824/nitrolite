@@ -80,7 +80,7 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 			},
 			SessionData: `{"state":"updated"}`,
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -184,7 +184,7 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 			},
 			SessionData: "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -279,7 +279,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 			},
 			SessionData: "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -385,7 +385,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 			},
 			SessionData: "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -492,7 +492,7 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 			},
 			SessionData: "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -588,7 +588,7 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 			},
 			SessionData: "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -680,7 +680,7 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 			},
 			SessionData: "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -752,7 +752,7 @@ func TestSubmitAppState_DepositIntent_Rejected(t *testing.T) {
 			Allocations:  []rpc.AppAllocationV1{},
 			SessionData:  "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Create RPC context
@@ -815,7 +815,7 @@ func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 			Allocations:  []rpc.AppAllocationV1{},
 			SessionData:  "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -880,7 +880,7 @@ func TestSubmitAppState_InvalidVersion_Rejected(t *testing.T) {
 			Allocations:  []rpc.AppAllocationV1{},
 			SessionData:  "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -939,7 +939,7 @@ func TestSubmitAppState_SessionNotFound_Rejected(t *testing.T) {
 			Allocations:  []rpc.AppAllocationV1{},
 			SessionData:  "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations - session not found
@@ -1027,7 +1027,7 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 			},
 			SessionData: "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -1117,7 +1117,7 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 			},
 			SessionData: "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations

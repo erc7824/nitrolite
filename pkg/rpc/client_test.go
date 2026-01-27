@@ -462,22 +462,19 @@ func TestClientV1_AppSessionsV1SubmitAppState(t *testing.T) {
 
 	client, dialer := setupClient()
 
-	response := rpc.AppSessionsV1SubmitAppStateResponse{
-		Signature: "0xsigabc",
-	}
+	response := rpc.AppSessionsV1SubmitAppStateResponse{}
 
 	registerSimpleHandlerV1(dialer, "app_sessions.v1.submit_app_state", response)
 
-	resp, err := client.AppSessionsV1SubmitAppState(testCtxV1, rpc.AppSessionsV1SubmitAppStateRequest{
+	_, err := client.AppSessionsV1SubmitAppState(testCtxV1, rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: testAppSession,
 			Intent:       app.AppStateUpdateIntentOperate,
 			Version:      3,
 		},
-		Signatures: []string{"0xsig1", "0xsig2"},
+		QuorumSigs: []string{"0xsig1", "0xsig2"},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "0xsigabc", resp.Signature)
 }
 
 // ============================================================================

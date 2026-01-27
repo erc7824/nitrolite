@@ -162,6 +162,13 @@ func (h *Handler) issueReleaseReceiverState(ctx context.Context, tx Store, recei
 	if err := tx.RecordTransaction(*transaction); err != nil {
 		return rpc.Errorf("failed to record transaction: %v", err)
 	}
+	logger.Info("recorded transaction",
+		"txID", transaction.ID,
+		"txType", transaction.TxType.String(),
+		"from", transaction.FromAccount,
+		"to", transaction.ToAccount,
+		"asset", transaction.Asset,
+		"amount", transaction.Amount.String())
 
 	logger.Info("issued app session receiver state",
 		"stateVersion", newState.Version,

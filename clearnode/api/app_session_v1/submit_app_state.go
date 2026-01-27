@@ -65,7 +65,7 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 
 		participantWeights := getParticipantWeights(appSession.Participants)
 
-		if len(reqPayload.Signatures) == 0 {
+		if len(reqPayload.QuorumSigs) == 0 {
 			return rpc.Errorf("no signatures provided")
 		}
 
@@ -75,7 +75,7 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 			return rpc.Errorf("failed to pack app state update: %v", err)
 		}
 
-		if err := h.verifyQuorum(participantWeights, appSession.Quorum, packedStateUpdate, reqPayload.Signatures); err != nil {
+		if err := h.verifyQuorum(participantWeights, appSession.Quorum, packedStateUpdate, reqPayload.QuorumSigs); err != nil {
 			return err
 		}
 
@@ -132,9 +132,7 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 		return
 	}
 
-	resp := rpc.AppSessionsV1SubmitAppStateResponse{
-		Signature: "", // No user state signature needed for these intents
-	}
+	resp := rpc.AppSessionsV1SubmitAppStateResponse{}
 
 	payload, err := rpc.NewPayload(resp)
 	if err != nil {

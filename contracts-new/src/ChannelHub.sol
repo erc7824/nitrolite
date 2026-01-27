@@ -347,11 +347,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
     // Create channel with DEPOSIT, WITHDRAW, or OPERATE intent
     // This enables users who already have off-chain virtual states with non-zero version
     // to create a channel and perform initial operation simultaneously
-    function createChannel(ChannelDefinition calldata def, State calldata initCCS) external payable {
+    function createChannel(ChannelDefinition calldata def, State calldata initState) external payable {
         require(
-            initCCS.intent == StateIntent.DEPOSIT ||
-            initCCS.intent == StateIntent.WITHDRAW ||
-            initCCS.intent == StateIntent.OPERATE,
+            initState.intent == StateIntent.DEPOSIT || initState.intent == StateIntent.WITHDRAW
+                || initState.intent == StateIntent.OPERATE,
             "invalid state intent for channel creation"
         );
 
@@ -360,24 +359,24 @@ contract ChannelHub is IVault, ReentrancyGuard {
         _requireValidDefinition(def);
 
         ChannelEngine.TransitionContext memory ctx =
-            _buildChannelContext(channelId, _nodeBalances[def.node][initCCS.homeState.token]);
-        ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, initCCS);
+            _buildChannelContext(channelId, _nodeBalances[def.node][initState.homeState.token]);
+        ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, initState);
 
-        initCCS.validateSignatures(channelId, def.user, def.node);
+        initState.validateSignatures(channelId, def.user, def.node);
 
-        _applyEffects(channelId, def, initCCS, effects);
+        _applyEffects(channelId, def, initState, effects);
         _userChannels[def.user].add(channelId);
 
         // Emit appropriate event based on intent
-        if (initCCS.intent == StateIntent.DEPOSIT) {
-            emit ChannelDeposited(channelId, initCCS);
-        } else if (initCCS.intent == StateIntent.WITHDRAW) {
-            emit ChannelWithdrawn(channelId, initCCS);
+        if (initState.intent == StateIntent.DEPOSIT) {
+            emit ChannelDeposited(channelId, initState);
+        } else if (initState.intent == StateIntent.WITHDRAW) {
+            emit ChannelWithdrawn(channelId, initState);
         } else {
-            emit ChannelCheckpointed(channelId, initCCS);
+            emit ChannelCheckpointed(channelId, initState);
         }
 
-        emit ChannelCreated(channelId, def.user, def.node, def, initCCS);
+        emit ChannelCreated(channelId, def.user, def.node, def, initState);
     }
 
     function depositToChannel(bytes32 channelId, State calldata candidate) public payable {
@@ -883,26 +882,26 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         // Process POSITIVE deltas first (additions to lockedFunds) to prevent underflow
         if (effects.userFundsDelta > 0) {
-            uint256 amount = uint256(effects.userFundsDelta);
+            uint256 amount = effects.userFundsDelta.toUint256();
             _pullFunds(def.user, token, amount);
             meta.lockedFunds += amount;
         }
 
         if (effects.nodeFundsDelta > 0) {
-            uint256 amount = uint256(effects.nodeFundsDelta);
+            uint256 amount = effects.nodeFundsDelta.toUint256();
             _nodeBalances[def.node][token] -= amount;
             meta.lockedFunds += amount;
         }
 
         // Then process NEGATIVE deltas (subtractions from lockedFunds)
         if (effects.userFundsDelta < 0) {
-            uint256 amount = uint256(-effects.userFundsDelta);
+            uint256 amount = (-effects.userFundsDelta).toUint256();
             _pushFunds(def.user, token, amount);
             meta.lockedFunds -= amount;
         }
 
         if (effects.nodeFundsDelta < 0) {
-            uint256 amount = uint256(-effects.nodeFundsDelta);
+            uint256 amount = (-effects.nodeFundsDelta).toUint256();
             _nodeBalances[def.node][token] += amount;
             meta.lockedFunds -= amount;
         }

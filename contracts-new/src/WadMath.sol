@@ -24,7 +24,7 @@ library WadMath {
             return amount;
         }
 
-        return amount * 10**(MAX_PRECISION - decimals);
+        return amount * 10 ** (MAX_PRECISION - decimals);
     }
 
     /**
@@ -42,6 +42,6 @@ library WadMath {
             return amount;
         }
 
-        return amount * int256(10**(MAX_PRECISION - decimals));
+        return amount * int256(10 ** (MAX_PRECISION - decimals));
     }
 }

@@ -100,7 +100,7 @@ library EscrowDepositEngine {
         int256 netFlowsSum = candidate.nonHomeState.userNetFlow + candidate.nonHomeState.nodeNetFlow;
 
         require(netFlowsSum >= 0, "negative net flow sum");
-        require(allocsSum == uint256(netFlowsSum), "invalid allocation sum");
+        require(allocsSum == netFlowsSum.toUint256(), "invalid allocation sum");
     }
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========
@@ -153,7 +153,7 @@ library EscrowDepositEngine {
 
     function _calculateFinalizeEffects(TransitionContext memory ctx, State memory candidate)
         internal
-        view
+        pure
         returns (TransitionEffects memory effects)
     {
         // FINALIZE: Node claims with finalization proof

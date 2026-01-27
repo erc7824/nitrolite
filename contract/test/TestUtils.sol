@@ -62,7 +62,7 @@ library TestUtils {
         return sign(vm, privateKey, packedState);
     }
 
-    function signStateEIP191(Vm vm, bytes32 channelId, State memory state, uint256 privateKey)
+    function signStateEip191(Vm vm, bytes32 channelId, State memory state, uint256 privateKey)
         internal
         pure
         returns (bytes memory)

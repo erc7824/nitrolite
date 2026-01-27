@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Vm} from "lib/forge-std/src/Vm.sol";
 import {Test} from "lib/forge-std/src/Test.sol";
 
 import {MockERC20} from "./mocks/MockERC20.sol";
@@ -10,13 +9,14 @@ import {TestUtils} from "./TestUtils.sol";
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {State, StateIntent, Ledger} from "../src/interfaces/Types.sol";
 
+// forge-lint: disable-next-item(unsafe-typecast)
 contract ChannelHubTest_Base is Test {
     ChannelHub public cHub;
     MockERC20 public token;
 
-    uint256 constant nodePK = 1;
-    uint256 constant alicePK = 2;
-    uint256 constant bobPK = 3;
+    uint256 constant NODE_PK = 1;
+    uint256 constant ALICE_PK = 2;
+    uint256 constant BOB_PK = 3;
 
     address node;
     address alice;
@@ -32,9 +32,9 @@ contract ChannelHubTest_Base is Test {
         cHub = new ChannelHub();
         token = new MockERC20("Test Token", "TST", 18);
 
-        node = vm.addr(nodePK);
-        alice = vm.addr(alicePK);
-        bob = vm.addr(bobPK);
+        node = vm.addr(NODE_PK);
+        alice = vm.addr(ALICE_PK);
+        bob = vm.addr(BOB_PK);
 
         token.mint(node, INITIAL_BALANCE);
         token.mint(alice, INITIAL_BALANCE);
@@ -71,7 +71,13 @@ contract ChannelHubTest_Base is Test {
                 nodeNetFlow: netFlows[1]
             }),
             nonHomeState: Ledger({
-                chainId: 0, token: address(0), decimals: 0, userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
+                chainId: 0,
+                token: address(0),
+                decimals: 0,
+                userAllocation: 0,
+                userNetFlow: 0,
+                nodeAllocation: 0,
+                nodeNetFlow: 0
             }),
             userSig: "",
             nodeSig: ""
@@ -153,13 +159,13 @@ contract ChannelHubTest_Base is Test {
         });
     }
 
-    function signStateWithBothParties(State memory state, bytes32 channelId, uint256 userPK)
+    function signStateWithBothParties(State memory state, bytes32 channelId, uint256 userPk)
         internal
         pure
         returns (State memory)
     {
-        state.userSig = TestUtils.signStateEIP191(vm, channelId, state, userPK);
-        state.nodeSig = TestUtils.signStateEIP191(vm, channelId, state, nodePK);
+        state.userSig = TestUtils.signStateEip191(vm, channelId, state, userPk);
+        state.nodeSig = TestUtils.signStateEip191(vm, channelId, state, NODE_PK);
         return state;
     }
 

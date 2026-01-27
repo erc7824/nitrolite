@@ -140,7 +140,7 @@ contract CustodyIntegrationTest_Signatures is Test {
         // Create initial state - participant1 uses EIP191
         State memory initialState = _createInitialState();
         initialState.sigs = new bytes[](1);
-        initialState.sigs[0] = TestUtils.signStateEIP191(vm, channelId, initialState, participant1PrivateKey);
+        initialState.sigs[0] = TestUtils.signStateEip191(vm, channelId, initialState, participant1PrivateKey);
 
         vm.prank(participant1);
         custody.depositAndCreate(address(token), DEPOSIT_AMOUNT, channel, initialState);
@@ -226,7 +226,7 @@ contract CustodyIntegrationTest_Signatures is Test {
         State memory finalState = _createFinalState(4);
         finalState.sigs = new bytes[](2);
         // as participant1 already has a contract at its address, we assume this contract expects EIP-191 signature
-        finalState.sigs[PARTICIPANT_1] = TestUtils.signStateEIP191(vm, channelId, finalState, participant1PrivateKey);
+        finalState.sigs[PARTICIPANT_1] = TestUtils.signStateEip191(vm, channelId, finalState, participant1PrivateKey);
         finalState.sigs[PARTICIPANT_2] = TestUtils.signStateRaw(vm, channelId, finalState, participant2PrivateKey);
 
         vm.prank(participant1);

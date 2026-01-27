@@ -7,23 +7,8 @@ import (
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
-)
-
-const (
-	INTENT_OPERATE                    = 0
-	INTENT_CREATE                     = 1
-	INTENT_CLOSE                      = 2
-	INTENT_DEPOSIT                    = 3
-	INTENT_WITHDRAW                   = 4
-	INTENT_INITIATE_ESCROW_DEPOSIT    = 5
-	INTENT_FINALIZE_ESCROW_DEPOSIT    = 6
-	INTENT_INITIATE_ESCROW_WITHDRAWAL = 7
-	INTENT_FINALIZE_ESCROW_WITHDRAWAL = 8
-	INTENT_INITIATE_MIGRATION         = 9
-	INTENT_FINALIZE_MIGRATION         = 10
 )
 
 // waitForBackOffTimeout implements exponential backoff between retries
@@ -55,18 +40,12 @@ func hexToBytes32(s string) ([32]byte, error) {
 }
 
 func coreDefToContractDef(def core.ChannelDefinition, asset, userWallet string, nodeAddress common.Address) (ChannelDefinition, error) {
-	assetHash := crypto.Keccak256Hash([]byte(asset))
-	assetID := assetHash[:8]
-
-	var metadata [32]byte
-	copy(metadata[:8], assetID)
-
 	return ChannelDefinition{
 		ChallengeDuration: def.Challenge,
 		User:              common.HexToAddress(userWallet),
 		Node:              nodeAddress,
 		Nonce:             def.Nonce,
-		Metadata:          metadata,
+		Metadata:          core.GenerateChannelMetadata(asset),
 	}, nil
 }
 
@@ -109,7 +88,7 @@ func coreStateToContractState(state core.State, tokenGetter func(blockchainID ui
 	}
 
 	lastTransition := state.GetLastTransition()
-	intent, err := transitionToIntent(lastTransition)
+	intent, err := core.TransitionToIntent(lastTransition)
 	if err != nil {
 		return State{}, err
 	}
@@ -128,40 +107,6 @@ func coreStateToContractState(state core.State, tokenGetter func(blockchainID ui
 		UserSig:      userSig,
 		NodeSig:      nodeSig,
 	}, nil
-}
-
-func transitionToIntent(transition *core.Transition) (uint8, error) {
-	if transition == nil {
-		return 0, errors.New("at least one transition is expected")
-	}
-
-	switch transition.Type {
-	case core.TransitionTypeTransferSend,
-		core.TransitionTypeTransferReceive,
-		core.TransitionTypeCommit,
-		core.TransitionTypeRelease:
-		return INTENT_OPERATE, nil
-	case core.TransitionTypeFinalize:
-		return INTENT_CLOSE, nil
-	case core.TransitionTypeHomeDeposit:
-		return INTENT_DEPOSIT, nil
-	case core.TransitionTypeHomeWithdrawal:
-		return INTENT_WITHDRAW, nil
-	case core.TransitionTypeMutualLock:
-		return INTENT_INITIATE_ESCROW_DEPOSIT, nil
-	case core.TransitionTypeEscrowDeposit:
-		return INTENT_FINALIZE_ESCROW_DEPOSIT, nil
-	case core.TransitionTypeEscrowLock:
-		return INTENT_INITIATE_ESCROW_WITHDRAWAL, nil
-	case core.TransitionTypeEscrowWithdraw:
-		return INTENT_FINALIZE_ESCROW_WITHDRAWAL, nil
-	case core.TransitionTypeMigrate:
-		return INTENT_INITIATE_MIGRATION, nil
-	// TODO: Add:
-	// FINALIZE_MIGRATION.
-	default:
-		return 0, errors.New("unexpected transition type: " + transition.Type.String())
-	}
 }
 
 func coreLedgerToContractLedger(ledger core.Ledger, decimals uint8) (Ledger, error) {

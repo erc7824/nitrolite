@@ -77,62 +77,6 @@ func TestCoreDefToContractDef_Success(t *testing.T) {
 	require.Equal(t, expectedMetadata, result.Metadata)
 }
 
-// ========= transitionToIntent Tests =========
-
-func TestTransitionToIntent_OperateIntents(t *testing.T) {
-	tests := []struct {
-		name           string
-		transitionType core.TransitionType
-		expectedIntent uint8
-	}{
-		{"TransferSend", core.TransitionTypeTransferSend, INTENT_OPERATE},
-		{"TransferReceive", core.TransitionTypeTransferReceive, INTENT_OPERATE},
-		{"Commit", core.TransitionTypeCommit, INTENT_OPERATE},
-		{"Release", core.TransitionTypeRelease, INTENT_OPERATE},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			transition := &core.Transition{Type: tt.transitionType}
-			intent, err := transitionToIntent(transition)
-			require.NoError(t, err)
-			require.Equal(t, tt.expectedIntent, intent)
-		})
-	}
-}
-
-func TestTransitionToIntent_AllTransitionTypes(t *testing.T) {
-	tests := []struct {
-		name           string
-		transitionType core.TransitionType
-		expectedIntent uint8
-	}{
-		{"Finalize", core.TransitionTypeFinalize, INTENT_CLOSE},
-		{"HomeDeposit", core.TransitionTypeHomeDeposit, INTENT_DEPOSIT},
-		{"HomeWithdrawal", core.TransitionTypeHomeWithdrawal, INTENT_WITHDRAW},
-		{"MutualLock", core.TransitionTypeMutualLock, INTENT_INITIATE_ESCROW_DEPOSIT},
-		{"EscrowDeposit", core.TransitionTypeEscrowDeposit, INTENT_FINALIZE_ESCROW_DEPOSIT},
-		{"EscrowLock", core.TransitionTypeEscrowLock, INTENT_INITIATE_ESCROW_WITHDRAWAL},
-		{"EscrowWithdraw", core.TransitionTypeEscrowWithdraw, INTENT_FINALIZE_ESCROW_WITHDRAWAL},
-		{"Migrate", core.TransitionTypeMigrate, INTENT_INITIATE_MIGRATION},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			transition := &core.Transition{Type: tt.transitionType}
-			intent, err := transitionToIntent(transition)
-			require.NoError(t, err)
-			require.Equal(t, tt.expectedIntent, intent)
-		})
-	}
-}
-
-func TestTransitionToIntent_NilTransition(t *testing.T) {
-	_, err := transitionToIntent(nil)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "at least one transition is expected")
-}
-
 // ========= coreLedgerToContractLedger Tests =========
 
 func TestCoreLedgerToContractLedger_Success(t *testing.T) {
@@ -173,10 +117,10 @@ func TestContractLedgerToCoreLedger_Success(t *testing.T) {
 	tokenAddr := common.HexToAddress("0x1234567890123456789012345678901234567890")
 	decimals := uint8(18)
 
-	userAllocation, _ := new(big.Int).SetString("100500000000000000000", 10)  // 100.5 * 10^18
+	userAllocation, _ := new(big.Int).SetString("100500000000000000000", 10) // 100.5 * 10^18
 	userNetFlow, _ := new(big.Int).SetString("150250000000000000000", 10)    // 150.25 * 10^18
-	nodeAllocation, _ := new(big.Int).SetString("50750000000000000000", 10)   // 50.75 * 10^18
-	nodeNetFlow, _ := new(big.Int).SetString("1000000000000000000", 10)       // 1.0 * 10^18
+	nodeAllocation, _ := new(big.Int).SetString("50750000000000000000", 10)  // 50.75 * 10^18
+	nodeNetFlow, _ := new(big.Int).SetString("1000000000000000000", 10)      // 1.0 * 10^18
 
 	contractLedger := Ledger{
 		ChainId:        1,
@@ -235,7 +179,7 @@ func TestCoreStateToContractState_BasicState(t *testing.T) {
 
 	// Verify basic fields
 	require.Equal(t, uint64(1), result.Version)
-	require.Equal(t, uint8(INTENT_OPERATE), result.Intent)
+	require.Equal(t, uint8(core.INTENT_OPERATE), result.Intent)
 
 	// Verify signatures
 	expectedUserSig, _ := hex.DecodeString(userSigHex)
@@ -288,7 +232,7 @@ func TestCoreStateToContractState_WithEscrowLedger(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify intent
-	require.Equal(t, uint8(INTENT_INITIATE_ESCROW_DEPOSIT), result.Intent)
+	require.Equal(t, uint8(core.INTENT_INITIATE_ESCROW_DEPOSIT), result.Intent)
 
 	// Verify escrow ledger is populated
 	require.Equal(t, uint64(2), result.NonHomeState.ChainId)
@@ -335,7 +279,7 @@ func TestContractStateToCoreState_HomeOnly(t *testing.T) {
 
 	contractState := State{
 		Version: 1,
-		Intent:  INTENT_OPERATE,
+		Intent:  core.INTENT_OPERATE,
 		HomeState: Ledger{
 			ChainId:        1,
 			Token:          common.HexToAddress("0x1234567890123456789012345678901234567890"),
@@ -380,7 +324,7 @@ func TestContractStateToCoreState_WithEscrow(t *testing.T) {
 
 	contractState := State{
 		Version: 2,
-		Intent:  INTENT_INITIATE_ESCROW_DEPOSIT,
+		Intent:  core.INTENT_INITIATE_ESCROW_DEPOSIT,
 		HomeState: Ledger{
 			ChainId:        1,
 			Token:          common.HexToAddress("0x1234567890123456789012345678901234567890"),
@@ -421,7 +365,7 @@ func TestContractStateToCoreState_EmptyChannelID(t *testing.T) {
 
 	contractState := State{
 		Version: 1,
-		Intent:  INTENT_OPERATE,
+		Intent:  core.INTENT_OPERATE,
 		HomeState: Ledger{
 			ChainId:        1,
 			Token:          common.HexToAddress("0x1234567890123456789012345678901234567890"),
@@ -446,7 +390,7 @@ func TestContractStateToCoreState_EmptySignatures(t *testing.T) {
 
 	contractState := State{
 		Version: 1,
-		Intent:  INTENT_OPERATE,
+		Intent:  core.INTENT_OPERATE,
 		HomeState: Ledger{
 			ChainId:        1,
 			Token:          common.HexToAddress("0x1234567890123456789012345678901234567890"),

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -16,6 +17,40 @@ var (
 	uint64Type, _  = abi.NewType("uint64", "", nil)
 	uint256Type, _ = abi.NewType("uint256", "", nil)
 )
+
+func TransitionToIntent(transition *Transition) (uint8, error) {
+	if transition == nil {
+		return 0, errors.New("at least one transition is expected")
+	}
+
+	switch transition.Type {
+	case TransitionTypeTransferSend,
+		TransitionTypeTransferReceive,
+		TransitionTypeCommit,
+		TransitionTypeRelease:
+		return INTENT_OPERATE, nil
+	case TransitionTypeFinalize:
+		return INTENT_CLOSE, nil
+	case TransitionTypeHomeDeposit:
+		return INTENT_DEPOSIT, nil
+	case TransitionTypeHomeWithdrawal:
+		return INTENT_WITHDRAW, nil
+	case TransitionTypeMutualLock:
+		return INTENT_INITIATE_ESCROW_DEPOSIT, nil
+	case TransitionTypeEscrowDeposit:
+		return INTENT_FINALIZE_ESCROW_DEPOSIT, nil
+	case TransitionTypeEscrowLock:
+		return INTENT_INITIATE_ESCROW_WITHDRAWAL, nil
+	case TransitionTypeEscrowWithdraw:
+		return INTENT_FINALIZE_ESCROW_WITHDRAWAL, nil
+	case TransitionTypeMigrate:
+		return INTENT_INITIATE_MIGRATION, nil
+	// TODO: Add:
+	// FINALIZE_MIGRATION.
+	default:
+		return 0, errors.New("unexpected transition type: " + transition.Type.String())
+	}
+}
 
 // ValidateDecimalPrecision validates that an amount doesn't exceed the maximum allowed decimal places.
 func ValidateDecimalPrecision(amount decimal.Decimal, maxDecimals uint8) error {
@@ -42,26 +77,47 @@ func DecimalToBigInt(amount decimal.Decimal, decimals uint8) (*big.Int, error) {
 	return scaled.BigInt(), nil
 }
 
-// GetHomeChannelID generates a unique identifier for a primary channel between a node and a user.
-func GetHomeChannelID(nodeAddress, userAddress, asset string, nonce uint64, challenge uint32) (string, error) {
-	nodeAddr := common.HexToAddress(nodeAddress)
-	userAddr := common.HexToAddress(userAddress)
+// GetHomeChannelID generates a unique identifier for a primary channel based on its definition.
+// This matches the Solidity getChannelId function which computes keccak256(abi.encode(ChannelDefinition)).
+// The metadata is derived from the asset: first 8 bytes of keccak256(asset) padded to 32 bytes.
+func GetHomeChannelID(challengeDuration uint32, user, node common.Address, nonce uint64, asset string) (string, error) {
+	// Generate metadata from asset
+	metadata := GenerateChannelMetadata(asset)
 
-	assetHash := crypto.Keccak256Hash([]byte(asset))
-	assetID := assetHash[:8] // Use first 8 bytes as asset identifier
-
-	metadata := make([]byte, 32)
-	copy(metadata[:8], assetID)
-
-	args := abi.Arguments{
-		{Type: abi.Type{T: abi.AddressTy}},              // node
-		{Type: abi.Type{T: abi.AddressTy}},              // user
-		{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // metadata
-		{Type: uint32Type},                              // challenge
-		{Type: uint64Type},                              // nonce
+	// Define the struct to match Solidity's ChannelDefinition
+	type channelDefinition struct {
+		ChallengeDuration uint32
+		User              common.Address
+		Node              common.Address
+		Nonce             uint64
+		Metadata          [32]byte
 	}
 
-	packed, err := args.Pack(nodeAddr, userAddr, metadata, challenge, nonce)
+	def := channelDefinition{
+		ChallengeDuration: challengeDuration,
+		User:              user,
+		Node:              node,
+		Nonce:             nonce,
+		Metadata:          metadata,
+	}
+
+	// Define the struct type for ABI encoding
+	channelDefType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{Name: "challengeDuration", Type: "uint32"},
+		{Name: "user", Type: "address"},
+		{Name: "node", Type: "address"},
+		{Name: "nonce", Type: "uint64"},
+		{Name: "metadata", Type: "bytes32"},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	args := abi.Arguments{
+		{Type: channelDefType},
+	}
+
+	packed, err := args.Pack(def)
 	if err != nil {
 		return "", err
 	}
@@ -70,17 +126,16 @@ func GetHomeChannelID(nodeAddress, userAddress, asset string, nonce uint64, chal
 }
 
 // GetEscrowChannelID derives an escrow-specific channel ID based on a home channel and state version.
+// This matches the Solidity getEscrowId function which computes keccak256(abi.encode(channelId, version)).
 func GetEscrowChannelID(homeChannelID string, stateVersion uint64) (string, error) {
 	rawHomeChannelID := common.HexToHash(homeChannelID)
 
 	args := abi.Arguments{
-		{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // homeChannelID
-		{Type: uint256Type},                             // stateVersion
+		{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // channelId
+		{Type: uint64Type}, // version
 	}
 
-	stateVersionBI := new(big.Int).SetUint64(stateVersion)
-
-	packed, err := args.Pack(rawHomeChannelID, stateVersionBI)
+	packed, err := args.Pack(rawHomeChannelID, stateVersion)
 	if err != nil {
 		return "", err
 	}
@@ -178,4 +233,11 @@ func getTransactionID(account, newStateID string) (string, error) {
 	return crypto.Keccak256Hash(packed).Hex(), nil
 }
 
-// TODO: add get transition hash func([]core.transition)hash
+// GenerateChannelMetadata creates metadata from an asset by taking the first 8 bytes of keccak256(asset)
+// and padding the rest with zeros to make a 32-byte array.
+func GenerateChannelMetadata(asset string) [32]byte {
+	assetHash := crypto.Keccak256Hash([]byte(asset))
+	var metadata [32]byte
+	copy(metadata[:8], assetHash[:8])
+	return metadata
+}

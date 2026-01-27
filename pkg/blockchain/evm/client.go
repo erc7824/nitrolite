@@ -233,7 +233,7 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 	}
 
 	switch contractState.Intent {
-	case INTENT_OPERATE, INTENT_DEPOSIT, INTENT_WITHDRAW:
+	case core.INTENT_OPERATE, core.INTENT_DEPOSIT, core.INTENT_WITHDRAW:
 	default:
 		return "", errors.New("unsupported intent for create: " + string(contractState.Intent))
 	}
@@ -282,12 +282,12 @@ func (c *Client) Checkpoint(candidate core.State, _ []core.State) (string, error
 
 	var tx *types.Transaction
 	switch contractCandidate.Intent {
-	case INTENT_OPERATE:
+	case core.INTENT_OPERATE:
 		// TODO: recheck proofs logic
 		tx, err = c.contract.CheckpointChannel(c.transactOpts, channelIDBytes, contractCandidate, []State{})
-	case INTENT_DEPOSIT:
+	case core.INTENT_DEPOSIT:
 		tx, err = c.contract.DepositToChannel(c.transactOpts, channelIDBytes, contractCandidate)
-	case INTENT_WITHDRAW:
+	case core.INTENT_WITHDRAW:
 		tx, err = c.contract.WithdrawFromChannel(c.transactOpts, channelIDBytes, contractCandidate)
 	default:
 		return "", errors.New("unsupported intent for checkpointing: " + string(contractCandidate.Intent))
@@ -338,7 +338,7 @@ func (c *Client) Close(candidate core.State, _ []core.State) (string, error) {
 		return "", errors.Wrap(err, "failed to convert candidate state")
 	}
 
-	if contractCandidate.Intent != INTENT_CLOSE {
+	if contractCandidate.Intent != core.INTENT_CLOSE {
 		return "", errors.New("unsupported intent for close: " + string(contractCandidate.Intent))
 	}
 
@@ -364,7 +364,7 @@ func (c *Client) InitiateEscrowDeposit(def core.ChannelDefinition, initCCS core.
 		return "", errors.Wrap(err, "failed to convert state")
 	}
 
-	if contractState.Intent != INTENT_INITIATE_ESCROW_DEPOSIT {
+	if contractState.Intent != core.INTENT_INITIATE_ESCROW_DEPOSIT {
 		return "", errors.New("unsupported intent for initiate escrow deposit: " + string(contractState.Intent))
 	}
 
@@ -409,7 +409,7 @@ func (c *Client) FinalizeEscrowDeposit(candidate core.State, _ [2]core.State) (s
 		return "", errors.Wrap(err, "failed to convert candidate state")
 	}
 
-	if contractCandidate.Intent != INTENT_FINALIZE_ESCROW_DEPOSIT {
+	if contractCandidate.Intent != core.INTENT_FINALIZE_ESCROW_DEPOSIT {
 		return "", errors.New("unsupported intent for finalize escrow deposit: " + string(contractCandidate.Intent))
 	}
 
@@ -434,7 +434,7 @@ func (c *Client) InitiateEscrowWithdrawal(def core.ChannelDefinition, initCCS co
 		return "", errors.Wrap(err, "failed to convert state")
 	}
 
-	if contractState.Intent != INTENT_INITIATE_ESCROW_WITHDRAWAL {
+	if contractState.Intent != core.INTENT_INITIATE_ESCROW_WITHDRAWAL {
 		return "", errors.New("unsupported intent for initiate escrow withdrawal: " + string(contractState.Intent))
 	}
 
@@ -482,7 +482,7 @@ func (c *Client) FinalizeEscrowWithdrawal(candidate core.State) (string, error) 
 		return "", errors.Wrap(err, "failed to convert candidate state")
 	}
 
-	if contractCandidate.Intent != INTENT_INITIATE_ESCROW_WITHDRAWAL {
+	if contractCandidate.Intent != core.INTENT_INITIATE_ESCROW_WITHDRAWAL {
 		return "", errors.New("unsupported intent for initiate escrow withdrawal: " + string(contractCandidate.Intent))
 	}
 

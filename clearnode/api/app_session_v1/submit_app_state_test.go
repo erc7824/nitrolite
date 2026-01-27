@@ -1027,7 +1027,7 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 			},
 			SessionData: "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations
@@ -1117,7 +1117,7 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 			},
 			SessionData: "",
 		},
-		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
 	}
 
 	// Mock expectations

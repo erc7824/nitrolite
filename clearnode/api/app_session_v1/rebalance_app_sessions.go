@@ -81,9 +81,9 @@ func (h *Handler) RebalanceAppSessions(c *rpc.Context) {
 			return rpc.Errorf("failed to generate batch ID: %v", err)
 		}
 
-		// Track all balance changes per session per asset
-		balanceChanges := make(map[string]map[string]decimal.Decimal) // sessionID -> asset -> change
-		assetTotalDiff := make(map[string]decimal.Decimal)            // asset -> total change
+		// Track all balance changes per session per participant per asset
+		balanceChanges := make(map[string]map[string]map[string]decimal.Decimal) // sessionID -> participant -> asset -> change
+		assetTotalDiff := make(map[string]decimal.Decimal)                       // asset -> total change
 
 		// Validate and process each session
 		for _, update := range updates {
@@ -142,8 +142,8 @@ func (h *Handler) RebalanceAppSessions(c *rpc.Context) {
 				newAllocations[alloc.Participant][alloc.Asset] = alloc.Amount
 			}
 
-			// Calculate balance changes for this session
-			sessionChanges := make(map[string]decimal.Decimal) // asset -> change
+			// Calculate balance changes for this session per participant
+			sessionChanges := make(map[string]map[string]decimal.Decimal) // participant -> asset -> change
 
 			// Process all assets in current allocations
 			for participant, assets := range currentAllocations {
@@ -155,7 +155,11 @@ func (h *Handler) RebalanceAppSessions(c *rpc.Context) {
 
 					change := newAmount.Sub(currentAmount)
 					if !change.IsZero() {
-						sessionChanges[asset] = sessionChanges[asset].Add(change)
+						if sessionChanges[participant] == nil {
+							sessionChanges[participant] = make(map[string]decimal.Decimal)
+						}
+						sessionChanges[participant][asset] = change
+						assetTotalDiff[asset] = assetTotalDiff[asset].Add(change)
 					}
 				}
 			}
@@ -165,7 +169,11 @@ func (h *Handler) RebalanceAppSessions(c *rpc.Context) {
 				for asset, newAmount := range assets {
 					if currentAllocations[participant] == nil || currentAllocations[participant][asset].IsZero() {
 						if !newAmount.IsZero() {
-							sessionChanges[asset] = sessionChanges[asset].Add(newAmount)
+							if sessionChanges[participant] == nil {
+								sessionChanges[participant] = make(map[string]decimal.Decimal)
+							}
+							sessionChanges[participant][asset] = newAmount
+							assetTotalDiff[asset] = assetTotalDiff[asset].Add(newAmount)
 						}
 					}
 				}
@@ -173,11 +181,6 @@ func (h *Handler) RebalanceAppSessions(c *rpc.Context) {
 
 			// Store session changes
 			balanceChanges[update.AppStateUpdate.AppSessionID] = sessionChanges
-
-			// Update global asset totals
-			for asset, change := range sessionChanges {
-				assetTotalDiff[asset] = assetTotalDiff[asset].Add(change)
-			}
 
 			// Update app session
 			appSession.Version++
@@ -199,19 +202,41 @@ func (h *Handler) RebalanceAppSessions(c *rpc.Context) {
 			}
 		}
 
-		// Record ledger entries and transactions for each session
-		for sessionID, diffs := range balanceChanges {
-			for asset, diff := range diffs {
+		// Record ledger entries per participant
+		for sessionID, participantChanges := range balanceChanges {
+			for participant, assetChanges := range participantChanges {
+				for asset, diff := range assetChanges {
+					if diff.IsZero() {
+						continue
+					}
+
+					// Record ledger entry with user wallet (participant)
+					if err := tx.RecordLedgerEntry(participant, sessionID, asset, diff); err != nil {
+						return rpc.Errorf("failed to record ledger entry for session %s: %v", sessionID, err)
+					}
+				}
+			}
+		}
+
+		// Calculate aggregate changes per session per asset and record transactions
+		sessionAssetChanges := make(map[string]map[string]decimal.Decimal) // sessionID -> asset -> aggregated change
+		for sessionID, participantChanges := range balanceChanges {
+			sessionAssetChanges[sessionID] = make(map[string]decimal.Decimal)
+			for _, assetChanges := range participantChanges {
+				for asset, diff := range assetChanges {
+					sessionAssetChanges[sessionID][asset] = sessionAssetChanges[sessionID][asset].Add(diff)
+				}
+			}
+		}
+
+		// Record one transaction per session per asset
+		for sessionID, assetChanges := range sessionAssetChanges {
+			for asset, diff := range assetChanges {
 				if diff.IsZero() {
 					continue
 				}
 
-				// Record ledger entry
-				if err := tx.RecordLedgerEntry(sessionID, asset, diff, nil); err != nil {
-					return rpc.Errorf("failed to record ledger entry for session %s: %v", sessionID, err)
-				}
-
-				// Record transaction
+				// Record transaction for the aggregated change
 				var fromAccount, toAccount string
 				var amount decimal.Decimal
 

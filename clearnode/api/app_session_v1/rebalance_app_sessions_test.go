@@ -51,6 +51,8 @@ func TestRebalanceAppSessions_Success_TwoSessions(t *testing.T) {
 		storeTxProvider,
 		nil,
 		nil,
+		nil,
+		nil,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
@@ -150,8 +152,8 @@ func TestRebalanceAppSessions_Success_TwoSessions(t *testing.T) {
 	})).Return(nil).Once()
 
 	// Mock ledger entry and transaction recording
-	mockStore.On("RecordLedgerEntry", sessionID1, "USDC", decimal.NewFromInt(-100), (*string)(nil)).Return(nil)
-	mockStore.On("RecordLedgerEntry", sessionID2, "USDC", decimal.NewFromInt(100), (*string)(nil)).Return(nil)
+	mockStore.On("RecordLedgerEntry", participant1, sessionID1, "USDC", decimal.NewFromInt(-100)).Return(nil)
+	mockStore.On("RecordLedgerEntry", participant2, sessionID2, "USDC", decimal.NewFromInt(100)).Return(nil)
 	mockStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeRebalance && tx.Asset == "USDC"
 	})).Return(nil).Twice()
@@ -191,6 +193,8 @@ func TestRebalanceAppSessions_Success_MultiAsset(t *testing.T) {
 
 	handler := NewHandler(
 		storeTxProvider,
+		nil,
+		nil,
 		nil,
 		nil,
 		map[SigType]SigValidator{
@@ -287,10 +291,10 @@ func TestRebalanceAppSessions_Success_MultiAsset(t *testing.T) {
 	})).Return(nil).Once()
 
 	// Ledger entries
-	mockStore.On("RecordLedgerEntry", sessionID1, "USDC", decimal.NewFromInt(-100), (*string)(nil)).Return(nil)
-	mockStore.On("RecordLedgerEntry", sessionID1, "ETH", decimal.RequireFromString("0.5"), (*string)(nil)).Return(nil)
-	mockStore.On("RecordLedgerEntry", sessionID2, "USDC", decimal.NewFromInt(100), (*string)(nil)).Return(nil)
-	mockStore.On("RecordLedgerEntry", sessionID2, "ETH", decimal.RequireFromString("-0.5"), (*string)(nil)).Return(nil)
+	mockStore.On("RecordLedgerEntry", participant1, sessionID1, "USDC", decimal.NewFromInt(-100)).Return(nil)
+	mockStore.On("RecordLedgerEntry", participant1, sessionID1, "ETH", decimal.RequireFromString("0.5")).Return(nil)
+	mockStore.On("RecordLedgerEntry", participant2, sessionID2, "USDC", decimal.NewFromInt(100)).Return(nil)
+	mockStore.On("RecordLedgerEntry", participant2, sessionID2, "ETH", decimal.RequireFromString("-0.5")).Return(nil)
 	mockStore.On("RecordTransaction", mock.Anything).Return(nil).Times(4) // 2 assets × 2 sessions
 
 	// Create RPC context
@@ -321,6 +325,8 @@ func TestRebalanceAppSessions_Error_InsufficientSessions(t *testing.T) {
 
 	handler := NewHandler(
 		storeTxProvider,
+		nil,
+		nil,
 		nil,
 		nil,
 		nil,
@@ -366,6 +372,8 @@ func TestRebalanceAppSessions_Error_InvalidIntent(t *testing.T) {
 
 	handler := NewHandler(
 		storeTxProvider,
+		nil,
+		nil,
 		nil,
 		nil,
 		nil,
@@ -422,6 +430,8 @@ func TestRebalanceAppSessions_Error_DuplicateSession(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
+		nil,
 		"0xNode",
 	)
 
@@ -475,6 +485,8 @@ func TestRebalanceAppSessions_Error_ConservationViolation(t *testing.T) {
 
 	handler := NewHandler(
 		storeTxProvider,
+		nil,
+		nil,
 		nil,
 		nil,
 		map[SigType]SigValidator{
@@ -595,6 +607,8 @@ func TestRebalanceAppSessions_Error_SessionNotFound(t *testing.T) {
 		storeTxProvider,
 		nil,
 		nil,
+		nil,
+		nil,
 		map[SigType]SigValidator{
 			EcdsaSigType: new(MockSigValidator),
 		},
@@ -655,6 +669,8 @@ func TestRebalanceAppSessions_Error_ClosedSession(t *testing.T) {
 
 	handler := NewHandler(
 		storeTxProvider,
+		nil,
+		nil,
 		nil,
 		nil,
 		map[SigType]SigValidator{
@@ -722,6 +738,8 @@ func TestRebalanceAppSessions_Error_InvalidVersion(t *testing.T) {
 
 	handler := NewHandler(
 		storeTxProvider,
+		nil,
+		nil,
 		nil,
 		nil,
 		map[SigType]SigValidator{

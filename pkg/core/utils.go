@@ -80,8 +80,10 @@ func DecimalToBigInt(amount decimal.Decimal, decimals uint8) (*big.Int, error) {
 // GetHomeChannelID generates a unique identifier for a primary channel based on its definition.
 // This matches the Solidity getChannelId function which computes keccak256(abi.encode(ChannelDefinition)).
 // The metadata is derived from the asset: first 8 bytes of keccak256(asset) padded to 32 bytes.
-func GetHomeChannelID(challengeDuration uint32, user, node common.Address, nonce uint64, asset string) (string, error) {
+func GetHomeChannelID(node, user, asset string, nonce uint64, challengeDuration uint32) (string, error) {
 	// Generate metadata from asset
+	userAddr := common.HexToAddress(user)
+	nodeAddr := common.HexToAddress(node)
 	metadata := GenerateChannelMetadata(asset)
 
 	// Define the struct to match Solidity's ChannelDefinition
@@ -95,8 +97,8 @@ func GetHomeChannelID(challengeDuration uint32, user, node common.Address, nonce
 
 	def := channelDefinition{
 		ChallengeDuration: challengeDuration,
-		User:              user,
-		Node:              node,
+		User:              userAddr,
+		Node:              nodeAddr,
 		Nonce:             nonce,
 		Metadata:          metadata,
 	}

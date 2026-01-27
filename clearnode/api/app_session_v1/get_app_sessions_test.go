@@ -120,7 +120,7 @@ func TestGetAppSessions_SuccessWithParticipant(t *testing.T) {
 	assert.Equal(t, "closed", response.AppSessions[0].Status)
 	assert.Len(t, response.AppSessions[0].Participants, 2)
 	assert.Equal(t, participant, response.AppSessions[0].Participants[0].WalletAddress)
-	assert.Equal(t, uint64(2), response.AppSessions[0].Quorum)
+	assert.Equal(t, uint8(2), response.AppSessions[0].Quorum)
 	assert.Equal(t, uint64(1), response.AppSessions[0].Version)
 	assert.NotNil(t, response.AppSessions[0].SessionData)
 
@@ -128,7 +128,7 @@ func TestGetAppSessions_SuccessWithParticipant(t *testing.T) {
 	assert.Equal(t, "session2", response.AppSessions[1].AppSessionID)
 	assert.Equal(t, "open", response.AppSessions[1].Status)
 	assert.Len(t, response.AppSessions[1].Participants, 1)
-	assert.Equal(t, uint64(1), response.AppSessions[1].Quorum)
+	assert.Equal(t, uint8(1), response.AppSessions[1].Quorum)
 	assert.Equal(t, uint64(5), response.AppSessions[1].Version)
 	assert.Nil(t, response.AppSessions[1].SessionData)
 

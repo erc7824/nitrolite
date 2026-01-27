@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -390,13 +389,13 @@ func TestDecimalToBigInt_RoundTrip(t *testing.T) {
 func TestGetHomeChannelID(t *testing.T) {
 	t.Run("match_solidity_implementation", func(t *testing.T) {
 		// Test values from contracts-new/test/Utils.t.sol:test_log_calculateChannelId
-		challengeDuration := uint32(86400)
-		user := common.HexToAddress("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")
-		node := common.HexToAddress("0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a")
-		nonce := uint64(42)
+		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
+		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
 		asset := "ether"
+		nonce := uint64(42)
+		challengeDuration := uint32(86400)
 
-		channelID, err := GetHomeChannelID(challengeDuration, user, node, nonce, asset)
+		channelID, err := GetHomeChannelID(node, user, asset, nonce, challengeDuration)
 		assert.NoError(t, err)
 
 		// Expected value from Solidity test
@@ -405,30 +404,30 @@ func TestGetHomeChannelID(t *testing.T) {
 	})
 
 	t.Run("different_assets_produce_different_ids", func(t *testing.T) {
-		challengeDuration := uint32(86400)
-		user := common.HexToAddress("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")
-		node := common.HexToAddress("0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a")
+		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
+		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
 		nonce := uint64(42)
+		challengeDuration := uint32(86400)
 
-		channelID1, err := GetHomeChannelID(challengeDuration, user, node, nonce, "ether")
+		channelID1, err := GetHomeChannelID(node, user, "ether", nonce, challengeDuration)
 		assert.NoError(t, err)
 
-		channelID2, err := GetHomeChannelID(challengeDuration, user, node, nonce, "usdc")
+		channelID2, err := GetHomeChannelID(node, user, "usdc", nonce, challengeDuration)
 		assert.NoError(t, err)
 
 		assert.NotEqual(t, channelID1, channelID2, "Different assets should produce different channel IDs")
 	})
 
 	t.Run("different_nonces_produce_different_ids", func(t *testing.T) {
-		challengeDuration := uint32(86400)
-		user := common.HexToAddress("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")
-		node := common.HexToAddress("0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a")
+		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
+		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
 		asset := "ether"
+		challengeDuration := uint32(86400)
 
-		channelID1, err := GetHomeChannelID(challengeDuration, user, node, 1, asset)
+		channelID1, err := GetHomeChannelID(node, user, asset, 1, challengeDuration)
 		assert.NoError(t, err)
 
-		channelID2, err := GetHomeChannelID(challengeDuration, user, node, 2, asset)
+		channelID2, err := GetHomeChannelID(node, user, asset, 2, challengeDuration)
 		assert.NoError(t, err)
 
 		assert.NotEqual(t, channelID1, channelID2, "Different nonces should produce different channel IDs")
@@ -560,7 +559,7 @@ func TestGetStateTransitionsHash(t *testing.T) {
 		transitions := []Transition{}
 		hash, err := GetStateTransitionsHash(transitions)
 		assert.NoError(t, err)
-		
+
 		t.Logf("Hash for empty transitions: 0x%x", hash)
 	})
 
@@ -570,9 +569,9 @@ func TestGetStateTransitionsHash(t *testing.T) {
 		}
 		hash, err := GetStateTransitionsHash(transitions)
 		assert.NoError(t, err)
-		
+
 		t.Logf("Hash for single transition: 0x%x", hash)
-		t.Logf("Transition details: Type=%d, TxID=%s, AccountID=%s, Amount=%s", 
+		t.Logf("Transition details: Type=%d, TxID=%s, AccountID=%s, Amount=%s",
 			transitions[0].Type, transitions[0].TxID, transitions[0].AccountID, transitions[0].Amount.String())
 	})
 
@@ -584,10 +583,10 @@ func TestGetStateTransitionsHash(t *testing.T) {
 		}
 		hash, err := GetStateTransitionsHash(transitions)
 		assert.NoError(t, err)
-		
+
 		t.Logf("Hash for multiple transitions: 0x%x", hash)
 		for i, tr := range transitions {
-			t.Logf("  Transition[%d]: Type=%d, TxID=%s, AccountID=%s, Amount=%s", 
+			t.Logf("  Transition[%d]: Type=%d, TxID=%s, AccountID=%s, Amount=%s",
 				i, tr.Type, tr.TxID, tr.AccountID, tr.Amount.String())
 		}
 	})
@@ -599,10 +598,10 @@ func TestGetStateTransitionsHash(t *testing.T) {
 		}
 		hash, err := GetStateTransitionsHash(transitions)
 		assert.NoError(t, err)
-		
+
 		t.Logf("Hash for transitions with negative amounts: 0x%x", hash)
 		for i, tr := range transitions {
-			t.Logf("  Transition[%d]: Type=%d, TxID=%s, AccountID=%s, Amount=%s", 
+			t.Logf("  Transition[%d]: Type=%d, TxID=%s, AccountID=%s, Amount=%s",
 				i, tr.Type, tr.TxID, tr.AccountID, tr.Amount.String())
 		}
 	})

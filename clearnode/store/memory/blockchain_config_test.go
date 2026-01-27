@@ -141,7 +141,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			err := verifyBlockchainsConfig(&tc.cfg, false)
+			err := verifyBlockchainsConfig(&tc.cfg)
 			if tc.expectedErrorStr != "" {
 				require.Error(t, err)
 				assert.Equal(t, tc.expectedErrorStr, err.Error())

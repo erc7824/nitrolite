@@ -36,7 +36,19 @@ func (h *Handler) GetAppSessions(c *rpc.Context) {
 
 	err := h.useStoreInTx(func(store Store) error {
 		var err error
-		sessions, metadata, err = store.GetAppSessions(req.AppSessionID, req.Participant, req.Status, &paginationParams)
+		status := app.AppSessionStatusVoid
+		if req.Status != nil {
+			switch *req.Status {
+			case "open":
+				status = app.AppSessionStatusOpen
+			case "closed":
+				status = app.AppSessionStatusClosed
+			default:
+				c.Fail(nil, "invalid status value")
+				return nil
+			}
+		}
+		sessions, metadata, err = store.GetAppSessions(req.AppSessionID, req.Participant, status, &paginationParams)
 		if err != nil {
 			return err
 		}

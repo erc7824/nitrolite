@@ -10,7 +10,9 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o ./bin/clearnode .
+ARG VERSION="n/a"
+
+RUN go build -o ./bin/clearnode -ldflags "-X main.Version=${VERSION}" ./clearnode
 
 FROM alpine
 
@@ -21,6 +23,15 @@ USER clearnode
 
 COPY --from=builder /build/bin /bin
 
-EXPOSE 8000 4242
+EXPOSE 7824 4242
 
 CMD ["clearnode"]
+
+#  => ERROR [builder 7/7] RUN go build -o ./bin/clearnode . -ldflags "-X main.Version=3.0.0"                   0.2s
+# ------
+#  > [builder 7/7] RUN go build -o ./bin/clearnode . -ldflags "-X main.Version=3.0.0":
+# #15 0.188 no Go files in /build
+# #15 0.188 malformed import path "-ldflags": leading dash
+# #15 0.188 malformed import path "-X main.Version=3.0.0": leading dash
+# ------
+# executor failed running [/bin/sh -c go build -o ./bin/clearnode . -ldflags "-X main.Version=${VERSION}"]: exit code: 1

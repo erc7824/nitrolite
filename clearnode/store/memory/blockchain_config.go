@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -38,8 +37,6 @@ type BlockchainConfig struct {
 	ID uint64 `yaml:"id"`
 	// Disabled determines if this blockchain should be connected
 	Disabled bool `yaml:"disabled"`
-	// BlockchainRPC is populated from environment variable <NAME>_BLOCKCHAIN_RPC
-	BlockchainRPC string
 	// BlockStep defines the block range for scanning (default: 10000)
 	BlockStep uint64 `yaml:"block_step"`
 	// ContractAddress can override the default addresses
@@ -68,14 +65,14 @@ func LoadEnabledBlockchains(configDirPath string) (map[uint64]BlockchainConfig, 
 		return nil, err
 	}
 
-	if err := verifyBlockchainsConfig(&cfg, true); err != nil {
+	if err := verifyBlockchainsConfig(&cfg); err != nil {
 		return nil, err
 	}
 
 	return getEnabledBlockchains(&cfg), nil
 }
 
-func verifyBlockchainsConfig(cfg *BlockchainsConfig, checkRPC bool) error {
+func verifyBlockchainsConfig(cfg *BlockchainsConfig) error {
 	if !contractAddressRegex.MatchString(cfg.DefaultContractAddress) && cfg.DefaultContractAddress != "" {
 		return fmt.Errorf("invalid default contract address '%s'", cfg.DefaultContractAddress)
 	}
@@ -97,16 +94,6 @@ func verifyBlockchainsConfig(cfg *BlockchainsConfig, checkRPC bool) error {
 			}
 		} else if !contractAddressRegex.MatchString(bc.ContractAddress) {
 			return fmt.Errorf("invalid contract address '%s' for blockchain '%s'", bc.ContractAddress, bc.Name)
-		}
-
-		// It reads RPC URLs from environment variables following the pattern:
-		// <BLOCKCHAIN_NAME_UPPERCASE>_BLOCKCHAIN_RPC and verifies that each endpoint returns the expected chain ID.
-		if checkRPC {
-			blockchainRPC := os.Getenv(fmt.Sprintf("%s_BLOCKCHAIN_RPC", strings.ToUpper(bc.Name)))
-			if blockchainRPC == "" {
-				return fmt.Errorf("missing blockchain RPC for blockchain '%s'", bc.Name)
-			}
-			cfg.Blockchains[i].BlockchainRPC = blockchainRPC
 		}
 
 		if bc.BlockStep == 0 {

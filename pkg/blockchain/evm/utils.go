@@ -1,15 +1,51 @@
 package evm
 
 import (
+	"context"
 	"encoding/hex"
+	"math/big"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/sign"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
 )
+
+// signerTxOpts creates a TransactOpts object for signing transactions
+// using the provided signer and blockchain ID.
+func signerTxOpts(signer sign.Signer, blockchainID uint64) *bind.TransactOpts {
+	bigChainID := big.NewInt(int64(blockchainID))
+	signingMethod := types.LatestSignerForChainID(bigChainID)
+	signerAddress := common.HexToAddress(signer.PublicKey().Address().String())
+	signerFn := func(address common.Address, tx *types.Transaction) (*types.Transaction, error) {
+		if address != signerAddress {
+			return nil, bind.ErrNotAuthorized
+		}
+
+		hash := signingMethod.Hash(tx).Bytes()
+		sig, err := signer.Sign(hash)
+		if err != nil {
+			return nil, err
+		}
+
+		if sig[64] >= 27 {
+			sig[64] -= 27
+		}
+
+		return tx.WithSignature(signingMethod, sig)
+	}
+
+	return &bind.TransactOpts{
+		From:    signerAddress,
+		Signer:  signerFn,
+		Context: context.Background(),
+	}
+}
 
 // waitForBackOffTimeout implements exponential backoff between retries
 func waitForBackOffTimeout(logger log.Logger, backOffCount int, originator string) {

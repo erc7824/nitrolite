@@ -2,109 +2,77 @@ package main
 
 import (
 	"context"
-	"embed"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/api"
-	"github.com/erc7824/nitrolite/clearnode/custody"
-	"github.com/erc7824/nitrolite/clearnode/metrics/prometheus"
-	db "github.com/erc7824/nitrolite/clearnode/store/database"
-	"github.com/erc7824/nitrolite/pkg/log"
-	"github.com/erc7824/nitrolite/pkg/rpc"
-	"github.com/erc7824/nitrolite/pkg/sign"
-	"gorm.io/gorm"
-
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/erc7824/nitrolite/clearnode/api"
+	"github.com/erc7824/nitrolite/clearnode/event_handlers"
+	"github.com/erc7824/nitrolite/clearnode/store/database"
+	"github.com/erc7824/nitrolite/pkg/blockchain/evm"
 )
 
-//go:embed config/migrations/*/*.sql
-var embedMigrations embed.FS
-
 func main() {
-	cfg := log.Config{
-		Format: "json",
-		Level:  log.LevelDebug,
-	}
+	bb := InitBackbone()
+	logger := bb.Logger.WithName("main")
+	ctx := context.Background()
 
-	logger := log.NewZapLogger(cfg)
-	if len(os.Args) > 1 {
-		// If a CLI command is provided, run it and exit
-		runCli(logger, os.Args[1])
-		return
-	}
+	api.NewRPCRouter(bb.NodeVersion, bb.ChannelMinChallengeDuration,
+		bb.RpcNode, bb.Signer, bb.DbStore, bb.MemoryStore, bb.Logger)
 
-	config, err := LoadConfig(logger)
-	if err != nil {
-		logger.Fatal("failed to load configuration", "error", err)
-	}
-
-	database, err := db.ConnectToDB(config.dbConf, embedMigrations)
-	if err != nil {
-		logger.Fatal("Failed to setup database", "error", err)
-	}
-
-	err = db.LoadSessionKeyCache(database)
-	if err != nil {
-		logger.Fatal("Failed to load session key cache", "error", err)
-	}
-
-	signer, err := sign.NewEthereumSigner(config.privateKeyHex)
-	if err != nil {
-		logger.Fatal("failed to initialise signer", "error", err)
-	}
-	logger.Info("broker signer initialized", "address", signer.PublicKey().Address())
-
-	rpcStore := db.NewRPCStore(database)
-
-	// Initialize Prometheus metrics
-	metrics := prometheus.NewMetrics()
-	// Map to store custody clients for later reference
-	custodyClients := make(map[uint32]*custody.Custody)
-
-	rpcNode, err := rpc.NewWebsocketNode(rpc.WebsocketNodeConfig{
-		Signer: signer,
-		Logger: logger,
-	})
-	if err != nil {
-		logger.Fatal("failed to initialize RPC node", "error", err)
-	}
-	wsNotifier := api.NewWSNotifier(rpcNode.Notify, logger)
-
-	api.NewRPCRouter(rpcNode, config, signer, database, metrics, rpcStore, wsNotifier, logger)
-
-	rpcListenAddr := ":8000"
+	rpcListenAddr := ":7824"
 	rpcListenEndpoint := "/ws"
 	rpcMux := http.NewServeMux()
-	rpcMux.HandleFunc(rpcListenEndpoint, rpcNode.ServeHTTP)
+	rpcMux.HandleFunc(rpcListenEndpoint, bb.RpcNode.ServeHTTP)
 
 	rpcServer := &http.Server{
 		Addr:    rpcListenAddr,
 		Handler: rpcMux,
 	}
 
-	for chainID, blockchain := range config.blockchains {
-		client, err := custody.NewCustody(signer, database, wsNotifier, blockchain, &config.assets, logger)
-		if err != nil {
-			logger.Fatal("failed to initialize blockchain client", "chainID", chainID, "error", err)
-			continue
-		}
-		custodyClients[chainID] = client
-		go client.ListenEvents(context.Background())
+	blockchains, err := bb.MemoryStore.GetBlockchains()
+	if err != nil {
+		logger.Fatal("failed to get blockchains from memory store", "error", err)
 	}
 
-	// Start blockchain action worker for all custody clients
-	// TODO: This can be moved to a separate worker process in the future for better scalability
-	if len(custodyClients) > 0 {
-		custodyClients := make(map[uint32]custody.CustodyInterface, len(custodyClients))
-		for chainID, client := range custodyClients {
-			custodyClients[chainID] = client
+	wrapInTx := func(handler func(database.DatabaseStore) error) error {
+		return bb.DbStore.ExecuteInTransaction(handler)
+	}
+	useEHV1StoreInTx := func(h event_handlers.StoreTxHandler) error {
+		return wrapInTx(func(s database.DatabaseStore) error { return h(s) })
+	}
+
+	eventHandlerService := event_handlers.NewEventHandlerService(useEHV1StoreInTx, logger)
+
+	for _, b := range blockchains {
+		rpcURL, ok := bb.BlockchainRPCs[b.ID]
+		if !ok {
+			logger.Fatal("no RPC URL configured for blockchain", "blockchainID", b.ID)
 		}
-		worker := NewBlockchainWorker(database, custodyClients, logger)
-		go worker.Start(context.Background())
+
+		client, err := ethclient.Dial(rpcURL)
+		if err != nil {
+			logger.Fatal("failed to connect to EVM Node")
+		}
+		reactor := evm.NewReactor(b.ID, eventHandlerService, bb.DbStore.StoreContractEvent)
+		l := evm.NewListener(common.HexToAddress(b.ContractAddress), client, b.ID, b.BlockStep, logger, reactor.HandleEvent, bb.DbStore.GetLatestEvent)
+		if err := l.Listen(ctx); err != nil {
+			logger.Fatal("failed to start EVM listener")
+		}
+
+		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ContractAddress), client, bb.Signer, b.ID, bb.MemoryStore)
+		if err != nil {
+			logger.Fatal("failed to create EVM client")
+		}
+
+		worker := NewBlockchainWorker(blockchainClient, bb.DbStore, logger)
+		go worker.Start(ctx)
 	}
 
 	metricsListenAddr := ":4242"
@@ -119,11 +87,8 @@ func main() {
 		Handler: metricsMux,
 	}
 
-	// Start metrics monitoring
-	go RecordMetricsPeriodically(database, custodyClients, metrics, logger)
-
 	go func() {
-		logger.Info("Prometheus metrics available", "listenAddr", metricsListenAddr, "endpoint", metricsEndpoint)
+		logger.Info("pxrometheus metrics available", "listenAddr", metricsListenAddr, "endpoint", metricsEndpoint)
 		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("metrics server failure", "error", err)
 		}
@@ -159,39 +124,4 @@ func main() {
 	}
 
 	logger.Info("shutdown complete")
-}
-
-func runCli(logger log.Logger, name string) {
-	switch name {
-	case "reconcile":
-		runReconcileCli(logger)
-	case "export-transactions":
-		runExportTransactionsCli(logger)
-	default:
-		logger.Fatal("Unknown CLI command", "name", name)
-	}
-}
-
-func RecordMetricsPeriodically(db *gorm.DB, custodyClients map[uint32]*custody.Custody, m *prometheus.Metrics, logger log.Logger) {
-	logger = logger.WithName("metrics")
-	dbTicker := time.NewTicker(15 * time.Second)
-	defer dbTicker.Stop()
-
-	balanceTicker := time.NewTicker(30 * time.Second)
-	defer balanceTicker.Stop()
-	for {
-		select {
-		case <-dbTicker.C:
-			m.UpdateChannelMetrics(db)
-			m.UpdateAppSessionMetrics(db)
-		case <-balanceTicker.C:
-			ctx := context.Background()
-			ctx = log.SetContextLogger(ctx, logger)
-
-			// Update metrics for each custody client
-			for _, custodyClient := range custodyClients {
-				custodyClient.UpdateBalanceMetrics(ctx, m)
-			}
-		}
-	}
 }

@@ -9,11 +9,26 @@ import (
 )
 
 type DBStore struct {
-	db *gorm.DB
+	inTx bool
+	db   *gorm.DB
 }
 
 func NewDBStore(db *gorm.DB) DatabaseStore {
 	return &DBStore{db: db}
+}
+
+func (s *DBStore) ExecuteInTransaction(txFunc StoreTxHandler) error {
+	if s.inTx {
+		return txFunc(s)
+	}
+
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		txStore := &DBStore{
+			inTx: true,
+			db:   tx,
+		}
+		return txFunc(txStore)
+	})
 }
 
 // GetUserBalances retrieves the balances for a user's wallet.

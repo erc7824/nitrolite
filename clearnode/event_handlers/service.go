@@ -397,7 +397,7 @@ func (s *EventHandlerService) HandleEscrowWithdrawalChallenged(ctx context.Conte
 			logger.Warn("last signed state version is not greater than challenged state version", "channelId", chanID, "lastSignedStateVersion", lastSignedState.Version, "challengedStateVersion", event.StateVersion)
 		} else {
 			if lastSignedState.EscrowLedger == nil {
-				logger.Warn("last signed state has no escrow ledger during EscrowDepositChallenged event", "channelId", chanID)
+				logger.Warn("last signed state has no escrow ledger during EscrowWithdrawalChallenged event", "channelId", chanID)
 			}
 			if err := tx.ScheduleFinalizeEscrowWithdrawal(lastSignedState.ID, lastSignedState.EscrowLedger.BlockchainID); err != nil {
 				return err

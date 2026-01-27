@@ -48,7 +48,7 @@ type channelChallengedEvent struct {
 
 type BlockchainEvent struct {
 	ContractAddress string `json:"contract_address"`
-	ChainID         uint64 `json:"chain_id"`
+	BlockchainID    uint64 `json:"blockchain_id"`
 	Name            string `json:"name"`
 	BlockNumber     uint64 `json:"block_number"`
 	TransactionHash string `json:"transaction_hash"`

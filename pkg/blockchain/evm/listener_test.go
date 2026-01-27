@@ -34,6 +34,7 @@ func TestReconcileBlockRange(t *testing.T) {
 		499, // blockStep
 		logger,
 		nil, // eventHandler not needed for this test
+		nil, // getLatestEvent not needed for this test
 	)
 
 	// Call reconcileBlockRange with appropriate parameters

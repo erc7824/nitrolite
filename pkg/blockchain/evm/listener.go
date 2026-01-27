@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -25,9 +26,18 @@ type Listener struct {
 	blockStep       uint64
 	logger          log.Logger
 	handleEvent     HandleEvent
+	getLatestEvent  LatestEventGetter
 }
 
-func NewListener(contractAddress common.Address, client bind.ContractBackend, blockchainID uint64, blockStep uint64, logger log.Logger, eventHandler HandleEvent) *Listener {
+func NewListener(contractAddress common.Address, client bind.ContractBackend, blockchainID uint64, blockStep uint64, logger log.Logger, eventHandler HandleEvent, getLatestEvent LatestEventGetter) *Listener {
+	if getLatestEvent == nil {
+		getLatestEvent = func(contractAddress string, networkID uint64) (core.BlockchainEvent, error) {
+			return core.BlockchainEvent{
+				BlockNumber: 0,
+				LogIndex:    0,
+			}, nil
+		}
+	}
 	return &Listener{
 		contractAddress: contractAddress,
 		client:          client,
@@ -35,21 +45,26 @@ func NewListener(contractAddress common.Address, client bind.ContractBackend, bl
 		blockStep:       blockStep,
 		logger:          logger,
 		handleEvent:     eventHandler,
+		getLatestEvent:  getLatestEvent,
 	}
 }
 
+// GetLatestContractEvent(contractAddress string, networkID uint32) (*ContractEvent, error)
 func (l *Listener) Listen(ctx context.Context) error {
-	// FIXME: get last block and index from persistent storage
-	go l.listenEvents(ctx, 0, 0)
+	go l.listenEvents(ctx)
 	return nil
 }
 
 // listenEvents listens for blockchain events and processes them with the provided handler
-func (l *Listener) listenEvents(
-	ctx context.Context,
-	lastBlock uint64,
-	lastIndex uint32,
-) {
+func (l *Listener) listenEvents(ctx context.Context) {
+	ev, err := l.getLatestEvent(l.contractAddress.String(), l.blockchainID)
+	if err != nil {
+		l.logger.Error("failed to get latest processed event", "error", err, "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String())
+		return
+	}
+	lastBlock := ev.BlockNumber
+	lastIndex := ev.LogIndex
+
 	var backOffCount atomic.Uint64
 	var historicalCh, currentCh chan types.Log
 	var eventSubscription event.Subscription

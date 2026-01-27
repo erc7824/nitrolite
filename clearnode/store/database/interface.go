@@ -123,4 +123,12 @@ type DatabaseStore interface {
 
 	// RecordLedgerEntry logs a movement of funds within the internal ledger.
 	RecordLedgerEntry(userWallet, accountID, asset string, amount decimal.Decimal) error
+
+	// --- Contract Event Operations ---
+
+	// StoreContractEvent stores a blockchain event to prevent duplicate processing.
+	StoreContractEvent(ev core.BlockchainEvent) error
+
+	// GetLatestEvent returns the latest block number and log index for a given contract.
+	GetLatestEvent(contractAddress string, blockchainID uint64) (core.BlockchainEvent, error)
 }

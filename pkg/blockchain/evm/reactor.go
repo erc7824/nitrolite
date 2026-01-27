@@ -16,6 +16,7 @@ import (
 
 var contractAbi *abi.ABI
 var contractFilterer *ChannelHubFilterer
+var eventMapping map[common.Hash]string
 
 func init() {
 	var err error
@@ -27,15 +28,24 @@ func init() {
 	// Create a filterer for parsing events (address not needed for parsing)
 	contract := bind.NewBoundContract(common.Address{}, *contractAbi, nil, nil, nil)
 	contractFilterer = &ChannelHubFilterer{contract: contract}
+
+	eventMapping = make(map[common.Hash]string)
+	for name, event := range contractAbi.Events {
+		eventMapping[event.ID] = name
+	}
 }
 
 type Reactor struct {
-	eventHandler core.BlockchainEventHandler
+	blockchainID       uint64
+	eventHandler       core.BlockchainEventHandler
+	storeContractEvent StoreContractEvent
 }
 
-func NewReactor(eventHandler core.BlockchainEventHandler) *Reactor {
+func NewReactor(blockchainID uint64, eventHandler core.BlockchainEventHandler, storeContractEvent StoreContractEvent) *Reactor {
 	return &Reactor{
-		eventHandler: eventHandler,
+		blockchainID:       blockchainID,
+		eventHandler:       eventHandler,
+		storeContractEvent: storeContractEvent,
 	}
 }
 
@@ -100,7 +110,24 @@ func (r *Reactor) HandleEvent(ctx context.Context, l types.Log) {
 		logger.Warn("error processing event", "error", err)
 		return
 	}
-	// todo: Record event processed
+
+	eventName, ok := eventMapping[eventID]
+	if !ok {
+		eventName = "unknown"
+	}
+
+	if err := r.storeContractEvent(core.BlockchainEvent{
+		BlockNumber:     l.BlockNumber,
+		BlockchainID:    r.blockchainID,
+		Name:            eventName,
+		ContractAddress: l.Address.Hex(),
+		TransactionHash: l.TxHash.String(),
+		LogIndex:        uint32(l.Index),
+	}); err != nil {
+		logger.Warn("error storing contract event", "error", err, "event", eventName, "blockNumber", l.BlockNumber, "txHash", l.TxHash.String(), "logIndex", l.Index)
+	}
+
+	logger.Info("processed event", "event", eventName, "blockNumber", l.BlockNumber, "txHash", l.TxHash.String(), "logIndex", l.Index)
 }
 
 func (r *Reactor) handleHomeChannelCreated(ctx context.Context, l types.Log) error {

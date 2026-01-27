@@ -278,9 +278,10 @@ func (s *EventHandlerService) HandleEscrowDepositChallenged(ctx context.Context,
 		} else {
 			if lastSignedState.EscrowLedger == nil {
 				logger.Warn("last signed state has no escrow ledger during EscrowDepositChallenged event", "channelId", chanID)
-			}
-			if err := tx.ScheduleFinalizeEscrowDeposit(lastSignedState.ID, lastSignedState.EscrowLedger.BlockchainID); err != nil {
-				return err
+			} else {
+				if err := tx.ScheduleFinalizeEscrowDeposit(lastSignedState.ID, lastSignedState.EscrowLedger.BlockchainID); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -398,9 +399,10 @@ func (s *EventHandlerService) HandleEscrowWithdrawalChallenged(ctx context.Conte
 		} else {
 			if lastSignedState.EscrowLedger == nil {
 				logger.Warn("last signed state has no escrow ledger during EscrowWithdrawalChallenged event", "channelId", chanID)
-			}
-			if err := tx.ScheduleFinalizeEscrowWithdrawal(lastSignedState.ID, lastSignedState.EscrowLedger.BlockchainID); err != nil {
-				return err
+			} else {
+				if err := tx.ScheduleFinalizeEscrowWithdrawal(lastSignedState.ID, lastSignedState.EscrowLedger.BlockchainID); err != nil {
+					return err
+				}
 			}
 		}
 

@@ -222,6 +222,14 @@ library ChannelEngine {
         uint256 allocsSum = candidate.homeState.userAllocation + candidate.homeState.nodeAllocation;
         require(allocsSum <= ctx.lockedFunds, "allocation exceeds locked funds");
 
+        // Ensure final locked funds will be sufficient for special nodeAllocation handling
+        int256 finalLockedFunds = ctx.lockedFunds.toInt256() + userNfDelta + nodeNfDelta;
+        require(finalLockedFunds >= 0, "negative final locked funds");
+        require(
+            finalLockedFunds >= candidate.homeState.nodeAllocation.toInt256(),
+            "insufficient funds for node allocation payout"
+        );
+
         // Calculate effects
         // Push allocations to parties (negative = push out from channel)
         effects.userFundsDelta = userNfDelta;

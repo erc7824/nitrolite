@@ -9,7 +9,7 @@
     "@erc7824/nitrolite": "file:../sdk",
     "pg": "^8.16.3",
     "viem": "^2.43.5",
-    "ws": "^8.18.3"
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

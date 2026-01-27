@@ -36,7 +36,7 @@ func TestDBStore_ScheduleCheckpoint(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.ScheduleCheckpoint(state.ID)
+		err := store.ScheduleCheckpoint(state.ID, 0)
 		require.NoError(t, err)
 
 		// Verify action was created
@@ -75,7 +75,7 @@ func TestDBStore_ScheduleInitiateEscrowWithdrawal(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.ScheduleInitiateEscrowWithdrawal(state.ID)
+		err := store.ScheduleInitiateEscrowWithdrawal(state.ID, 0)
 		require.NoError(t, err)
 
 		// Verify action was created
@@ -109,7 +109,7 @@ func TestDBStore_ScheduleFinalizeEscrowDeposit(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.ScheduleFinalizeEscrowDeposit(state.ID)
+		err := store.ScheduleFinalizeEscrowDeposit(state.ID, 0)
 		require.NoError(t, err)
 
 		var action BlockchainAction
@@ -141,7 +141,7 @@ func TestDBStore_ScheduleFinalizeEscrowWithdrawal(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.ScheduleFinalizeEscrowWithdrawal(state.ID)
+		err := store.ScheduleFinalizeEscrowWithdrawal(state.ID, 0)
 		require.NoError(t, err)
 
 		var action BlockchainAction
@@ -172,7 +172,7 @@ func TestDBStore_Fail(t *testing.T) {
 			},
 		}
 		require.NoError(t, store.StoreUserState(state))
-		require.NoError(t, store.ScheduleCheckpoint(state.ID))
+		require.NoError(t, store.ScheduleCheckpoint(state.ID, 0))
 
 		var action BlockchainAction
 		err := db.Where("state_id = ?", state.ID).First(&action).Error
@@ -212,7 +212,7 @@ func TestDBStore_FailNoRetry(t *testing.T) {
 			},
 		}
 		require.NoError(t, store.StoreUserState(state))
-		require.NoError(t, store.ScheduleCheckpoint(state.ID))
+		require.NoError(t, store.ScheduleCheckpoint(state.ID, 0))
 
 		var action BlockchainAction
 		err := db.Where("state_id = ?", state.ID).First(&action).Error
@@ -252,7 +252,7 @@ func TestDBStore_RecordAttempt(t *testing.T) {
 			},
 		}
 		require.NoError(t, store.StoreUserState(state))
-		require.NoError(t, store.ScheduleCheckpoint(state.ID))
+		require.NoError(t, store.ScheduleCheckpoint(state.ID, 0))
 
 		var action BlockchainAction
 		err := db.Where("state_id = ?", state.ID).First(&action).Error
@@ -292,7 +292,7 @@ func TestDBStore_Complete(t *testing.T) {
 			},
 		}
 		require.NoError(t, store.StoreUserState(state))
-		require.NoError(t, store.ScheduleCheckpoint(state.ID))
+		require.NoError(t, store.ScheduleCheckpoint(state.ID, 0))
 
 		var action BlockchainAction
 		err := db.Where("state_id = ?", state.ID).First(&action).Error
@@ -330,7 +330,7 @@ func TestDBStore_Complete(t *testing.T) {
 			},
 		}
 		require.NoError(t, store.StoreUserState(state))
-		require.NoError(t, store.ScheduleCheckpoint(state.ID))
+		require.NoError(t, store.ScheduleCheckpoint(state.ID, 0))
 
 		var action BlockchainAction
 		err := db.Where("state_id = ?", state.ID).First(&action).Error
@@ -394,12 +394,12 @@ func TestDBStore_GetActions(t *testing.T) {
 		require.NoError(t, store.StoreUserState(state2))
 		require.NoError(t, store.StoreUserState(state3))
 
-		require.NoError(t, store.ScheduleCheckpoint(state1.ID))
-		require.NoError(t, store.ScheduleInitiateEscrowWithdrawal(state2.ID))
-		require.NoError(t, store.ScheduleFinalizeEscrowDeposit(state3.ID))
+		require.NoError(t, store.ScheduleCheckpoint(state1.ID, 0))
+		require.NoError(t, store.ScheduleInitiateEscrowWithdrawal(state2.ID, 0))
+		require.NoError(t, store.ScheduleFinalizeEscrowDeposit(state3.ID, 0))
 
 		// Get all pending actions
-		actions, err := store.GetActions(0)
+		actions, err := store.GetActions(0, 0)
 		require.NoError(t, err)
 
 		assert.Len(t, actions, 3)
@@ -426,11 +426,11 @@ func TestDBStore_GetActions(t *testing.T) {
 				HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(int64(100 * (i + 1)))},
 			}
 			require.NoError(t, store.StoreUserState(state))
-			require.NoError(t, store.ScheduleCheckpoint(state.ID))
+			require.NoError(t, store.ScheduleCheckpoint(state.ID, 0))
 		}
 
 		// Get only 2 actions
-		actions, err := store.GetActions(2)
+		actions, err := store.GetActions(2, 0)
 		require.NoError(t, err)
 
 		assert.Len(t, actions, 2)
@@ -475,9 +475,9 @@ func TestDBStore_GetActions(t *testing.T) {
 		require.NoError(t, store.StoreUserState(state2))
 		require.NoError(t, store.StoreUserState(state3))
 
-		require.NoError(t, store.ScheduleCheckpoint(state1.ID))
-		require.NoError(t, store.ScheduleCheckpoint(state2.ID))
-		require.NoError(t, store.ScheduleCheckpoint(state3.ID))
+		require.NoError(t, store.ScheduleCheckpoint(state1.ID, 0))
+		require.NoError(t, store.ScheduleCheckpoint(state2.ID, 0))
+		require.NoError(t, store.ScheduleCheckpoint(state3.ID, 0))
 
 		// Get action IDs
 		var action1, action2 BlockchainAction
@@ -489,7 +489,7 @@ func TestDBStore_GetActions(t *testing.T) {
 		require.NoError(t, store.Fail(action2.ID, "some error"))
 
 		// Get pending actions - should only return the third one
-		actions, err := store.GetActions(0)
+		actions, err := store.GetActions(0, 0)
 		require.NoError(t, err)
 
 		assert.Len(t, actions, 1)
@@ -503,7 +503,7 @@ func TestDBStore_GetActions(t *testing.T) {
 
 		store := NewDBStore(db)
 
-		actions, err := store.GetActions(0)
+		actions, err := store.GetActions(0, 0)
 		require.NoError(t, err)
 
 		assert.Empty(t, actions)

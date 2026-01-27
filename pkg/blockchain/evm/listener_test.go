@@ -1,14 +1,15 @@
-package main
+package evm
 
 import (
 	"context"
 	"testing"
 
-	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
+
+	"github.com/erc7824/nitrolite/pkg/log"
 )
 
 func TestReconcileBlockRange(t *testing.T) {
@@ -25,5 +26,18 @@ func TestReconcileBlockRange(t *testing.T) {
 
 	historicalCh := make(chan types.Log, 100)
 	logger := log.NewNoopLogger()
-	ReconcileBlockRange(client, contractAddress, uint32(chainID.Uint64()), 31530000, 499, 31527936, 0, historicalCh, logger)
+
+	listener := NewListener(
+		contractAddress,
+		client,
+		chainID.Uint64(),
+		499, // blockStep
+		logger,
+		nil, // eventHandler not needed for this test
+		nil, // getLatestEvent not needed for this test
+	)
+
+	// Call reconcileBlockRange with appropriate parameters
+	// currentBlock, lastBlock, lastIndex, historicalCh
+	listener.reconcileBlockRange(31530000, 31527936, 0, historicalCh)
 }

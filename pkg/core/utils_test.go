@@ -6,6 +6,7 @@ import (
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateDecimalPrecision(t *testing.T) {
@@ -382,5 +383,226 @@ func TestDecimalToBigInt_RoundTrip(t *testing.T) {
 		recovered := decimal.NewFromBigInt(bigIntValue, 0).Div(divisor)
 
 		assert.Equal(t, original, recovered.String(), "Round trip conversion should preserve value")
+	})
+}
+
+func TestGetHomeChannelID(t *testing.T) {
+	t.Run("match_solidity_implementation", func(t *testing.T) {
+		// Test values from contracts-new/test/Utils.t.sol:test_log_calculateChannelId
+		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
+		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+		asset := "ether"
+		nonce := uint64(42)
+		challengeDuration := uint32(86400)
+
+		channelID, err := GetHomeChannelID(node, user, asset, nonce, challengeDuration)
+		assert.NoError(t, err)
+
+		// Expected value from Solidity test
+		expected := "0x7c827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee"
+		assert.Equal(t, expected, channelID, "Channel ID should match Solidity implementation")
+	})
+
+	t.Run("different_assets_produce_different_ids", func(t *testing.T) {
+		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
+		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+		nonce := uint64(42)
+		challengeDuration := uint32(86400)
+
+		channelID1, err := GetHomeChannelID(node, user, "ether", nonce, challengeDuration)
+		assert.NoError(t, err)
+
+		channelID2, err := GetHomeChannelID(node, user, "usdc", nonce, challengeDuration)
+		assert.NoError(t, err)
+
+		assert.NotEqual(t, channelID1, channelID2, "Different assets should produce different channel IDs")
+	})
+
+	t.Run("different_nonces_produce_different_ids", func(t *testing.T) {
+		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
+		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+		asset := "ether"
+		challengeDuration := uint32(86400)
+
+		channelID1, err := GetHomeChannelID(node, user, asset, 1, challengeDuration)
+		assert.NoError(t, err)
+
+		channelID2, err := GetHomeChannelID(node, user, asset, 2, challengeDuration)
+		assert.NoError(t, err)
+
+		assert.NotEqual(t, channelID1, channelID2, "Different nonces should produce different channel IDs")
+	})
+}
+
+func TestGetEscrowChannelID(t *testing.T) {
+	t.Run("match_solidity_implementation", func(t *testing.T) {
+		// Test values from contracts-new/test/Utils.t.sol:test_log_calculateEscrowId
+		homeChannelID := "0xeac2bed767671a8ab77527e1e2fff00bb2e62de5467d9ba3a4105dad5c6e3d66"
+		version := uint64(42)
+
+		escrowID, err := GetEscrowChannelID(homeChannelID, version)
+		assert.NoError(t, err)
+
+		// Expected value from Solidity test
+		expected := "0xe4d925dcf63add647f25c757d6ff0e74ba31401da91d8c7bafa4846c97a92ac2"
+		assert.Equal(t, expected, escrowID, "Escrow ID should match Solidity implementation")
+	})
+
+	t.Run("different_versions_produce_different_ids", func(t *testing.T) {
+		homeChannelID := "0xeac2bed767671a8ab77527e1e2fff00bb2e62de5467d9ba3a4105dad5c6e3d66"
+
+		escrowID1, err := GetEscrowChannelID(homeChannelID, 1)
+		assert.NoError(t, err)
+
+		escrowID2, err := GetEscrowChannelID(homeChannelID, 2)
+		assert.NoError(t, err)
+
+		assert.NotEqual(t, escrowID1, escrowID2, "Different versions should produce different escrow IDs")
+	})
+
+	t.Run("different_channels_produce_different_ids", func(t *testing.T) {
+		version := uint64(42)
+
+		escrowID1, err := GetEscrowChannelID("0xeac2bed767671a8ab77527e1e2fff00bb2e62de5467d9ba3a4105dad5c6e3d66", version)
+		assert.NoError(t, err)
+
+		escrowID2, err := GetEscrowChannelID("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef", version)
+		assert.NoError(t, err)
+
+		assert.NotEqual(t, escrowID1, escrowID2, "Different home channel IDs should produce different escrow IDs")
+	})
+}
+
+func TestGenerateChannelMetadata(t *testing.T) {
+	t.Run("match_solidity_implementation", func(t *testing.T) {
+		// Test that metadata generation matches Solidity
+		asset := "ether"
+		metadata := GenerateChannelMetadata(asset)
+
+		// Expected from Solidity test: first 8 bytes of keccak256("ether")
+		// keccak256("ether") = 0x13730b0d8e1bdbdc293b62ba010b1eede56b412ea2980defabe3d0b6c7844c3a
+		// First 8 bytes: 0x13730b0d8e1bdbdc
+		expected := [32]byte{0x13, 0x73, 0x0b, 0x0d, 0x8e, 0x1b, 0xdb, 0xdc}
+
+		assert.Equal(t, expected[:8], metadata[:8], "First 8 bytes should match asset hash")
+
+		// Rest should be zeros
+		for i := 8; i < 32; i++ {
+			assert.Equal(t, byte(0), metadata[i], "Bytes after index 8 should be zero")
+		}
+	})
+
+	t.Run("different_assets_produce_different_metadata", func(t *testing.T) {
+		metadata1 := GenerateChannelMetadata("ether")
+		metadata2 := GenerateChannelMetadata("usdc")
+
+		assert.NotEqual(t, metadata1, metadata2, "Different assets should produce different metadata")
+	})
+}
+
+func TestTransitionToIntent_OperateIntents(t *testing.T) {
+	tests := []struct {
+		name           string
+		transitionType TransitionType
+		expectedIntent uint8
+	}{
+		{"TransferSend", TransitionTypeTransferSend, INTENT_OPERATE},
+		{"TransferReceive", TransitionTypeTransferReceive, INTENT_OPERATE},
+		{"Commit", TransitionTypeCommit, INTENT_OPERATE},
+		{"Release", TransitionTypeRelease, INTENT_OPERATE},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transition := &Transition{Type: tt.transitionType}
+			intent, err := TransitionToIntent(transition)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedIntent, intent)
+		})
+	}
+}
+
+func TestTransitionToIntent_AllTransitionTypes(t *testing.T) {
+	tests := []struct {
+		name           string
+		transitionType TransitionType
+		expectedIntent uint8
+	}{
+		{"Finalize", TransitionTypeFinalize, INTENT_CLOSE},
+		{"HomeDeposit", TransitionTypeHomeDeposit, INTENT_DEPOSIT},
+		{"HomeWithdrawal", TransitionTypeHomeWithdrawal, INTENT_WITHDRAW},
+		{"MutualLock", TransitionTypeMutualLock, INTENT_INITIATE_ESCROW_DEPOSIT},
+		{"EscrowDeposit", TransitionTypeEscrowDeposit, INTENT_FINALIZE_ESCROW_DEPOSIT},
+		{"EscrowLock", TransitionTypeEscrowLock, INTENT_INITIATE_ESCROW_WITHDRAWAL},
+		{"EscrowWithdraw", TransitionTypeEscrowWithdraw, INTENT_FINALIZE_ESCROW_WITHDRAWAL},
+		{"Migrate", TransitionTypeMigrate, INTENT_INITIATE_MIGRATION},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transition := &Transition{Type: tt.transitionType}
+			intent, err := TransitionToIntent(transition)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedIntent, intent)
+		})
+	}
+}
+
+func TestTransitionToIntent_NilTransition(t *testing.T) {
+	_, err := TransitionToIntent(nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "at least one transition is expected")
+}
+
+func TestGetStateTransitionsHash(t *testing.T) {
+	t.Run("print_hash_for_empty_transitions", func(t *testing.T) {
+		transitions := []Transition{}
+		hash, err := GetStateTransitionsHash(transitions)
+		assert.NoError(t, err)
+
+		t.Logf("Hash for empty transitions: 0x%x", hash)
+	})
+
+	t.Run("print_hash_for_single_transition", func(t *testing.T) {
+		transitions := []Transition{
+			*NewTransition(TransitionTypeHomeDeposit, "tx123", "account456", decimal.NewFromInt(1000)),
+		}
+		hash, err := GetStateTransitionsHash(transitions)
+		assert.NoError(t, err)
+
+		t.Logf("Hash for single transition: 0x%x", hash)
+		t.Logf("Transition details: Type=%d, TxID=%s, AccountID=%s, Amount=%s",
+			transitions[0].Type, transitions[0].TxID, transitions[0].AccountID, transitions[0].Amount.String())
+	})
+
+	t.Run("print_hash_for_multiple_transitions", func(t *testing.T) {
+		transitions := []Transition{
+			*NewTransition(TransitionTypeHomeDeposit, "tx1", "account1", decimal.NewFromInt(100)),
+			*NewTransition(TransitionTypeTransferSend, "tx2", "account2", decimal.NewFromInt(50)),
+			*NewTransition(TransitionTypeCommit, "tx3", "account3", decimal.NewFromInt(25)),
+		}
+		hash, err := GetStateTransitionsHash(transitions)
+		assert.NoError(t, err)
+
+		t.Logf("Hash for multiple transitions: 0x%x", hash)
+		for i, tr := range transitions {
+			t.Logf("  Transition[%d]: Type=%d, TxID=%s, AccountID=%s, Amount=%s",
+				i, tr.Type, tr.TxID, tr.AccountID, tr.Amount.String())
+		}
+	})
+
+	t.Run("print_hash_with_negative_amounts", func(t *testing.T) {
+		transitions := []Transition{
+			*NewTransition(TransitionTypeHomeWithdrawal, "tx1", "account1", decimal.NewFromInt(-100)),
+			*NewTransition(TransitionTypeEscrowWithdraw, "tx2", "account2", decimal.NewFromInt(-50)),
+		}
+		hash, err := GetStateTransitionsHash(transitions)
+		assert.NoError(t, err)
+
+		t.Logf("Hash for transitions with negative amounts: 0x%x", hash)
+		for i, tr := range transitions {
+			t.Logf("  Transition[%d]: Type=%d, TxID=%s, AccountID=%s, Amount=%s",
+				i, tr.Type, tr.TxID, tr.AccountID, tr.Amount.String())
+		}
 	})
 }

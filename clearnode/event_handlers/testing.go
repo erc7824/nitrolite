@@ -45,19 +45,25 @@ func (m *MockStore) GetChannelByID(channelID string) (*core.Channel, error) {
 }
 
 // ScheduleCheckpoint mocks scheduling a checkpoint operation
-func (m *MockStore) ScheduleCheckpoint(stateID string) error {
-	args := m.Called(stateID)
+func (m *MockStore) ScheduleCheckpoint(stateID string, chainID uint64) error {
+	args := m.Called(stateID, chainID)
+	return args.Error(0)
+}
+
+// ScheduleInitiateEscrowDeposit mocks scheduling an escrow deposit checkpoint
+func (m *MockStore) ScheduleInitiateEscrowDeposit(stateID string, chainID uint64) error {
+	args := m.Called(stateID, chainID)
 	return args.Error(0)
 }
 
 // ScheduleFinalizeEscrowDeposit mocks scheduling an escrow deposit checkpoint
-func (m *MockStore) ScheduleFinalizeEscrowDeposit(stateID string) error {
-	args := m.Called(stateID)
+func (m *MockStore) ScheduleFinalizeEscrowDeposit(stateID string, chainID uint64) error {
+	args := m.Called(stateID, chainID)
 	return args.Error(0)
 }
 
 // ScheduleFinalizeEscrowWithdrawal mocks scheduling an escrow withdrawal checkpoint
-func (m *MockStore) ScheduleFinalizeEscrowWithdrawal(stateID string) error {
-	args := m.Called(stateID)
+func (m *MockStore) ScheduleFinalizeEscrowWithdrawal(stateID string, chainID uint64) error {
+	args := m.Called(stateID, chainID)
 	return args.Error(0)
 }

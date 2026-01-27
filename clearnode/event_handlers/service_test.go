@@ -1,6 +1,7 @@
 package event_handlers
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -14,13 +15,12 @@ import (
 func TestHandleHomeChannelCreated_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	logger := log.NewNoopLogger()
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
 
 	service := &EventHandlerService{
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		logger: logger,
 	}
 
 	// Test data
@@ -49,7 +49,7 @@ func TestHandleHomeChannelCreated_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Execute
-	err := service.HandleHomeChannelCreated(event)
+	err := service.HandleHomeChannelCreated(ctx, event)
 
 	// Assert
 	require.NoError(t, err)
@@ -59,13 +59,12 @@ func TestHandleHomeChannelCreated_Success(t *testing.T) {
 func TestHandleHomeChannelCheckpointed_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	logger := log.NewNoopLogger()
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
 
 	service := &EventHandlerService{
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		logger: logger,
 	}
 
 	// Test data
@@ -96,7 +95,7 @@ func TestHandleHomeChannelCheckpointed_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Execute
-	err := service.HandleHomeChannelCheckpointed(event)
+	err := service.HandleHomeChannelCheckpointed(ctx, event)
 
 	// Assert
 	require.NoError(t, err)
@@ -106,13 +105,12 @@ func TestHandleHomeChannelCheckpointed_Success(t *testing.T) {
 func TestHandleHomeChannelChallenged_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	logger := log.NewNoopLogger()
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
 
 	service := &EventHandlerService{
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		logger: logger,
 	}
 
 	// Test data
@@ -131,6 +129,9 @@ func TestHandleHomeChannelChallenged_Success(t *testing.T) {
 	state := &core.State{
 		ID:      "state123",
 		Version: 6,
+		HomeLedger: core.Ledger{
+			BlockchainID: 0,
+		},
 	}
 
 	event := &core.HomeChannelChallengedEvent{
@@ -148,10 +149,10 @@ func TestHandleHomeChannelChallenged_Success(t *testing.T) {
 			ch.ChallengeExpiresAt != nil
 	})).Return(nil)
 	mockStore.On("GetLastStateByChannelID", channelID, true).Return(state, nil)
-	mockStore.On("ScheduleCheckpoint", "state123").Return(nil)
+	mockStore.On("ScheduleCheckpoint", "state123", uint64(0)).Return(nil)
 
 	// Execute
-	err := service.HandleHomeChannelChallenged(event)
+	err := service.HandleHomeChannelChallenged(ctx, event)
 
 	// Assert
 	require.NoError(t, err)
@@ -161,13 +162,12 @@ func TestHandleHomeChannelChallenged_Success(t *testing.T) {
 func TestHandleHomeChannelClosed_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	logger := log.NewNoopLogger()
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
 
 	service := &EventHandlerService{
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		logger: logger,
 	}
 
 	// Test data
@@ -196,7 +196,7 @@ func TestHandleHomeChannelClosed_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Execute
-	err := service.HandleHomeChannelClosed(event)
+	err := service.HandleHomeChannelClosed(ctx, event)
 
 	// Assert
 	require.NoError(t, err)
@@ -206,13 +206,12 @@ func TestHandleHomeChannelClosed_Success(t *testing.T) {
 func TestHandleEscrowDepositInitiated_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	logger := log.NewNoopLogger()
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
 
 	service := &EventHandlerService{
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		logger: logger,
 	}
 
 	// Test data
@@ -230,6 +229,12 @@ func TestHandleEscrowDepositInitiated_Success(t *testing.T) {
 	state := &core.State{
 		ID:      "state123",
 		Version: 1,
+		HomeLedger: core.Ledger{
+			BlockchainID: 0,
+		},
+		EscrowLedger: &core.Ledger{
+			BlockchainID: 2,
+		},
 	}
 
 	event := &core.EscrowDepositInitiatedEvent{
@@ -245,10 +250,10 @@ func TestHandleEscrowDepositInitiated_Success(t *testing.T) {
 			ch.StateVersion == 1
 	})).Return(nil)
 	mockStore.On("GetStateByChannelIDAndVersion", channelID, uint64(1)).Return(state, nil)
-	mockStore.On("ScheduleCheckpoint", "state123").Return(nil)
+	mockStore.On("ScheduleInitiateEscrowDeposit", "state123", uint64(0)).Return(nil)
 
 	// Execute
-	err := service.HandleEscrowDepositInitiated(event)
+	err := service.HandleEscrowDepositInitiated(ctx, event)
 
 	// Assert
 	require.NoError(t, err)
@@ -258,13 +263,12 @@ func TestHandleEscrowDepositInitiated_Success(t *testing.T) {
 func TestHandleEscrowDepositChallenged_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	logger := log.NewNoopLogger()
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
 
 	service := &EventHandlerService{
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		logger: logger,
 	}
 
 	// Test data
@@ -283,6 +287,9 @@ func TestHandleEscrowDepositChallenged_Success(t *testing.T) {
 	state := &core.State{
 		ID:      "state123",
 		Version: 5,
+		EscrowLedger: &core.Ledger{
+			BlockchainID: 2,
+		},
 	}
 
 	event := &core.EscrowDepositChallengedEvent{
@@ -300,10 +307,10 @@ func TestHandleEscrowDepositChallenged_Success(t *testing.T) {
 			ch.ChallengeExpiresAt != nil
 	})).Return(nil)
 	mockStore.On("GetLastStateByChannelID", channelID, true).Return(state, nil)
-	mockStore.On("ScheduleFinalizeEscrowDeposit", "state123").Return(nil)
+	mockStore.On("ScheduleFinalizeEscrowDeposit", "state123", uint64(2)).Return(nil)
 
 	// Execute
-	err := service.HandleEscrowDepositChallenged(event)
+	err := service.HandleEscrowDepositChallenged(ctx, event)
 
 	// Assert
 	require.NoError(t, err)
@@ -313,13 +320,12 @@ func TestHandleEscrowDepositChallenged_Success(t *testing.T) {
 func TestHandleEscrowDepositFinalized_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	logger := log.NewNoopLogger()
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
 
 	service := &EventHandlerService{
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		logger: logger,
 	}
 
 	// Test data
@@ -348,7 +354,7 @@ func TestHandleEscrowDepositFinalized_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Execute
-	err := service.HandleEscrowDepositFinalized(event)
+	err := service.HandleEscrowDepositFinalized(ctx, event)
 
 	// Assert
 	require.NoError(t, err)
@@ -358,13 +364,12 @@ func TestHandleEscrowDepositFinalized_Success(t *testing.T) {
 func TestHandleEscrowWithdrawalInitiated_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	logger := log.NewNoopLogger()
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
 
 	service := &EventHandlerService{
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		logger: logger,
 	}
 
 	// Test data
@@ -393,7 +398,7 @@ func TestHandleEscrowWithdrawalInitiated_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Execute
-	err := service.HandleEscrowWithdrawalInitiated(event)
+	err := service.HandleEscrowWithdrawalInitiated(ctx, event)
 
 	// Assert
 	require.NoError(t, err)
@@ -403,13 +408,12 @@ func TestHandleEscrowWithdrawalInitiated_Success(t *testing.T) {
 func TestHandleEscrowWithdrawalChallenged_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	logger := log.NewNoopLogger()
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
 
 	service := &EventHandlerService{
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		logger: logger,
 	}
 
 	// Test data
@@ -428,6 +432,9 @@ func TestHandleEscrowWithdrawalChallenged_Success(t *testing.T) {
 	state := &core.State{
 		ID:      "state123",
 		Version: 5,
+		EscrowLedger: &core.Ledger{
+			BlockchainID: 2,
+		},
 	}
 
 	event := &core.EscrowWithdrawalChallengedEvent{
@@ -445,10 +452,10 @@ func TestHandleEscrowWithdrawalChallenged_Success(t *testing.T) {
 			ch.ChallengeExpiresAt != nil
 	})).Return(nil)
 	mockStore.On("GetLastStateByChannelID", channelID, true).Return(state, nil)
-	mockStore.On("ScheduleFinalizeEscrowWithdrawal", "state123").Return(nil)
+	mockStore.On("ScheduleFinalizeEscrowWithdrawal", "state123", uint64(2)).Return(nil)
 
 	// Execute
-	err := service.HandleEscrowWithdrawalChallenged(event)
+	err := service.HandleEscrowWithdrawalChallenged(ctx, event)
 
 	// Assert
 	require.NoError(t, err)
@@ -458,13 +465,12 @@ func TestHandleEscrowWithdrawalChallenged_Success(t *testing.T) {
 func TestHandleEscrowWithdrawalFinalized_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	logger := log.NewNoopLogger()
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
 
 	service := &EventHandlerService{
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		logger: logger,
 	}
 
 	// Test data
@@ -493,7 +499,7 @@ func TestHandleEscrowWithdrawalFinalized_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Execute
-	err := service.HandleEscrowWithdrawalFinalized(event)
+	err := service.HandleEscrowWithdrawalFinalized(ctx, event)
 
 	// Assert
 	require.NoError(t, err)

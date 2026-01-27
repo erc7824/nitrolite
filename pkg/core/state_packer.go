@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -25,31 +26,56 @@ func PackState(state State, assetStore AssetStore) ([]byte, error) {
 }
 
 // PackState encodes a channel ID and state into ABI-packed bytes for on-chain submission.
+// This matches the Solidity pack function which encodes: channelId, version, intent, metadata, homeState, nonHomeState.
 func (p *StatePackerV1) PackState(state State) ([]byte, error) {
-	// Pack the state using the cross-chain state structure
+	// Ensure HomeChannelID is present
+	if state.HomeChannelID == nil {
+		return nil, fmt.Errorf("state.HomeChannelID is required for packing")
+	}
+
+	// Convert HomeChannelID to bytes32
+	channelID := common.HexToHash(*state.HomeChannelID)
+
+	// Generate metadata from state transitions
+	metadata, err := GetStateTransitionsHash(state.Transitions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate state transitions hash: %w", err)
+	}
+
+	// Define the Ledger type to match Solidity
 	ledgerType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{Name: "chainId", Type: "uint64"},
 		{Name: "token", Type: "address"},
 		{Name: "decimals", Type: "uint8"},
-		{Name: "participantBalance", Type: "tuple", Components: []abi.ArgumentMarshaling{
-			{Name: "allocation", Type: "uint256"},
-			{Name: "netFlow", Type: "int256"},
-		}},
-		{Name: "nodeBalance", Type: "tuple", Components: []abi.ArgumentMarshaling{
-			{Name: "allocation", Type: "uint256"},
-			{Name: "netFlow", Type: "int256"},
-		}},
+		{Name: "userAllocation", Type: "uint256"},
+		{Name: "userNetFlow", Type: "int256"},
+		{Name: "nodeAllocation", Type: "uint256"},
+		{Name: "nodeNetFlow", Type: "int256"},
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	bytes32Type := abi.Type{T: abi.FixedBytesTy, Size: 32}
+
 	args := abi.Arguments{
-		{Type: uint256Type}, // version
-		{Type: uint64Type},  // homeChainId
+		{Type: bytes32Type}, // channelId
+		{Type: uint64Type},  // version
 		{Type: uint8Type},   // intent
+		{Type: bytes32Type}, // metadata
 		{Type: ledgerType},  // homeState
 		{Type: ledgerType},  // nonHomeState
+	}
+
+	// Define a private type to match Solidity's Ledger struct
+	type contractLedger struct {
+		ChainId        uint64
+		Token          common.Address
+		Decimals       uint8
+		UserAllocation *big.Int
+		UserNetFlow    *big.Int
+		NodeAllocation *big.Int
+		NodeNetFlow    *big.Int
 	}
 
 	homeDecimals, err := p.assetStore.GetTokenDecimals(state.HomeLedger.BlockchainID, state.HomeLedger.TokenAddress)
@@ -75,52 +101,18 @@ func (p *StatePackerV1) PackState(state State) ([]byte, error) {
 		return nil, err
 	}
 
-	homeState := struct {
-		ChainId            uint64
-		Token              common.Address
-		Decimals           uint8
-		ParticipantBalance struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}
-		NodeBalance struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}
-	}{
-		ChainId:  uint64(state.HomeLedger.BlockchainID),
-		Token:    common.HexToAddress(state.HomeLedger.TokenAddress),
-		Decimals: homeDecimals,
-		ParticipantBalance: struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}{
-			Allocation: userBalanceBI,
-			NetFlow:    userNetFlowBI,
-		},
-		NodeBalance: struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}{
-			Allocation: nodeBalanceBI,
-			NetFlow:    nodeNetFlowBI,
-		},
+	homeLedger := contractLedger{
+		ChainId:        state.HomeLedger.BlockchainID,
+		Token:          common.HexToAddress(state.HomeLedger.TokenAddress),
+		Decimals:       homeDecimals,
+		UserAllocation: userBalanceBI,
+		UserNetFlow:    userNetFlowBI,
+		NodeAllocation: nodeBalanceBI,
+		NodeNetFlow:    nodeNetFlowBI,
 	}
 
 	// For nonHomeState, use escrow ledger if available, otherwise use zero values
-	var nonHomeState struct {
-		ChainId            uint64
-		Token              common.Address
-		Decimals           uint8
-		ParticipantBalance struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}
-		NodeBalance struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}
-	}
+	var nonHomeLedger contractLedger
 
 	if state.EscrowLedger != nil {
 		escrowDecimals, err := p.assetStore.GetTokenDecimals(state.EscrowLedger.BlockchainID, state.EscrowLedger.TokenAddress)
@@ -145,92 +137,43 @@ func (p *StatePackerV1) PackState(state State) ([]byte, error) {
 			return nil, err
 		}
 
-		nonHomeState = struct {
-			ChainId            uint64
-			Token              common.Address
-			Decimals           uint8
-			ParticipantBalance struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}
-			NodeBalance struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}
-		}{
-			ChainId:  uint64(state.EscrowLedger.BlockchainID),
-			Token:    common.HexToAddress(state.EscrowLedger.TokenAddress),
-			Decimals: escrowDecimals,
-			ParticipantBalance: struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}{
-				Allocation: escrowUserBalanceBI,
-				NetFlow:    escrowUserNetFlowBI,
-			},
-			NodeBalance: struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}{
-				Allocation: escrowNodeBalanceBI,
-				NetFlow:    escrowNodeNetFlowBI,
-			},
+		nonHomeLedger = contractLedger{
+			ChainId:        state.EscrowLedger.BlockchainID,
+			Token:          common.HexToAddress(state.EscrowLedger.TokenAddress),
+			Decimals:       escrowDecimals,
+			UserAllocation: escrowUserBalanceBI,
+			UserNetFlow:    escrowUserNetFlowBI,
+			NodeAllocation: escrowNodeBalanceBI,
+			NodeNetFlow:    escrowNodeNetFlowBI,
 		}
 	} else {
-		nonHomeState = struct {
-			ChainId            uint64
-			Token              common.Address
-			Decimals           uint8
-			ParticipantBalance struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}
-			NodeBalance struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}
-		}{
-			ChainId:  0,
-			Token:    common.Address{},
-			Decimals: 0,
-			ParticipantBalance: struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}{
-				Allocation: big.NewInt(0),
-				NetFlow:    big.NewInt(0),
-			},
-			NodeBalance: struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}{
-				Allocation: big.NewInt(0),
-				NetFlow:    big.NewInt(0),
-			},
+		nonHomeLedger = contractLedger{
+			ChainId:        0,
+			Token:          common.Address{},
+			Decimals:       0,
+			UserAllocation: big.NewInt(0),
+			UserNetFlow:    big.NewInt(0),
+			NodeAllocation: big.NewInt(0),
+			NodeNetFlow:    big.NewInt(0),
 		}
 	}
 
 	// Determine intent based on last transition
-	intent := uint8(0) // default intent
+	intent := uint8(0)
 	if lastTransition := state.GetLastTransition(); lastTransition != nil {
-		// Map transition type to intent
-		// This is a simplified mapping - adjust based on actual requirements
-		switch lastTransition.Type {
-		case TransitionTypeTransferSend, TransitionTypeTransferReceive:
-			intent = 1 // operate intent
-		case TransitionTypeHomeDeposit, TransitionTypeEscrowDeposit:
-			intent = 2 // deposit intent
-		case TransitionTypeHomeWithdrawal, TransitionTypeEscrowWithdraw:
-			intent = 3 // withdraw intent
+		intent, err = TransitionToIntent(lastTransition)
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	packed, err := args.Pack(
-		big.NewInt(int64(state.Version)),
-		uint64(state.HomeLedger.BlockchainID),
+		channelID,
+		state.Version,
 		intent,
-		homeState,
-		nonHomeState,
+		metadata,
+		homeLedger,
+		nonHomeLedger,
 	)
 	if err != nil {
 		return nil, err

@@ -33,7 +33,7 @@ type Store interface {
 
 	// ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate
 	// withdrawal from an escrow channel (triggered by escrow_lock transition).
-	ScheduleInitiateEscrowWithdrawal(stateID string) error
+	ScheduleInitiateEscrowWithdrawal(stateID string, chainID uint64) error
 
 	// RecordTransaction creates a transaction record linking state transitions
 	// to track the history of operations (deposits, withdrawals, transfers, etc.).

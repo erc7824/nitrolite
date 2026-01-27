@@ -23,6 +23,20 @@ var (
 	ChannelStatusClosed     ChannelStatus = 3
 )
 
+const (
+	INTENT_OPERATE                    = 0
+	INTENT_CREATE                     = 1
+	INTENT_CLOSE                      = 2
+	INTENT_DEPOSIT                    = 3
+	INTENT_WITHDRAW                   = 4
+	INTENT_INITIATE_ESCROW_DEPOSIT    = 5
+	INTENT_FINALIZE_ESCROW_DEPOSIT    = 6
+	INTENT_INITIATE_ESCROW_WITHDRAWAL = 7
+	INTENT_FINALIZE_ESCROW_WITHDRAWAL = 8
+	INTENT_INITIATE_MIGRATION         = 9
+	INTENT_FINALIZE_MIGRATION         = 10
+)
+
 // Channel represents an on-chain channel
 type Channel struct {
 	ChannelID          string        `json:"channel_id"`                     // Unique identifier for the channel
@@ -867,18 +881,18 @@ type HomeChannelDataResponse struct {
 
 // EscrowDepositDataResponse represents the response from getEscrowDepositData
 type EscrowDepositDataResponse struct {
-	Definition      ChannelDefinition `json:"definition"`
-	Node            string            `json:"node"`
-	LastState       State             `json:"last_state"`
-	UnlockExpiry    uint64            `json:"unlock_expiry"`
-	ChallengeExpiry uint64            `json:"challenge_expiry"`
+	EscrowChannelID string `json:"escrow_channel_id"`
+	Node            string `json:"node"`
+	LastState       State  `json:"last_state"`
+	UnlockExpiry    uint64 `json:"unlock_expiry"`
+	ChallengeExpiry uint64 `json:"challenge_expiry"`
 }
 
 // EscrowWithdrawalDataResponse represents the response from getEscrowWithdrawalData
 type EscrowWithdrawalDataResponse struct {
-	Definition ChannelDefinition `json:"definition"`
-	Node       string            `json:"node"`
-	LastState  State             `json:"last_state"`
+	EscrowChannelID string `json:"escrow_channel_id"`
+	Node            string `json:"node"`
+	LastState       State  `json:"last_state"`
 }
 
 // ========= Storage Related Types =========

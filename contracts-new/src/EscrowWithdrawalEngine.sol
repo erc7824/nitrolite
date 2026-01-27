@@ -96,14 +96,14 @@ library EscrowWithdrawalEngine {
         int256 netFlowsSum = candidate.nonHomeState.userNetFlow + candidate.nonHomeState.nodeNetFlow;
 
         require(netFlowsSum >= 0, "negative net flow sum");
-        require(allocsSum == uint256(netFlowsSum), "invalid allocation sum");
+        require(allocsSum == netFlowsSum.toUint256(), "invalid allocation sum");
     }
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========
 
     function _calculateEffectsByIntent(TransitionContext memory ctx, State memory candidate)
         internal
-        view
+        pure
         returns (TransitionEffects memory effects)
     {
         StateIntent intent = candidate.intent;
@@ -121,7 +121,7 @@ library EscrowWithdrawalEngine {
 
     function _calculateInitiateEffects(TransitionContext memory ctx, State memory candidate)
         internal
-        view
+        pure
         returns (TransitionEffects memory effects)
     {
         // INITIATE: Node locks funds for user withdrawal
@@ -155,7 +155,7 @@ library EscrowWithdrawalEngine {
 
     function _calculateFinalizeEffects(TransitionContext memory ctx, State memory candidate)
         internal
-        view
+        pure
         returns (TransitionEffects memory effects)
     {
         // FINALIZE: Release to user with finalization proof

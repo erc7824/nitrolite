@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Vm} from "lib/forge-std/src/Vm.sol";
-import {Test} from "lib/forge-std/src/Test.sol";
-
 import {ChannelHubTest_Base} from "./ChannelHub_Base.t.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
-import {TestUtils} from "./TestUtils.sol";
 
-import {ChannelHub} from "../src/ChannelHub.sol";
 import {Utils} from "../src/Utils.sol";
 import {State, ChannelDefinition, StateIntent, Ledger, ChannelStatus, EscrowStatus} from "../src/interfaces/Types.sol";
 
+// forge-lint: disable-next-item(unsafe-typecast)
 contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
     bytes32 bobChannelId;
     ChannelDefinition bobDef;
@@ -44,24 +40,31 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         // Expected: user allocation = 1000, user net flow = 1000, node allocation = 0, node net flow = 0
         State memory state = State({
             version: 0,
-            intent: StateIntent.CREATE,
+            intent: StateIntent.DEPOSIT,
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: uint64(block.chainid),
-                token: address(token), decimals: 18,
+                token: address(token),
+                decimals: 18,
                 userAllocation: DEPOSIT_AMOUNT,
                 userNetFlow: int256(DEPOSIT_AMOUNT),
                 nodeAllocation: 0,
                 nodeNetFlow: 0
             }),
             nonHomeState: Ledger({
-                chainId: 0, token: address(0), decimals: 0, userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
+                chainId: 0,
+                token: address(0),
+                decimals: 0,
+                userAllocation: 0,
+                userNetFlow: 0,
+                nodeAllocation: 0,
+                nodeNetFlow: 0
             }),
             userSig: "",
             nodeSig: ""
         });
 
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         vm.prank(alice);
         cHub.createChannel(def, state);
@@ -71,7 +74,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         // transfer 42 (allocation decreases by 42, node net flow decreases by 42)
         state = nextState(state, StateIntent.OPERATE, [uint256(958), uint256(0)], [int256(1000), int256(-42)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // deposit from another chain
         state = nextState(
@@ -86,7 +89,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(500), uint256(0)],
             [int256(500), int256(0)]
         );
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // on chainId 42:
         // channelsHub.initiateEscrowDeposit(channelId, state)
@@ -111,20 +114,20 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(0)],
             [int256(500), int256(-500)]
         );
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // receive 24 (allocation increases by 24, node net flow increases by 24)
         state = nextState(state, StateIntent.OPERATE, [uint256(1482), uint256(0)], [int256(1000), int256(482)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // send 12 (allocation decreases by 12, node net flow decreases by 12)
         state = nextState(state, StateIntent.OPERATE, [uint256(1470), uint256(0)], [int256(1000), int256(470)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // withdraw 250 on home chain
         // Expected: user allocation = 1220, user net flow = 750, node allocation = 0, node net flow = 470
         state = nextState(state, StateIntent.WITHDRAW, [uint256(1220), uint256(0)], [int256(750), int256(470)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         vm.prank(alice);
         cHub.withdrawFromChannel(channelId, state);
@@ -135,15 +138,15 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         // send 2 (allocation decreases by 2, node net flow decreases by 2)
         state = nextState(state, StateIntent.OPERATE, [uint256(1218), uint256(0)], [int256(750), int256(468)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // receive 3 (allocation increases by 3, node net flow increases by 3)
         state = nextState(state, StateIntent.OPERATE, [uint256(1221), uint256(0)], [int256(750), int256(471)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // send 4 (allocation decreases by 4, node net flow decreases by 4)
         state = nextState(state, StateIntent.OPERATE, [uint256(1217), uint256(0)], [int256(750), int256(467)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // withdrawal to another chain
         state = nextState(
@@ -158,7 +161,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(750)],
             [int256(0), int256(750)]
         );
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         // on chainId 42:
         // channelsHub.initiateEscrowWithdrawal(channelId, state)
@@ -177,11 +180,11 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(0)],
             [int256(-750), int256(750)]
         );
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // receive 10 (allocation increases by 10, node net flow increases by 10)
         state = nextState(state, StateIntent.OPERATE, [uint256(477), uint256(0)], [int256(750), int256(-273)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // checkpoint on home chain
         vm.prank(alice);
@@ -193,15 +196,15 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         // send 9 (allocation decreases by 9, node net flow decreases by 9)
         state = nextState(state, StateIntent.OPERATE, [uint256(468), uint256(0)], [int256(750), int256(-282)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // receive 8 (allocation increases by 8, node net flow increases by 8)
         state = nextState(state, StateIntent.OPERATE, [uint256(476), uint256(0)], [int256(750), int256(-274)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // send 7 (allocation decreases by 7, node net flow decreases by 7)
         state = nextState(state, StateIntent.OPERATE, [uint256(469), uint256(0)], [int256(750), int256(-281)]);
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         // migrate channel
         state = nextState(
@@ -216,7 +219,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(469)],
             [int256(0), int256(469)]
         );
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         // on chainId 42:
         // channelsHub.initiateMigrationIn(channelId, state)
@@ -239,7 +242,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         Ledger memory temp = state.homeState;
         state.homeState = state.nonHomeState;
         state.nonHomeState = temp;
-        state = signStateWithBothParties(state, channelId, alicePK);
+        state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         vm.prank(node);
         cHub.finalizeMigration(channelId, state);
@@ -272,7 +275,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: 42,
-                token: address(42), decimals: 18,
+                token: address(42),
+                decimals: 18,
                 userAllocation: 958,
                 userNetFlow: 1000,
                 nodeAllocation: 500,
@@ -280,7 +284,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             }),
             nonHomeState: Ledger({
                 chainId: uint64(block.chainid),
-                token: address(token), decimals: 18,
+                token: address(token),
+                decimals: 18,
                 userAllocation: 500,
                 userNetFlow: 500,
                 nodeAllocation: 0,
@@ -289,12 +294,12 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
         // verify no escrow struct exists yet
-        (,EscrowStatus escrowStatus,,,,) = cHub.getEscrowDepositData(escrowId);
+        (, EscrowStatus escrowStatus,,,,) = cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(escrowStatus), uint8(EscrowStatus.VOID), "Escrow should be VOID");
 
         vm.prank(bob);
@@ -334,11 +339,11 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [int256(1000), int256(458)],
             uint64(block.chainid),
             address(token),
-            18,  // nonHomeDecimals
+            18, // nonHomeDecimals
             [uint256(0), uint256(0)],
             [int256(500), int256(-500)]
         );
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
         cHub.finalizeEscrowDeposit(escrowId, state);
@@ -350,7 +355,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(nodeBalanceAfter, nodeBalanceBefore + 500, "Node balance after escrow deposit finalized");
 
         // Verify escrow struct is updated on ChannelsHub
-        (,finalEscrowStatus, unlockAt, challengeExpiresAt, lockedAmount, initState) = cHub.getEscrowDepositData(escrowId);
+        (, finalEscrowStatus, unlockAt, challengeExpiresAt, lockedAmount, initState) =
+            cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.FINALIZED), "Escrow should be FINALIZED");
         assertEq(unlockAt, expectedUnlockAt, "Escrow unlockAt should remain unchanged");
         assertEq(challengeExpiresAt, 0, "Escrow challengeExpiresAt should be zero");
@@ -383,18 +389,18 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: 42,
-                token: address(0x42),  // USDC token on home chain
+                token: address(0x42), // USDC token on home chain
                 decimals: 6,
-                userAllocation: 50 * 1e6,  // Existing user allocation
+                userAllocation: 50 * 1e6, // Existing user allocation
                 userNetFlow: int256(50 * 1e6),
-                nodeAllocation: 10 * 1e6,  // Node locks 10 USDC for cross-chain deposit
+                nodeAllocation: 10 * 1e6, // Node locks 10 USDC for cross-chain deposit
                 nodeNetFlow: int256(10 * 1e6)
             }),
             nonHomeState: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token14dec),
                 decimals: 14,
-                userAllocation: 10 * 1e14,  // User deposits 10 tokens (14 decimals)
+                userAllocation: 10 * 1e14, // User deposits 10 tokens (14 decimals)
                 userNetFlow: int256(10 * 1e14),
                 nodeAllocation: 0,
                 nodeNetFlow: 0
@@ -402,12 +408,12 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
         // Verify no escrow struct exists yet
-        (,EscrowStatus escrowStatus,,,,) = cHub.getEscrowDepositData(escrowId);
+        (, EscrowStatus escrowStatus,,,,) = cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(escrowStatus), uint8(EscrowStatus.VOID), "Escrow should be VOID");
 
         // Initiate escrow deposit on non-home chain
@@ -442,15 +448,15 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         state = nextState(
             state,
             StateIntent.FINALIZE_ESCROW_DEPOSIT,
-            [uint256(60 * 1e6), uint256(0)],  // Home: user allocation increases by 10 USDC
-            [int256(50 * 1e6), int256(10 * 1e6)],  // Home: net flows stay same
+            [uint256(60 * 1e6), uint256(0)], // Home: user allocation increases by 10 USDC
+            [int256(50 * 1e6), int256(10 * 1e6)], // Home: net flows stay same
             uint64(block.chainid),
             address(token14dec),
-            14,  // nonHomeDecimals
-            [uint256(0), uint256(0)],  // Non-home: allocations zero out
-            [int256(10 * 1e14), int256(-10 * 1e14)]  // Non-home: node releases deposited amount
+            14, // nonHomeDecimals
+            [uint256(0), uint256(0)], // Non-home: allocations zero out
+            [int256(10 * 1e14), int256(-10 * 1e14)] // Non-home: node releases deposited amount
         );
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
         cHub.finalizeEscrowDeposit(escrowId, state);
@@ -463,7 +469,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(nodeBalanceAfter, nodeBalanceBefore + 10 * 1e14, "Node balance after escrow deposit finalized");
 
         // Verify escrow struct is updated on ChannelsHub
-        (,finalEscrowStatus, unlockAt, challengeExpiresAt, lockedAmount, initState) = cHub.getEscrowDepositData(escrowId);
+        (, finalEscrowStatus, unlockAt, challengeExpiresAt, lockedAmount, initState) =
+            cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.FINALIZED), "Escrow should be FINALIZED");
         assertEq(unlockAt, expectedUnlockAt, "Escrow unlockAt should remain unchanged");
         assertEq(challengeExpiresAt, 0, "Escrow challengeExpiresAt should be zero");
@@ -485,7 +492,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: 42,
-                token: address(42), decimals: 18,
+                token: address(42),
+                decimals: 18,
                 userAllocation: 1217,
                 userNetFlow: 750,
                 nodeAllocation: 0,
@@ -493,7 +501,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             }),
             nonHomeState: Ledger({
                 chainId: uint64(block.chainid),
-                token: address(token), decimals: 18,
+                token: address(token),
+                decimals: 18,
                 userAllocation: 0,
                 userNetFlow: 0,
                 nodeAllocation: 750,
@@ -502,12 +511,12 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
         // verify no escrow struct exists yet
-        (,EscrowStatus escrowStatus,,,) = cHub.getEscrowWithdrawalData(escrowId);
+        (, EscrowStatus escrowStatus,,,) = cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(escrowStatus), uint8(EscrowStatus.VOID), "Escrow should be VOID");
 
         vm.prank(bob);
@@ -518,7 +527,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(nodeBalanceAfter, nodeBalanceBefore - 750, "Node balance after escrow withdrawal");
 
         // Verify escrow struct is updated on ChannelsHub: escrow data exists, `locked` equals to withdrawalAmount
-        (,EscrowStatus finalEscrowStatus, uint64 challengeExpireAt, uint256 lockedAmount, State memory initState) =
+        (, EscrowStatus finalEscrowStatus, uint64 challengeExpireAt, uint256 lockedAmount, State memory initState) =
             cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.INITIALIZED), "Escrow should be INITIALIZED");
         assertEq(challengeExpireAt, 0, "Escrow challengeExpireAt should be zero");
@@ -538,7 +547,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(0)],
             [int256(-750), int256(750)]
         );
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
         cHub.finalizeEscrowWithdrawal(escrowId, state);
@@ -548,7 +557,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(bobBalanceAfter, bobBalanceBefore + 750, "User balance after escrow withdrawal");
 
         // Verify escrow struct is updated on ChannelsHub: escrow data exists, has status "finalized", `locked` equals to 0
-        (,finalEscrowStatus, challengeExpireAt, lockedAmount, initState) = cHub.getEscrowWithdrawalData(escrowId);
+        (, finalEscrowStatus, challengeExpireAt, lockedAmount, initState) = cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.FINALIZED), "Escrow should be FINALIZED");
         assertEq(challengeExpireAt, 0, "Escrow challengeExpireAt should be zero");
         assertEq(lockedAmount, 0, "Escrow locked amount is incorrect");
@@ -580,7 +589,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: 42,
-                token: address(0x42),  // Some token on home chain
+                token: address(0x42), // Some token on home chain
                 decimals: 2,
                 userAllocation: 10 * 1e2,
                 userNetFlow: int256(10 * 1e2),
@@ -593,18 +602,18 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
                 decimals: 8,
                 userAllocation: 0,
                 userNetFlow: 0,
-                nodeAllocation: 5 * 1e8,  // Node locks 5 tokens (5e8 with 8 decimals)
+                nodeAllocation: 5 * 1e8, // Node locks 5 tokens (5e8 with 8 decimals)
                 nodeNetFlow: int256(5 * 1e8)
             }),
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
         // Verify no escrow exists yet
-        (,EscrowStatus escrowStatus,,,) = cHub.getEscrowWithdrawalData(escrowId);
+        (, EscrowStatus escrowStatus,,,) = cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(escrowStatus), uint8(EscrowStatus.VOID), "Escrow should be VOID");
 
         // Initiate escrow withdrawal on non-home chain
@@ -616,7 +625,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(nodeBalanceAfter, nodeBalanceBefore - 5 * 1e8, "Node balance after escrow withdrawal initiation");
 
         // Verify escrow struct is created
-        (,EscrowStatus finalEscrowStatus, uint64 challengeExpireAt, uint256 lockedAmount, State memory initState) =
+        (, EscrowStatus finalEscrowStatus, uint64 challengeExpireAt, uint256 lockedAmount, State memory initState) =
             cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.INITIALIZED), "Escrow should be INITIALIZED");
         assertEq(challengeExpireAt, 0, "Escrow challengeExpireAt should be zero");
@@ -630,15 +639,15 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         state = nextState(
             state,
             StateIntent.FINALIZE_ESCROW_WITHDRAWAL,
-            [uint256(5 * 1e2), uint256(0)],  // Home: user allocation decreased by 5 tokens
-            [int256(10 * 1e2), int256(-5 * 1e2)],  // Home: node net flow decreased by 5 tokens
+            [uint256(5 * 1e2), uint256(0)], // Home: user allocation decreased by 5 tokens
+            [int256(10 * 1e2), int256(-5 * 1e2)], // Home: node net flow decreased by 5 tokens
             uint64(block.chainid),
             address(token8dec),
-            8,  // nonHomeDecimals
+            8, // nonHomeDecimals
             [uint256(0), uint256(0)],
-            [int256(-5 * 1e8), int256(5 * 1e8)]  // Non-home: user withdraws, node releases
+            [int256(-5 * 1e8), int256(5 * 1e8)] // Non-home: user withdraws, node releases
         );
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
         cHub.finalizeEscrowWithdrawal(escrowId, state);
@@ -648,7 +657,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         assertEq(bobBalanceAfter, bobBalanceBefore + 5 * 1e8, "User balance after withdrawal");
 
         // Verify escrow is finalized
-        (,finalEscrowStatus, challengeExpireAt, lockedAmount, initState) = cHub.getEscrowWithdrawalData(escrowId);
+        (, finalEscrowStatus, challengeExpireAt, lockedAmount, initState) = cHub.getEscrowWithdrawalData(escrowId);
         assertEq(uint8(finalEscrowStatus), uint8(EscrowStatus.FINALIZED), "Escrow should be FINALIZED");
         assertEq(challengeExpireAt, 0, "Escrow challengeExpireAt should be zero");
         assertEq(lockedAmount, 0, "Escrow locked amount should be zero");
@@ -670,7 +679,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: 42,
-                token: address(42), decimals: 18,
+                token: address(42),
+                decimals: 18,
                 userAllocation: 469,
                 userNetFlow: 750,
                 nodeAllocation: 0,
@@ -678,7 +688,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             }),
             nonHomeState: Ledger({
                 chainId: uint64(block.chainid),
-                token: address(token), decimals: 18,
+                token: address(token),
+                decimals: 18,
                 userAllocation: 0,
                 userNetFlow: 0,
                 nodeAllocation: 469,
@@ -687,7 +698,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         vm.prank(bob);
         cHub.initiateMigration(bobDef, state);
@@ -712,7 +723,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             metadata: bytes32(0),
             nonHomeState: Ledger({
                 chainId: 42,
-                token: address(42), decimals: 18,
+                token: address(42),
+                decimals: 18,
                 userAllocation: 0,
                 userNetFlow: 750,
                 nodeAllocation: 0,
@@ -720,7 +732,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             }),
             homeState: Ledger({
                 chainId: uint64(block.chainid),
-                token: address(token), decimals: 18,
+                token: address(token),
+                decimals: 18,
                 userAllocation: 469,
                 userNetFlow: 0,
                 nodeAllocation: 0,
@@ -729,25 +742,25 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         // perform some operations to verify channel is operating as normal
         // send 9 (allocation decreases by 9, node net flow decreases by 9)
         state = nextState(state, StateIntent.OPERATE, [uint256(460), uint256(0)], [int256(0), int256(460)]);
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         // receive 8 (allocation increases by 8, node net flow increases by 8)
         state = nextState(state, StateIntent.OPERATE, [uint256(468), uint256(0)], [int256(0), int256(468)]);
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         // send 7 (allocation decreases by 7, node net flow decreases by 7)
         state = nextState(state, StateIntent.OPERATE, [uint256(461), uint256(0)], [int256(0), int256(461)]);
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         // withdraw 400 on home chain
         // Expected: user allocation = 61, user net flow = -400, node allocation = 0, node net flow = 461
         state = nextState(state, StateIntent.WITHDRAW, [uint256(61), uint256(0)], [int256(-400), int256(461)]);
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         vm.prank(bob);
         cHub.withdrawFromChannel(bobChannelId, state);
@@ -779,7 +792,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         // Bob deposits 50 tokens (50e10)
         State memory state = State({
             version: 0,
-            intent: StateIntent.CREATE,
+            intent: StateIntent.DEPOSIT,
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: uint64(block.chainid),
@@ -802,7 +815,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         vm.prank(bob);
         cHub.createChannel(bobDef, state);
@@ -813,8 +826,10 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         // 2. Perform some operations to build up channel state
         // Transfer 5 tokens (allocation decreases, node net flow decreases)
-        state = nextState(state, StateIntent.OPERATE, [uint256(45 * 1e10), uint256(0)], [int256(50 * 1e10), int256(-5 * 1e10)]);
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = nextState(
+            state, StateIntent.OPERATE, [uint256(45 * 1e10), uint256(0)], [int256(50 * 1e10), int256(-5 * 1e10)]
+        );
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         // 3. Initiate Migration to New Home Chain (14 decimals)
         // Deploy 14-decimal token for new home chain
@@ -833,15 +848,15 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         state = nextState(
             state,
             StateIntent.INITIATE_MIGRATION,
-            [uint256(45 * 1e10), uint256(0)],  // Old home stays the same
+            [uint256(45 * 1e10), uint256(0)], // Old home stays the same
             [int256(50 * 1e10), int256(-5 * 1e10)],
             42,
             address(token14dec),
-            14,  // nonHomeDecimals
-            [uint256(0), uint256(45 * 1e14)],  // Node locks user allocation on new home
+            14, // nonHomeDecimals
+            [uint256(0), uint256(45 * 1e14)], // Node locks user allocation on new home
             [int256(0), int256(45 * 1e14)]
         );
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         // Submit on old home chain
         vm.prank(bob);
@@ -858,19 +873,19 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         state = nextState(
             state,
             StateIntent.FINALIZE_MIGRATION,
-            [uint256(0), uint256(0)],  // Old home: allocations zero out
-            [int256(50 * 1e10), int256(-50 * 1e10)],  // Old home: net flows balance
+            [uint256(0), uint256(0)], // Old home: allocations zero out
+            [int256(50 * 1e10), int256(-50 * 1e10)], // Old home: net flows balance
             42,
             address(token14dec),
-            14,  // nonHomeDecimals
-            [uint256(45 * 1e14), uint256(0)],  // New home: user receives allocation
+            14, // nonHomeDecimals
+            [uint256(45 * 1e14), uint256(0)], // New home: user receives allocation
             [int256(0), int256(45 * 1e14)]
         );
         // Swap home and non-home states as per migration protocol
         Ledger memory temp = state.homeState;
         state.homeState = state.nonHomeState;
         state.nonHomeState = temp;
-        state = signStateWithBothParties(state, bobChannelId, bobPK);
+        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
 
         // Submit finalization on old home chain
         vm.prank(node);

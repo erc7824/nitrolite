@@ -109,7 +109,7 @@ contract SimpleConsensusTest is Test {
         return TestUtils.sign(vm, privateKey, packedState);
     }
 
-    function _signStateEIP191(State memory state, uint256 privateKey) internal view returns (bytes memory) {
+    function _signStateEip191(State memory state, uint256 privateKey) internal view returns (bytes memory) {
         bytes memory packedState = Utils.getPackedState(Utils.getChannelId(channel), state);
         return TestUtils.signEIP191(vm, privateKey, packedState);
     }
@@ -133,8 +133,8 @@ contract SimpleConsensusTest is Test {
     function test_adjudicate_firstState_valid_withEIP191Signatures() public {
         State memory initialState = _createInitialState("initial state");
         initialState.sigs = new bytes[](2);
-        initialState.sigs[HOST] = _signStateEIP191(initialState, hostPrivateKey);
-        initialState.sigs[GUEST] = _signStateEIP191(initialState, guestPrivateKey);
+        initialState.sigs[HOST] = _signStateEip191(initialState, hostPrivateKey);
+        initialState.sigs[GUEST] = _signStateEip191(initialState, guestPrivateKey);
 
         bool valid = adjudicator.adjudicate(channel, initialState, new State[](0));
         assertTrue(valid, "Valid first state transition with EIP191 signatures should be accepted");

@@ -666,7 +666,7 @@ contract CustodyTest_create is CustodyTest_Base {
 
         bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
         bytes32 channelId = Utils.getChannelId(chan);
-        bytes memory guestSig = TestUtils.signStateEIP191(vm, channelId, initialState, guestSKPrivKey);
+        bytes memory guestSig = TestUtils.signStateEip191(vm, channelId, initialState, guestSKPrivKey);
         bytes[] memory sigs = new bytes[](2);
         sigs[0] = hostSig;
         sigs[1] = guestSig;

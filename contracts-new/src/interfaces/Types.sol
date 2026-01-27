@@ -32,7 +32,6 @@ enum EscrowStatus {
 
 enum StateIntent {
     OPERATE,
-    CREATE, // FIXME: to be removed (?) when "create channel from non-zero state" is added
     CLOSE,
     DEPOSIT,
     WITHDRAW,

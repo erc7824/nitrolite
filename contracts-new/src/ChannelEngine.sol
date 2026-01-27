@@ -94,7 +94,7 @@ library ChannelEngine {
         int256 netFlowsSum = candidate.homeState.userNetFlow + candidate.homeState.nodeNetFlow;
 
         require(netFlowsSum >= 0, "negative net flow sum");
-        require(allocsSum == uint256(netFlowsSum), "invalid allocation sum");
+        require(allocsSum == netFlowsSum.toUint256(), "invalid allocation sum");
     }
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========
@@ -109,9 +109,7 @@ library ChannelEngine {
 
         StateIntent intent = candidate.intent;
 
-        if (intent == StateIntent.CREATE) {
-            effects = _calculateCreateEffects(ctx, candidate, userNfDelta);
-        } else if (intent == StateIntent.DEPOSIT) {
+        if (intent == StateIntent.DEPOSIT) {
             effects = _calculateDepositEffects(ctx, candidate, userNfDelta, nodeNfDelta);
         } else if (intent == StateIntent.WITHDRAW) {
             effects = _calculateWithdrawEffects(ctx, candidate, userNfDelta, nodeNfDelta);
@@ -139,25 +137,6 @@ library ChannelEngine {
         return effects;
     }
 
-    function _calculateCreateEffects(TransitionContext memory ctx, State memory candidate, int256 userNfDelta)
-        internal
-        pure
-        returns (TransitionEffects memory effects)
-    {
-        // CREATE-specific validations
-        require(candidate.version == 0, "invalid version");
-        require(ctx.status == ChannelStatus.VOID, "invalid status");
-        require(candidate.homeState.nodeAllocation == 0, "node allocation must be zero");
-        require(candidate.nonHomeState.isEmpty(), "non-home state must be empty");
-
-        // Calculate effects
-        effects.userFundsDelta = userNfDelta; // Pull user's initial deposit
-        effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = false;
-
-        return effects;
-    }
-
     function _calculateDepositEffects(
         TransitionContext memory ctx,
         State memory candidate,
@@ -166,8 +145,8 @@ library ChannelEngine {
     ) internal pure returns (TransitionEffects memory effects) {
         // DEPOSIT-specific validations
         require(
-            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
-                || ctx.status == ChannelStatus.MIGRATING_IN,
+            ctx.status == ChannelStatus.VOID || ctx.status == ChannelStatus.OPERATING
+                || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN,
             "invalid status"
         );
         require(userNfDelta > 0, "invalid user delta");
@@ -189,8 +168,8 @@ library ChannelEngine {
     ) internal pure returns (TransitionEffects memory effects) {
         // WITHDRAW-specific validations
         require(
-            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
-                || ctx.status == ChannelStatus.MIGRATING_IN,
+            ctx.status == ChannelStatus.VOID || ctx.status == ChannelStatus.OPERATING
+                || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN,
             "invalid status"
         );
         require(userNfDelta < 0, "invalid user delta");
@@ -212,8 +191,8 @@ library ChannelEngine {
     ) internal pure returns (TransitionEffects memory effects) {
         // OPERATE-specific validations (checkpoint)
         require(
-            ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
-                || ctx.status == ChannelStatus.MIGRATING_IN,
+            ctx.status == ChannelStatus.VOID || ctx.status == ChannelStatus.OPERATING
+                || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN,
             "invalid status"
         );
         require(userNfDelta == 0, "invalid user delta");
@@ -243,6 +222,14 @@ library ChannelEngine {
         uint256 allocsSum = candidate.homeState.userAllocation + candidate.homeState.nodeAllocation;
         require(allocsSum <= ctx.lockedFunds, "allocation exceeds locked funds");
 
+        // Ensure final locked funds will be sufficient for special nodeAllocation handling
+        int256 finalLockedFunds = ctx.lockedFunds.toInt256() + userNfDelta + nodeNfDelta;
+        require(finalLockedFunds >= 0, "negative final locked funds");
+        require(
+            finalLockedFunds >= candidate.homeState.nodeAllocation.toInt256(),
+            "insufficient funds for node allocation payout"
+        );
+
         // Calculate effects
         // Push allocations to parties (negative = push out from channel)
         effects.userFundsDelta = userNfDelta;
@@ -258,7 +245,7 @@ library ChannelEngine {
         State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
-    ) internal view returns (TransitionEffects memory effects) {
+    ) internal pure returns (TransitionEffects memory effects) {
         // INITIATE_ESCROW_DEPOSIT-specific validations (Home Chain)
         // Node locks liquidity in channel for cross-chain deposit
         require(
@@ -293,7 +280,7 @@ library ChannelEngine {
         State memory candidate,
         int256 userNfDelta,
         int256 nodeNfDelta
-    ) internal view returns (TransitionEffects memory effects) {
+    ) internal pure returns (TransitionEffects memory effects) {
         // FINALIZE_ESCROW_DEPOSIT-specific validations (Home Chain)
         // Previous on-chain state MUST be INITIATE_ESCROW_DEPOSIT
         // Funds stay in channel, just move from node allocation to user allocation
@@ -319,7 +306,8 @@ library ChannelEngine {
 
         uint256 userAllocDelta = candidate.homeState.userAllocation - ctx.prevState.homeState.userAllocation;
         require(
-            userAllocDelta.toWad(candidate.homeState.decimals) == depositAmount.toWad(ctx.prevState.nonHomeState.decimals),
+            userAllocDelta.toWad(candidate.homeState.decimals)
+                == depositAmount.toWad(ctx.prevState.nonHomeState.decimals),
             "user allocation delta mismatch"
         );
 

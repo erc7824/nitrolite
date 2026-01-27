@@ -3,7 +3,9 @@ pragma solidity 0.8.30;
 
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import {WadMath} from "./WadMath.sol";
 import {ChannelDefinition, State, Ledger} from "./interfaces/Types.sol";
 
 library Utils {
@@ -60,6 +62,25 @@ library Utils {
     }
 
     // ========== Ledger ==========
+
+    /**
+     * @notice Validates that the ledger's decimals match the token contract's decimals
+     * @dev Only validates if on the same chain as the ledger
+     * @param ledger The ledger to validate
+     */
+    function validateTokenDecimals(Ledger memory ledger) internal view {
+        if (ledger.decimals > WadMath.MAX_PRECISION) {
+            revert("decimals exceed max precision");
+        }
+
+        if (ledger.chainId == block.chainid) {
+            try IERC20Metadata(ledger.token).decimals() returns (uint8 tokenDecimals) {
+                require(ledger.decimals == tokenDecimals, "decimals mismatch");
+            } catch {
+                revert("failed to fetch decimals");
+            }
+        }
+    }
 
     function isEmpty(Ledger memory state) internal pure returns (bool) {
         return state.chainId == 0;

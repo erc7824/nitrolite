@@ -35,14 +35,14 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             metadata: bytes32(0),
             homeState: Ledger({
                 chainId: uint64(block.chainid),
-                token: address(token),
+                token: address(token), decimals: 18,
                 userAllocation: 1000,
                 userNetFlow: 1000,
                 nodeAllocation: 0,
                 nodeNetFlow: 0
             }),
             nonHomeState: Ledger({
-                chainId: 0, token: address(0), userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
+                chainId: 0, token: address(0), decimals: 0, userAllocation: 0, userNetFlow: 0, nodeAllocation: 0, nodeNetFlow: 0
             }),
             userSig: "",
             nodeSig: ""

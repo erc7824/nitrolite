@@ -3,6 +3,8 @@ pragma solidity 0.8.30;
 
 import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {EscrowStatus, State, StateIntent} from "./interfaces/Types.sol";
+import {Utils} from "./Utils.sol";
+import {WadMath} from "./WadMath.sol";
 
 /**
  * @title EscrowDepositEngine
@@ -11,6 +13,8 @@ import {EscrowStatus, State, StateIntent} from "./interfaces/Types.sol";
 library EscrowDepositEngine {
     using SafeCast for int256;
     using SafeCast for uint256;
+    using WadMath for uint256;
+    using WadMath for int256;
 
     // ========== Constants ==========
 
@@ -88,6 +92,9 @@ library EscrowDepositEngine {
         require(candidate.nonHomeState.chainId == blockchainId, "must be on non-home chain");
         require(candidate.version > 0, "invalid version");
 
+        // Validate token decimals for nonHomeState (current chain)
+        Utils.validateTokenDecimals(candidate.nonHomeState);
+
         // Validate allocations equal net flows
         uint256 allocsSum = candidate.nonHomeState.userAllocation + candidate.nonHomeState.nodeAllocation;
         int256 netFlowsSum = candidate.nonHomeState.userNetFlow + candidate.nonHomeState.nodeNetFlow;
@@ -129,7 +136,11 @@ library EscrowDepositEngine {
         require(candidate.nonHomeState.nodeNetFlow == 0, "node net flow must be zero on non-home");
 
         // Validate that home state shows node locking equal amount
-        require(candidate.homeState.nodeAllocation == depositAmount, "home node alloc must match non-home user deposit");
+        require(
+            candidate.homeState.nodeAllocation.toWad(candidate.homeState.decimals)
+                == depositAmount.toWad(candidate.nonHomeState.decimals),
+            "home node alloc must match non-home user deposit"
+        );
 
         // Calculate effects
         effects.userFundsDelta = depositAmount.toInt256(); // Pull from user
@@ -142,7 +153,7 @@ library EscrowDepositEngine {
 
     function _calculateFinalizeEffects(TransitionContext memory ctx, State memory candidate)
         internal
-        pure
+        view
         returns (TransitionEffects memory effects)
     {
         // FINALIZE: Node claims with finalization proof
@@ -162,7 +173,11 @@ library EscrowDepositEngine {
 
         // Check home - non-home state consistency
         uint256 userHomeAllocDelta = candidate.homeState.userAllocation - ctx.initState.homeState.userAllocation;
-        require(userHomeAllocDelta == depositAmount, "home user allocation must increase by deposit amount");
+        require(
+            userHomeAllocDelta.toWad(candidate.homeState.decimals)
+                == depositAmount.toWad(ctx.initState.nonHomeState.decimals),
+            "home user allocation must increase by deposit amount"
+        );
         require(candidate.homeState.nodeAllocation == 0, "home node allocation must be zero");
         int256 userHomeNfDelta = candidate.homeState.userNetFlow - ctx.initState.homeState.userNetFlow;
         require(userHomeNfDelta == 0, "home user net flow must not change");

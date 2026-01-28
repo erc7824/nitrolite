@@ -150,8 +150,6 @@ type WebsocketNodeConfig struct {
 // Required configuration:
 //   - Logger: Used for structured logging
 //
-// The node automatically registers a built-in "node.v1.ping" handler that responds with "node.v1.ping".
-//
 // Returns an error if required configuration is missing.
 func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 	if config.Logger == nil {
@@ -202,8 +200,6 @@ func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 		routes:       make(map[string][]string),
 		connHub:      NewConnectionHub(),
 	}
-
-	node.Handle(NodeV1PingMethod.String(), node.handlePing) // Built-in ping handler
 
 	return node, nil
 }
@@ -495,17 +491,6 @@ func (wn *WebsocketNode) sendErrorResponse(conn Connection, requestID uint64, me
 	}
 
 	conn.WriteRawResponse(responseBytes)
-}
-
-// handlePing is the built-in handler for the "node.v1.ping" method.
-// It provides a standard way for clients to check if the connection
-// is alive and measure round-trip time. The handler executes any
-// registered middleware before responding with the same method.
-//
-// This handler is automatically registered when the node is created.
-func (wn *WebsocketNode) handlePing(ctx *Context) {
-	ctx.Next() // Call any middleware first
-	ctx.Succeed(NodeV1PingMethod.String(), nil)
 }
 
 // prepareRawNotification creates a server-initiated notification message.

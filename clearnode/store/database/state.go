@@ -48,6 +48,12 @@ type State struct {
 	UserSig *string `gorm:"column:user_sig;type:text"`
 	NodeSig *string `gorm:"column:node_sig;type:text"`
 
+	// Read-only fields populated from JOINs with channels table
+	HomeBlockchainID   *uint64 `gorm:"->;column:home_blockchain_id"`
+	HomeTokenAddress   *string `gorm:"->;column:home_token_address"`
+	EscrowBlockchainID *uint64 `gorm:"->;column:escrow_blockchain_id"`
+	EscrowTokenAddress *string `gorm:"->;column:escrow_token_address"`
+
 	CreatedAt time.Time
 }
 
@@ -59,13 +65,17 @@ func (State) TableName() string {
 // GetLastUserState retrieves the most recent state for a user's asset.
 func (s *DBStore) GetLastUserState(wallet, asset string, signed bool) (*core.State, error) {
 	var dbState State
-	query := s.db.Where("user_wallet = ? AND asset = ?", wallet, asset)
+	query := s.db.Table("channel_states AS s").
+		Select("s.*, hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address, ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address").
+		Joins("LEFT JOIN channels AS hc ON s.home_channel_id = hc.channel_id").
+		Joins("LEFT JOIN channels AS ec ON s.escrow_channel_id = ec.channel_id").
+		Where("s.user_wallet = ? AND s.asset = ?", wallet, asset)
 
 	if signed {
-		query = query.Where("user_sig IS NOT NULL AND node_sig IS NOT NULL")
+		query = query.Where("s.user_sig IS NOT NULL AND s.node_sig IS NOT NULL")
 	}
 
-	err := query.Order("epoch DESC, version DESC").First(&dbState).Error
+	err := query.Order("s.epoch DESC, s.version DESC").First(&dbState).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
@@ -93,13 +103,17 @@ func (s *DBStore) StoreUserState(state core.State) error {
 // GetLastStateByChannelID retrieves the most recent state for a given channel.
 func (s *DBStore) GetLastStateByChannelID(channelID string, signed bool) (*core.State, error) {
 	var dbState State
-	query := s.db.Where("home_channel_id = ? OR escrow_channel_id = ?", channelID, channelID)
+	query := s.db.Table("channel_states AS s").
+		Select("s.*, hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address, ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address").
+		Joins("LEFT JOIN channels AS hc ON s.home_channel_id = hc.channel_id").
+		Joins("LEFT JOIN channels AS ec ON s.escrow_channel_id = ec.channel_id").
+		Where("s.home_channel_id = ? OR s.escrow_channel_id = ?", channelID, channelID)
 
 	if signed {
-		query = query.Where("user_sig IS NOT NULL AND node_sig IS NOT NULL")
+		query = query.Where("s.user_sig IS NOT NULL AND s.node_sig IS NOT NULL")
 	}
 
-	err := query.Order("epoch DESC, version DESC").First(&dbState).Error
+	err := query.Order("s.epoch DESC, s.version DESC").First(&dbState).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
@@ -113,7 +127,11 @@ func (s *DBStore) GetLastStateByChannelID(channelID string, signed bool) (*core.
 // GetStateByChannelIDAndVersion retrieves a specific state version for a channel.
 func (s *DBStore) GetStateByChannelIDAndVersion(channelID string, version uint64) (*core.State, error) {
 	var dbState State
-	err := s.db.Where("(home_channel_id = ? OR escrow_channel_id = ?) AND version = ?", channelID, channelID, version).
+	err := s.db.Table("channel_states AS s").
+		Select("s.*, hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address, ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address").
+		Joins("LEFT JOIN channels AS hc ON s.home_channel_id = hc.channel_id").
+		Joins("LEFT JOIN channels AS ec ON s.escrow_channel_id = ec.channel_id").
+		Where("(s.home_channel_id = ? OR s.escrow_channel_id = ?) AND s.version = ?", channelID, channelID, version).
 		First(&dbState).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {

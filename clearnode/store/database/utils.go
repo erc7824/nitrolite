@@ -56,6 +56,23 @@ func databaseStateToCore(dbState *State) (*core.State, error) {
 		return nil, fmt.Errorf("cannot unmarshal transitions: %w", err)
 	}
 
+	// Build home ledger with blockchain ID and token address from joined channels
+	homeLedger := core.Ledger{
+		UserBalance: dbState.HomeUserBalance,
+		UserNetFlow: dbState.HomeUserNetFlow,
+		NodeBalance: dbState.HomeNodeBalance,
+		NodeNetFlow: dbState.HomeNodeNetFlow,
+	}
+
+	// If home channel ID exists, blockchain ID and token address must be present
+	if dbState.HomeChannelID != nil {
+		if dbState.HomeBlockchainID == nil || dbState.HomeTokenAddress == nil {
+			return nil, fmt.Errorf("home channel %s exists but blockchain ID or token address is missing", *dbState.HomeChannelID)
+		}
+		homeLedger.BlockchainID = *dbState.HomeBlockchainID
+		homeLedger.TokenAddress = *dbState.HomeTokenAddress
+	}
+
 	state := &core.State{
 		ID:              dbState.ID,
 		Transitions:     transitions,
@@ -65,20 +82,21 @@ func databaseStateToCore(dbState *State) (*core.State, error) {
 		Version:         dbState.Version,
 		HomeChannelID:   dbState.HomeChannelID,
 		EscrowChannelID: dbState.EscrowChannelID,
-		HomeLedger: core.Ledger{
-			UserBalance: dbState.HomeUserBalance,
-			UserNetFlow: dbState.HomeUserNetFlow,
-			NodeBalance: dbState.HomeNodeBalance,
-			NodeNetFlow: dbState.HomeNodeNetFlow,
-		},
+		HomeLedger:      homeLedger,
 	}
 
+	// If escrow channel ID exists, blockchain ID and token address must be present
 	if dbState.EscrowChannelID != nil {
+		if dbState.EscrowBlockchainID == nil || dbState.EscrowTokenAddress == nil {
+			return nil, fmt.Errorf("escrow channel %s exists but blockchain ID or token address is missing", *dbState.EscrowChannelID)
+		}
 		state.EscrowLedger = &core.Ledger{
-			UserBalance: dbState.EscrowUserBalance,
-			UserNetFlow: dbState.EscrowUserNetFlow,
-			NodeBalance: dbState.EscrowNodeBalance,
-			NodeNetFlow: dbState.EscrowNodeNetFlow,
+			BlockchainID: *dbState.EscrowBlockchainID,
+			TokenAddress: *dbState.EscrowTokenAddress,
+			UserBalance:  dbState.EscrowUserBalance,
+			UserNetFlow:  dbState.EscrowUserNetFlow,
+			NodeBalance:  dbState.EscrowNodeBalance,
+			NodeNetFlow:  dbState.EscrowNodeNetFlow,
 		}
 	}
 

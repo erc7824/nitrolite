@@ -181,6 +181,15 @@ func (c *Client) AppSessionsV1CloseAppSession(ctx context.Context, req AppSessio
 	return resp, nil
 }
 
+// AppSessionsV1RebalanceAppSessions rebalances multiple application sessions atomically.
+func (c *Client) AppSessionsV1RebalanceAppSessions(ctx context.Context, req AppSessionsV1RebalanceAppSessionsRequest) (AppSessionsV1RebalanceAppSessionsResponse, error) {
+	var resp AppSessionsV1RebalanceAppSessionsResponse
+	if err := c.call(ctx, AppSessionsV1RebalanceAppSessionsMethod, req, &resp); err != nil {
+		return resp, err
+	}
+	return resp, nil
+}
+
 // ============================================================================
 // Session Keys Group - V1 API Methods
 // ============================================================================

@@ -938,3 +938,16 @@ type PaginationMetadata struct {
 	TotalCount uint32 `json:"total_count"` // Total number of items
 	PageCount  uint32 `json:"page_count"`  // Total number of pages
 }
+
+// NodeConfig represents the configuration of a Clearnode instance.
+// It includes the node's identity, version, and supported blockchain networks.
+type NodeConfig struct {
+	// NodeAddress is the Ethereum address of the clearnode operator
+	NodeAddress string
+
+	// NodeVersion is the software version of the clearnode instance
+	NodeVersion string
+
+	// Blockchains is the list of supported blockchain networks
+	Blockchains []Blockchain
+}

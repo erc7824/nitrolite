@@ -4,18 +4,18 @@ import (
 	"fmt"
 )
 
-type ECDSASigValidator struct {
+type SigValidator struct {
 	recoverer AddressRecoverer
 }
 
-func NewECDSASigValidator() *ECDSASigValidator {
-	recoverer, _ := NewAddressRecoverer(TypeEthereum)
-	return &ECDSASigValidator{
+func NewSigValidator(sigType Type) *SigValidator {
+	recoverer, _ := NewAddressRecoverer(sigType)
+	return &SigValidator{
 		recoverer: recoverer,
 	}
 }
 
-func (s *ECDSASigValidator) Recover(data, sig []byte) (string, error) {
+func (s *SigValidator) Recover(data, sig []byte) (string, error) {
 	address, err := s.recoverer.RecoverAddress(data, sig)
 	if err != nil {
 		return "", err
@@ -23,7 +23,7 @@ func (s *ECDSASigValidator) Recover(data, sig []byte) (string, error) {
 	return address.String(), nil
 }
 
-func (s *ECDSASigValidator) Verify(wallet string, data, sig []byte) error {
+func (s *SigValidator) Verify(wallet string, data, sig []byte) error {
 	address, err := s.Recover(data, sig)
 	if err != nil {
 		return err

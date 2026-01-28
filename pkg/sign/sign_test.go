@@ -14,7 +14,7 @@ func TestType(t *testing.T) {
 			sigType  Type
 			expected string
 		}{
-			{TypeEthereum, "Ethereum"},
+			{TypeRawEthereum, "Ethereum"},
 			{TypeUnknown, "Unknown"},
 			{Type(99), "Unknown"},
 		}
@@ -35,7 +35,7 @@ func TestSignature(t *testing.T) {
 			{
 				name:     "Ethereum signature (65 bytes)",
 				sig:      make(Signature, 65),
-				expected: TypeEthereum,
+				expected: TypeRawEthereum,
 			},
 			{
 				name:     "Short signature",
@@ -108,7 +108,7 @@ func TestSignature(t *testing.T) {
 
 func TestAddressRecovererFactory(t *testing.T) {
 	t.Run("NewAddressRecoverer with supported algorithm", func(t *testing.T) {
-		recoverer, err := NewAddressRecoverer(TypeEthereum)
+		recoverer, err := NewAddressRecoverer(TypeRawEthereum)
 		require.NoError(t, err)
 		assert.NotNil(t, recoverer)
 

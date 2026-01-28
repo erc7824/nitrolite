@@ -40,14 +40,15 @@ type Signature []byte
 type Type uint8
 
 const (
-	TypeEthereum Type = iota
-	TypeUnknown       = 255
+	TypeRawEthereum Type = iota
+	TypeEthereumMsg
+	TypeUnknown = 255
 )
 
 // String returns the string representation of the algorithm.
 func (t Type) String() string {
 	switch t {
-	case TypeEthereum:
+	case TypeRawEthereum:
 		return "Ethereum"
 	default:
 		return "Unknown"
@@ -58,7 +59,7 @@ func (t Type) String() string {
 func (s Signature) Type() Type {
 	if len(s) == 65 {
 		// Standard Ethereum signature format (r: 32 bytes, s: 32 bytes, v: 1 byte)
-		return TypeEthereum
+		return TypeRawEthereum
 	}
 	return TypeUnknown
 }
@@ -90,7 +91,7 @@ func (s Signature) String() string {
 // NewAddressRecoverer creates an appropriate AddressRecoverer based on the signature algorithm.
 func NewAddressRecoverer(sigType Type) (AddressRecoverer, error) {
 	switch sigType {
-	case TypeEthereum:
+	case TypeRawEthereum:
 		return &EthereumAddressRecoverer{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported signature type: %s", sigType.String())

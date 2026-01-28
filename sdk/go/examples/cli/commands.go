@@ -60,10 +60,6 @@ ADVANCED STATE MANAGEMENT
   submit-state                  Interactively build and submit a state transition
                                 Supports: transfer, deposit, withdrawal, finalize, commit
 
-SCENARIOS
-  scenario <file>               Run a scenario from JSON file
-  scenario-template [file]      Generate a scenario template file
-
 OTHER
   exit                          Exit the CLI
 
@@ -73,8 +69,7 @@ EXAMPLES
   deposit 80002 usdc 100
   transfer 0x1234... usdc 50
   balances 0x1234...
-  chains
-`)
+  chains`)
 }
 
 func (o *Operator) showConfig(ctx context.Context) {
@@ -88,7 +83,7 @@ func (o *Operator) showConfig(ctx context.Context) {
 	} else {
 		// Get signer to show address
 		privateKey, _ := o.store.GetPrivateKey()
-		signer, err := sign.NewEthereumSigner(privateKey)
+		signer, err := sign.NewEthereumRawSigner(privateKey)
 		if err == nil {
 			fmt.Printf("🔑 Wallet:     ✅ Imported (%s)\n", signer.PublicKey().Address().String())
 		} else {
@@ -136,7 +131,7 @@ func (o *Operator) showWallet(ctx context.Context) {
 	}
 
 	// Create signer to get address
-	signer, err := sign.NewEthereumSigner(privateKey)
+	signer, err := sign.NewEthereumRawSigner(privateKey)
 	if err != nil {
 		fmt.Printf("❌ Failed to get wallet address: %v\n", err)
 		return
@@ -186,7 +181,7 @@ func (o *Operator) importWallet(ctx context.Context) {
 		}
 
 		// Validate by creating signer
-		signer, err = sign.NewEthereumSigner(privateKey)
+		signer, err = sign.NewEthereumRawSigner(privateKey)
 		if err != nil {
 			fmt.Printf("❌ Invalid private key: %v\n", err)
 			return
@@ -202,7 +197,7 @@ func (o *Operator) importWallet(ctx context.Context) {
 			return
 		}
 
-		signer, err = sign.NewEthereumSigner(privateKey)
+		signer, err = sign.NewEthereumRawSigner(privateKey)
 		if err != nil {
 			fmt.Printf("❌ Failed to create signer: %v\n", err)
 			return
@@ -1070,42 +1065,4 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 	fmt.Println("\n✅ State submitted successfully!")
 	fmt.Printf("📝 Node signature: %s\n", nodeSig[:20]+"...")
 	fmt.Printf("🎉 New state version: %d (Epoch: %d)\n", nextState.Version, nextState.Epoch)
-}
-
-// ============================================================================
-// Scenario Commands
-// ============================================================================
-
-func (o *Operator) runScenario(ctx context.Context, path string) {
-	fmt.Printf("📂 Loading scenario from: %s\n", path)
-
-	scenario, err := o.scenarioRunner.LoadScenario(path)
-	if err != nil {
-		fmt.Printf("❌ Failed to load scenario: %v\n", err)
-		return
-	}
-
-	fmt.Println()
-	err = o.scenarioRunner.ExecuteScenario(ctx, scenario)
-	if err != nil {
-		fmt.Printf("❌ Scenario execution failed: %v\n", err)
-		return
-	}
-}
-
-func (o *Operator) createScenarioTemplate(path string) {
-	fmt.Printf("📝 Creating scenario template: %s\n", path)
-
-	err := SaveScenarioTemplate(path)
-	if err != nil {
-		fmt.Printf("❌ Failed to create template: %v\n", err)
-		return
-	}
-
-	fmt.Println("✅ Scenario template created!")
-	fmt.Println()
-	fmt.Println("📋 Next steps:")
-	fmt.Printf("   1. Edit %s to customize your scenario\n", path)
-	fmt.Println("   2. Update variables, steps, and commands as needed")
-	fmt.Printf("   3. Run with: scenario %s\n", path)
 }

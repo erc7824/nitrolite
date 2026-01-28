@@ -28,7 +28,7 @@ type Client struct {
 func NewClient(
 	contractAddress common.Address,
 	backend bind.ContractBackend,
-	signer sign.Signer,
+	txSigner sign.Signer,
 	blockchainID uint64,
 	nodeAddress string,
 	assetStore core.AssetStore,
@@ -40,7 +40,7 @@ func NewClient(
 
 	return &Client{
 		contract:        contract,
-		transactOpts:    signerTxOpts(signer, blockchainID),
+		transactOpts:    signerTxOpts(txSigner, blockchainID),
 		nodeAddress:     common.HexToAddress(nodeAddress),
 		contractAddress: contractAddress,
 		blockchainID:    blockchainID,

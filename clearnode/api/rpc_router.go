@@ -101,6 +101,11 @@ func (r *RPCRouter) LoggerMiddleware(c *rpc.Context) {
 
 	c.Next()
 
+	if c.Request.Method == rpc.NodeV1PingMethod.String() {
+		// Skip logging for ping requests
+		return
+	}
+
 	logger.Info("handled RPC request",
 		"method", c.Request.Method,
 		"success", c.Response.Type == rpc.MsgTypeResp,

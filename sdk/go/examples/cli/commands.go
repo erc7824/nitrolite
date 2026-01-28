@@ -2,14 +2,18 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
-	sdk "github.com/erc7824/nitrolite/sdk/go"
 	"github.com/erc7824/nitrolite/pkg/sign"
+	sdk "github.com/erc7824/nitrolite/sdk/go"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 )
 
@@ -25,7 +29,7 @@ func (o *Operator) showHelp() {
 SETUP COMMANDS
   help                          Show this help message
   config                        Show current configuration
-  import wallet                 Import private key (interactive)
+  import wallet                 Setup wallet (import existing or generate new)
   import rpc <chain_id> <url>   Import blockchain RPC URL
 
 HIGH-LEVEL OPERATIONS (Smart Client)
@@ -54,6 +58,10 @@ LOW-LEVEL APP SESSIONS (Base Client)
 ADVANCED STATE MANAGEMENT
   submit-state                  Interactively build and submit a state transition
                                 Supports: transfer, deposit, withdrawal, finalize, commit
+
+SCENARIOS
+  scenario <file>               Run a scenario from JSON file
+  scenario-template [file]      Generate a scenario template file
 
 OTHER
   exit                          Exit the CLI
@@ -118,23 +126,78 @@ func (o *Operator) showConfig(ctx context.Context) {
 // ============================================================================
 
 func (o *Operator) importWallet(ctx context.Context) {
-	fmt.Println("🔑 Import Wallet")
-	fmt.Println("================")
-	fmt.Print("Enter private key (with or without 0x prefix): ")
+	fmt.Println("🔑 Wallet Setup")
+	fmt.Println("===============")
+	fmt.Println()
+	fmt.Println("Choose an option:")
+	fmt.Println("  1. Import existing private key")
+	fmt.Println("  2. Generate new wallet")
+	fmt.Println()
+	fmt.Print("Enter choice (1 or 2): ")
+
+	var choice string
+	fmt.Scanln(&choice)
+	choice = strings.TrimSpace(choice)
 
 	var privateKey string
-	fmt.Scanln(&privateKey)
+	var signer sign.Signer
+	var err error
 
-	privateKey = strings.TrimSpace(privateKey)
-	if privateKey == "" {
-		fmt.Println("❌ Private key cannot be empty")
-		return
-	}
+	switch choice {
+	case "1":
+		// Import existing key
+		fmt.Println()
+		fmt.Println("📥 Import Existing Wallet")
+		fmt.Print("Enter private key (with or without 0x prefix): ")
+		fmt.Scanln(&privateKey)
 
-	// Validate by creating signer
-	signer, err := sign.NewEthereumSigner(privateKey)
-	if err != nil {
-		fmt.Printf("❌ Invalid private key: %v\n", err)
+		privateKey = strings.TrimSpace(privateKey)
+		if privateKey == "" {
+			fmt.Println("❌ Private key cannot be empty")
+			return
+		}
+
+		// Validate by creating signer
+		signer, err = sign.NewEthereumSigner(privateKey)
+		if err != nil {
+			fmt.Printf("❌ Invalid private key: %v\n", err)
+			return
+		}
+
+	case "2":
+		// Generate new wallet
+		fmt.Println()
+		fmt.Println("🆕 Generate New Wallet")
+		privateKey, err = generatePrivateKey()
+		if err != nil {
+			fmt.Printf("❌ Failed to generate private key: %v\n", err)
+			return
+		}
+
+		signer, err = sign.NewEthereumSigner(privateKey)
+		if err != nil {
+			fmt.Printf("❌ Failed to create signer: %v\n", err)
+			return
+		}
+
+		fmt.Println()
+		fmt.Println("⚠️  IMPORTANT: Save your private key securely!")
+		fmt.Println("=====================================")
+		fmt.Printf("Private Key: %s\n", privateKey)
+		fmt.Println("=====================================")
+		fmt.Println()
+		fmt.Print("Type 'I have saved my private key' to continue: ")
+
+		var confirmation string
+		fmt.Scanln(&confirmation)
+		// Read the full line
+		if confirmation == "" {
+			fmt.Println("❌ You must confirm that you saved the private key")
+			return
+		}
+
+	default:
+		fmt.Println("❌ Invalid choice")
 		return
 	}
 
@@ -145,13 +208,21 @@ func (o *Operator) importWallet(ctx context.Context) {
 	}
 
 	// Reset smart client to force recreation with new key
-	if o.smartClient != nil {
-		o.smartClient.Close()
-		o.smartClient = nil
+	if o.sdkClient != nil {
+		o.sdkClient.Close()
+		o.sdkClient = nil
 	}
 
-	fmt.Printf("✅ Wallet imported successfully\n")
+	fmt.Printf("✅ Wallet setup completed successfully\n")
 	fmt.Printf("📍 Address: %s\n", signer.PublicKey().Address().String())
+
+	if choice == "2" {
+		fmt.Println()
+		fmt.Println("💡 Tips:")
+		fmt.Println("   - Store your private key in a secure location")
+		fmt.Println("   - Never share your private key with anyone")
+		fmt.Println("   - Consider using a hardware wallet for large amounts")
+	}
 }
 
 func (o *Operator) importRPC(ctx context.Context, chainIDStr, rpcURL string) {
@@ -167,9 +238,9 @@ func (o *Operator) importRPC(ctx context.Context, chainIDStr, rpcURL string) {
 	}
 
 	// Reset smart client to force recreation with new RPC
-	if o.smartClient != nil {
-		o.smartClient.Close()
-		o.smartClient = nil
+	if o.sdkClient != nil {
+		o.sdkClient.Close()
+		o.sdkClient = nil
 	}
 
 	fmt.Printf("✅ RPC imported for chain %d\n", chainID)
@@ -199,7 +270,7 @@ func (o *Operator) deposit(ctx context.Context, chainIDStr, asset, amountStr str
 
 	fmt.Printf("💰 Depositing %s %s on chain %d...\n", amount.String(), asset, chainID)
 
-	txHash, err := o.smartClient.Deposit(ctx, chainID, asset, amount)
+	txHash, err := o.sdkClient.Deposit(ctx, chainID, asset, amount)
 	if err != nil {
 		fmt.Printf("❌ Deposit failed: %v\n", err)
 		return
@@ -229,7 +300,7 @@ func (o *Operator) withdraw(ctx context.Context, chainIDStr, asset, amountStr st
 
 	fmt.Printf("💸 Withdrawing %s %s from chain %d...\n", amount.String(), asset, chainID)
 
-	txHash, err := o.smartClient.Withdraw(ctx, chainID, asset, amount)
+	txHash, err := o.sdkClient.Withdraw(ctx, chainID, asset, amount)
 	if err != nil {
 		fmt.Printf("❌ Withdrawal failed: %v\n", err)
 		return
@@ -253,7 +324,7 @@ func (o *Operator) transfer(ctx context.Context, recipient, asset, amountStr str
 
 	fmt.Printf("📤 Transferring %s %s to %s...\n", amount.String(), asset, recipient)
 
-	txID, err := o.smartClient.Transfer(ctx, recipient, asset, amount)
+	txID, err := o.sdkClient.Transfer(ctx, recipient, asset, amount)
 	if err != nil {
 		fmt.Printf("❌ Transfer failed: %v\n", err)
 		return
@@ -570,6 +641,21 @@ func min(a, b int) int {
 	return b
 }
 
+// generatePrivateKey generates a new Ethereum private key
+func generatePrivateKey() (string, error) {
+	// Generate new ECDSA private key
+	privateKey, err := ecdsa.GenerateKey(crypto.S256(), rand.Reader)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate key: %w", err)
+	}
+
+	// Convert to hex string
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+	privateKeyHex := "0x" + hex.EncodeToString(privateKeyBytes)
+
+	return privateKeyHex, nil
+}
+
 func (o *Operator) interactiveSubmitState(ctx context.Context) {
 	if err := o.ensureSmartClient(ctx); err != nil {
 		fmt.Printf("❌ %v\n", err)
@@ -586,7 +672,7 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 	fmt.Scanln(&wallet)
 	wallet = strings.TrimSpace(wallet)
 	if wallet == "" {
-		wallet = o.smartClient.GetUserAddress()
+		wallet = o.sdkClient.GetUserAddress()
 		fmt.Printf("Using your wallet: %s\n", wallet)
 	}
 
@@ -875,7 +961,7 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 
 		// Sign user state
 		fmt.Println("\n✍️  Signing user state...")
-		sig, err := o.smartClient.SignState(nextState)
+		sig, err := o.sdkClient.SignState(nextState)
 		if err != nil {
 			fmt.Printf("❌ Failed to sign state: %v\n", err)
 			return
@@ -937,7 +1023,7 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 
 	// Step 7: Sign and submit
 	fmt.Println("\n✍️  Signing state...")
-	sig, err := o.smartClient.SignState(nextState)
+	sig, err := o.sdkClient.SignState(nextState)
 	if err != nil {
 		fmt.Printf("❌ Failed to sign state: %v\n", err)
 		return
@@ -956,4 +1042,42 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 	fmt.Println("\n✅ State submitted successfully!")
 	fmt.Printf("📝 Node signature: %s\n", nodeSig[:20]+"...")
 	fmt.Printf("🎉 New state version: %d (Epoch: %d)\n", nextState.Version, nextState.Epoch)
+}
+
+// ============================================================================
+// Scenario Commands
+// ============================================================================
+
+func (o *Operator) runScenario(ctx context.Context, path string) {
+	fmt.Printf("📂 Loading scenario from: %s\n", path)
+
+	scenario, err := o.scenarioRunner.LoadScenario(path)
+	if err != nil {
+		fmt.Printf("❌ Failed to load scenario: %v\n", err)
+		return
+	}
+
+	fmt.Println()
+	err = o.scenarioRunner.ExecuteScenario(ctx, scenario)
+	if err != nil {
+		fmt.Printf("❌ Scenario execution failed: %v\n", err)
+		return
+	}
+}
+
+func (o *Operator) createScenarioTemplate(path string) {
+	fmt.Printf("📝 Creating scenario template: %s\n", path)
+
+	err := SaveScenarioTemplate(path)
+	if err != nil {
+		fmt.Printf("❌ Failed to create template: %v\n", err)
+		return
+	}
+
+	fmt.Println("✅ Scenario template created!")
+	fmt.Println()
+	fmt.Println("📋 Next steps:")
+	fmt.Printf("   1. Edit %s to customize your scenario\n", path)
+	fmt.Println("   2. Update variables, steps, and commands as needed")
+	fmt.Printf("   3. Run with: scenario %s\n", path)
 }

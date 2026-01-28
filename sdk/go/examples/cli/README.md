@@ -43,9 +43,12 @@ go install github.com/erc7824/nitrolite/sdk/go/examples/cli@latest
 # Connect to Clearnode
 ./clearnode-cli wss://clearnode.example.com/ws
 
-# Import your wallet
+# Setup your wallet (import existing or generate new)
 clearnode> import wallet
-Enter private key: 0x1234...
+Choose an option:
+  1. Import existing private key
+  2. Generate new wallet
+Enter choice (1 or 2): 2
 
 # Import blockchain RPC (for deposits/withdrawals)
 clearnode> import rpc 80002 https://polygon-amoy.g.alchemy.com/v2/YOUR_KEY
@@ -70,8 +73,45 @@ clearnode> withdraw 80002 usdc 25
 ```bash
 help                          # Show detailed help
 config                        # Show current configuration
-import wallet                 # Import private key (interactive)
+import wallet                 # Setup wallet (import or generate new)
 import rpc <chain_id> <url>   # Import blockchain RPC URL
+```
+
+**Wallet Setup Options:**
+
+When you run `import wallet`, you can choose between:
+1. **Import existing** - Enter your existing private key
+2. **Generate new** - Create a brand new wallet with secure random key
+
+**Example:**
+```bash
+clearnode> import wallet
+
+🔑 Wallet Setup
+===============
+
+Choose an option:
+  1. Import existing private key
+  2. Generate new wallet
+
+Enter choice (1 or 2): 2
+
+🆕 Generate New Wallet
+
+⚠️  IMPORTANT: Save your private key securely!
+=====================================
+Private Key: 0x1234567890abcdef...
+=====================================
+
+Type 'I have saved my private key' to continue: I have saved my private key
+
+✅ Wallet setup completed successfully
+📍 Address: 0xYourNewAddress...
+
+💡 Tips:
+   - Store your private key in a secure location
+   - Never share your private key with anyone
+   - Consider using a hardware wallet for large amounts
 ```
 
 ### High-Level Operations (Smart Client)
@@ -153,6 +193,34 @@ Application session management:
 app-sessions                 # List all app sessions
 ```
 
+### Scenarios (Automation)
+
+Automate sequences of operations:
+
+```bash
+scenario <file>              # Execute a scenario from YAML file
+scenario-template [file]     # Generate a scenario template
+```
+
+Scenarios allow you to define complex workflows as YAML files and execute them automatically. Perfect for:
+- Automated testing
+- Reproducible demos
+- CI/CD integration
+- Quick state setup
+
+**Key Features:**
+- Variable substitution (`${VAR}`)
+- Retry logic for resilience
+- Timing controls (wait_before, wait_after)
+- Comprehensive assertions for testing
+  - Balance checks (exact, >, <)
+  - Channel validation (exists, status)
+  - State version tracking
+  - Transaction count verification
+- Error handling options
+
+See `scenarios/README.md` for detailed documentation and examples.
+
 ## Configuration
 
 ### Environment Variables
@@ -173,9 +241,9 @@ app-sessions                 # List all app sessions
 # 1. Connect
 ./clearnode-cli wss://clearnode.example.com/ws
 
-# 2. Import wallet
+# 2. Setup wallet
 clearnode> import wallet
-# Enter your private key when prompted
+# Choose option 1 to import existing key, or option 2 to generate new wallet
 
 # 3. Check available chains
 clearnode> chains
@@ -254,12 +322,18 @@ The CLI provides intelligent autocomplete:
 
 ```
 cli/
-├── main.go       # Entry point, terminal setup
-├── operator.go   # Command routing and completion
-├── commands.go   # Command implementations
-├── storage.go    # SQLite storage for config
-├── go.mod        # Dependencies
-└── README.md     # This file
+├── main.go         # Entry point, terminal setup
+├── operator.go     # Command routing and completion
+├── commands.go     # Command implementations
+├── storage.go      # SQLite storage for config
+├── scenario.go     # Scenario loading and execution
+├── scenarios/      # Example scenario files
+│   ├── README.md
+│   ├── demo_workflow.yaml
+│   ├── quick_test.yaml
+│   └── balance_verification.yaml
+├── go.mod          # Dependencies
+└── README.md       # This file
 ```
 
 ### Design
@@ -269,14 +343,16 @@ cli/
 - **Local storage** - SQLite for secure wallet and RPC storage
 - **Context-aware** - All operations use context for timeout/cancellation
 - **Error resilient** - Clear error messages with recovery suggestions
+- **Automation-ready** - YAML-based scenarios for automated workflows
 
 ## Troubleshooting
 
 ### "No wallet imported"
 
 ```bash
-# Import your wallet first
+# Setup your wallet first
 clearnode> import wallet
+# Choose to import existing or generate new
 ```
 
 ### "No RPC configured for chain X"
@@ -334,6 +410,33 @@ clearnode> withdraw 80002 usdc 500
 
 # Check final state
 clearnode> balances 0xYourAddress...
+```
+
+### Automated Workflow with Scenarios
+
+Instead of manual commands, automate everything:
+
+```bash
+# Connect
+./clearnode-cli wss://testnet.clearnode.example.com/ws
+
+# Setup (still manual)
+clearnode> import wallet
+clearnode> import rpc 80002 https://polygon-amoy.g.alchemy.com/v2/KEY
+
+# Run entire workflow automatically
+clearnode> scenario scenarios/demo_workflow.yaml
+
+# Output:
+# 🎬 Starting Scenario: Demo Workflow
+# ▶️  Step 1/13: Connection Check
+#    ✅ Success
+# ▶️  Step 2/13: Initial Deposit
+#    🔧 Executing: deposit 80002 usdc 1000
+#    ✅ Success
+# ... (continues automatically)
+# 🎉 Scenario completed!
+# 📊 Results: 13 succeeded, 0 failed, 13 total
 ```
 
 ### Development & Testing
@@ -484,10 +587,13 @@ Submit this commit state? yes
 ## Security Notes
 
 - Private keys are stored in local SQLite database (unencrypted)
+- When generating a new wallet, **save the private key immediately** - it cannot be recovered
 - For production use, consider hardware wallets or key management services
 - Never commit or share your config database
+- Never share your private key with anyone
 - Config directory is user-specific and protected by OS permissions
 - When providing quorum signatures, ensure they are from trusted participants
+- **Backup your private key** - if you lose it, you lose access to your funds
 
 ## Contributing
 

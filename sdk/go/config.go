@@ -22,7 +22,7 @@ type Config struct {
 	ErrorHandler func(error)
 
 	// BlockchainRPCs maps blockchain IDs to their RPC endpoints
-	// Used by SmartClient for on-chain operations
+	// Used by SDKClient for on-chain operations
 	BlockchainRPCs map[uint64]string
 }
 

@@ -14,11 +14,12 @@ import (
 )
 
 type Operator struct {
-	wsURL       string
-	store       *Storage
-	baseClient  *sdk.Client
-	smartClient *sdk.SmartClient
-	exitCh      chan struct{}
+	wsURL          string
+	store          *Storage
+	baseClient     *sdk.Client
+	sdkClient      *sdk.SDKClient
+	scenarioRunner *ScenarioRunner
+	exitCh         chan struct{}
 }
 
 func NewOperator(wsURL string, store *Storage) (*Operator, error) {
@@ -28,12 +29,17 @@ func NewOperator(wsURL string, store *Storage) (*Operator, error) {
 		return nil, fmt.Errorf("failed to create base client: %w", err)
 	}
 
-	return &Operator{
+	op := &Operator{
 		wsURL:      wsURL,
 		store:      store,
 		baseClient: baseClient,
 		exitCh:     make(chan struct{}),
-	}, nil
+	}
+
+	// Initialize scenario runner
+	op.scenarioRunner = NewScenarioRunner(op)
+
+	return op, nil
 }
 
 func (o *Operator) Wait() <-chan struct{} {
@@ -55,29 +61,33 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "config", Description: "Show current configuration"},
 			{Text: "import", Description: "Import wallet or blockchain RPC"},
 
-			// High-level operations (Smart Client)
-			{Text: "deposit", Description: "💰 Deposit funds to channel (smart)"},
-			{Text: "withdraw", Description: "💸 Withdraw funds from channel (smart)"},
-			{Text: "transfer", Description: "📤 Transfer funds to another wallet (smart)"},
+			// High-level operations
+			{Text: "deposit", Description: "💰 Deposit funds to channel"},
+			{Text: "withdraw", Description: "💸 Withdraw funds from channel"},
+			{Text: "transfer", Description: "📤 Transfer funds to another wallet"},
 
-			// Node information (Base Client)
+			// Node information
 			{Text: "ping", Description: "🏓 Ping the Clearnode server"},
 			{Text: "node", Description: "🖥️  Get node information"},
 			{Text: "chains", Description: "⛓️  List supported blockchains"},
 			{Text: "assets", Description: "💎 List supported assets"},
 
-			// User queries (Base Client)
+			// User queries
 			{Text: "balances", Description: "💵 Get user balances"},
 			{Text: "channels", Description: "📡 List user channels"},
 			{Text: "transactions", Description: "📋 Get transaction history"},
 
-			// State management (Base Client - Low-level)
-			{Text: "state", Description: "📊 Get latest state (low-level)"},
-			{Text: "states", Description: "📚 Get state history (low-level)"},
+			// State management
+			{Text: "state", Description: "📊 Get latest state"},
+			{Text: "states", Description: "📚 Get state history"},
 			{Text: "submit-state", Description: "🔧 Build and submit state interactively"},
 
 			// App sessions (Base Client - Low-level)
-			{Text: "app-sessions", Description: "🎮 List app sessions (low-level)"},
+			{Text: "app-sessions", Description: "🎮 List app sessions"},
+
+			// Scenarios (DRAFT)
+			{Text: "scenario", Description: "🎬 Run a scenario from file"},
+			{Text: "scenario-template", Description: "📄 Generate scenario template file"},
 
 			{Text: "exit", Description: "👋 Exit the CLI"},
 		}
@@ -234,6 +244,20 @@ func (o *Operator) Execute(s string) {
 	case "app-sessions":
 		o.listAppSessions(ctx)
 
+	// Scenarios
+	case "scenario":
+		if len(args) < 2 {
+			fmt.Println("❌ Usage: scenario <path_to_scenario.yaml>")
+			return
+		}
+		o.runScenario(ctx, args[1])
+	case "scenario-template":
+		path := "scenario_template.yaml"
+		if len(args) >= 2 {
+			path = args[1]
+		}
+		o.createScenarioTemplate(path)
+
 	case "exit":
 		fmt.Println("👋 Exiting...")
 		close(o.exitCh)
@@ -281,7 +305,7 @@ func (o *Operator) getAssetSuggestions() []prompt.Suggest {
 }
 
 func (o *Operator) ensureSmartClient(ctx context.Context) error {
-	if o.smartClient != nil {
+	if o.sdkClient != nil {
 		return nil
 	}
 
@@ -309,12 +333,12 @@ func (o *Operator) ensureSmartClient(ctx context.Context) error {
 		opts = append(opts, sdk.WithBlockchainRPC(chainID, rpcURL))
 	}
 
-	smartClient, err := sdk.NewSmartClient(o.wsURL, signer, opts...)
+	sdkClient, err := sdk.NewSDKClient(o.wsURL, signer, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create smart client: %w", err)
 	}
 
-	o.smartClient = smartClient
+	o.sdkClient = sdkClient
 	return nil
 }
 

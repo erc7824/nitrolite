@@ -1,0 +1,11 @@
+{
+  "deployer": "0xF8bedb0aBa14833e95F29e760487C3d34Bc4Ec64",
+  "deployedTo": "0xE749eCF94531A3dDbC5F293B91C9DAbE1Df44a06",
+  "transactionHash": "0xee06a618fca810ef6fdfdde94ac513fb067eb48aad4577ba4acde89753561c0b",
+  "commit": "0e5cd5b75117e6e8ab61f4de7271e60087f2f523",
+  "timestamp": 1769591917,
+  "chainId": 11155111,
+  "contractPath": "./src/EscrowWithdrawalEngine.sol:EscrowWithdrawalEngine",
+  "constructorArgs": [],
+  "comment": "PoC v1.0.0-alpha1"
+}

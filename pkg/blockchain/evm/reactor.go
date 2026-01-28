@@ -51,9 +51,15 @@ func NewReactor(blockchainID uint64, eventHandler core.BlockchainEventHandler, s
 
 func (r *Reactor) HandleEvent(ctx context.Context, l types.Log) {
 	logger := log.FromContext(ctx)
-	logger.Debug("received event", "blockNumber", l.BlockNumber, "txHash", l.TxHash.String(), "logIndex", l.Index)
 
 	eventID := l.Topics[0]
+	eventName, ok := eventMapping[eventID]
+	if !ok {
+		logger.Warn("unknown event ID", "eventID", eventID.Hex(), "blockNumber", l.BlockNumber, "txHash", l.TxHash.String(), "logIndex", l.Index)
+		return
+	}
+	logger.Debug("received event", "name", eventName, "blockNumber", l.BlockNumber, "txHash", l.TxHash.String(), "logIndex", l.Index)
+
 	var err error
 	switch eventID {
 	case contractAbi.Events["ChannelCreated"].ID:
@@ -108,12 +114,6 @@ func (r *Reactor) HandleEvent(ctx context.Context, l types.Log) {
 	}
 	if err != nil {
 		logger.Warn("error processing event", "error", err)
-		return
-	}
-
-	eventName, ok := eventMapping[eventID]
-	if !ok {
-		eventName = "unknown"
 	}
 
 	if err := r.storeContractEvent(core.BlockchainEvent{

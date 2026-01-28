@@ -21,7 +21,7 @@ func (o *Operator) handleAuthenticate(args []string) {
 		fmt.Printf("Failed to retrieve wallet private key: %s\n", err.Error())
 		return
 	}
-	wallet, err := sign.NewEthereumSigner(walletPKey.PrivateKey)
+	wallet, err := sign.NewEthereumRawSigner(walletPKey.PrivateKey)
 	if err != nil {
 		fmt.Printf("Failed to create wallet signer: %s\n", err.Error())
 		return
@@ -32,7 +32,7 @@ func (o *Operator) handleAuthenticate(args []string) {
 		fmt.Printf("Failed to retrieve signer private key: %s\n", err.Error())
 		return
 	}
-	signer, err := sign.NewEthereumSigner(signerPKey.PrivateKey)
+	signer, err := sign.NewEthereumRawSigner(signerPKey.PrivateKey)
 	if err != nil {
 		fmt.Printf("Failed to create signer: %s\n", err.Error())
 		return

@@ -55,7 +55,11 @@ func NewRPCRouter(
 	statePacker := core.NewStatePackerV1(memoryStore)
 	stateAdvancer := core.NewStateAdvancerV1(memoryStore)
 
-	validator := sign.NewECDSASigValidator()
+	validator, err := sign.NewSigValidator(sign.TypeEthereumMsg)
+	if err != nil {
+		panic("failed to create signature validator: " + err.Error())
+	}
+
 	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, map[channel_v1.SigValidatorType]channel_v1.SigValidator{
 		channel_v1.EcdsaSigValidatorType: validator,
 	}, nodeAddress, minChallenge)

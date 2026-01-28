@@ -24,7 +24,7 @@ func main() {
 	ctx := context.Background()
 
 	api.NewRPCRouter(bb.NodeVersion, bb.ChannelMinChallengeDuration,
-		bb.RpcNode, bb.Signer, bb.DbStore, bb.MemoryStore, bb.Logger)
+		bb.RpcNode, bb.StateSigner, bb.DbStore, bb.MemoryStore, bb.Logger)
 
 	rpcListenAddr := ":7824"
 	rpcListenEndpoint := "/ws"
@@ -67,8 +67,8 @@ func main() {
 		}
 
 		// For the node itself, the node address is the signer's address
-		nodeAddress := bb.Signer.PublicKey().Address().String()
-		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ContractAddress), client, bb.Signer, b.ID, nodeAddress, bb.MemoryStore)
+		nodeAddress := bb.StateSigner.PublicKey().Address().String()
+		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ContractAddress), client, bb.TxSigner, b.ID, nodeAddress, bb.MemoryStore)
 		if err != nil {
 			logger.Fatal("failed to create EVM client")
 		}

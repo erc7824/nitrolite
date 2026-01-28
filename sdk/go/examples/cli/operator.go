@@ -14,12 +14,11 @@ import (
 )
 
 type Operator struct {
-	wsURL          string
-	store          *Storage
-	baseClient     *sdk.Client
-	sdkClient      *sdk.SDKClient
-	scenarioRunner *ScenarioRunner
-	exitCh         chan struct{}
+	wsURL      string
+	store      *Storage
+	baseClient *sdk.Client
+	sdkClient  *sdk.SDKClient
+	exitCh     chan struct{}
 }
 
 func NewOperator(wsURL string, store *Storage) (*Operator, error) {
@@ -35,9 +34,6 @@ func NewOperator(wsURL string, store *Storage) (*Operator, error) {
 		baseClient: baseClient,
 		exitCh:     make(chan struct{}),
 	}
-
-	// Initialize scenario runner
-	op.scenarioRunner = NewScenarioRunner(op)
 
 	// Monitor WebSocket connection - exit if connection is lost
 	go func() {
@@ -97,10 +93,6 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 
 			// App sessions (Base Client - Low-level)
 			{Text: "app-sessions", Description: "🎮 List app sessions"},
-
-			// Scenarios (DRAFT)
-			{Text: "scenario", Description: "🎬 Run a scenario from file"},
-			{Text: "scenario-template", Description: "📄 Generate scenario template file"},
 
 			{Text: "exit", Description: "👋 Exit the CLI"},
 		}
@@ -259,20 +251,6 @@ func (o *Operator) Execute(s string) {
 	case "app-sessions":
 		o.listAppSessions(ctx)
 
-	// Scenarios
-	case "scenario":
-		if len(args) < 2 {
-			fmt.Println("❌ Usage: scenario <path_to_scenario.yaml>")
-			return
-		}
-		o.runScenario(ctx, args[1])
-	case "scenario-template":
-		path := "scenario_template.yaml"
-		if len(args) >= 2 {
-			path = args[1]
-		}
-		o.createScenarioTemplate(path)
-
 	case "exit":
 		fmt.Println("👋 Exiting...")
 		close(o.exitCh)
@@ -330,8 +308,14 @@ func (o *Operator) ensureSmartClient(ctx context.Context) error {
 		return fmt.Errorf("no wallet imported (use 'import wallet' first)")
 	}
 
+	// Create stateSigner
+	stateSigner, err := sign.NewEthereumRawSigner(privateKey)
+	if err != nil {
+		return fmt.Errorf("failed to create signer: %w", err)
+	}
+
 	// Create signer
-	signer, err := sign.NewEthereumSigner(privateKey)
+	txSigner, err := sign.NewEthereumMsgSigner(privateKey)
 	if err != nil {
 		return fmt.Errorf("failed to create signer: %w", err)
 	}
@@ -348,7 +332,7 @@ func (o *Operator) ensureSmartClient(ctx context.Context) error {
 		opts = append(opts, sdk.WithBlockchainRPC(chainID, rpcURL))
 	}
 
-	sdkClient, err := sdk.NewSDKClient(o.wsURL, signer, opts...)
+	sdkClient, err := sdk.NewSDKClient(o.wsURL, stateSigner, txSigner, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create smart client: %w", err)
 	}

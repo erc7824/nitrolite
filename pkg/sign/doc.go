@@ -22,7 +22,7 @@
 // Usage
 //
 //	// Create a new Ethereum signer from a hex-encoded private key
-//	signer, err := sign.NewEthereumSigner(privateKeyHex)
+//	signer, err := sign.NewEthereumRawSigner(privateKeyHex)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}

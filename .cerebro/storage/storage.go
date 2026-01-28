@@ -49,7 +49,7 @@ type PrivateKeyDTO struct {
 }
 
 func (s *Storage) AddPrivateKey(name, privateKeyHex string, isSigner bool) (*PrivateKeyDTO, error) {
-	signer, err := sign.NewEthereumSigner(privateKeyHex)
+	signer, err := sign.NewEthereumRawSigner(privateKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode private key: %w", err)
 	}

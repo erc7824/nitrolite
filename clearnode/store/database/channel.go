@@ -111,7 +111,6 @@ func (s *DBStore) CheckOpenChannel(wallet, asset string) (bool, error) {
 			AND s.asset = ?
 			AND c.status = ?
 			AND c.type = ?
-		ORDER BY s.epoch DESC, s.version DESC
 		LIMIT 1
 	`, wallet, asset, core.ChannelStatusOpen, core.ChannelTypeHome).Scan(&count).Error
 

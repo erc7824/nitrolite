@@ -2,6 +2,7 @@ package evm
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -29,6 +30,7 @@ func NewClient(
 	backend bind.ContractBackend,
 	signer sign.Signer,
 	blockchainID uint64,
+	nodeAddress string,
 	assetStore core.AssetStore,
 ) (*Client, error) {
 	contract, err := NewChannelHub(contractAddress, backend)
@@ -39,7 +41,7 @@ func NewClient(
 	return &Client{
 		contract:        contract,
 		transactOpts:    signerTxOpts(signer, blockchainID),
-		nodeAddress:     common.HexToAddress(signer.PublicKey().Address().String()),
+		nodeAddress:     common.HexToAddress(nodeAddress),
 		contractAddress: contractAddress,
 		blockchainID:    blockchainID,
 		assetStore:      assetStore,
@@ -238,11 +240,62 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 		return "", errors.New("unsupported intent for create: " + string(contractState.Intent))
 	}
 
+	// Debug logging
+	fmt.Println("========================================")
+	fmt.Println("DEBUG: CreateChannel parameters:")
+	fmt.Printf("  Contract address: %s\n", c.contract.ChannelHubCaller.contract.Address().Hex())
+	fmt.Println("  Channel Definition:")
+	fmt.Printf("    ChallengeDuration: %d\n", contractDef.ChallengeDuration)
+	fmt.Printf("    User: %s\n", contractDef.User.Hex())
+	fmt.Printf("    Node: %s\n", contractDef.Node.Hex())
+	fmt.Printf("    Nonce: %d\n", contractDef.Nonce)
+	fmt.Printf("    Metadata: 0x%x\n", contractDef.Metadata)
+	fmt.Println("  State:")
+	fmt.Printf("    Version: %d\n", contractState.Version)
+	fmt.Printf("    Intent: %d\n", contractState.Intent)
+	fmt.Printf("    Metadata: 0x%x\n", contractState.Metadata)
+	fmt.Println("    HomeState:")
+	fmt.Printf("      ChainId: %d\n", contractState.HomeState.ChainId)
+	fmt.Printf("      Token: %s\n", contractState.HomeState.Token.Hex())
+	fmt.Printf("      Decimals: %d\n", contractState.HomeState.Decimals)
+	fmt.Printf("      UserAllocation: %s\n", contractState.HomeState.UserAllocation.String())
+	fmt.Printf("      UserNetFlow: %s\n", contractState.HomeState.UserNetFlow.String())
+	fmt.Printf("      NodeAllocation: %s\n", contractState.HomeState.NodeAllocation.String())
+	fmt.Printf("      NodeNetFlow: %s\n", contractState.HomeState.NodeNetFlow.String())
+	fmt.Println("    NonHomeState:")
+	fmt.Printf("      ChainId: %d\n", contractState.NonHomeState.ChainId)
+	fmt.Printf("      Token: %s\n", contractState.NonHomeState.Token.Hex())
+	fmt.Printf("      Decimals: %d\n", contractState.NonHomeState.Decimals)
+	fmt.Printf("      UserAllocation: %s\n", contractState.NonHomeState.UserAllocation.String())
+	fmt.Printf("      UserNetFlow: %s\n", contractState.NonHomeState.UserNetFlow.String())
+	fmt.Printf("      NodeAllocation: %s\n", contractState.NonHomeState.NodeAllocation.String())
+	fmt.Printf("      NodeNetFlow: %s\n", contractState.NonHomeState.NodeNetFlow.String())
+	fmt.Printf("    UserSig: 0x%x\n", contractState.UserSig)
+	fmt.Printf("    NodeSig: 0x%x\n", contractState.NodeSig)
+	fmt.Println("  TransactOpts:")
+	fmt.Printf("    From: %s\n", c.transactOpts.From.Hex())
+	fmt.Printf("    Nonce: %v\n", c.transactOpts.Nonce)
+	fmt.Printf("    Value: %v\n", c.transactOpts.Value)
+	fmt.Printf("    GasPrice: %v\n", c.transactOpts.GasPrice)
+	fmt.Printf("    GasFeeCap: %v\n", c.transactOpts.GasFeeCap)
+	fmt.Printf("    GasTipCap: %v\n", c.transactOpts.GasTipCap)
+	fmt.Printf("    GasLimit: %d\n", c.transactOpts.GasLimit)
+	fmt.Println("========================================")
+
 	tx, err := c.contract.CreateChannel(c.transactOpts, contractDef, contractState)
 	if err != nil {
+		fmt.Println("========================================")
+		fmt.Printf("DEBUG: CreateChannel FAILED\n")
+		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Error type: %T\n", err)
+		fmt.Printf("Error detailed: %+v\n", err)
+		fmt.Println("========================================")
 		return "", errors.Wrap(err, "failed to create channel")
 	}
 
+	fmt.Println("========================================")
+	fmt.Printf("DEBUG: CreateChannel succeeded, tx hash: %s\n", tx.Hash().Hex())
+	fmt.Println("========================================")
 	return tx.Hash().Hex(), nil
 }
 

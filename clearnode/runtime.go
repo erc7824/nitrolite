@@ -101,7 +101,7 @@ func InitBackbone() *Backbone {
 	// Signer
 	// ------------------------------------------------
 
-	signer, err := sign.NewEthereumSigner(conf.SignerKey)
+	signer, err := sign.NewEthereumRawSigner(conf.SignerKey)
 	if err != nil {
 		logger.Fatal("failed to initialise signer", "error", err)
 	}

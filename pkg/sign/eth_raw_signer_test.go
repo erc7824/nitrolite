@@ -16,7 +16,7 @@ const (
 
 // setupSigner is a helper to create a signer for tests
 func setupSigner(t *testing.T) Signer {
-	signer, err := NewEthereumSigner(testPrivKey)
+	signer, err := NewEthereumRawSigner(testPrivKey)
 	require.NoError(t, err)
 	require.NotNil(t, signer)
 	return signer
@@ -25,19 +25,19 @@ func setupSigner(t *testing.T) Signer {
 func TestEthereumSigner(t *testing.T) {
 	t.Run("Initialisation", func(t *testing.T) {
 		t.Run("With 0x Prefix", func(t *testing.T) {
-			signer, err := NewEthereumSigner(testPrivKey)
+			signer, err := NewEthereumRawSigner(testPrivKey)
 			require.NoError(t, err)
 			assert.True(t, strings.EqualFold(testAddress, signer.PublicKey().Address().String()))
 		})
 
 		t.Run("Without 0x Prefix", func(t *testing.T) {
-			signer, err := NewEthereumSigner(strings.TrimPrefix(testPrivKey, "0x"))
+			signer, err := NewEthereumRawSigner(strings.TrimPrefix(testPrivKey, "0x"))
 			require.NoError(t, err)
 			assert.True(t, strings.EqualFold(testAddress, signer.PublicKey().Address().String()))
 		})
 
 		t.Run("With Invalid Key", func(t *testing.T) {
-			_, err := NewEthereumSigner("0xinvalidkey")
+			_, err := NewEthereumRawSigner("0xinvalidkey")
 			assert.Error(t, err)
 		})
 	})

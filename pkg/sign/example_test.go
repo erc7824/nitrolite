@@ -8,12 +8,12 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
-// ExampleNewEthereumSigner demonstrates creating an Ethereum signer and signing a message.
-func ExampleNewEthereumSigner() {
+// ExampleNewEthereumRawSigner demonstrates creating an Ethereum signer and signing a message.
+func ExampleNewEthereumRawSigner() {
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" // Example private key
 
 	// Create a new Ethereum signer. It returns the generic sign.Signer interface.
-	signer, err := sign.NewEthereumSigner(pkHex)
+	signer, err := sign.NewEthereumRawSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func ExampleRecoverAddressFromHash() {
 
 	// Create a signature using our signer
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	signer, err := sign.NewEthereumSigner(pkHex)
+	signer, err := sign.NewEthereumRawSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func ExampleEthereumAddressRecoverer() {
 
 	// Create a signer
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	signer, err := sign.NewEthereumSigner(pkHex)
+	signer, err := sign.NewEthereumRawSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}

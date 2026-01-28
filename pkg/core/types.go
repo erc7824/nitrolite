@@ -25,16 +25,15 @@ var (
 
 const (
 	INTENT_OPERATE                    = 0
-	INTENT_CREATE                     = 1
-	INTENT_CLOSE                      = 2
-	INTENT_DEPOSIT                    = 3
-	INTENT_WITHDRAW                   = 4
-	INTENT_INITIATE_ESCROW_DEPOSIT    = 5
-	INTENT_FINALIZE_ESCROW_DEPOSIT    = 6
-	INTENT_INITIATE_ESCROW_WITHDRAWAL = 7
-	INTENT_FINALIZE_ESCROW_WITHDRAWAL = 8
-	INTENT_INITIATE_MIGRATION         = 9
-	INTENT_FINALIZE_MIGRATION         = 10
+	INTENT_CLOSE                      = 1
+	INTENT_DEPOSIT                    = 2
+	INTENT_WITHDRAW                   = 3
+	INTENT_INITIATE_ESCROW_DEPOSIT    = 4
+	INTENT_FINALIZE_ESCROW_DEPOSIT    = 5
+	INTENT_INITIATE_ESCROW_WITHDRAWAL = 6
+	INTENT_FINALIZE_ESCROW_WITHDRAWAL = 7
+	INTENT_INITIATE_MIGRATION         = 8
+	INTENT_FINALIZE_MIGRATION         = 9
 )
 
 // Channel represents an on-chain channel
@@ -937,4 +936,17 @@ type PaginationMetadata struct {
 	PerPage    uint32 `json:"per_page"`    // Number of items per page
 	TotalCount uint32 `json:"total_count"` // Total number of items
 	PageCount  uint32 `json:"page_count"`  // Total number of pages
+}
+
+// NodeConfig represents the configuration of a Clearnode instance.
+// It includes the node's identity, version, and supported blockchain networks.
+type NodeConfig struct {
+	// NodeAddress is the Ethereum address of the clearnode operator
+	NodeAddress string
+
+	// NodeVersion is the software version of the clearnode instance
+	NodeVersion string
+
+	// Blockchains is the list of supported blockchain networks
+	Blockchains []Blockchain
 }

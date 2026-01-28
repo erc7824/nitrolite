@@ -8,6 +8,7 @@ assets:
         decimals: 6
   - name: "Wrapped ETH"
     symbol: "weth"
+    decimals: 6
     tokens:
       - blockchain_id: 11155111
         address: "0x2A35728CADd8076dfD424fC3e20974A3CD03bFa5"

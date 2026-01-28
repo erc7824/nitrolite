@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,7 @@ func TestHexToBytes32_Success(t *testing.T) {
 	for i := 0; i < 32; i++ {
 		expected[i] = byte(i)
 	}
-	hexStr := hex.EncodeToString(expected[:])
+	hexStr := "0x" + hex.EncodeToString(expected[:])
 
 	result, err := hexToBytes32(hexStr)
 	require.NoError(t, err)
@@ -37,13 +38,13 @@ func TestHexToBytes32_InvalidHex(t *testing.T) {
 
 func TestHexToBytes32_InvalidLength(t *testing.T) {
 	// 16 bytes instead of 32
-	shortHex := hex.EncodeToString(make([]byte, 16))
+	shortHex := "0x" + hex.EncodeToString(make([]byte, 16))
 	_, err := hexToBytes32(shortHex)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid length: expected 32 bytes, got 16")
 
 	// 64 bytes instead of 32
-	longHex := hex.EncodeToString(make([]byte, 64))
+	longHex := "0x" + hex.EncodeToString(make([]byte, 64))
 	_, err = hexToBytes32(longHex)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid length: expected 32 bytes, got 64")
@@ -149,8 +150,8 @@ func TestContractLedgerToCoreLedger_Success(t *testing.T) {
 
 func TestCoreStateToContractState_BasicState(t *testing.T) {
 	homeChannelID := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-	userSigHex := "1234567890abcdef"
-	nodeSigHex := "fedcba0987654321"
+	userSigHex := "0x1234567890abcdef"
+	nodeSigHex := "0xfedcba0987654321"
 
 	coreState := core.State{
 		Version:       1,
@@ -182,8 +183,8 @@ func TestCoreStateToContractState_BasicState(t *testing.T) {
 	require.Equal(t, uint8(core.INTENT_OPERATE), result.Intent)
 
 	// Verify signatures
-	expectedUserSig, _ := hex.DecodeString(userSigHex)
-	expectedNodeSig, _ := hex.DecodeString(nodeSigHex)
+	expectedUserSig, _ := hexutil.Decode(userSigHex)
+	expectedNodeSig, _ := hexutil.Decode(nodeSigHex)
 	require.Equal(t, expectedUserSig, result.UserSig)
 	require.Equal(t, expectedNodeSig, result.NodeSig)
 
@@ -237,6 +238,52 @@ func TestCoreStateToContractState_WithEscrowLedger(t *testing.T) {
 	// Verify escrow ledger is populated
 	require.Equal(t, uint64(2), result.NonHomeState.ChainId)
 	// Note: Decimals field is not set by coreLedgerToContractLedger
+}
+
+func TestCoreStateToContractState_WithoutEscrowLedger(t *testing.T) {
+	// This test ensures that when there's no escrow ledger,
+	// the NonHomeState is initialized with proper empty values
+	// to prevent ABI encoding panics
+	homeChannelID := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+
+	coreState := core.State{
+		Version:       1,
+		HomeChannelID: &homeChannelID,
+		HomeLedger: core.Ledger{
+			BlockchainID: 1,
+			TokenAddress: "0x1234567890123456789012345678901234567890",
+			UserBalance:  decimal.NewFromInt(100),
+			UserNetFlow:  decimal.NewFromInt(100),
+			NodeBalance:  decimal.NewFromInt(50),
+			NodeNetFlow:  decimal.NewFromInt(50),
+		},
+		EscrowLedger: nil, // Explicitly nil
+		Transitions: []core.Transition{
+			{Type: core.TransitionTypeHomeDeposit, Amount: decimal.NewFromInt(100)},
+		},
+	}
+
+	mockTokenGetter := func(blockchainID uint64, tokenAddress string) (uint8, error) {
+		return 18, nil
+	}
+
+	result, err := coreStateToContractState(coreState, mockTokenGetter)
+	require.NoError(t, err)
+
+	// Verify that NonHomeState is initialized with non-nil big.Int pointers
+	require.NotNil(t, result.NonHomeState.UserAllocation, "UserAllocation should not be nil")
+	require.NotNil(t, result.NonHomeState.UserNetFlow, "UserNetFlow should not be nil")
+	require.NotNil(t, result.NonHomeState.NodeAllocation, "NodeAllocation should not be nil")
+	require.NotNil(t, result.NonHomeState.NodeNetFlow, "NodeNetFlow should not be nil")
+
+	// Verify they are zero values
+	require.Equal(t, big.NewInt(0), result.NonHomeState.UserAllocation)
+	require.Equal(t, big.NewInt(0), result.NonHomeState.UserNetFlow)
+	require.Equal(t, big.NewInt(0), result.NonHomeState.NodeAllocation)
+	require.Equal(t, big.NewInt(0), result.NonHomeState.NodeNetFlow)
+
+	// Verify the intent
+	require.Equal(t, uint8(core.INTENT_DEPOSIT), result.Intent)
 }
 
 func TestCoreStateToContractState_InvalidUserSig(t *testing.T) {
@@ -310,9 +357,9 @@ func TestContractStateToCoreState_HomeOnly(t *testing.T) {
 
 	// Verify signatures
 	require.NotNil(t, result.UserSig)
-	require.Equal(t, "1234", *result.UserSig)
+	require.Equal(t, "0x1234", *result.UserSig)
 	require.NotNil(t, result.NodeSig)
-	require.Equal(t, "5678", *result.NodeSig)
+	require.Equal(t, "0x5678", *result.NodeSig)
 }
 
 func TestContractStateToCoreState_WithEscrow(t *testing.T) {

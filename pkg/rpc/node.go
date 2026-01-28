@@ -315,14 +315,10 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 
 		var routeHandlers []Handler
 		for _, handlersId := range methodRoute {
-			handlers, exists := wn.handlerChain[handlersId]
-			if !exists || len(handlers) == 0 {
-				routeHandlers = nil
-				wn.cfg.Logger.Error("no handlers found for id", "id", handlersId)
-				break
+			handlers := wn.handlerChain[handlersId]
+			if len(handlers) > 0 {
+				routeHandlers = append(routeHandlers, handlers...)
 			}
-
-			routeHandlers = append(routeHandlers, handlers...)
 		}
 		if len(routeHandlers) == 0 {
 			wn.sendErrorResponse(conn, req.RequestID, req.Method, fmt.Sprintf("unknown method: %s", req.Method))

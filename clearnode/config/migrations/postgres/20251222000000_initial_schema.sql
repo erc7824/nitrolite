@@ -203,22 +203,3 @@ DROP TABLE IF EXISTS channel_states;
 DROP INDEX IF EXISTS idx_channels_status;
 DROP INDEX IF EXISTS idx_channels_user_wallet;
 DROP TABLE IF EXISTS channels;
-
-INSERT INTO "transactions" (
-    "id",
-    "tx_type",
-    "asset_symbol",
-    "from_account",
-    "to_account",
-    "sender_new_state_id",
-    "receiver_new_state_id",
-    "amount",
-    "created_at"
-) VALUES (
-    '0xfb690ebdab8bf5a335c33ec3db25db2985cc2a2f6af24552c3e63663435e0b86',
-    10,
-    'usdc',
-    '0x746a4a0c91bb8dbaa1c24fa596f3c7391ddbbc3ac4345dbbca75a109df2761e8',
-    '0x053aEAD7d3eebE4359300fDE849bCD9E77384989',
-    '0x5e95450726aa23be1bb3ae6f5e6b8b017efb6981c424abf2a7d67986a1938aec'
-    ,NULL,'1','2026-01-28 15:05:38.064')

@@ -29,6 +29,7 @@ func (o *Operator) showHelp() {
 SETUP COMMANDS
   help                          Show this help message
   config                        Show current configuration
+  wallet                        Show your wallet address
   import wallet                 Setup wallet (import existing or generate new)
   import rpc <chain_id> <url>   Import blockchain RPC URL
 
@@ -119,6 +120,33 @@ func (o *Operator) showConfig(ctx context.Context) {
 		fmt.Printf("   Version:   %s\n", nodeConfig.NodeVersion)
 		fmt.Printf("   Chains:    %d\n", len(nodeConfig.Blockchains))
 	}
+}
+
+// ============================================================================
+// Wallet Commands
+// ============================================================================
+
+func (o *Operator) showWallet(ctx context.Context) {
+	// Get private key
+	privateKey, err := o.store.GetPrivateKey()
+	if err != nil {
+		fmt.Println("❌ No wallet imported")
+		fmt.Println("💡 Use 'import wallet' to setup your wallet")
+		return
+	}
+
+	// Create signer to get address
+	signer, err := sign.NewEthereumSigner(privateKey)
+	if err != nil {
+		fmt.Printf("❌ Failed to get wallet address: %v\n", err)
+		return
+	}
+
+	address := signer.PublicKey().Address().String()
+
+	fmt.Println("🔑 Your Wallet")
+	fmt.Println("==============")
+	fmt.Printf("Address: %s\n", address)
 }
 
 // ============================================================================
@@ -410,31 +438,31 @@ func (o *Operator) listAssets(ctx context.Context, chainIDStr string) {
 	}
 
 	if chainID != nil {
-		fmt.Printf("💎 Assets on Chain %d (%d)\n", *chainID, len(assets))
+		fmt.Printf("Assets on Chain %d (%d)\n", *chainID, len(assets))
 	} else {
-		fmt.Printf("💎 All Supported Assets (%d)\n", len(assets))
+		fmt.Printf("All Supported Assets (%d)\n", len(assets))
 	}
 	fmt.Println("==========================")
 
 	for _, asset := range assets {
 		fmt.Printf("• %s (%s)\n", asset.Name, asset.Symbol)
 		fmt.Printf("  Decimals:  %d\n", asset.Decimals)
-		fmt.Printf("  Tokens:    %d implementations\n", len(asset.Tokens))
-		if chainID == nil && len(asset.Tokens) > 0 {
-			fmt.Printf("  Chains:    ")
-			chainIDs := make(map[uint64]bool)
-			for _, token := range asset.Tokens {
-				chainIDs[token.BlockchainID] = true
-			}
-			first := true
-			for cid := range chainIDs {
-				if !first {
-					fmt.Print(", ")
+		fmt.Printf("  Tokens:    %d connected\n", len(asset.Tokens))
+
+		// Show token details
+		if len(asset.Tokens) > 0 {
+			if chainID != nil {
+				// When filtering by chain, show detailed info for each token
+				for _, token := range asset.Tokens {
+					fmt.Printf("    • Chain %d: %s\n", token.BlockchainID, token.Address)
+					fmt.Printf("      Decimals: %d\n", token.Decimals)
 				}
-				fmt.Printf("%d", cid)
-				first = false
+			} else {
+				// When showing all assets, list chains with their token details
+				for _, token := range asset.Tokens {
+					fmt.Printf("    • Chain %d: %s (decimals: %d)\n", token.BlockchainID, token.Address, token.Decimals)
+				}
 			}
-			fmt.Println()
 		}
 		fmt.Println()
 	}

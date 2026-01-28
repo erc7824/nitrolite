@@ -2,7 +2,6 @@ package evm
 
 import (
 	"context"
-	"encoding/hex"
 	"math/big"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
@@ -64,7 +64,7 @@ func waitForBackOffTimeout(logger log.Logger, backOffCount int, originator strin
 
 func hexToBytes32(s string) ([32]byte, error) {
 	var arr [32]byte
-	b, err := hex.DecodeString(s)
+	b, err := hexutil.Decode(s)
 	if err != nil {
 		return arr, errors.Wrap(err, "failed to decode hex string")
 	}
@@ -111,13 +111,13 @@ func coreStateToContractState(state core.State, tokenGetter func(blockchainID ui
 
 	var userSig, nodeSig []byte
 	if state.UserSig != nil {
-		userSig, err = hex.DecodeString(*state.UserSig)
+		userSig, err = hexutil.Decode(*state.UserSig)
 		if err != nil {
 			return State{}, errors.Wrap(err, "failed to decode user signature")
 		}
 	}
 	if state.NodeSig != nil {
-		nodeSig, err = hex.DecodeString(*state.NodeSig)
+		nodeSig, err = hexutil.Decode(*state.NodeSig)
 		if err != nil {
 			return State{}, errors.Wrap(err, "failed to decode node signature")
 		}
@@ -194,11 +194,11 @@ func contractStateToCoreState(contractState State, homeChannelID string, escrowC
 
 	var userSig, nodeSig *string
 	if len(contractState.UserSig) > 0 {
-		sig := hex.EncodeToString(contractState.UserSig)
+		sig := hexutil.Encode(contractState.UserSig)
 		userSig = &sig
 	}
 	if len(contractState.NodeSig) > 0 {
-		sig := hex.EncodeToString(contractState.NodeSig)
+		sig := hexutil.Encode(contractState.NodeSig)
 		nodeSig = &sig
 	}
 

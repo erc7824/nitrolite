@@ -71,6 +71,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			// Setup
 			{Text: "help", Description: "Show help information"},
 			{Text: "config", Description: "Show current configuration"},
+			{Text: "wallet", Description: "🔑 Show your wallet address"},
 			{Text: "import", Description: "Import wallet or blockchain RPC"},
 
 			// High-level operations
@@ -162,6 +163,8 @@ func (o *Operator) Execute(s string) {
 		o.showHelp()
 	case "config":
 		o.showConfig(ctx)
+	case "wallet":
+		o.showWallet(ctx)
 	case "import":
 		if len(args) < 2 {
 			fmt.Println("❌ Usage: import <wallet|rpc> ...")

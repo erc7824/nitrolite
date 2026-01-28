@@ -331,7 +331,7 @@ func (o *Operator) ensureSmartClient(ctx context.Context) error {
 	}
 
 	// Create signer
-	signer, err := sign.NewEthereumSigner(privateKey)
+	signer, err := sign.NewEthereumRawSigner(privateKey)
 	if err != nil {
 		return fmt.Errorf("failed to create signer: %w", err)
 	}

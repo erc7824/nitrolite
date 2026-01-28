@@ -23,7 +23,7 @@ import (
 //
 // Example usage:
 //
-//	signer, err := sign.NewEthereumSigner(privateKeyHex)
+//	signer, err := sign.NewEthereumRawSigner(privateKeyHex)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
@@ -118,7 +118,7 @@ func (s *clientAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress st
 //
 // Parameters:
 //   - wsURL: WebSocket URL of the Clearnode server (e.g., "wss://clearnode.example.com/ws")
-//   - signer: sign.Signer for signing channel states (use sign.NewEthereumSigner)
+//   - signer: sign.Signer for signing channel states (use sign.NewEthereumRawSigner)
 //   - opts: Optional configuration (WithBlockchainRPC, WithHandshakeTimeout, etc.)
 //
 // Returns:
@@ -127,7 +127,7 @@ func (s *clientAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress st
 //
 // Example:
 //
-//	signer, _ := sign.NewEthereumSigner(privateKeyHex)
+//	signer, _ := sign.NewEthereumRawSigner(privateKeyHex)
 //	client, err := sdk.NewSDKClient(
 //	    "wss://clearnode.example.com/ws",
 //	    signer,

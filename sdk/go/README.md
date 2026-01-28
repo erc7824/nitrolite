@@ -26,7 +26,7 @@ import (
 
 func main() {
     // Create signer from private key
-    signer, _ := sign.NewEthereumSigner(privateKeyHex)
+    signer, _ := sign.NewEthereumRawSigner(privateKeyHex)
 
     // Create smart client
     client, _ := sdk.NewSmartClient(
@@ -80,7 +80,7 @@ sdk/go/
 
 ```go
 // Step 1: Create signer from private key
-signer, err := sign.NewEthereumSigner("0x1234...")
+signer, err := sign.NewEthereumRawSigner("0x1234...")
 if err != nil {
     log.Fatal(err)
 }
@@ -206,7 +206,7 @@ States are signed using ECDSA with EIP-155 via `pkg/sign`:
 
 ```go
 // Create signer from private key
-signer, err := sign.NewEthereumSigner(privateKeyHex)
+signer, err := sign.NewEthereumRawSigner(privateKeyHex)
 
 // Get address
 address := signer.PublicKey().Address().String()

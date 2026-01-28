@@ -88,7 +88,7 @@ func (o *Operator) showConfig(ctx context.Context) {
 	} else {
 		// Get signer to show address
 		privateKey, _ := o.store.GetPrivateKey()
-		signer, err := sign.NewEthereumSigner(privateKey)
+		signer, err := sign.NewEthereumRawSigner(privateKey)
 		if err == nil {
 			fmt.Printf("🔑 Wallet:     ✅ Imported (%s)\n", signer.PublicKey().Address().String())
 		} else {
@@ -136,7 +136,7 @@ func (o *Operator) showWallet(ctx context.Context) {
 	}
 
 	// Create signer to get address
-	signer, err := sign.NewEthereumSigner(privateKey)
+	signer, err := sign.NewEthereumRawSigner(privateKey)
 	if err != nil {
 		fmt.Printf("❌ Failed to get wallet address: %v\n", err)
 		return
@@ -186,7 +186,7 @@ func (o *Operator) importWallet(ctx context.Context) {
 		}
 
 		// Validate by creating signer
-		signer, err = sign.NewEthereumSigner(privateKey)
+		signer, err = sign.NewEthereumRawSigner(privateKey)
 		if err != nil {
 			fmt.Printf("❌ Invalid private key: %v\n", err)
 			return
@@ -202,7 +202,7 @@ func (o *Operator) importWallet(ctx context.Context) {
 			return
 		}
 
-		signer, err = sign.NewEthereumSigner(privateKey)
+		signer, err = sign.NewEthereumRawSigner(privateKey)
 		if err != nil {
 			fmt.Printf("❌ Failed to create signer: %v\n", err)
 			return

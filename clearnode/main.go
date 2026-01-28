@@ -20,7 +20,7 @@ import (
 
 func main() {
 	bb := InitBackbone()
-	logger := bb.Logger.WithName("main")
+	logger := bb.Logger
 	ctx := context.Background()
 
 	api.NewRPCRouter(bb.NodeVersion, bb.ChannelMinChallengeDuration,

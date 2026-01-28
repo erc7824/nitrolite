@@ -54,7 +54,7 @@ func InitBackbone() *Backbone {
 		panic("failed to read logger config from env: " + err.Error())
 	}
 	logger := log.NewZapLogger(loggerConf)
-	logger = logger.WithName("config")
+	logger = logger.WithName("main")
 
 	// ------------------------------------------------
 	// (Preparation)

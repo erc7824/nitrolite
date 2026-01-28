@@ -31,7 +31,7 @@ func NewBlockchainWorker(client core.Client, db database.DatabaseStore, logger l
 	return &BlockchainWorker{
 		client: client,
 		db:     db,
-		logger: logger.WithName("blockchain-worker"),
+		logger: logger.WithName("bw"),
 	}
 }
 

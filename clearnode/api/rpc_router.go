@@ -31,7 +31,7 @@ func NewRPCRouter(
 ) *RPCRouter {
 	r := &RPCRouter{
 		Node: node,
-		lg:   logger.WithName("rpcRouter"),
+		lg:   logger.WithName("rpc-router"),
 	}
 
 	r.Node.Use(r.LoggerMiddleware)
@@ -65,28 +65,29 @@ func NewRPCRouter(
 	nodeV1Handler := node_v1.NewHandler(memoryStore, nodeAddress, nodeVersion)
 	userV1Handler := user_v1.NewHandler(useUserV1StoreInTx)
 
-	appSessionV1Group := r.Node.NewGroup("app_session_v1")
-	appSessionV1Group.Handle("submit_deposit_state", appSessionV1Handler.SubmitDepositState)
-	appSessionV1Group.Handle("submit_app_state", appSessionV1Handler.SubmitAppState)
-	appSessionV1Group.Handle("rebalance_app_sessions", appSessionV1Handler.RebalanceAppSessions)
-	appSessionV1Group.Handle("create_app_session", appSessionV1Handler.CreateAppSession)
-	appSessionV1Group.Handle("get_app_definition", appSessionV1Handler.GetAppDefinition)
-	appSessionV1Group.Handle("get_app_sessions", appSessionV1Handler.GetAppSessions)
+	appSessionV1Group := r.Node.NewGroup(rpc.AppSessionsV1Group.String())
+	appSessionV1Group.Handle(rpc.AppSessionsV1SubmitDepositStateMethod.String(), appSessionV1Handler.SubmitDepositState)
+	appSessionV1Group.Handle(rpc.AppSessionsV1SubmitAppStateMethod.String(), appSessionV1Handler.SubmitAppState)
+	appSessionV1Group.Handle(rpc.AppSessionsV1RebalanceAppSessionsMethod.String(), appSessionV1Handler.RebalanceAppSessions)
+	appSessionV1Group.Handle(rpc.AppSessionsV1CreateAppSessionMethod.String(), appSessionV1Handler.CreateAppSession)
+	appSessionV1Group.Handle(rpc.AppSessionsV1GetAppDefinitionMethod.String(), appSessionV1Handler.GetAppDefinition)
+	appSessionV1Group.Handle(rpc.AppSessionsV1GetAppSessionsMethod.String(), appSessionV1Handler.GetAppSessions)
 
-	channelV1Group := r.Node.NewGroup("channel_v1")
-	channelV1Group.Handle("get_escrow_channel", channelV1Handler.GetEscrowChannel)
-	channelV1Group.Handle("get_home_channel", channelV1Handler.GetHomeChannel)
-	channelV1Group.Handle("get_latest_state", channelV1Handler.GetLatestState)
-	channelV1Group.Handle("request_creation", channelV1Handler.RequestCreation)
-	channelV1Group.Handle("submit_state", channelV1Handler.SubmitState)
+	channelV1Group := r.Node.NewGroup(rpc.ChannelV1Group.String())
+	channelV1Group.Handle(rpc.ChannelsV1GetEscrowChannelMethod.String(), channelV1Handler.GetEscrowChannel)
+	channelV1Group.Handle(rpc.ChannelsV1GetHomeChannelMethod.String(), channelV1Handler.GetHomeChannel)
+	channelV1Group.Handle(rpc.ChannelsV1GetLatestStateMethod.String(), channelV1Handler.GetLatestState)
+	channelV1Group.Handle(rpc.ChannelsV1RequestCreationMethod.String(), channelV1Handler.RequestCreation)
+	channelV1Group.Handle(rpc.ChannelsV1SubmitStateMethod.String(), channelV1Handler.SubmitState)
 
-	nodeV1Group := r.Node.NewGroup("node_v1")
-	nodeV1Group.Handle("get_assets", nodeV1Handler.GetAssets)
-	nodeV1Group.Handle("get_config", nodeV1Handler.GetConfig)
+	nodeV1Group := r.Node.NewGroup(rpc.NodeV1Group.String())
+	nodeV1Group.Handle(rpc.NodeV1PingMethod.String(), nodeV1Handler.Ping)
+	nodeV1Group.Handle(rpc.NodeV1GetAssetsMethod.String(), nodeV1Handler.GetAssets)
+	nodeV1Group.Handle(rpc.NodeV1GetConfigMethod.String(), nodeV1Handler.GetConfig)
 
-	userV1Group := r.Node.NewGroup("user_v1")
-	userV1Group.Handle("get_balances", userV1Handler.GetBalances)
-	userV1Group.Handle("get_transactions", userV1Handler.GetTransactions)
+	userV1Group := r.Node.NewGroup(rpc.UserV1Group.String())
+	userV1Group.Handle(rpc.UserV1GetBalancesMethod.String(), userV1Handler.GetBalances)
+	userV1Group.Handle(rpc.UserV1GetTransactionsMethod.String(), userV1Handler.GetTransactions)
 
 	return r
 }
@@ -103,5 +104,5 @@ func (r *RPCRouter) LoggerMiddleware(c *rpc.Context) {
 	logger.Info("handled RPC request",
 		"method", c.Request.Method,
 		"success", c.Response.Type == rpc.MsgTypeResp,
-		"duration", time.Since(startTime))
+		"duration", time.Since(startTime).String())
 }

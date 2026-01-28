@@ -166,6 +166,17 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 
 		homeChannelID := "0xhomechannel123"
 
+		// Create home channel
+		homeChannel := core.Channel{
+			ChannelID:    homeChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeHome,
+			BlockchainID: 1,
+			TokenAddress: "0xtoken123",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(homeChannel))
+
 		// Create multiple states with different versions
 		state1 := core.State{
 			ID:            "state1",
@@ -208,6 +219,8 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, "state2", result.ID)
 		assert.Equal(t, uint64(2), result.Version)
+		assert.Equal(t, uint64(1), result.HomeLedger.BlockchainID)
+		assert.Equal(t, "0xtoken123", result.HomeLedger.TokenAddress)
 	})
 
 	t.Run("Success - Get last signed state only", func(t *testing.T) {
@@ -219,6 +232,17 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 		homeChannelID := "0xhomechannel123"
 		userSig := "0xusersig"
 		nodeSig := "0xnodesig"
+
+		// Create home channel
+		homeChannel := core.Channel{
+			ChannelID:    homeChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeHome,
+			BlockchainID: 1,
+			TokenAddress: "0xtoken123",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(homeChannel))
 
 		// Create unsigned state with higher version
 		state1 := core.State{
@@ -265,6 +289,8 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, "state2", result.ID)
 		assert.Equal(t, uint64(2), result.Version)
+		assert.Equal(t, uint64(1), result.HomeLedger.BlockchainID)
+		assert.Equal(t, "0xtoken123", result.HomeLedger.TokenAddress)
 	})
 
 	t.Run("No state found", func(t *testing.T) {
@@ -285,6 +311,17 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 		store := NewDBStore(db)
 
 		homeChannelID := "0xhomechannel123"
+
+		// Create home channel
+		homeChannel := core.Channel{
+			ChannelID:    homeChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeHome,
+			BlockchainID: 1,
+			TokenAddress: "0xtoken123",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(homeChannel))
 
 		// Create states with different epochs
 		state1 := core.State{
@@ -329,6 +366,8 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 		assert.Equal(t, "state2", result.ID)
 		assert.Equal(t, uint64(2), result.Epoch)
 		assert.Equal(t, uint64(1), result.Version)
+		assert.Equal(t, uint64(1), result.HomeLedger.BlockchainID)
+		assert.Equal(t, "0xtoken123", result.HomeLedger.TokenAddress)
 	})
 }
 
@@ -340,6 +379,17 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 		store := NewDBStore(db)
 
 		homeChannelID := "0xhomechannel123"
+
+		// Create home channel
+		homeChannel := core.Channel{
+			ChannelID:    homeChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeHome,
+			BlockchainID: 1,
+			TokenAddress: "0xtoken123",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(homeChannel))
 
 		state := core.State{
 			ID:            "state1",
@@ -364,6 +414,8 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, "state1", result.ID)
 		assert.Equal(t, &homeChannelID, result.HomeChannelID)
+		assert.Equal(t, uint64(1), result.HomeLedger.BlockchainID)
+		assert.Equal(t, "0xtoken123", result.HomeLedger.TokenAddress)
 	})
 
 	t.Run("Success - Get by escrow channel ID", func(t *testing.T) {
@@ -374,6 +426,28 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 
 		homeChannelID := "0xhomechannel123"
 		escrowChannelID := "0xescrowchannel456"
+
+		// Create home channel
+		homeChannel := core.Channel{
+			ChannelID:    homeChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeHome,
+			BlockchainID: 1,
+			TokenAddress: "0xtoken123",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(homeChannel))
+
+		// Create escrow channel
+		escrowChannel := core.Channel{
+			ChannelID:    escrowChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeEscrow,
+			BlockchainID: 2,
+			TokenAddress: "0xtoken456",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(escrowChannel))
 
 		state := core.State{
 			ID:              "state2",
@@ -405,6 +479,10 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, "state2", result.ID)
 		assert.Equal(t, &escrowChannelID, result.EscrowChannelID)
+		assert.Equal(t, uint64(1), result.HomeLedger.BlockchainID)
+		assert.Equal(t, "0xtoken123", result.HomeLedger.TokenAddress)
+		assert.Equal(t, uint64(2), result.EscrowLedger.BlockchainID)
+		assert.Equal(t, "0xtoken456", result.EscrowLedger.TokenAddress)
 	})
 
 	t.Run("Success - Get signed state only", func(t *testing.T) {
@@ -416,6 +494,17 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 		homeChannelID := "0xhomechannel123"
 		userSig := "0xusersig"
 		nodeSig := "0xnodesig"
+
+		// Create home channel
+		homeChannel := core.Channel{
+			ChannelID:    homeChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeHome,
+			BlockchainID: 1,
+			TokenAddress: "0xtoken123",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(homeChannel))
 
 		// Unsigned state
 		state1 := core.State{
@@ -461,6 +550,8 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, "state2", result.ID)
 		assert.Equal(t, uint64(1), result.Version)
+		assert.Equal(t, uint64(1), result.HomeLedger.BlockchainID)
+		assert.Equal(t, "0xtoken123", result.HomeLedger.TokenAddress)
 	})
 
 	t.Run("No state found", func(t *testing.T) {
@@ -483,6 +574,17 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 		store := NewDBStore(db)
 
 		homeChannelID := "0xhomechannel123"
+
+		// Create home channel
+		homeChannel := core.Channel{
+			ChannelID:    homeChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeHome,
+			BlockchainID: 1,
+			TokenAddress: "0xtoken123",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(homeChannel))
 
 		// Create multiple versions
 		state1 := core.State{
@@ -526,6 +628,8 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, "state1", result.ID)
 		assert.Equal(t, uint64(1), result.Version)
+		assert.Equal(t, uint64(1), result.HomeLedger.BlockchainID)
+		assert.Equal(t, "0xtoken123", result.HomeLedger.TokenAddress)
 
 		// Get version 2
 		result, err = store.GetStateByChannelIDAndVersion(homeChannelID, 2)
@@ -533,6 +637,8 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, "state2", result.ID)
 		assert.Equal(t, uint64(2), result.Version)
+		assert.Equal(t, uint64(1), result.HomeLedger.BlockchainID)
+		assert.Equal(t, "0xtoken123", result.HomeLedger.TokenAddress)
 	})
 
 	t.Run("Success - Get by escrow channel ID and version", func(t *testing.T) {
@@ -543,6 +649,28 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 
 		homeChannelID := "0xhomechannel123"
 		escrowChannelID := "0xescrowchannel456"
+
+		// Create home channel
+		homeChannel := core.Channel{
+			ChannelID:    homeChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeHome,
+			BlockchainID: 1,
+			TokenAddress: "0xtoken123",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(homeChannel))
+
+		// Create escrow channel
+		escrowChannel := core.Channel{
+			ChannelID:    escrowChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeEscrow,
+			BlockchainID: 2,
+			TokenAddress: "0xtoken456",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(escrowChannel))
 
 		state := core.State{
 			ID:              "state1",
@@ -574,6 +702,10 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, "state1", result.ID)
 		assert.Equal(t, uint64(5), result.Version)
+		assert.Equal(t, uint64(1), result.HomeLedger.BlockchainID)
+		assert.Equal(t, "0xtoken123", result.HomeLedger.TokenAddress)
+		assert.Equal(t, uint64(2), result.EscrowLedger.BlockchainID)
+		assert.Equal(t, "0xtoken456", result.EscrowLedger.TokenAddress)
 	})
 
 	t.Run("No state found - version not exists", func(t *testing.T) {
@@ -583,6 +715,17 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 		store := NewDBStore(db)
 
 		homeChannelID := "0xhomechannel123"
+
+		// Create home channel
+		homeChannel := core.Channel{
+			ChannelID:    homeChannelID,
+			UserWallet:   "0xuser123",
+			Type:         core.ChannelTypeHome,
+			BlockchainID: 1,
+			TokenAddress: "0xtoken123",
+			Status:       core.ChannelStatusOpen,
+		}
+		require.NoError(t, store.CreateChannel(homeChannel))
 
 		state := core.State{
 			ID:            "state1",

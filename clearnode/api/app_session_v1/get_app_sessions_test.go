@@ -81,7 +81,7 @@ func TestGetAppSessions_SuccessWithParticipant(t *testing.T) {
 	}
 
 	// Mock expectations
-	mockStore.On("GetAppSessions", (*string)(nil), &participant, (*string)(nil), &core.PaginationParams{}).Return(sessions, metadata, nil)
+	mockStore.On("GetAppSessions", (*string)(nil), &participant, app.AppSessionStatusVoid, &core.PaginationParams{}).Return(sessions, metadata, nil)
 	mockStore.On("GetParticipantAllocations", "session1").Return(map[string]map[string]decimal.Decimal{}, nil)
 	mockStore.On("GetParticipantAllocations", "session2").Return(map[string]map[string]decimal.Decimal{}, nil)
 
@@ -193,7 +193,7 @@ func TestGetAppSessions_SuccessWithAppSessionID(t *testing.T) {
 	}
 
 	// Mock expectations
-	mockStore.On("GetAppSessions", &sessionID, (*string)(nil), (*string)(nil), &core.PaginationParams{}).Return(sessions, metadata, nil)
+	mockStore.On("GetAppSessions", &sessionID, (*string)(nil), app.AppSessionStatusVoid, &core.PaginationParams{}).Return(sessions, metadata, nil)
 	mockStore.On("GetParticipantAllocations", "session1").Return(map[string]map[string]decimal.Decimal{}, nil)
 
 	// Create RPC request
@@ -330,7 +330,7 @@ func TestGetAppSessions_WithStatusFilter(t *testing.T) {
 	}
 
 	// Mock expectations
-	mockStore.On("GetAppSessions", (*string)(nil), &participant, &status, &core.PaginationParams{}).Return(sessions, metadata, nil)
+	mockStore.On("GetAppSessions", (*string)(nil), &participant, app.AppSessionStatusOpen, &core.PaginationParams{}).Return(sessions, metadata, nil)
 	mockStore.On("GetParticipantAllocations", "session1").Return(map[string]map[string]decimal.Decimal{}, nil)
 
 	// Create RPC request
@@ -395,7 +395,7 @@ func TestGetAppSessions_StoreError(t *testing.T) {
 	participant := "0x1234567890123456789012345678901234567890"
 
 	// Mock expectations - return error
-	mockStore.On("GetAppSessions", (*string)(nil), &participant, (*string)(nil), &core.PaginationParams{}).Return(nil, core.PaginationMetadata{}, fmt.Errorf("database error"))
+	mockStore.On("GetAppSessions", (*string)(nil), &participant, app.AppSessionStatusVoid, &core.PaginationParams{}).Return(nil, core.PaginationMetadata{}, fmt.Errorf("database error"))
 
 	// Create RPC request
 	reqPayload := rpc.AppSessionsV1GetAppSessionsRequest{

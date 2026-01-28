@@ -15,12 +15,13 @@ const (
 	ChannelsV1SubmitStateMethod      Method = "channels.v1.submit_state"
 
 	// App Sessions Group - V1 Methods
-	AppSessionsV1SubmitDepositStateMethod Method = "app_sessions.v1.submit_deposit_state"
-	AppSessionsV1SubmitAppStateMethod     Method = "app_sessions.v1.submit_app_state"
-	AppSessionsV1GetAppDefinitionMethod   Method = "app_sessions.v1.get_app_definition"
-	AppSessionsV1GetAppSessionsMethod     Method = "app_sessions.v1.get_app_sessions"
-	AppSessionsV1CreateAppSessionMethod   Method = "app_sessions.v1.create_app_session"
-	AppSessionsV1CloseAppSessionMethod    Method = "app_sessions.v1.close_app_session"
+	AppSessionsV1SubmitDepositStateMethod    Method = "app_sessions.v1.submit_deposit_state"
+	AppSessionsV1SubmitAppStateMethod        Method = "app_sessions.v1.submit_app_state"
+	AppSessionsV1RebalanceAppSessionsMethod  Method = "app_sessions.v1.rebalance_app_sessions"
+	AppSessionsV1GetAppDefinitionMethod      Method = "app_sessions.v1.get_app_definition"
+	AppSessionsV1GetAppSessionsMethod        Method = "app_sessions.v1.get_app_sessions"
+	AppSessionsV1CreateAppSessionMethod      Method = "app_sessions.v1.create_app_session"
+	AppSessionsV1CloseAppSessionMethod       Method = "app_sessions.v1.close_app_session"
 
 	// Session Keys Group - V1 Methods
 	SessionKeysV1RegisterMethod         Method = "session_keys.v1.register"

@@ -28,6 +28,7 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 			ID:              bc.ID,
 			Name:            bc.Name,
 			ContractAddress: bc.ContractAddress,
+			BlockStep:       bc.BlockStep,
 		})
 	}
 	slices.SortFunc(blockchains, func(a, b core.Blockchain) int {

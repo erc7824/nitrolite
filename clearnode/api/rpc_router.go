@@ -1,262 +1,107 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
 	"time"
 
-	prometheus "github.com/erc7824/nitrolite/clearnode/metrics/prometheus"
-	db "github.com/erc7824/nitrolite/clearnode/store/database"
+	"github.com/erc7824/nitrolite/clearnode/api/app_session_v1"
+	"github.com/erc7824/nitrolite/clearnode/api/channel_v1"
+	"github.com/erc7824/nitrolite/clearnode/api/node_v1"
+	"github.com/erc7824/nitrolite/clearnode/api/user_v1"
+	"github.com/erc7824/nitrolite/clearnode/store/database"
+	"github.com/erc7824/nitrolite/clearnode/store/memory"
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/erc7824/nitrolite/pkg/sign"
-	"github.com/ethereum/go-ethereum/common"
-	"gorm.io/gorm"
-)
-
-var (
-	ConnectionStoragePolicyKey = "connection_auth_policy"
 )
 
 type RPCRouter struct {
-	Node       *RPCNode
-	Config     *Config
-	Signer     sign.Signer
-	DB         *gorm.DB
-	Metrics    *prometheus.Metrics
-	RPCStore   *db.RPCStore
-	wsNotifier *WSNotifier
-
-	lg log.Logger
+	Node rpc.Node
+	lg   log.Logger
 }
 
 func NewRPCRouter(
-	node *RPCNode,
-	conf *Config,
+	nodeVersion string,
+	minChallenge uint32,
+	node rpc.Node,
 	signer sign.Signer,
-	db *gorm.DB,
-	metrics *prometheus.Metrics,
-	rpcStore *db.RPCStore,
-	wsNotifier *WSNotifier,
+	dbStore database.DatabaseStore,
+	memoryStore memory.MemoryStore,
 	logger log.Logger,
 ) *RPCRouter {
 	r := &RPCRouter{
-		Node:       node,
-		Config:     conf,
-		Signer:     signer,
-		DB:         db,
-		wsNotifier: wsNotifier,
-		Metrics:    metrics,
-		RPCStore:   rpcStore,
-		lg:         logger.WithName("rpc-router"),
+		Node: node,
+		lg:   logger.WithName("rpcRouter"),
 	}
 
-	r.Node.OnConnect(r.HandleConnect)
-	r.Node.OnDisconnect(r.HandleDisconnect)
-	r.Node.OnAuthenticated(r.HandleAuthenticated)
-	r.Node.OnMessageSent(r.HandleMessageSent)
-
 	r.Node.Use(r.LoggerMiddleware)
-	r.Node.Use(r.MetricsMiddleware)
-	r.Node.Handle("ping", r.HandlePing)
-	r.Node.Handle("get_config", r.HandleGetConfig)
-	r.Node.Handle("get_assets", r.HandleGetAssets)
-	r.Node.Handle("get_app_definition", r.HandleGetAppDefinition)
-	r.Node.Handle("get_app_sessions", r.HandleGetAppSessions)
-	r.Node.Handle("get_channels", r.HandleGetChannels)
-	r.Node.Handle("get_ledger_entries", r.HandleGetLedgerEntries)
-	r.Node.Handle("get_ledger_transactions", r.HandleGetLedgerTransactions)
-	r.Node.Handle("auth_request", r.HandleAuthRequest)
-	r.Node.Handle("auth_verify", r.HandleAuthVerify)
 
-	testModeGroup := r.Node.NewGroup("test_mode")
-	testModeGroup.Use(r.TestModeMiddleware)
-	testModeGroup.Handle("cleanup_session_key_cache", r.HandleCleanupSessionKeyCache)
+	// Transaction wrapper helpers for each store type
+	wrapInTx := func(handler func(database.DatabaseStore) error) error {
+		return dbStore.ExecuteInTransaction(handler)
+	}
+	useChannelV1StoreInTx := func(h channel_v1.StoreTxHandler) error {
+		return wrapInTx(func(s database.DatabaseStore) error { return h(s) })
+	}
+	useAppSessionV1StoreInTx := func(h app_session_v1.StoreTxHandler) error {
+		return wrapInTx(func(s database.DatabaseStore) error { return h(s) })
+	}
+	useUserV1StoreInTx := func(h user_v1.StoreTxHandler) error {
+		return wrapInTx(func(s database.DatabaseStore) error { return h(s) })
+	}
 
-	privGroup := r.Node.NewGroup("private")
-	privGroup.Use(r.AuthMiddleware)
+	nodeAddress := signer.PublicKey().Address().String()
 
-	privGroup.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
-	privGroup.Handle("get_rpc_history", r.HandleGetRPCHistory)
-	privGroup.Handle("get_session_keys", r.HandleGetSessionKeys)
-	privGroup.Handle("revoke_session_key", r.HandleRevokeSessionKey)
+	statePacker := core.NewStatePackerV1(memoryStore)
+	stateAdvancer := core.NewStateAdvancerV1(memoryStore)
 
-	historyGroup := privGroup.NewGroup("")
-	historyGroup.Use(r.HistoryMiddleware)
-	historyGroup.Handle("create_channel", r.HandleCreateChannel)
-	historyGroup.Handle("close_channel", r.HandleCloseChannel)
+	validator := sign.NewECDSASigValidator()
+	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, map[channel_v1.SigValidatorType]channel_v1.SigValidator{
+		channel_v1.EcdsaSigValidatorType: validator,
+	}, nodeAddress, minChallenge)
+	appSessionV1Handler := app_session_v1.NewHandler(useAppSessionV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, map[app_session_v1.SigType]app_session_v1.SigValidator{
+		app_session_v1.EcdsaSigType: validator,
+	}, nodeAddress)
+	nodeV1Handler := node_v1.NewHandler(memoryStore, nodeAddress, nodeVersion)
+	userV1Handler := user_v1.NewHandler(useUserV1StoreInTx)
 
-	appSessionGroup := historyGroup.NewGroup("app_session")
-	appSessionGroup.Use(r.BalanceUpdateMiddleware)
-	appSessionGroup.Handle("transfer", r.HandleTransfer)
-	appSessionGroup.Handle("create_app_session", r.HandleCreateApplication)
-	appSessionGroup.Handle("submit_app_state", r.HandleSubmitAppState)
-	appSessionGroup.Handle("close_app_session", r.HandleCloseApplication)
+	appSessionV1Group := r.Node.NewGroup("app_session_v1")
+	appSessionV1Group.Handle("submit_deposit_state", appSessionV1Handler.SubmitDepositState)
+	appSessionV1Group.Handle("submit_app_state", appSessionV1Handler.SubmitAppState)
+	appSessionV1Group.Handle("rebalance_app_sessions", appSessionV1Handler.RebalanceAppSessions)
+	appSessionV1Group.Handle("create_app_session", appSessionV1Handler.CreateAppSession)
+	appSessionV1Group.Handle("get_app_definition", appSessionV1Handler.GetAppDefinition)
+	appSessionV1Group.Handle("get_app_sessions", appSessionV1Handler.GetAppSessions)
+
+	channelV1Group := r.Node.NewGroup("channel_v1")
+	channelV1Group.Handle("get_escrow_channel", channelV1Handler.GetEscrowChannel)
+	channelV1Group.Handle("get_home_channel", channelV1Handler.GetHomeChannel)
+	channelV1Group.Handle("get_latest_state", channelV1Handler.GetLatestState)
+	channelV1Group.Handle("request_creation", channelV1Handler.RequestCreation)
+	channelV1Group.Handle("submit_state", channelV1Handler.SubmitState)
+
+	nodeV1Group := r.Node.NewGroup("node_v1")
+	nodeV1Group.Handle("get_assets", nodeV1Handler.GetAssets)
+	nodeV1Group.Handle("get_config", nodeV1Handler.GetConfig)
+
+	userV1Group := r.Node.NewGroup("user_v1")
+	userV1Group.Handle("get_balances", userV1Handler.GetBalances)
+	userV1Group.Handle("get_transactions", userV1Handler.GetTransactions)
 
 	return r
 }
 
-func (r *RPCRouter) HandleConnect(send SendRPCMessageFunc) {
-	// Increment connection metrics
-	r.Metrics.ConnectionsTotal.Inc()
-	r.Metrics.ConnectedClients.Inc()
-
-	// Convert to AssetResponse format
-	respAssets := []AssetResponse{}
-	for _, asset := range r.Config.assets.Assets {
-		for _, token := range asset.Tokens {
-			respAssets = append(respAssets, AssetResponse{
-				Symbol:   asset.Symbol,
-				ChainID:  token.BlockchainID,
-				Token:    token.Address,
-				Decimals: token.Decimals,
-			})
-		}
-	}
-
-	send("assets", AssetsResponse{Assets: respAssets})
-}
-
-func (r *RPCRouter) HandleDisconnect(userID string) {
-	// Decrement connection metrics
-	r.Metrics.ConnectedClients.Dec()
-}
-
-func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) {
-	walletAddress := userID
-
-	channels, err := getChannelsByWallet(r.DB, walletAddress, string(ChannelStatusOpen))
-	if err != nil {
-		r.lg.Error("error retrieving channels for participant", "error", err)
-	}
-
-	respChannels := []ChannelResponse{}
-	for _, ch := range channels {
-		respChannels = append(respChannels, ChannelResponse{
-			ChannelID:    ch.ChannelID,
-			UserWallet:   ch.UserWallet,
-			Status:       ch.Status,
-			Token:        ch.Token,
-			BlockchainID: ch.BlockchainID,
-			Challenge:    ch.Challenge,
-			Nonce:        ch.Nonce,
-			CreatedAt:    ch.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:    ch.UpdatedAt.Format(time.RFC3339),
-		})
-	}
-
-	// Send channel updates
-	send("channels", ChannelsResponse{Channels: respChannels})
-
-	// Send initial balances
-	balances, err := GetWalletLedger(r.DB, common.HexToAddress(walletAddress)).GetBalances(NewAccountID(walletAddress))
-	if err != nil {
-		r.lg.Error("error getting balances", "sender", walletAddress, "error", err)
-		return
-	}
-	send("bu", BalanceUpdatesResponse{BalanceUpdates: balances})
-}
-
-func (r *RPCRouter) HandleMessageSent() {
-	// Increment sent message counter
-	r.Metrics.MessageSent.Inc()
-}
-
-func (r *RPCRouter) LoggerMiddleware(c *RPCContext) {
-	logger := r.lg.WithKV("requestID", c.Message.Req.RequestID)
+func (r *RPCRouter) LoggerMiddleware(c *rpc.Context) {
+	logger := r.lg.WithKV("requestID", c.Request.RequestID)
 	c.Context = log.SetContextLogger(c.Context, logger)
 	logger = log.FromContext(c.Context)
 
-	c.Next()
-
-	if c.Message.Res == nil {
-		logger.Warn("RPC response is nil",
-			"userID", c.UserID,
-			"method", c.Message.Req.Method,
-		)
-		return
-	}
-
-	if c.Message.Res.Method == "error" {
-		logger.Warn("failed to handle RPC request",
-			"userID", c.UserID,
-			"method", c.Message.Req.Method,
-			"error", c.Message.Res.Params,
-		)
-	}
-}
-
-func (r *RPCRouter) MetricsMiddleware(c *RPCContext) {
-	// Increment received message counter
-	r.Metrics.MessageReceived.Inc()
-
-	reqMethod := c.Message.Req.Method
-	c.Next()
-
-	status := "success"
-	if c.Message.Res.Method == "error" {
-		status = "failure"
-	}
-
-	r.Metrics.RPCRequests.WithLabelValues(reqMethod, status).Inc()
-}
-
-type RPCEntry struct {
-	ID        uint        `json:"id"`
-	Sender    string      `json:"sender"`
-	ReqID     uint64      `json:"req_id"`
-	Method    string      `json:"method"`
-	Params    string      `json:"params"`
-	Timestamp uint64      `json:"timestamp"`
-	ReqSig    []Signature `json:"req_sig"`
-	Result    string      `json:"response"`
-	ResSig    []Signature `json:"res_sig"`
-}
-
-func (r *RPCRouter) HistoryMiddleware(c *RPCContext) {
-	logger := LoggerFromContext(c.Context)
-
-	req := c.Message.Req
-	reqSig := c.Message.Sig
-	c.Next()
-
-	resRaw, err := json.Marshal(c.Message.Res)
-	if err != nil {
-		logger.Error("failed to marshal response", "error", err)
-		return
-	}
-	resSig := c.Message.Sig
-
-	// Store the request in history
-	if err := r.RPCStore.StoreMessage(c.UserID, req, reqSig, resRaw, resSig); err != nil {
-		logger.Error("failed to store RPC message", "error", err)
-	}
-}
-
-func (r *RPCRouter) TestModeMiddleware(c *RPCContext) {
-	if r.Config.mode != ModeTest {
-		c.Fail(nil, "test mode endpoints are disabled")
-		return
-	}
+	startTime := time.Now()
 
 	c.Next()
-}
 
-func (r *RPCRouter) HandleCleanupSessionKeyCache(c *RPCContext) {
-	sessionKeyCache.Clear()
-	c.Succeed(c.Message.Req.Method, nil)
-}
-
-func parseParams(params rpc.Payload, unmarshalTo any) error {
-	paramsJSON, err := json.Marshal(params)
-	if err != nil {
-		return fmt.Errorf("failed to parse parameters: %w", err)
-	}
-
-	err = json.Unmarshal(paramsJSON, &unmarshalTo)
-	if err != nil {
-		return err
-	}
-
-	return getValidator().Struct(unmarshalTo)
+	logger.Info("handled RPC request",
+		"method", c.Request.Method,
+		"success", c.Response.Type == rpc.MsgTypeResp,
+		"duration", time.Since(startTime))
 }

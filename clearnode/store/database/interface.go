@@ -9,11 +9,13 @@ import (
 // StoreTxHandler is a function that executes Store operations within a transaction.
 type StoreTxHandler func(DatabaseStore) error
 
-// StoreTxProvider wraps Store operations in a database transaction.
-type StoreTxProvider func(StoreTxHandler) error
-
 // DatabaseStore defines the unified persistence layer.
 type DatabaseStore interface {
+	// ExecuteInTransaction runs the provided handler within a database transaction.
+	// If the handler returns an error, the transaction is rolled back.
+	// If the handler completes successfully, the transaction is committed.
+	ExecuteInTransaction(handler StoreTxHandler) error
+
 	// --- User & Balance Operations ---
 
 	// GetUserBalances retrieves the balances for a user's wallet.

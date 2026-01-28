@@ -37,14 +37,14 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 
 				ethCfg := blockchains[0]
 				assert.Equal(t, "ethereum", ethCfg.Name)
-				assert.Equal(t, uint32(1), ethCfg.ID)
+				assert.Equal(t, uint64(1), ethCfg.ID)
 				assert.Equal(t, "0x1111111111111111111111111111111111111111", ethCfg.ContractAddress)
 				assert.False(t, ethCfg.Disabled)
 				assert.Equal(t, uint64(10), ethCfg.BlockStep)
 
 				sepoliaCfg := blockchains[1]
 				assert.Equal(t, "ethereum_sepolia", sepoliaCfg.Name)
-				assert.Equal(t, uint32(11155111), sepoliaCfg.ID)
+				assert.Equal(t, uint64(11155111), sepoliaCfg.ID)
 				assert.Equal(t, "0x0000000000000000000000000000000000000001", sepoliaCfg.ContractAddress)
 				assert.False(t, sepoliaCfg.Disabled)
 				assert.Equal(t, defaultBlockStep, sepoliaCfg.BlockStep)
@@ -97,11 +97,11 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 
 				ethCfg := blockchains[0]
 				assert.Equal(t, "ethereum", ethCfg.Name)
-				assert.Equal(t, uint32(1), ethCfg.ID)
+				assert.Equal(t, uint64(1), ethCfg.ID)
 
 				sepoliaCfg := blockchains[1]
 				assert.Equal(t, "_ethereum_sepolia_", sepoliaCfg.Name)
-				assert.Equal(t, uint32(11155111), sepoliaCfg.ID)
+				assert.Equal(t, uint64(11155111), sepoliaCfg.ID)
 			},
 		},
 		{
@@ -122,7 +122,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 					},
 				},
 			},
-			expectedErrorStr: "missing default and blockchain-specific custody contract address for blockchain 'ethereum'",
+			expectedErrorStr: "missing default and blockchain-specific contract address for blockchain 'ethereum'",
 		},
 		{
 			name: "invalid custody address",
@@ -135,13 +135,13 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 					},
 				},
 			},
-			expectedErrorStr: "invalid custody contract address '0x0000s00000000000000000000000000000000001' for blockchain 'ethereum'",
+			expectedErrorStr: "invalid contract address '0x0000s00000000000000000000000000000000001' for blockchain 'ethereum'",
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			err := verifyBlockchainsConfig(&tc.cfg, false)
+			err := verifyBlockchainsConfig(&tc.cfg)
 			if tc.expectedErrorStr != "" {
 				require.Error(t, err)
 				assert.Equal(t, tc.expectedErrorStr, err.Error())

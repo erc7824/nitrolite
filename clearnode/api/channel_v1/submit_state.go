@@ -54,27 +54,28 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 			return rpc.Errorf("failed to get last user state: %v", err)
 		}
 
-		var extraTransitions []core.Transition
+		// FIXME:
+		// var extraTransitions []core.Transition
 		switch incomingTransition.Type {
 		case core.TransitionTypeEscrowDeposit, core.TransitionTypeEscrowWithdraw, core.TransitionTypeMigrate:
-			latestStateVersion := currentState.Version
-			extraTransitions = currentState.Transitions
+			return rpc.Errorf("transition is not supported yet")
+			// latestStateVersion := currentState.Version
+			// extraTransitions = currentState.Transitions
 
-			currentState, err = tx.GetLastUserState(incomingState.UserWallet, incomingState.Asset, true)
-			if err != nil {
-				return rpc.Errorf("failed to get last user state: %v", err)
-			}
+			// currentState, err = tx.GetLastUserState(incomingState.UserWallet, incomingState.Asset, true)
+			// if err != nil {
+			// 	return rpc.Errorf("failed to get last user state: %v", err)
+			// }
 
-			// User has no signed previous state
-			if currentState == nil {
-				return rpc.Errorf("no signed previous state found for escrow/migrate transition")
-			}
-			if currentState.Version < latestStateVersion {
-				currentState.Version = latestStateVersion
-			} else if currentState.Version == latestStateVersion {
-				extraTransitions = nil // no extra transitions to reapply
-			}
-
+			// // User has no signed previous state
+			// if currentState == nil {
+			// 	return rpc.Errorf("no signed previous state found for escrow/migrate transition")
+			// }
+			// if currentState.Version < latestStateVersion {
+			// 	currentState.Version = latestStateVersion
+			// } else if currentState.Version == latestStateVersion {
+			// 	extraTransitions = nil // no extra transitions to reapply
+			// }
 		default:
 			// User has no previous state
 			if currentState == nil {
@@ -140,50 +141,51 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
 			case core.TransitionTypeMutualLock:
-				if err := h.createEscrowChannel(tx, incomingState); err != nil {
-					return err
-				}
+				return rpc.Errorf("transition is not supported yet")
+				// if err := h.createEscrowChannel(tx, incomingState); err != nil {
+				// 	return err
+				// }
 
-				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
-				if err != nil {
-					return rpc.Errorf("failed to create transaction: %v", err)
-				}
+				// transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
+				// if err != nil {
+				// 	return rpc.Errorf("failed to create transaction: %v", err)
+				// }
 			case core.TransitionTypeEscrowLock:
-				if err := h.createEscrowChannel(tx, incomingState); err != nil {
-					return err
-				}
+				return rpc.Errorf("transition is not supported yet")
+				// if err := h.createEscrowChannel(tx, incomingState); err != nil {
+				// 	return err
+				// }
 
-				if err := tx.ScheduleInitiateEscrowWithdrawal(incomingState.ID, incomingState.EscrowLedger.BlockchainID); err != nil {
-					return rpc.Errorf("failed to schedule blockchain action: %v", err)
-				}
-				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
-				if err != nil {
-					return rpc.Errorf("failed to create transaction: %v", err)
-				}
+				// if err := tx.ScheduleInitiateEscrowWithdrawal(incomingState.ID, incomingState.EscrowLedger.BlockchainID); err != nil {
+				// 	return rpc.Errorf("failed to schedule blockchain action: %v", err)
+				// }
+				// transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
+				// if err != nil {
+				// 	return rpc.Errorf("failed to create transaction: %v", err)
+				// }
 			case core.TransitionTypeEscrowDeposit:
-				// We return Node's signature, the user is expected to submit this on blockchain.
-				// Optionally schedule blockchain action (finalizeEscrowDeposit) on escrow chain
-				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
-				if err != nil {
-					return rpc.Errorf("failed to create transaction: %v", err)
-				}
-				extraState, err := h.issueExtraState(ctx, tx, incomingState, extraTransitions)
-				if err != nil {
-					return rpc.Errorf("failed to issue an extra state: %v", err)
-				}
-				logger.Info("extra state issued", "userID", extraState.UserWallet, "asset", extraState.Asset, "version", extraState.Version)
-
+				return rpc.Errorf("transition is not supported yet")
+				// transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
+				// if err != nil {
+				// 	return rpc.Errorf("failed to create transaction: %v", err)
+				// }
+				// extraState, err := h.issueExtraState(ctx, tx, incomingState, extraTransitions)
+				// if err != nil {
+				// 	return rpc.Errorf("failed to issue an extra state: %v", err)
+				// }
+				// logger.Info("extra state issued", "userID", extraState.UserWallet, "asset", extraState.Asset, "version", extraState.Version)
 			case core.TransitionTypeEscrowWithdraw:
-				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
-				if err != nil {
-					return rpc.Errorf("failed to create transaction: %v", err)
-				}
+				return rpc.Errorf("transition is not supported yet")
+				// transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
+				// if err != nil {
+				// 	return rpc.Errorf("failed to create transaction: %v", err)
+				// }
 
-				extraState, err := h.issueExtraState(ctx, tx, incomingState, extraTransitions)
-				if err != nil {
-					return rpc.Errorf("failed to issue an extra state: %v", err)
-				}
-				logger.Info("extra state issued", "userID", extraState.UserWallet, "asset", extraState.Asset, "version", extraState.Version)
+				// extraState, err := h.issueExtraState(ctx, tx, incomingState, extraTransitions)
+				// if err != nil {
+				// 	return rpc.Errorf("failed to issue an extra state: %v", err)
+				// }
+				// logger.Info("extra state issued", "userID", extraState.UserWallet, "asset", extraState.Asset, "version", extraState.Version)
 			case core.TransitionTypeFinalize:
 				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
 				if err != nil {

@@ -2,6 +2,7 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /build
 ENV CGO_ENABLED=1
+ARG VERSION="n/a"
 
 RUN apk add --no-cache gcc musl-dev sqlite-dev
 
@@ -10,7 +11,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o ./bin/clearnode .
+RUN go build -o ./bin/clearnode -ldflags "-X main.Version=${VERSION}" ./clearnode
 
 FROM alpine
 
@@ -21,6 +22,6 @@ USER clearnode
 
 COPY --from=builder /build/bin /bin
 
-EXPOSE 8000 4242
+EXPOSE 7824 4242
 
 CMD ["clearnode"]

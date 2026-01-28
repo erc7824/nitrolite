@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/erc7824/nitrolite/pkg/core"
+	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 var _ core.Client = &Client{}
@@ -26,8 +27,7 @@ type Client struct {
 func NewClient(
 	contractAddress common.Address,
 	backend bind.ContractBackend,
-	transactOpts *bind.TransactOpts,
-	nodeAddress common.Address,
+	signer sign.Signer,
 	blockchainID uint64,
 	assetStore core.AssetStore,
 ) (*Client, error) {
@@ -38,8 +38,8 @@ func NewClient(
 
 	return &Client{
 		contract:        contract,
-		transactOpts:    transactOpts,
-		nodeAddress:     nodeAddress,
+		transactOpts:    signerTxOpts(signer, blockchainID),
+		nodeAddress:     common.HexToAddress(signer.PublicKey().Address().String()),
 		contractAddress: contractAddress,
 		blockchainID:    blockchainID,
 		assetStore:      assetStore,

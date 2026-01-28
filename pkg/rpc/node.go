@@ -30,6 +30,12 @@ const (
 // server-initiated notifications. The interface is transport-agnostic,
 // allowing for different implementations (WebSocket, HTTP/2, etc.).
 type Node interface {
+	// ServeHTTP handles incoming HTTP requests and upgrades them to
+	// the appropriate transport protocol (e.g., WebSocket). It manages
+	// connection lifecycle, including reading requests, routing to
+	// handlers, and sending responses.
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+
 	// Handle registers a handler function for a specific RPC method.
 	// When a request with the matching method name is received,
 	// the handler will be invoked with the request context.

@@ -44,8 +44,7 @@ func (h *Handler) GetAppSessions(c *rpc.Context) {
 			case "closed":
 				status = app.AppSessionStatusClosed
 			default:
-				c.Fail(nil, "invalid status value")
-				return nil
+				return rpc.Errorf("invalid status: %s", *req.Status)
 			}
 		}
 		sessions, metadata, err = store.GetAppSessions(req.AppSessionID, req.Participant, status, &paginationParams)

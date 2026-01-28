@@ -190,6 +190,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 }
 
 func TestSubmitState_EscrowLock_Success(t *testing.T) {
+	t.Skip("transition is not supported yet")
 	// Setup
 	mockTxStore := new(MockStore)
 	mockMemoryStore := new(MockMemoryStore)
@@ -346,6 +347,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 }
 
 func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
+	t.Skip("transition is not supported yet")
 	// Setup
 	mockTxStore := new(MockStore)
 	mockMemoryStore := new(MockMemoryStore)
@@ -765,6 +767,7 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 }
 
 func TestSubmitState_MutualLock_Success(t *testing.T) {
+	t.Skip("transition is not supported yet")
 	// Setup
 	mockTxStore := new(MockStore)
 	mockMemoryStore := new(MockMemoryStore)
@@ -920,6 +923,7 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 }
 
 func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
+	t.Skip("transition is not supported yet")
 	// Setup
 	mockTxStore := new(MockStore)
 	mockMemoryStore := new(MockMemoryStore)

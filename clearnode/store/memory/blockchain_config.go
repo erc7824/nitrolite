@@ -35,7 +35,7 @@ type BlockchainConfig struct {
 	Name string `yaml:"name"`
 	// ID is the chain ID used for RPC validation
 	ID uint64 `yaml:"id"`
-	// Disabled determines if this blockchain should be connected
+	// TODO: blockchains must not be disabled in prod deployment
 	Disabled bool `yaml:"disabled"`
 	// BlockStep defines the block range for scanning (default: 10000)
 	BlockStep uint64 `yaml:"block_step"`

@@ -3,8 +3,6 @@ package channel_v1
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -96,8 +94,7 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 			return nil, rpc.Errorf("failed to pack receiver state")
 		}
 
-		stateHash := crypto.Keccak256Hash(packedState).Bytes()
-		_nodeSig, err := h.signer.Sign(stateHash)
+		_nodeSig, err := h.signer.Sign(packedState)
 		if err != nil {
 			return nil, rpc.Errorf("failed to sign receiver state")
 		}
@@ -144,8 +141,7 @@ func (h *Handler) issueExtraState(ctx context.Context, tx Store, incomingState c
 		return nil, rpc.Errorf("failed to pack extra state")
 	}
 
-	stateHash := crypto.Keccak256Hash(packedState).Bytes()
-	_nodeSig, err := h.signer.Sign(stateHash)
+	_nodeSig, err := h.signer.Sign(packedState)
 	if err != nil {
 		return nil, rpc.Errorf("failed to sign extra state")
 	}

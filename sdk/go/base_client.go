@@ -470,12 +470,12 @@ func (c *Client) SubmitState(ctx context.Context, state core.State) (string, err
 //
 // Example:
 //
-//	initialState := sdk.State{
+//	initialState := State{
 //	    Asset: "usdc",
 //	    UserWallet: "0x1234...",
 //	    // ... other fields
 //	}
-//	channelDef := sdk.core.ChannelDefinition{
+//	channelDef := core.ChannelDefinition{
 //	    Nonce: 1,
 //	    Challenge: 3600, // 1 hour challenge period
 //	}
@@ -768,7 +768,7 @@ func (c *Client) RebalanceAppSessions(ctx context.Context, signedUpdates []app.S
 //
 // Example:
 //
-//	client, err := clearnode.NewClient("ws://localhost:7824/ws")
+//	client, err := NewClient("ws://localhost:7824/ws")
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
@@ -789,7 +789,7 @@ func (c *Client) Close() error {
 //
 // Example:
 //
-//	client, err := clearnode.NewClient("ws://localhost:7824/ws")
+//	client, err := NewClient("ws://localhost:7824/ws")
 //	if err != nil {
 //	    log.Fatal(err)
 //	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/erc7824/nitrolite/pkg/blockchain/evm"
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -23,7 +24,7 @@ import (
 //
 // Example usage:
 //
-//	signer, err := sign.NewEthereumSigner(privateKeyHex)
+//	signer, err := sign.NewEthereumRawSigner(privateKeyHex)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
@@ -45,7 +46,8 @@ import (
 type SDKClient struct {
 	*Client
 	blockchainClients map[uint64]*evm.Client
-	signer            sign.Signer
+	stateSigner       sign.Signer
+	txSigner          sign.Signer
 	assetStore        *clientAssetStore
 }
 
@@ -118,7 +120,7 @@ func (s *clientAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress st
 //
 // Parameters:
 //   - wsURL: WebSocket URL of the Clearnode server (e.g., "wss://clearnode.example.com/ws")
-//   - signer: sign.Signer for signing channel states (use sign.NewEthereumSigner)
+//   - signer: sign.Signer for signing channel states (use sign.NewEthereumRawSigner)
 //   - opts: Optional configuration (WithBlockchainRPC, WithHandshakeTimeout, etc.)
 //
 // Returns:
@@ -127,13 +129,13 @@ func (s *clientAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress st
 //
 // Example:
 //
-//	signer, _ := sign.NewEthereumSigner(privateKeyHex)
+//	signer, _ := sign.NewEthereumRawSigner(privateKeyHex)
 //	client, err := sdk.NewSDKClient(
 //	    "wss://clearnode.example.com/ws",
 //	    signer,
 //	    sdk.WithBlockchainRPC(80002, "https://polygon-amoy.alchemy.com/v2/KEY"),
 //	)
-func NewSDKClient(wsURL string, signer sign.Signer, opts ...Option) (*SDKClient, error) {
+func NewSDKClient(wsURL string, stateSigner, txSigner sign.Signer, opts ...Option) (*SDKClient, error) {
 	// Create base client
 	baseClient, err := NewClient(wsURL, opts...)
 	if err != nil {
@@ -147,7 +149,8 @@ func NewSDKClient(wsURL string, signer sign.Signer, opts ...Option) (*SDKClient,
 	sdkClient := &SDKClient{
 		Client:            baseClient,
 		blockchainClients: make(map[uint64]*evm.Client),
-		signer:            signer,
+		stateSigner:       stateSigner,
+		txSigner:          txSigner,
 		assetStore:        assetStore,
 	}
 
@@ -217,11 +220,12 @@ func (c *SDKClient) initializeBlockchainClient(ctx context.Context, chainID uint
 	evmClient, err := evm.NewClient(
 		common.HexToAddress(contractAddress),
 		ethClient,
-		c.signer,
+		c.txSigner,
 		chainID,
 		nodeAddress,
 		c.assetStore,
 	)
+
 	if err != nil {
 		return fmt.Errorf("failed to create blockchain client: %w", err)
 	}
@@ -235,7 +239,7 @@ func generateNonce() uint64 {
 	nonceBig, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 64))
 	if err != nil {
 		// Fallback to timestamp-based nonce if crypto/rand fails
-		return uint64(1)
+		return uint64(time.Now().UnixNano())
 	}
 	return nonceBig.Uint64()
 }
@@ -308,7 +312,7 @@ func (c *SDKClient) SignState(state *core.State) (string, error) {
 	stateHash := crypto.Keccak256Hash(packedState).Bytes()
 
 	// Sign the hash
-	signature, err := c.signer.Sign(stateHash)
+	signature, err := c.stateSigner.Sign(stateHash)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign state hash: %w", err)
 	}
@@ -320,7 +324,7 @@ func (c *SDKClient) SignState(state *core.State) (string, error) {
 // GetUserAddress returns the Ethereum address associated with the signer.
 // This is useful for identifying the current user's wallet address.
 func (c *SDKClient) GetUserAddress() string {
-	return c.signer.PublicKey().Address().String()
+	return c.stateSigner.PublicKey().Address().String()
 }
 
 // signAndSubmitState is a helper that signs a state and submits it to the node.

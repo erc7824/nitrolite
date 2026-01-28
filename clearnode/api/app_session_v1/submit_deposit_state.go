@@ -8,7 +8,6 @@ import (
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 )
 
@@ -231,8 +230,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 
 		// Sign the user state with node's signature
 		// TODO:create a function to handle state signing
-		userStateHash := crypto.Keccak256Hash(packedUserState).Bytes()
-		_nodeSig, err := h.signer.Sign(userStateHash)
+		_nodeSig, err := h.signer.Sign(packedUserState)
 		if err != nil {
 			return rpc.Errorf("failed to sign user state: %v", err)
 		}

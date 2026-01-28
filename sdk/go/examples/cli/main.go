@@ -52,7 +52,7 @@ func main() {
 	fmt.Println("🚀 Clearnode CLI - Developer Tool for Clearnode SDK")
 	fmt.Printf("📡 Connected to: %s\n", wsURL)
 	fmt.Printf("💾 Config directory: %s\n", configDir)
-	fmt.Println("\n💡 Type 'help' for available commands or 'exit' to quit\n")
+	fmt.Println("\n💡 Type 'help' for available commands or 'exit' to quit")
 
 	// Terminal handling
 	initialState, _ := term.GetState(int(os.Stdin.Fd()))

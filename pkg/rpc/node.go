@@ -329,11 +329,6 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 			continue
 		}
 
-		wn.cfg.Logger.Info("processing message",
-			"requestID", req.RequestID,
-			"method", req.Method,
-			"route", methodRoute)
-
 		ctx := &Context{
 			Context:  parentCtx,
 			Request:  req,

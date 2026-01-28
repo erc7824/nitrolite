@@ -104,5 +104,5 @@ func (r *RPCRouter) LoggerMiddleware(c *rpc.Context) {
 	logger.Info("handled RPC request",
 		"method", c.Request.Method,
 		"success", c.Response.Type == rpc.MsgTypeResp,
-		"duration", time.Since(startTime))
+		"duration", time.Since(startTime).String())
 }

@@ -696,7 +696,7 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil).Maybe()
 	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil).Maybe()
 	mockStore.On("StoreUserState", mock.Anything).Return(nil).Maybe()
-	mockStore.On("RecordTransaction", mock.Anything).Return(nil)
+	mockStore.On("RecordTransaction", mock.Anything).Return(nil).Maybe()
 
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)

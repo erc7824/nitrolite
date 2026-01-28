@@ -66,7 +66,9 @@ func main() {
 			logger.Fatal("failed to start EVM listener")
 		}
 
-		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ContractAddress), client, bb.Signer, b.ID, bb.MemoryStore)
+		// For the node itself, the node address is the signer's address
+		nodeAddress := bb.Signer.PublicKey().Address().String()
+		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ContractAddress), client, bb.Signer, b.ID, nodeAddress, bb.MemoryStore)
 		if err != nil {
 			logger.Fatal("failed to create EVM client")
 		}

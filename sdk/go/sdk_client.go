@@ -193,23 +193,19 @@ func (c *SDKClient) initializeBlockchainClient(ctx context.Context, chainID uint
 		return fmt.Errorf("blockchain RPC not configured for chain %d (use WithBlockchainRPC)", chainID)
 	}
 
-	// Get node config to find contract address
-	nodeConfig, err := c.GetConfig(ctx)
+	// Get contract address for this blockchain
+	contractAddress, err := c.getContractAddress(ctx, chainID)
 	if err != nil {
-		return fmt.Errorf("failed to get node config: %w", err)
+		return err
 	}
+	fmt.Printf("DEBUG: Contract address for chain %d: %s\n", chainID, contractAddress)
 
-	// Find contract address for this blockchain
-	var contractAddress string
-	for _, bc := range nodeConfig.Blockchains {
-		if bc.ID == chainID {
-			contractAddress = bc.ContractAddress
-			break
-		}
+	// Get node address
+	nodeAddress, err := c.getNodeAddress(ctx)
+	if err != nil {
+		return err
 	}
-	if contractAddress == "" {
-		return fmt.Errorf("blockchain %d not supported by node", chainID)
-	}
+	fmt.Printf("DEBUG: Node address: %s\n", nodeAddress)
 
 	// Connect to blockchain
 	ethClient, err := ethclient.Dial(rpcURL)
@@ -217,12 +213,13 @@ func (c *SDKClient) initializeBlockchainClient(ctx context.Context, chainID uint
 		return fmt.Errorf("failed to connect to blockchain RPC: %w", err)
 	}
 
-	// Create blockchain client using the user's signer
+	// Create blockchain client using the user's signer and node address
 	evmClient, err := evm.NewClient(
 		common.HexToAddress(contractAddress),
 		ethClient,
 		c.signer,
 		chainID,
+		nodeAddress,
 		c.assetStore,
 	)
 	if err != nil {

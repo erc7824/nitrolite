@@ -182,6 +182,7 @@ func coreLedgerToContractLedger(ledger core.Ledger, decimals uint8) (Ledger, err
 	return Ledger{
 		ChainId:        ledger.BlockchainID,
 		Token:          tokenAddr,
+		Decimals:       decimals,
 		UserAllocation: userAllocation,
 		UserNetFlow:    userNetFlow,
 		NodeAllocation: nodeAllocation,

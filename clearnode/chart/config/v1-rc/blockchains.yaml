@@ -1,6 +1,6 @@
 default_contract_address: "0xCe87FD88F4B5Fd5475d163e2642C5c2c7dD655Ec"
 
 blockchains:
-- name: ethereum_sepolia
+- name: "ethereum_sepolia"
   id: 11155111
   contract_address: "0xCe87FD88F4B5Fd5475d163e2642C5c2c7dD655Ec"

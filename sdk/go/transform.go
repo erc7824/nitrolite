@@ -55,7 +55,7 @@ func transformAssets(assets []rpc.AssetV1) []core.Asset {
 		result = append(result, core.Asset{
 			Name:     asset.Name,
 			Symbol:   asset.Symbol,
-			Decimals: 0, // RPC doesn't provide this at asset level
+			Decimals: asset.Decimals,
 			Tokens:   tokens,
 		})
 	}

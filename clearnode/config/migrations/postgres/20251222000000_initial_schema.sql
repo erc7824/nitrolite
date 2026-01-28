@@ -6,13 +6,13 @@ CREATE TABLE channels (
     channel_id CHAR(66) PRIMARY KEY,
     user_wallet CHAR(42) NOT NULL,
     type SMALLINT NOT NULL, -- ChannelType enum: 0=void, 1=home, 2=escrow
-    blockchain_id BIGINT NOT NULL, -- uint64
+    blockchain_id NUMERIC(20,0) NOT NULL,
     token CHAR(42) NOT NULL,
     challenge_duration BIGINT NOT NULL DEFAULT 0,
     challenge_expires_at TIMESTAMPTZ,
-    nonce BIGINT NOT NULL DEFAULT 0,
+    nonce NUMERIC(20,0) NOT NULL DEFAULT 0,
     status SMALLINT NOT NULL, -- ChannelStatus enum: 0=void, 1=open, 2=challenged, 3=closed
-    state_version BIGINT NOT NULL DEFAULT 0,
+    state_version NUMERIC(20,0) NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -26,8 +26,8 @@ CREATE TABLE channel_states (
     transitions JSONB NOT NULL, -- JSON array of state transitions
     asset VARCHAR(20) NOT NULL,
     user_wallet CHAR(42) NOT NULL,
-    epoch BIGINT NOT NULL,
-    version BIGINT NOT NULL,
+    epoch NUMERIC(20,0) NOT NULL,
+    version NUMERIC(20,0) NOT NULL,
 
     -- Optional channel references
     home_channel_id CHAR(66),
@@ -85,10 +85,10 @@ CREATE INDEX idx_transactions_to_comp ON transactions(to_account, asset_symbol, 
 CREATE TABLE app_sessions_v1 (
     id CHAR(66) PRIMARY KEY,
     application VARCHAR NOT NULL,
-    nonce BIGINT NOT NULL,
+    nonce NUMERIC(20,0) NOT NULL,
     session_data TEXT NOT NULL,
     quorum SMALLINT NOT NULL DEFAULT 100,
-    version BIGINT NOT NULL DEFAULT 1,
+    version NUMERIC(20,0) NOT NULL DEFAULT 1,
     status SMALLINT NOT NULL, -- AppSessionStatus enum
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -126,11 +126,11 @@ CREATE INDEX idx_app_ledger_v1_wallet ON app_ledger_v1(wallet);
 CREATE TABLE contract_events (
     id BIGSERIAL PRIMARY KEY,
     contract_address CHAR(42) NOT NULL,
-    blockchain_id BIGINT NOT NULL,
+    blockchain_id NUMERIC(20,0) NOT NULL,
     name VARCHAR(255) NOT NULL,
-    block_number BIGINT NOT NULL,
+    block_number NUMERIC(20,0) NOT NULL,
     transaction_hash VARCHAR(255) NOT NULL,
-    log_index INTEGER NOT NULL DEFAULT 0,
+    log_index BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -141,10 +141,10 @@ CREATE TABLE blockchain_actions (
     id BIGSERIAL PRIMARY KEY,
     action_type SMALLINT NOT NULL,
     state_id CHAR(66),
-    blockchain_id BIGINT NOT NULL,
+    blockchain_id NUMERIC(20,0) NOT NULL,
     action_data JSONB,
     status SMALLINT NOT NULL DEFAULT 0,
-    retry_count INTEGER NOT NULL DEFAULT 0,
+    retry_count SMALLINT NOT NULL DEFAULT 0,
     last_error TEXT,
     transaction_hash CHAR(66),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

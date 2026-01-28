@@ -29,17 +29,17 @@ const (
 )
 
 type BlockchainAction struct {
-	ID        int64                  `gorm:"primary_key"`
-	Type      BlockchainActionType   `gorm:"column:action_type;not null"`
-	StateID   string                 `gorm:"column:state_id;size:66"`
-	ChainID   uint64                 `gorm:"column:chain_id;not null"`
-	Data      datatypes.JSON         `gorm:"column:action_data;type:text"`
-	Status    BlockchainActionStatus `gorm:"column:status;not null"`
-	Retries   uint8                  `gorm:"column:retry_count;default:0"`
-	Error     string                 `gorm:"column:last_error;type:text"`
-	TxHash    string                 `gorm:"column:transaction_hash;size:66"`
-	CreatedAt time.Time              `gorm:"column:created_at"`
-	UpdatedAt time.Time              `gorm:"column:updated_at"`
+	ID           int64                  `gorm:"primary_key"`
+	Type         BlockchainActionType   `gorm:"column:action_type;not null"`
+	StateID      string                 `gorm:"column:state_id;size:66"`
+	BlockchainID uint64                 `gorm:"column:blockchain_id;not null"`
+	Data         datatypes.JSON         `gorm:"column:action_data;type:text"`
+	Status       BlockchainActionStatus `gorm:"column:status;not null"`
+	Retries      uint8                  `gorm:"column:retry_count;default:0"`
+	Error        string                 `gorm:"column:last_error;type:text"`
+	TxHash       string                 `gorm:"column:transaction_hash;size:66"`
+	CreatedAt    time.Time              `gorm:"column:created_at"`
+	UpdatedAt    time.Time              `gorm:"column:updated_at"`
 }
 
 func (BlockchainAction) TableName() string {
@@ -47,39 +47,39 @@ func (BlockchainAction) TableName() string {
 }
 
 // ScheduleCheckpoint queues a blockchain action to checkpoint a state on home blockchain.
-func (s *DBStore) ScheduleCheckpoint(stateID string, chainID uint64) error {
-	return s.scheduleStateEnforcement(stateID, chainID, ActionTypeCheckpoint)
+func (s *DBStore) ScheduleCheckpoint(stateID string, blockchainID uint64) error {
+	return s.scheduleStateEnforcement(stateID, blockchainID, ActionTypeCheckpoint)
 }
 
 // ScheduleInitiateEscrowDeposit queues a blockchain action to initiate escrow deposit on home blockchain.
-func (s *DBStore) ScheduleInitiateEscrowDeposit(stateID string, chainID uint64) error {
-	return s.scheduleStateEnforcement(stateID, chainID, ActionTypeInitiateEscrowDeposit)
+func (s *DBStore) ScheduleInitiateEscrowDeposit(stateID string, blockchainID uint64) error {
+	return s.scheduleStateEnforcement(stateID, blockchainID, ActionTypeInitiateEscrowDeposit)
 }
 
 // ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate withdrawal on non-home blockchain.
-func (s *DBStore) ScheduleInitiateEscrowWithdrawal(stateID string, chainID uint64) error {
-	return s.scheduleStateEnforcement(stateID, chainID, ActionTypeInitiateEscrowWithdrawal)
+func (s *DBStore) ScheduleInitiateEscrowWithdrawal(stateID string, blockchainID uint64) error {
+	return s.scheduleStateEnforcement(stateID, blockchainID, ActionTypeInitiateEscrowWithdrawal)
 }
 
 // ScheduleFinalizeEscrowDeposit schedules a finalize for an escrow deposit operation on non-home blockchain.
-func (s *DBStore) ScheduleFinalizeEscrowDeposit(stateID string, chainID uint64) error {
-	return s.scheduleStateEnforcement(stateID, chainID, ActionTypeFinalizeEscrowDeposit)
+func (s *DBStore) ScheduleFinalizeEscrowDeposit(stateID string, blockchainID uint64) error {
+	return s.scheduleStateEnforcement(stateID, blockchainID, ActionTypeFinalizeEscrowDeposit)
 }
 
 // ScheduleFinalizeEscrowWithdrawal schedules a finalize for an escrow withdrawal operation on non-home blockchain.
-func (s *DBStore) ScheduleFinalizeEscrowWithdrawal(stateID string, chainID uint64) error {
-	return s.scheduleStateEnforcement(stateID, chainID, ActionTypeFinalizeEscrowWithdrawal)
+func (s *DBStore) ScheduleFinalizeEscrowWithdrawal(stateID string, blockchainID uint64) error {
+	return s.scheduleStateEnforcement(stateID, blockchainID, ActionTypeFinalizeEscrowWithdrawal)
 }
 
 // scheduleStateEnforcement is a helper to create a blockchain action for state enforcement.
-func (s *DBStore) scheduleStateEnforcement(stateID string, chainID uint64, actionType BlockchainActionType) error {
+func (s *DBStore) scheduleStateEnforcement(stateID string, blockchainID uint64, actionType BlockchainActionType) error {
 	action := &BlockchainAction{
-		Type:      actionType,
-		StateID:   stateID,
-		ChainID:   chainID,
-		Status:    BlockchainActionStatusPending,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Type:         actionType,
+		StateID:      stateID,
+		BlockchainID: blockchainID,
+		Status:       BlockchainActionStatusPending,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
 	return s.db.Create(action).Error
@@ -122,9 +122,9 @@ func (s *DBStore) updateAction(actionID int64, status BlockchainActionStatus, tx
 	return nil
 }
 
-func (s *DBStore) GetActions(limit uint8, chainID uint64) ([]BlockchainAction, error) {
+func (s *DBStore) GetActions(limit uint8, blockchainID uint64) ([]BlockchainAction, error) {
 	var actions []BlockchainAction
-	query := s.db.Where("status = ? AND chain_id = ?", BlockchainActionStatusPending, chainID).Order("created_at ASC")
+	query := s.db.Where("status = ? AND blockchain_id = ?", BlockchainActionStatusPending, blockchainID).Order("created_at ASC")
 	if limit > 0 {
 		query = query.Limit(int(limit))
 	}

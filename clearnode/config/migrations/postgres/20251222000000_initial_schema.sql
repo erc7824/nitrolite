@@ -6,7 +6,7 @@ CREATE TABLE channels (
     channel_id CHAR(66) PRIMARY KEY,
     user_wallet CHAR(42) NOT NULL,
     type SMALLINT NOT NULL, -- ChannelType enum: 0=void, 1=home, 2=escrow
-    blockchain_id INTEGER NOT NULL, -- uint32
+    blockchain_id INTEGER NOT NULL, -- uint64
     token CHAR(42) NOT NULL,
     challenge_duration BIGINT NOT NULL DEFAULT 0,
     challenge_expires_at TIMESTAMPTZ,
@@ -125,25 +125,23 @@ CREATE INDEX idx_app_ledger_v1_wallet ON app_ledger_v1(wallet);
 -- Contract events table: Blockchain event logs
 CREATE TABLE contract_events (
     id BIGSERIAL PRIMARY KEY,
-    contract_address VARCHAR(255) NOT NULL,
-    chain_id INTEGER NOT NULL,
+    contract_address CHAR(42) NOT NULL,
+    blockchain_id INTEGER NOT NULL,
     name VARCHAR(255) NOT NULL,
     block_number BIGINT NOT NULL,
     transaction_hash VARCHAR(255) NOT NULL,
     log_index INTEGER NOT NULL DEFAULT 0,
-    data JSONB NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX contract_events_tx_log_chain_idx ON contract_events (transaction_hash, log_index, chain_id);
-CREATE INDEX idx_contract_events_block ON contract_events(chain_id, block_number);
-
+CREATE UNIQUE INDEX contract_events_tx_log_chain_idx ON contract_events (transaction_hash, log_index, blockchain_id);
+CREATE INDEX idx_contract_events_block ON contract_events(blockchain_id, block_number);
 -- Blockchain actions table: Pending blockchain operations
 CREATE TABLE blockchain_actions (
     id BIGSERIAL PRIMARY KEY,
     action_type SMALLINT NOT NULL,
     state_id CHAR(66),
-    chain_id INTEGER NOT NULL,
+    blockchain_id INTEGER NOT NULL,
     action_data JSONB,
     status SMALLINT NOT NULL DEFAULT 0,
     retry_count INTEGER NOT NULL DEFAULT 0,

@@ -41,7 +41,6 @@ type Config struct {
 	Database                    database.DatabaseConfig
 	ChannelMinChallengeDuration uint32 `yaml:"channel_min_challenge_duration" env:"CLEARNODE_CHANNEL_MIN_CHALLENGE_DURATION" env-default:"86400"` // 24 hours
 	SignerKey                   string `yaml:"signer_key" env:"CLEARNODE_SIGNER_KEY,required"`
-	ConfigDirPath               string `yaml:"config_dir_path" env:"CLEARNODE_CONFIG_DIR_PATH" env-default:"."`
 }
 
 // InitBackbone initializes the backbone components of the application.
@@ -61,18 +60,24 @@ func InitBackbone() *Backbone {
 	// (Preparation)
 	// ------------------------------------------------
 
-	var conf Config
-	if err := cleanenv.ReadEnv(&conf); err != nil {
-		logger.Fatal("failed to read env", "err", err)
+	configDirPath := os.Getenv("CLEARNODE_CONFIG_DIR_PATH")
+	if configDirPath == "" {
+		configDirPath = "."
 	}
 
-	configDotEnvPath := filepath.Join(conf.ConfigDirPath, ".env")
+	configDotEnvPath := filepath.Join(configDirPath, ".env")
 	logger.Info("loading .env file", "path", configDotEnvPath)
 	if err := godotenv.Load(configDotEnvPath); err != nil {
 		logger.Warn(".env file not found")
 	}
 
+	var conf Config
+	if err := cleanenv.ReadEnv(&conf); err != nil {
+		logger.Fatal("failed to read env", "err", err)
+	}
+
 	logger.Info("config loaded", "version", Version)
+
 	// ------------------------------------------------
 	// Database Store
 	// ------------------------------------------------
@@ -87,7 +92,7 @@ func InitBackbone() *Backbone {
 	// Memory Store
 	// ------------------------------------------------
 
-	memoryStore, err := memory.NewMemoryStoreV1FromConfig(conf.ConfigDirPath)
+	memoryStore, err := memory.NewMemoryStoreV1FromConfig(configDirPath)
 	if err != nil {
 		logger.Fatal("failed to load blockchains", "error", err)
 	}
@@ -131,6 +136,7 @@ func InitBackbone() *Backbone {
 		if err := checkChainId(rpcURL, bc.ID); err != nil {
 			logger.Fatal("failed to verify blockchain RPC", "blockchainID", bc.ID, "error", err)
 		}
+		blockchainRPCs[bc.ID] = rpcURL
 	}
 
 	return &Backbone{

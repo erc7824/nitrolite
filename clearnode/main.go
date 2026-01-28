@@ -88,7 +88,7 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("pxrometheus metrics available", "listenAddr", metricsListenAddr, "endpoint", metricsEndpoint)
+		logger.Info("prometheus metrics available", "listenAddr", metricsListenAddr, "endpoint", metricsEndpoint)
 		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("metrics server failure", "error", err)
 		}

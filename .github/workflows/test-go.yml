@@ -2,17 +2,17 @@ name: Test Go Project
 
 on:
   workflow_call:
-    inputs:
-      project-path:
-        description: 'Path to the Go project directory'
-        required: false
-        type: string
-        default: 'clearnode'
-      project-name:
-        description: 'Human-readable name for the project'
-        required: false
-        type: string
-        default: 'Go Project'
+    # inputs:
+    #   project-path:
+    #     description: 'Path to the Go project directory'
+    #     required: false
+    #     type: string
+    #     default: 'clearnode'
+    #   project-name:
+    #     description: 'Human-readable name for the project'
+    #     required: false
+    #     type: string
+    #     default: 'Go Project'
 
 jobs:
   test:
@@ -26,14 +26,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: '${{ inputs.project-path }}/go.mod'
+          go-version-file: 'go.mod'
           cache: true
-          cache-dependency-path: '${{ inputs.project-path }}/go.sum'
+          cache-dependency-path: 'go.sum'
 
       - name: Test
         run: go test -race -cover -covermode=atomic -coverprofile=coverage.txt -v ./...
-        working-directory: ${{ inputs.project-path }}
-      - uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: erc7824/nitrolite
+
+      # - uses: codecov/codecov-action@v5
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     slug: erc7824/nitrolite

@@ -20,9 +20,10 @@ func mapAssetV1(asset core.Asset) rpc.AssetV1 {
 	}
 
 	return rpc.AssetV1{
-		Name:   asset.Name,
-		Symbol: asset.Symbol,
-		Tokens: tokens,
+		Name:     asset.Name,
+		Symbol:   asset.Symbol,
+		Decimals: asset.Decimals,
+		Tokens:   tokens,
 	}
 }
 

@@ -39,6 +39,18 @@ func NewOperator(wsURL string, store *Storage) (*Operator, error) {
 	// Initialize scenario runner
 	op.scenarioRunner = NewScenarioRunner(op)
 
+	// Monitor WebSocket connection - exit if connection is lost
+	go func() {
+		<-baseClient.WaitCh()
+		fmt.Println("\n⚠️  WebSocket connection lost. Exiting...")
+		select {
+		case <-op.exitCh:
+			// Already closed
+		default:
+			close(op.exitCh)
+		}
+	}()
+
 	return op, nil
 }
 
@@ -339,6 +351,19 @@ func (o *Operator) ensureSmartClient(ctx context.Context) error {
 	}
 
 	o.sdkClient = sdkClient
+
+	// Monitor SDK client connection - exit if connection is lost
+	go func() {
+		<-sdkClient.WaitCh()
+		fmt.Println("\n⚠️  WebSocket connection lost. Exiting...")
+		select {
+		case <-o.exitCh:
+			// Already closed
+		default:
+			close(o.exitCh)
+		}
+	}()
+
 	return nil
 }
 

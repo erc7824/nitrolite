@@ -26,8 +26,9 @@ func TestGetAssets_Success(t *testing.T) {
 	// Test data
 	assets := []core.Asset{
 		{
-			Name:   "USD Coin",
-			Symbol: "USDC",
+			Name:     "USD Coin",
+			Symbol:   "USDC",
+			Decimals: 6,
 			Tokens: []core.Token{
 				{
 					Name:         "USDC on Ethereum",
@@ -95,6 +96,7 @@ func TestGetAssets_Success(t *testing.T) {
 	// Verify USDC asset
 	assert.Equal(t, "USD Coin", response.Assets[0].Name)
 	assert.Equal(t, "USDC", response.Assets[0].Symbol)
+	assert.Equal(t, uint8(6), response.Assets[0].Decimals)
 	assert.Len(t, response.Assets[0].Tokens, 2)
 	assert.Equal(t, "USDC on Ethereum", response.Assets[0].Tokens[0].Name)
 	assert.Equal(t, "USDC", response.Assets[0].Tokens[0].Symbol)

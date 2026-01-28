@@ -6,13 +6,13 @@ CREATE TABLE channels (
     channel_id CHAR(66) PRIMARY KEY,
     user_wallet CHAR(42) NOT NULL,
     type SMALLINT NOT NULL, -- ChannelType enum: 0=void, 1=home, 2=escrow
-    blockchain_id BIGINT NOT NULL, -- uint64
+    blockchain_id NUMERIC(20,0) NOT NULL,
     token CHAR(42) NOT NULL,
     challenge_duration BIGINT NOT NULL DEFAULT 0,
     challenge_expires_at TIMESTAMPTZ,
-    nonce BIGINT NOT NULL DEFAULT 0,
+    nonce NUMERIC(20,0) NOT NULL DEFAULT 0,
     status SMALLINT NOT NULL, -- ChannelStatus enum: 0=void, 1=open, 2=challenged, 3=closed
-    state_version BIGINT NOT NULL DEFAULT 0,
+    state_version NUMERIC(20,0) NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -26,8 +26,8 @@ CREATE TABLE channel_states (
     transitions JSONB NOT NULL, -- JSON array of state transitions
     asset VARCHAR(20) NOT NULL,
     user_wallet CHAR(42) NOT NULL,
-    epoch BIGINT NOT NULL,
-    version BIGINT NOT NULL,
+    epoch NUMERIC(20,0) NOT NULL,
+    version NUMERIC(20,0) NOT NULL,
 
     -- Optional channel references
     home_channel_id CHAR(66),
@@ -68,10 +68,7 @@ CREATE TABLE transactions (
     sender_new_state_id CHAR(66),
     receiver_new_state_id CHAR(66),
     amount NUMERIC(78, 18) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    FOREIGN KEY (sender_new_state_id) REFERENCES channel_states(id) ON DELETE SET NULL,
-    FOREIGN KEY (receiver_new_state_id) REFERENCES channel_states(id) ON DELETE SET NULL
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_transactions_type ON transactions(tx_type);
@@ -85,10 +82,10 @@ CREATE INDEX idx_transactions_to_comp ON transactions(to_account, asset_symbol, 
 CREATE TABLE app_sessions_v1 (
     id CHAR(66) PRIMARY KEY,
     application VARCHAR NOT NULL,
-    nonce BIGINT NOT NULL,
+    nonce NUMERIC(20,0) NOT NULL,
     session_data TEXT NOT NULL,
     quorum SMALLINT NOT NULL DEFAULT 100,
-    version BIGINT NOT NULL DEFAULT 1,
+    version NUMERIC(20,0) NOT NULL DEFAULT 1,
     status SMALLINT NOT NULL, -- AppSessionStatus enum
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -126,11 +123,11 @@ CREATE INDEX idx_app_ledger_v1_wallet ON app_ledger_v1(wallet);
 CREATE TABLE contract_events (
     id BIGSERIAL PRIMARY KEY,
     contract_address CHAR(42) NOT NULL,
-    blockchain_id BIGINT NOT NULL,
+    blockchain_id NUMERIC(20,0) NOT NULL,
     name VARCHAR(255) NOT NULL,
-    block_number BIGINT NOT NULL,
+    block_number NUMERIC(20,0) NOT NULL,
     transaction_hash VARCHAR(255) NOT NULL,
-    log_index INTEGER NOT NULL DEFAULT 0,
+    log_index BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -141,10 +138,10 @@ CREATE TABLE blockchain_actions (
     id BIGSERIAL PRIMARY KEY,
     action_type SMALLINT NOT NULL,
     state_id CHAR(66),
-    blockchain_id BIGINT NOT NULL,
+    blockchain_id NUMERIC(20,0) NOT NULL,
     action_data JSONB,
     status SMALLINT NOT NULL DEFAULT 0,
-    retry_count INTEGER NOT NULL DEFAULT 0,
+    retry_count SMALLINT NOT NULL DEFAULT 0,
     last_error TEXT,
     transaction_hash CHAR(66),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -206,3 +203,22 @@ DROP TABLE IF EXISTS channel_states;
 DROP INDEX IF EXISTS idx_channels_status;
 DROP INDEX IF EXISTS idx_channels_user_wallet;
 DROP TABLE IF EXISTS channels;
+
+INSERT INTO "transactions" (
+    "id",
+    "tx_type",
+    "asset_symbol",
+    "from_account",
+    "to_account",
+    "sender_new_state_id",
+    "receiver_new_state_id",
+    "amount",
+    "created_at"
+) VALUES (
+    '0xfb690ebdab8bf5a335c33ec3db25db2985cc2a2f6af24552c3e63663435e0b86',
+    10,
+    'usdc',
+    '0x746a4a0c91bb8dbaa1c24fa596f3c7391ddbbc3ac4345dbbca75a109df2761e8',
+    '0x053aEAD7d3eebE4359300fDE849bCD9E77384989',
+    '0x5e95450726aa23be1bb3ae6f5e6b8b017efb6981c424abf2a7d67986a1938aec'
+    ,NULL,'1','2026-01-28 15:05:38.064')

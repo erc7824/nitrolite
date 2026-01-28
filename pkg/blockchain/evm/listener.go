@@ -43,7 +43,7 @@ func NewListener(contractAddress common.Address, client bind.ContractBackend, bl
 		client:          client,
 		blockchainID:    blockchainID,
 		blockStep:       blockStep,
-		logger:          logger,
+		logger:          logger.WithName("evm"),
 		handleEvent:     eventHandler,
 		getLatestEvent:  getLatestEvent,
 	}

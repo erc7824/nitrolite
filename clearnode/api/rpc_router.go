@@ -31,7 +31,7 @@ func NewRPCRouter(
 ) *RPCRouter {
 	r := &RPCRouter{
 		Node: node,
-		lg:   logger.WithName("rpcRouter"),
+		lg:   logger.WithName("rpc-router"),
 	}
 
 	r.Node.Use(r.LoggerMiddleware)

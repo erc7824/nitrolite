@@ -1,8 +1,8 @@
 # Clearnode Go SDK
 
-Go SDK for Clearnode payment channels with two levels of abstraction:
-- **Smart Client**: High-level operations (`Deposit`, `Withdraw`, `Transfer`) with automatic state management
-- **Base Client**: Low-level RPC access for custom flows and advanced use cases
+Go SDK for Clearnode payment channels providing both high-level and low-level operations in a unified client:
+- **High-Level Operations**: `Deposit`, `Withdraw`, `Transfer` with automatic state management
+- **Low-Level Operations**: Direct RPC access for custom flows and advanced use cases
 
 ## Installation
 
@@ -12,7 +12,7 @@ go get github.com/erc7824/nitrolite/sdk/go
 
 ## Quick Start
 
-### Smart Client (Recommended for Most Users)
+### Unified Client (High-Level + Low-Level)
 
 ```go
 package main
@@ -25,70 +25,70 @@ import (
 )
 
 func main() {
-    // Create signer from private key
-    signer, _ := sign.NewEthereumRawSigner(privateKeyHex)
+    // Create signers from private key
+    stateSigner, _ := sign.NewEthereumMsgSigner(privateKeyHex)
+    txSigner, _ := sign.NewEthereumRawSigner(privateKeyHex)
 
-    // Create smart client
-    client, _ := sdk.NewSmartClient(
+    // Create unified client
+    client, _ := sdk.NewClient(
         "wss://clearnode.example.com/ws",
-        signer,
+        stateSigner,
+        txSigner,
         sdk.WithBlockchainRPC(80002, "https://polygon-amoy.alchemy.com/v2/KEY"),
     )
     defer client.Close()
 
     ctx := context.Background()
 
-    // Simple operations - SDK handles everything
+    // High-level operations - SDK handles everything
     txHash, _ := client.Deposit(ctx, 80002, "usdc", decimal.NewFromInt(100))
     txID, _ := client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
     txHash, _ = client.Withdraw(ctx, 80002, "usdc", decimal.NewFromInt(25))
+
+    // Low-level operations - same client
+    config, _ := client.GetConfig(ctx)
+    balances, _ := client.GetBalances(ctx, walletAddress)
+    state, _ := client.GetLatestState(ctx, wallet, asset, false)
 }
-```
-
-### Base Client (For Low-Level Access)
-
-```go
-// Create base client
-client, _ := sdk.NewClient("ws://localhost:7824/ws")
-defer client.Close()
-
-// Low-level operations
-config, _ := client.GetConfig(ctx)
-balances, _ := client.GetBalances(ctx, walletAddress)
-state, _ := client.GetLatestState(ctx, wallet, asset, false)
 ```
 
 ## Architecture
 
 ```
 sdk/go/
-├── base_client.go    # 18 low-level RPC methods
-├── smart_client.go   # High-level: Deposit/Withdraw/Transfer
+├── client.go         # Unified client with all methods
 ├── config.go         # Configuration options
 └── transform.go      # Type conversions
 ```
 
 **Design Principles:**
 - Zero SDK-specific types - all types from `pkg/core`, `pkg/app`, and `pkg/sign`
-- Smart Client embeds Base Client (all methods available)
+- Single unified client with both high-level and low-level methods
 - Uses `pkg/sign` for state signing (no SDK-specific signing wrapper)
-- Automatic flow management (channel creation, state building, signing)
+- Automatic flow management for high-level operations (channel creation, state building, signing)
+- Direct RPC access for low-level operations
 
-## Smart Client API
+## Client API
 
 ### Creating a Client
 
 ```go
-// Step 1: Create signer from private key
-signer, err := sign.NewEthereumRawSigner("0x1234...")
+// Step 1: Create signers from private key
+stateSigner, err := sign.NewEthereumMsgSigner("0x1234...")
 if err != nil {
     log.Fatal(err)
 }
 
-// Step 2: Create smart client
-client, err := sdk.NewSmartClient(
+txSigner, err := sign.NewEthereumRawSigner("0x1234...")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Step 2: Create unified client
+client, err := sdk.NewClient(
     wsURL,
-    signer,
+    stateSigner,  // For signing channel states
+    txSigner,     // For signing blockchain transactions
     sdk.WithBlockchainRPC(chainID, rpcURL), // Required for Deposit/Withdraw
     sdk.WithHandshakeTimeout(10*time.Second),
     sdk.WithPingInterval(5*time.Second),
@@ -138,9 +138,9 @@ txHash, err := client.Withdraw(ctx, 80002, "usdc", decimal.NewFromInt(25))
 - Blockchain RPC configured
 - Sufficient gas for transaction
 
-## Base Client API
+## Low-Level API
 
-All base client methods are available on Smart Client through embedding.
+All low-level RPC methods are available on the same Client instance.
 
 ### Node Information
 
@@ -155,15 +155,20 @@ assets, err := client.GetAssets(ctx, &blockchainID) // or nil for all
 
 ```go
 balances, err := client.GetBalances(ctx, wallet)
-channels, meta, err := client.GetChannels(ctx, wallet, opts)
 txs, meta, err := client.GetTransactions(ctx, wallet, opts)
+```
+
+### Channel Queries
+
+```go
+channel, err := client.GetHomeChannel(ctx, wallet, asset)
+channel, err := client.GetEscrowChannel(ctx, escrowChannelID)
 ```
 
 ### State Management (Low-Level)
 
 ```go
 state, err := client.GetLatestState(ctx, wallet, asset, onlySigned)
-states, meta, err := client.GetStates(ctx, wallet, asset, opts)
 nodeSig, err := client.SubmitState(ctx, state)
 nodeSig, err := client.RequestChannelCreation(ctx, state, channelDef)
 ```
@@ -186,16 +191,16 @@ batchID, err := client.RebalanceAppSessions(ctx, signedUpdates)
 Payment channels use versioned states signed by both user and node:
 
 ```go
-// Smart Client handles this automatically
+// High-level operations handle state management automatically
 client.Deposit(...)  // Creates/updates state, signs, submits
 
-// Base Client requires manual state building
+// Low-level operations require manual state building
 state, _ := client.GetLatestState(ctx, wallet, asset, false)
 nextState := state.NextState()
 transition, _ := nextState.ApplyHomeDepositTransition(amount)
 nextState.ID = core.GetStateID(nextState.UserWallet, nextState.Asset,
                                 nextState.Epoch, nextState.Version)
-sig, _ := signer.SignState(nextState)
+sig, _ := client.SignState(nextState)
 nextState.UserSig = &sig
 nodeSig, _ := client.SubmitState(ctx, *nextState)
 ```
@@ -205,11 +210,12 @@ nodeSig, _ := client.SubmitState(ctx, *nextState)
 States are signed using ECDSA with EIP-155 via `pkg/sign`:
 
 ```go
-// Create signer from private key
-signer, err := sign.NewEthereumRawSigner(privateKeyHex)
+// Create signers from private key
+stateSigner, err := sign.NewEthereumMsgSigner(privateKeyHex)  // For channel states
+txSigner, err := sign.NewEthereumRawSigner(privateKeyHex)     // For blockchain transactions
 
 // Get address
-address := signer.PublicKey().Address().String()
+address := txSigner.PublicKey().Address().String()
 ```
 
 **Signing Process:**
@@ -217,6 +223,10 @@ address := signer.PublicKey().Address().String()
 2. Packed State → Keccak256 Hash
 3. Hash → ECDSA Sign (via `signer.Sign`)
 4. Result: 65-byte signature (R || S || V)
+
+**Two Signer Types:**
+- `EthereumMsgSigner`: Signs channel state updates (off-chain signatures)
+- `EthereumRawSigner`: Signs blockchain transactions (on-chain operations)
 
 ### Channel Lifecycle
 
@@ -226,15 +236,15 @@ address := signer.PublicKey().Address().String()
 4. **Challenged**: Dispute initiated (advanced)
 5. **Closed**: Channel finalized (advanced)
 
-## When to Use Which Client
+## When to Use High-Level vs Low-Level Operations
 
-### Use Smart Client When:
+### Use High-Level Operations When:
 - Building user-facing applications
 - Need simple deposit/withdraw/transfer
 - Want automatic state management
 - Don't need custom flows
 
-### Use Base Client When:
+### Use Low-Level Operations When:
 - Building infrastructure/tooling
 - Implementing custom state transitions
 - Need fine-grained control
@@ -288,27 +298,13 @@ Features:
 - Wallet and RPC management
 - Colorful, easy-to-use interface
 
-### 2. Smart Client Example
+### 2. Programmatic Example
 
-Programmatic usage of high-level operations.
+Basic usage of both high-level and low-level operations.
 
-See [examples/smart/main.go](examples/smart/main.go)
-
-```bash
-cd examples/smart
-PRIVATE_KEY=0x... CLEARNODE_WS=wss://... POLYGON_RPC=https://... go run main.go
-```
-
-### 3. Base Client Example
-
-Low-level RPC operations.
-
-See [examples/basic/main.go](examples/basic/main.go)
-
-```bash
-cd examples/basic
-go run main.go
-```
+See [examples/basic/main.go](examples/basic/main.go) for examples of:
+- High-level operations (Deposit, Withdraw, Transfer)
+- Low-level operations (GetConfig, GetBalances, GetLatestState, etc.)
 
 ## Types
 
@@ -330,9 +326,9 @@ app.AppDefinitionV1       // Session definition
 app.AppStateUpdateV1      // Session update
 ```
 
-## Smart Client Internals
+## High-Level Operation Internals
 
-For understanding how operations work:
+For understanding how high-level operations work:
 
 ### Transfer Flow
 1. Get latest state

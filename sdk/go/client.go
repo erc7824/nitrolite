@@ -10,6 +10,7 @@ import (
 
 	"github.com/erc7824/nitrolite/pkg/blockchain/evm"
 	"github.com/erc7824/nitrolite/pkg/core"
+	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -17,33 +18,34 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// SDKClient provides high-level methods for interacting with Clearnode.
-// It extends the base Client with smart operations like Deposit, Withdraw, and Transfer
-// that handle complex multi-step flows automatically.
+// Client provides a unified interface for interacting with Clearnode.
+// It combines both high-level operations (Deposit, Withdraw, Transfer) and
+// low-level RPC access for advanced use cases.
 //
-// Example usage:
+// High-level example:
 //
-//	signer, err := sign.NewEthereumRawSigner(privateKeyHex)
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//
-//	client, err := sdk.NewSDKClient(
+//	stateSigner, _ := sign.NewEthereumMsgSigner(privateKeyHex)
+//	txSigner, _ := sign.NewEthereumRawSigner(privateKeyHex)
+//	client, _ := sdk.NewClient(
 //	    "wss://clearnode.example.com/ws",
-//	    signer,
+//	    stateSigner,
+//	    txSigner,
 //	    sdk.WithBlockchainRPC(80002, "https://polygon-amoy.alchemy.com/v2/KEY"),
 //	)
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
 //	defer client.Close()
 //
-//	// Simple operations
-//	txHash, err := client.Deposit(ctx, 80002, "usdc", decimal.NewFromInt(100))
-//	txID, err := client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
-//	txHash, err := client.Withdraw(ctx, 80002, "usdc", decimal.NewFromInt(25))
-type SDKClient struct {
-	*Client
+//	// High-level operations
+//	txHash, _ := client.Deposit(ctx, 80002, "usdc", decimal.NewFromInt(100))
+//	txID, _ := client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
+//
+//	// Low-level operations
+//	config, _ := client.GetConfig(ctx)
+//	balances, _ := client.GetBalances(ctx, walletAddress)
+type Client struct {
+	rpcDialer         rpc.Dialer
+	rpcClient         *rpc.Client
+	config            Config
+	exitCh            chan struct{}
 	blockchainClients map[uint64]*evm.Client
 	stateSigner       sign.Signer
 	txSigner          sign.Signer
@@ -114,47 +116,178 @@ func (s *clientAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress st
 	return 0, fmt.Errorf("token %s on blockchain %d not found", tokenAddress, blockchainID)
 }
 
-// NewSDKClient creates a new SDKClient and establishes a connection to the Clearnode server.
-// It initializes the RPC client and sets up the signer for state operations.
+// NewClient creates a new Clearnode client with both high-level and low-level methods.
+// This is the recommended constructor for most use cases.
 //
 // Parameters:
 //   - wsURL: WebSocket URL of the Clearnode server (e.g., "wss://clearnode.example.com/ws")
-//   - signer: sign.Signer for signing channel states (use sign.NewEthereumRawSigner)
+//   - stateSigner: sign.Signer for signing channel states (use sign.NewEthereumMsgSigner)
+//   - txSigner: sign.Signer for signing blockchain transactions (use sign.NewEthereumRawSigner)
 //   - opts: Optional configuration (WithBlockchainRPC, WithHandshakeTimeout, etc.)
 //
 // Returns:
-//   - Configured SDKClient ready for high-level operations
+//   - Configured Client ready for operations
 //   - Error if connection or initialization fails
 //
 // Example:
 //
-//	signer, _ := sign.NewEthereumRawSigner(privateKeyHex)
-//	client, err := sdk.NewSDKClient(
+//	stateSigner, _ := sign.NewEthereumMsgSigner(privateKeyHex)
+//	txSigner, _ := sign.NewEthereumRawSigner(privateKeyHex)
+//	client, err := sdk.NewClient(
 //	    "wss://clearnode.example.com/ws",
-//	    signer,
+//	    stateSigner,
+//	    txSigner,
 //	    sdk.WithBlockchainRPC(80002, "https://polygon-amoy.alchemy.com/v2/KEY"),
 //	)
-func NewSDKClient(wsURL string, stateSigner, txSigner sign.Signer, opts ...Option) (*SDKClient, error) {
-	// Create base client
-	baseClient, err := NewClient(wsURL, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create base client: %w", err)
+func NewClient(wsURL string, stateSigner, txSigner sign.Signer, opts ...Option) (*Client, error) {
+	// Build config starting with defaults
+	config := DefaultConfig
+	config.URL = wsURL
+
+	// Apply user options
+	for _, opt := range opts {
+		opt(&config)
 	}
 
-	// Create asset store
-	assetStore := newClientAssetStore(baseClient)
+	// Create WebSocket dialer with configuration
+	dialerConfig := rpc.DefaultWebsocketDialerConfig
+	dialerConfig.HandshakeTimeout = config.HandshakeTimeout
+	dialerConfig.PingInterval = config.PingInterval
 
-	// Create smart client
-	sdkClient := &SDKClient{
-		Client:            baseClient,
+	dialer := rpc.NewWebsocketDialer(dialerConfig)
+	rpcClient := rpc.NewClient(dialer)
+
+	// Create client instance
+	client := &Client{
+		rpcDialer:         dialer,
+		rpcClient:         rpcClient,
+		config:            config,
+		exitCh:            make(chan struct{}),
 		blockchainClients: make(map[uint64]*evm.Client),
 		stateSigner:       stateSigner,
 		txSigner:          txSigner,
-		assetStore:        assetStore,
 	}
 
-	return sdkClient, nil
+	// Create asset store
+	client.assetStore = newClientAssetStore(client)
+
+	// Error handler wrapper
+	handleError := func(err error) {
+		if config.ErrorHandler != nil {
+			config.ErrorHandler(err)
+		}
+		close(client.exitCh)
+	}
+
+	// Establish connection
+	err := rpcClient.Start(context.Background(), wsURL, handleError)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to clearnode: %w", err)
+	}
+
+	return client, nil
 }
+
+// ============================================================================
+// Connection & Lifecycle Methods
+// ============================================================================
+
+// Close cleanly shuts down the client connection.
+// It's recommended to defer this call after creating the client.
+//
+// Example:
+//
+//	client, err := NewClient(...)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer client.Close()
+func (c *Client) Close() error {
+	// The dialer handles connection cleanup internally
+	select {
+	case <-c.exitCh:
+		// Already closed
+	default:
+		close(c.exitCh)
+	}
+	return nil
+}
+
+// WaitCh returns a channel that closes when the connection is lost or closed.
+// This is useful for monitoring connection health in long-running applications.
+//
+// Example:
+//
+//	go func() {
+//	    <-client.WaitCh()
+//	    log.Println("Connection closed")
+//	}()
+func (c *Client) WaitCh() <-chan struct{} {
+	return c.exitCh
+}
+
+// ============================================================================
+// Shared Helper Methods
+// ============================================================================
+
+// SignState signs a channel state by packing it, hashing it, and signing the hash.
+// Returns the signature as a hex-encoded string (with 0x prefix).
+//
+// This is a low-level method exposed for advanced users who want to manually
+// construct and sign states. Most users should use the high-level methods like
+// Transfer, Deposit, and Withdraw instead.
+func (c *Client) SignState(state *core.State) (string, error) {
+	if state == nil {
+		return "", fmt.Errorf("state cannot be nil")
+	}
+
+	// Pack the state into ABI-encoded bytes
+	packedState, err := core.PackState(*state, c.assetStore)
+	if err != nil {
+		return "", fmt.Errorf("failed to pack state: %w", err)
+	}
+
+	// Sign the hash
+	signature, err := c.stateSigner.Sign(packedState)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign state hash: %w", err)
+	}
+
+	// Return hex-encoded signature with 0x prefix
+	return hexutil.Encode(signature), nil
+}
+
+// GetUserAddress returns the Ethereum address associated with the signer.
+// This is useful for identifying the current user's wallet address.
+func (c *Client) GetUserAddress() string {
+	return c.stateSigner.PublicKey().Address().String()
+}
+
+// signAndSubmitState is a helper that signs a state and submits it to the node.
+// It returns the node's signature.
+func (c *Client) signAndSubmitState(ctx context.Context, state *core.State) (string, error) {
+	// Sign state
+	sig, err := c.SignState(state)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign state: %w", err)
+	}
+	state.UserSig = &sig
+
+	// Submit to node
+	nodeSig, err := c.SubmitState(ctx, *state)
+	if err != nil {
+		return "", fmt.Errorf("failed to submit state: %w", err)
+	}
+
+	// Update state with node signature
+	state.NodeSig = &nodeSig
+
+	return nodeSig, nil
+}
+
+// ============================================================================
+// High-Level Operations (Blockchain Interaction)
+// ============================================================================
 
 // WithBlockchainRPC returns an Option that configures a blockchain RPC client for a specific chain.
 // This is required for operations that interact with the blockchain (Deposit, Withdraw).
@@ -165,9 +298,10 @@ func NewSDKClient(wsURL string, stateSigner, txSigner sign.Signer, opts ...Optio
 //
 // Example:
 //
-//	client, err := sdk.NewSDKClient(
+//	client, err := sdk.NewClient(
 //	    wsURL,
-//	    signer,
+//	    stateSigner,
+//	    txSigner,
 //	    sdk.WithBlockchainRPC(80002, "https://polygon-amoy.alchemy.com/v2/KEY"),
 //	    sdk.WithBlockchainRPC(84532, "https://base-sepolia.alchemy.com/v2/KEY"),
 //	)
@@ -183,7 +317,7 @@ func WithBlockchainRPC(chainID uint64, rpcURL string) Option {
 
 // initializeBlockchainClient initializes a blockchain client for a specific chain.
 // This is called lazily when a blockchain operation is needed.
-func (c *SDKClient) initializeBlockchainClient(ctx context.Context, chainID uint64) error {
+func (c *Client) initializeBlockchainClient(ctx context.Context, chainID uint64) error {
 	// Check if already initialized
 	if _, exists := c.blockchainClients[chainID]; exists {
 		return nil
@@ -200,14 +334,12 @@ func (c *SDKClient) initializeBlockchainClient(ctx context.Context, chainID uint
 	if err != nil {
 		return err
 	}
-	fmt.Printf("DEBUG: Contract address for chain %d: %s\n", chainID, contractAddress)
 
 	// Get node address
 	nodeAddress, err := c.getNodeAddress(ctx)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("DEBUG: Node address: %s\n", nodeAddress)
 
 	// Connect to blockchain
 	ethClient, err := ethclient.Dial(rpcURL)
@@ -244,7 +376,7 @@ func generateNonce() uint64 {
 }
 
 // getTokenAddress looks up the token address for an asset on a specific blockchain.
-func (c *SDKClient) getTokenAddress(ctx context.Context, blockchainID uint64, asset string) (string, error) {
+func (c *Client) getTokenAddress(ctx context.Context, blockchainID uint64, asset string) (string, error) {
 	assets, err := c.GetAssets(ctx, &blockchainID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get assets: %w", err)
@@ -266,7 +398,7 @@ func (c *SDKClient) getTokenAddress(ctx context.Context, blockchainID uint64, as
 }
 
 // getContractAddress retrieves the contract address for a specific blockchain from node config.
-func (c *SDKClient) getContractAddress(ctx context.Context, blockchainID uint64) (string, error) {
+func (c *Client) getContractAddress(ctx context.Context, blockchainID uint64) (string, error) {
 	nodeConfig, err := c.GetConfig(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get node config: %w", err)
@@ -282,160 +414,12 @@ func (c *SDKClient) getContractAddress(ctx context.Context, blockchainID uint64)
 }
 
 // getNodeAddress retrieves the node's Ethereum address from the node config.
-func (c *SDKClient) getNodeAddress(ctx context.Context) (string, error) {
+func (c *Client) getNodeAddress(ctx context.Context) (string, error) {
 	nodeConfig, err := c.GetConfig(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get node config: %w", err)
 	}
 	return nodeConfig.NodeAddress, nil
-}
-
-// SignState signs a channel state by packing it, hashing it, and signing the hash.
-// Returns the signature as a hex-encoded string (with 0x prefix).
-//
-// This is a low-level method exposed for advanced users who want to manually
-// construct and sign states. Most users should use the high-level methods like
-// Transfer, Deposit, and Withdraw instead.
-func (c *SDKClient) SignState(state *core.State) (string, error) {
-	if state == nil {
-		return "", fmt.Errorf("state cannot be nil")
-	}
-
-	// Pack the state into ABI-encoded bytes
-	packedState, err := core.PackState(*state, c.assetStore)
-	if err != nil {
-		return "", fmt.Errorf("failed to pack state: %w", err)
-	}
-
-	// Sign the hash
-	signature, err := c.stateSigner.Sign(packedState)
-	if err != nil {
-		return "", fmt.Errorf("failed to sign state hash: %w", err)
-	}
-
-	// Return hex-encoded signature with 0x prefix
-	return hexutil.Encode(signature), nil
-}
-
-// GetUserAddress returns the Ethereum address associated with the signer.
-// This is useful for identifying the current user's wallet address.
-func (c *SDKClient) GetUserAddress() string {
-	return c.stateSigner.PublicKey().Address().String()
-}
-
-// signAndSubmitState is a helper that signs a state and submits it to the node.
-// It returns the node's signature.
-func (c *SDKClient) signAndSubmitState(ctx context.Context, state *core.State) (string, error) {
-	// Sign state
-	sig, err := c.SignState(state)
-	if err != nil {
-		return "", fmt.Errorf("failed to sign state: %w", err)
-	}
-	state.UserSig = &sig
-
-	// Submit to node
-	nodeSig, err := c.SubmitState(ctx, *state)
-	if err != nil {
-		return "", fmt.Errorf("failed to submit state: %w", err)
-	}
-
-	// Update state with node signature
-	state.NodeSig = &nodeSig
-
-	return nodeSig, nil
-}
-
-// waitForTransaction waits for a blockchain transaction to be mined (stub for now).
-// In production, this should poll the blockchain and wait for confirmation.
-func (c *SDKClient) waitForTransaction(ctx context.Context, chainID uint64, txHash string) error {
-	// Get blockchain client
-	client, exists := c.blockchainClients[chainID]
-	if !exists {
-		return fmt.Errorf("blockchain client not initialized for chain %d", chainID)
-	}
-
-	// Use the underlying ethclient to wait for receipt
-	backend := client // This might need adjustment based on evm.Client implementation
-
-	_ = backend // TODO: implement actual receipt waiting
-	_ = txHash
-
-	// For now, return immediately
-	// In production: poll for transaction receipt and check for success
-	return nil
-}
-
-// ============================================================================
-// High-Level Operations
-// ============================================================================
-
-// Transfer sends funds from the user to another wallet address.
-// This is the simplest operation as it doesn't require any blockchain interaction.
-//
-// The flow:
-//  1. Get the sender's latest state
-//  2. Create next state
-//  3. Apply transfer send transition
-//  4. Calculate state ID
-//  5. Sign state
-//  6. Submit to node
-//  7. Return transaction ID
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - recipientWallet: The recipient's wallet address (e.g., "0x1234...")
-//   - asset: The asset symbol to transfer (e.g., "usdc")
-//   - amount: The amount to transfer
-//
-// Returns:
-//   - Transaction ID for tracking
-//   - Error if the operation fails
-//
-// Errors:
-//   - Returns error if channel doesn't exist (user must deposit first)
-//   - Returns error if insufficient balance
-//   - Returns error if state submission fails
-//
-// Example:
-//
-//	txID, err := client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	fmt.Printf("Transfer successful: %s\n", txID)
-func (c *SDKClient) Transfer(ctx context.Context, recipientWallet string, asset string, amount decimal.Decimal) (string, error) {
-	// Get sender's latest state
-	senderWallet := c.GetUserAddress()
-	state, err := c.GetLatestState(ctx, senderWallet, asset, false)
-	if err != nil {
-		return "", fmt.Errorf("failed to get latest state: %w", err)
-	}
-
-	// Check if channel exists
-	if state.HomeChannelID == nil {
-		return "", fmt.Errorf("channel not created, deposit first")
-	}
-
-	// Create next state
-	nextState := state.NextState()
-
-	// Apply transfer send transition
-	transition, err := nextState.ApplyTransferSendTransition(recipientWallet, amount)
-	if err != nil {
-		return "", fmt.Errorf("failed to apply transfer transition: %w", err)
-	}
-
-	// Calculate state ID (already done by NextState, but let's be explicit)
-	nextState.ID = core.GetStateID(nextState.UserWallet, nextState.Asset, nextState.Epoch, nextState.Version)
-
-	// Sign and submit state
-	_, err = c.signAndSubmitState(ctx, nextState)
-	if err != nil {
-		return "", err
-	}
-
-	// Return transaction ID from the transition
-	return transition.TxID, nil
 }
 
 // Deposit adds funds to the user's channel by depositing from the blockchain.
@@ -461,11 +445,8 @@ func (c *SDKClient) Transfer(ctx context.Context, recipientWallet string, asset 
 // Example:
 //
 //	txHash, err := client.Deposit(ctx, 80002, "usdc", decimal.NewFromInt(100))
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
 //	fmt.Printf("Deposit transaction: %s\n", txHash)
-func (c *SDKClient) Deposit(ctx context.Context, blockchainID uint64, asset string, amount decimal.Decimal) (string, error) {
+func (c *Client) Deposit(ctx context.Context, blockchainID uint64, asset string, amount decimal.Decimal) (string, error) {
 	userWallet := c.GetUserAddress()
 
 	// Initialize blockchain client if needed
@@ -495,7 +476,7 @@ func (c *SDKClient) Deposit(ctx context.Context, blockchainID uint64, asset stri
 		// Create channel definition
 		channelDef := core.ChannelDefinition{
 			Nonce:     generateNonce(),
-			Challenge: 86400, // 1 hour challenge period
+			Challenge: 86400, // 1 day challenge period
 		}
 
 		// Create void state
@@ -581,15 +562,6 @@ func (c *SDKClient) Deposit(ctx context.Context, blockchainID uint64, asset stri
 // Withdraw removes funds from the user's channel and returns them to the blockchain wallet.
 // This operation requires an existing channel with sufficient balance.
 //
-// The flow:
-//  1. Get latest state (must exist)
-//  2. Create next state
-//  3. Apply withdrawal transition
-//  4. Calculate state ID
-//  5. Sign state
-//  6. Submit to node
-//  7. Checkpoint on blockchain
-//
 // Parameters:
 //   - ctx: Context for the operation
 //   - blockchainID: The blockchain network ID (e.g., 80002 for Polygon Amoy)
@@ -608,11 +580,8 @@ func (c *SDKClient) Deposit(ctx context.Context, blockchainID uint64, asset stri
 // Example:
 //
 //	txHash, err := client.Withdraw(ctx, 80002, "usdc", decimal.NewFromInt(25))
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
 //	fmt.Printf("Withdrawal transaction: %s\n", txHash)
-func (c *SDKClient) Withdraw(ctx context.Context, blockchainID uint64, asset string, amount decimal.Decimal) (string, error) {
+func (c *Client) Withdraw(ctx context.Context, blockchainID uint64, asset string, amount decimal.Decimal) (string, error) {
 	userWallet := c.GetUserAddress()
 
 	// Initialize blockchain client if needed
@@ -658,4 +627,61 @@ func (c *SDKClient) Withdraw(ctx context.Context, blockchainID uint64, asset str
 	}
 
 	return txHash, nil
+}
+
+// Transfer sends funds from the user to another wallet address.
+// This is the simplest operation as it doesn't require any blockchain interaction.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - recipientWallet: The recipient's wallet address (e.g., "0x1234...")
+//   - asset: The asset symbol to transfer (e.g., "usdc")
+//   - amount: The amount to transfer
+//
+// Returns:
+//   - Transaction ID for tracking
+//   - Error if the operation fails
+//
+// Errors:
+//   - Returns error if channel doesn't exist (user must deposit first)
+//   - Returns error if insufficient balance
+//   - Returns error if state submission fails
+//
+// Example:
+//
+//	txID, err := client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
+//	fmt.Printf("Transfer successful: %s\n", txID)
+func (c *Client) Transfer(ctx context.Context, recipientWallet string, asset string, amount decimal.Decimal) (string, error) {
+	// Get sender's latest state
+	senderWallet := c.GetUserAddress()
+	state, err := c.GetLatestState(ctx, senderWallet, asset, false)
+	if err != nil {
+		return "", fmt.Errorf("failed to get latest state: %w", err)
+	}
+
+	// Check if channel exists
+	if state.HomeChannelID == nil {
+		return "", fmt.Errorf("channel not created, deposit first")
+	}
+
+	// Create next state
+	nextState := state.NextState()
+
+	// Apply transfer send transition
+	transition, err := nextState.ApplyTransferSendTransition(recipientWallet, amount)
+	if err != nil {
+		return "", fmt.Errorf("failed to apply transfer transition: %w", err)
+	}
+
+	// Calculate state ID
+	nextState.ID = core.GetStateID(nextState.UserWallet, nextState.Asset, nextState.Epoch, nextState.Version)
+
+	// Sign and submit state
+	_, err = c.signAndSubmitState(ctx, nextState)
+	if err != nil {
+		return "", err
+	}
+
+	// Return transaction ID from the transition
+	return transition.TxID, nil
 }

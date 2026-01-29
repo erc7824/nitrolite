@@ -83,43 +83,57 @@ func transformBalances(balances []rpc.BalanceEntryV1) []core.BalanceEntry {
 // Channel Transformations
 // ============================================================================
 
+// transformChannel converts a single RPC ChannelV1 to core.Channel.
+func transformChannel(channel rpc.ChannelV1) core.Channel {
+	// Parse channel type
+	var channelType core.ChannelType
+	switch channel.Type {
+	case "home":
+		channelType = core.ChannelTypeHome
+	case "escrow":
+		channelType = core.ChannelTypeEscrow
+	}
+
+	// Parse channel status
+	var channelStatus core.ChannelStatus
+	switch channel.Status {
+	case "void":
+		channelStatus = core.ChannelStatusVoid
+	case "open":
+		channelStatus = core.ChannelStatusOpen
+	case "challenged":
+		channelStatus = core.ChannelStatusChallenged
+	case "closed":
+		channelStatus = core.ChannelStatusClosed
+	}
+
+	// Parse state version (it's a string in RPC, convert to uint64)
+	var stateVersion uint64
+	if channel.StateVersion != "" {
+		parsed, err := strconv.ParseUint(channel.StateVersion, 10, 64)
+		if err == nil {
+			stateVersion = parsed
+		}
+	}
+
+	return core.Channel{
+		ChannelID:         channel.ChannelID,
+		UserWallet:        channel.UserWallet,
+		Type:              channelType,
+		BlockchainID:      channel.BlockchainID,
+		TokenAddress:      channel.TokenAddress,
+		ChallengeDuration: channel.ChallengeDuration,
+		Nonce:             channel.Nonce,
+		Status:            channelStatus,
+		StateVersion:      stateVersion,
+	}
+}
+
 // transformChannels converts RPC ChannelV1 slice to core.Channel slice.
 func transformChannels(channels []rpc.ChannelV1) []core.Channel {
 	result := make([]core.Channel, 0, len(channels))
 	for _, channel := range channels {
-		// Parse channel type
-		var channelType core.ChannelType
-		switch channel.Type {
-		case "home":
-			channelType = core.ChannelTypeHome
-		case "escrow":
-			channelType = core.ChannelTypeEscrow
-		}
-
-		// Parse channel status
-		var channelStatus core.ChannelStatus
-		switch channel.Status {
-		case "void":
-			channelStatus = core.ChannelStatusVoid
-		case "open":
-			channelStatus = core.ChannelStatusOpen
-		case "challenged":
-			channelStatus = core.ChannelStatusChallenged
-		case "closed":
-			channelStatus = core.ChannelStatusClosed
-		}
-
-		result = append(result, core.Channel{
-			ChannelID:         channel.ChannelID,
-			UserWallet:        channel.UserWallet,
-			Type:              channelType,
-			BlockchainID:      channel.BlockchainID,
-			TokenAddress:      channel.TokenAddress,
-			ChallengeDuration: channel.ChallengeDuration,
-			Nonce:             0, // Not in RPC
-			Status:            channelStatus,
-			StateVersion:      0, // Not in RPC
-		})
+		result = append(result, transformChannel(channel))
 	}
 	return result
 }

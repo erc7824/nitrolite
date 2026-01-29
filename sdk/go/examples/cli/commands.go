@@ -45,13 +45,13 @@ NODE INFORMATION (Base Client)
   assets [chain_id]             List supported assets (optionally filter by chain)
 
 USER QUERIES (Base Client)
-  balances <wallet>             Get user balances
-  channels <wallet>             List user channels
-  transactions <wallet>         Get transaction history
+  balances [wallet]             Get user balances (defaults to your wallet)
+  transactions [wallet]         Get transaction history (defaults to your wallet)
 
 LOW-LEVEL STATE MANAGEMENT (Base Client)
-  state <wallet> <asset>        Get latest state
-  states <wallet> <asset>       Get state history
+  state [wallet] <asset>        Get latest state (wallet defaults to yours)
+  home-channel [wallet] <asset> Get home channel (wallet defaults to yours)
+  escrow-channel <channel_id>   Get escrow channel by ID
 
 LOW-LEVEL APP SESSIONS (Base Client)
   app-sessions                  List app sessions
@@ -68,7 +68,9 @@ EXAMPLES
   import rpc 80002 https://polygon-amoy.g.alchemy.com/v2/KEY
   deposit 80002 usdc 100
   transfer 0x1234... usdc 50
-  balances 0x1234...
+  balances              # Uses your imported wallet
+  balances 0x1234...    # Check another wallet
+  state usdc            # Get your state for USDC
   chains`)
 }
 
@@ -108,7 +110,7 @@ func (o *Operator) showConfig(ctx context.Context) {
 	}
 
 	// Node info
-	nodeConfig, err := o.baseClient.GetConfig(ctx)
+	nodeConfig, err := o.client.GetConfig(ctx)
 	if err == nil {
 		fmt.Printf("\n📡 Node Info\n")
 		fmt.Printf("   Address:   %s\n", nodeConfig.NodeAddress)
@@ -230,12 +232,6 @@ func (o *Operator) importWallet(ctx context.Context) {
 		return
 	}
 
-	// Reset smart client to force recreation with new key
-	if o.sdkClient != nil {
-		o.sdkClient.Close()
-		o.sdkClient = nil
-	}
-
 	fmt.Printf("✅ Wallet setup completed successfully\n")
 	fmt.Printf("📍 Address: %s\n", signer.PublicKey().Address().String())
 
@@ -260,12 +256,6 @@ func (o *Operator) importRPC(ctx context.Context, chainIDStr, rpcURL string) {
 		return
 	}
 
-	// Reset smart client to force recreation with new RPC
-	if o.sdkClient != nil {
-		o.sdkClient.Close()
-		o.sdkClient = nil
-	}
-
 	fmt.Printf("✅ RPC imported for chain %d\n", chainID)
 }
 
@@ -274,11 +264,6 @@ func (o *Operator) importRPC(ctx context.Context, chainIDStr, rpcURL string) {
 // ============================================================================
 
 func (o *Operator) deposit(ctx context.Context, chainIDStr, asset, amountStr string) {
-	if err := o.ensureSmartClient(ctx); err != nil {
-		fmt.Printf("❌ %v\n", err)
-		return
-	}
-
 	chainID, err := o.parseChainID(chainIDStr)
 	if err != nil {
 		fmt.Printf("❌ %v\n", err)
@@ -293,7 +278,7 @@ func (o *Operator) deposit(ctx context.Context, chainIDStr, asset, amountStr str
 
 	fmt.Printf("💰 Depositing %s %s on chain %d...\n", amount.String(), asset, chainID)
 
-	txHash, err := o.sdkClient.Deposit(ctx, chainID, asset, amount)
+	txHash, err := o.client.Deposit(ctx, chainID, asset, amount)
 	if err != nil {
 		fmt.Printf("❌ Deposit failed: %v\n", err)
 		return
@@ -304,11 +289,6 @@ func (o *Operator) deposit(ctx context.Context, chainIDStr, asset, amountStr str
 }
 
 func (o *Operator) withdraw(ctx context.Context, chainIDStr, asset, amountStr string) {
-	if err := o.ensureSmartClient(ctx); err != nil {
-		fmt.Printf("❌ %v\n", err)
-		return
-	}
-
 	chainID, err := o.parseChainID(chainIDStr)
 	if err != nil {
 		fmt.Printf("❌ %v\n", err)
@@ -323,7 +303,7 @@ func (o *Operator) withdraw(ctx context.Context, chainIDStr, asset, amountStr st
 
 	fmt.Printf("💸 Withdrawing %s %s from chain %d...\n", amount.String(), asset, chainID)
 
-	txHash, err := o.sdkClient.Withdraw(ctx, chainID, asset, amount)
+	txHash, err := o.client.Withdraw(ctx, chainID, asset, amount)
 	if err != nil {
 		fmt.Printf("❌ Withdrawal failed: %v\n", err)
 		return
@@ -334,11 +314,6 @@ func (o *Operator) withdraw(ctx context.Context, chainIDStr, asset, amountStr st
 }
 
 func (o *Operator) transfer(ctx context.Context, recipient, asset, amountStr string) {
-	if err := o.ensureSmartClient(ctx); err != nil {
-		fmt.Printf("❌ %v\n", err)
-		return
-	}
-
 	amount, err := o.parseAmount(amountStr)
 	if err != nil {
 		fmt.Printf("❌ %v\n", err)
@@ -347,7 +322,7 @@ func (o *Operator) transfer(ctx context.Context, recipient, asset, amountStr str
 
 	fmt.Printf("📤 Transferring %s %s to %s...\n", amount.String(), asset, recipient)
 
-	txID, err := o.sdkClient.Transfer(ctx, recipient, asset, amount)
+	txID, err := o.client.Transfer(ctx, recipient, asset, amount)
 	if err != nil {
 		fmt.Printf("❌ Transfer failed: %v\n", err)
 		return
@@ -363,7 +338,7 @@ func (o *Operator) transfer(ctx context.Context, recipient, asset, amountStr str
 
 func (o *Operator) ping(ctx context.Context) {
 	fmt.Print("🏓 Pinging node... ")
-	err := o.baseClient.Ping(ctx)
+	err := o.client.Ping(ctx)
 	if err != nil {
 		fmt.Printf("❌ Failed: %v\n", err)
 		return
@@ -372,7 +347,7 @@ func (o *Operator) ping(ctx context.Context) {
 }
 
 func (o *Operator) nodeInfo(ctx context.Context) {
-	config, err := o.baseClient.GetConfig(ctx)
+	config, err := o.client.GetConfig(ctx)
 	if err != nil {
 		fmt.Printf("❌ Failed to get node info: %v\n", err)
 		return
@@ -391,7 +366,7 @@ func (o *Operator) nodeInfo(ctx context.Context) {
 }
 
 func (o *Operator) listChains(ctx context.Context) {
-	chains, err := o.baseClient.GetBlockchains(ctx)
+	chains, err := o.client.GetBlockchains(ctx)
 	if err != nil {
 		fmt.Printf("❌ Failed to list chains: %v\n", err)
 		return
@@ -426,7 +401,7 @@ func (o *Operator) listAssets(ctx context.Context, chainIDStr string) {
 		chainID = &parsed
 	}
 
-	assets, err := o.baseClient.GetAssets(ctx, chainID)
+	assets, err := o.client.GetAssets(ctx, chainID)
 	if err != nil {
 		fmt.Printf("❌ Failed to list assets: %v\n", err)
 		return
@@ -468,7 +443,7 @@ func (o *Operator) listAssets(ctx context.Context, chainIDStr string) {
 // ============================================================================
 
 func (o *Operator) getBalances(ctx context.Context, wallet string) {
-	balances, err := o.baseClient.GetBalances(ctx, wallet)
+	balances, err := o.client.GetBalances(ctx, wallet)
 	if err != nil {
 		fmt.Printf("❌ Failed to get balances: %v\n", err)
 		return
@@ -486,47 +461,81 @@ func (o *Operator) getBalances(ctx context.Context, wallet string) {
 	}
 }
 
-func (o *Operator) listChannels(ctx context.Context, wallet string) {
-	channels, meta, err := o.baseClient.GetChannels(ctx, wallet, nil)
+func (o *Operator) getHomeChannel(ctx context.Context, wallet, asset string) {
+	channel, err := o.client.GetHomeChannel(ctx, wallet, asset)
 	if err != nil {
-		fmt.Printf("❌ Failed to list channels: %v\n", err)
+		fmt.Printf("❌ Failed to get home channel: %v\n", err)
 		return
 	}
 
-	fmt.Printf("📡 Channels for %s (Total: %d)\n", wallet, meta.TotalCount)
-	fmt.Println("==============================================")
-	if len(channels) == 0 {
-		fmt.Println("No channels found")
+	typeStr := "unknown"
+	if channel.Type == core.ChannelTypeHome {
+		typeStr = "Home"
+	} else if channel.Type == core.ChannelTypeEscrow {
+		typeStr = "Escrow"
+	}
+
+	statusStr := "unknown"
+	switch channel.Status {
+	case core.ChannelStatusVoid:
+		statusStr = "Void"
+	case core.ChannelStatusOpen:
+		statusStr = "Open"
+	case core.ChannelStatusChallenged:
+		statusStr = "Challenged"
+	case core.ChannelStatusClosed:
+		statusStr = "Closed"
+	}
+
+	fmt.Printf("📡 Home Channel for %s (%s)\n", wallet, asset)
+	fmt.Println("==========================================")
+	fmt.Printf("Channel ID:  %s\n", channel.ChannelID)
+	fmt.Printf("Type:        %s\n", typeStr)
+	fmt.Printf("Status:      %s\n", statusStr)
+	fmt.Printf("Version:     %d\n", channel.StateVersion)
+	fmt.Printf("Nonce:       %d\n", channel.Nonce)
+	fmt.Printf("Chain ID:    %d\n", channel.BlockchainID)
+	fmt.Printf("Token:       %s\n", channel.TokenAddress)
+	fmt.Printf("Challenge:   %d seconds\n", channel.ChallengeDuration)
+}
+
+func (o *Operator) getEscrowChannel(ctx context.Context, escrowChannelID string) {
+	channel, err := o.client.GetEscrowChannel(ctx, escrowChannelID)
+	if err != nil {
+		fmt.Printf("❌ Failed to get escrow channel: %v\n", err)
 		return
 	}
 
-	for _, channel := range channels {
-		typeStr := "unknown"
-		if channel.Type == core.ChannelTypeHome {
-			typeStr = "Home"
-		} else if channel.Type == core.ChannelTypeEscrow {
-			typeStr = "Escrow"
-		}
-
-		statusStr := "unknown"
-		switch channel.Status {
-		case core.ChannelStatusVoid:
-			statusStr = "Void"
-		case core.ChannelStatusOpen:
-			statusStr = "Open"
-		case core.ChannelStatusChallenged:
-			statusStr = "Challenged"
-		case core.ChannelStatusClosed:
-			statusStr = "Closed"
-		}
-
-		fmt.Printf("\n• Channel %s\n", channel.ChannelID)
-		fmt.Printf("  Type:      %s\n", typeStr)
-		fmt.Printf("  Status:    %s\n", statusStr)
-		fmt.Printf("  Chain ID:  %d\n", channel.BlockchainID)
-		fmt.Printf("  Token:     %s\n", channel.TokenAddress)
-		fmt.Printf("  Challenge: %d seconds\n", channel.ChallengeDuration)
+	typeStr := "unknown"
+	if channel.Type == core.ChannelTypeHome {
+		typeStr = "Home"
+	} else if channel.Type == core.ChannelTypeEscrow {
+		typeStr = "Escrow"
 	}
+
+	statusStr := "unknown"
+	switch channel.Status {
+	case core.ChannelStatusVoid:
+		statusStr = "Void"
+	case core.ChannelStatusOpen:
+		statusStr = "Open"
+	case core.ChannelStatusChallenged:
+		statusStr = "Challenged"
+	case core.ChannelStatusClosed:
+		statusStr = "Closed"
+	}
+
+	fmt.Printf("📡 Escrow Channel %s\n", escrowChannelID)
+	fmt.Println("==========================================")
+	fmt.Printf("Channel ID:  %s\n", channel.ChannelID)
+	fmt.Printf("User Wallet: %s\n", channel.UserWallet)
+	fmt.Printf("Type:        %s\n", typeStr)
+	fmt.Printf("Status:      %s\n", statusStr)
+	fmt.Printf("Version:     %d\n", channel.StateVersion)
+	fmt.Printf("Nonce:       %d\n", channel.Nonce)
+	fmt.Printf("Chain ID:    %d\n", channel.BlockchainID)
+	fmt.Printf("Token:       %s\n", channel.TokenAddress)
+	fmt.Printf("Challenge:   %d seconds\n", channel.ChallengeDuration)
 }
 
 func (o *Operator) listTransactions(ctx context.Context, wallet string) {
@@ -537,7 +546,7 @@ func (o *Operator) listTransactions(ctx context.Context, wallet string) {
 		},
 	}
 
-	txs, meta, err := o.baseClient.GetTransactions(ctx, wallet, opts)
+	txs, meta, err := o.client.GetTransactions(ctx, wallet, opts)
 	if err != nil {
 		fmt.Printf("❌ Failed to list transactions: %v\n", err)
 		return
@@ -564,7 +573,7 @@ func (o *Operator) listTransactions(ctx context.Context, wallet string) {
 // ============================================================================
 
 func (o *Operator) getLatestState(ctx context.Context, wallet, asset string) {
-	state, err := o.baseClient.GetLatestState(ctx, wallet, asset, false)
+	state, err := o.client.GetLatestState(ctx, wallet, asset, false)
 	if err != nil {
 		fmt.Printf("❌ Failed to get state: %v\n", err)
 		return
@@ -589,46 +598,13 @@ func (o *Operator) getLatestState(ctx context.Context, wallet, asset string) {
 	}
 }
 
-func (o *Operator) getStates(ctx context.Context, wallet, asset string) {
-	limit := uint32(10)
-	opts := &sdk.GetStatesOptions{
-		Pagination: &core.PaginationParams{
-			Limit: &limit,
-		},
-	}
-
-	states, meta, err := o.baseClient.GetStates(ctx, wallet, asset, opts)
-	if err != nil {
-		fmt.Printf("❌ Failed to get states: %v\n", err)
-		return
-	}
-
-	fmt.Printf("📚 State History for %s (%s) - Showing %d of %d\n", wallet, asset, len(states), meta.TotalCount)
-	fmt.Println("=========================================================")
-	if len(states) == 0 {
-		fmt.Println("No states found")
-		return
-	}
-
-	for _, state := range states {
-		fmt.Printf("\n• Version %d (Epoch %d)\n", state.Version, state.Epoch)
-		fmt.Printf("  State ID:      %s\n", state.ID)
-		fmt.Printf("  User Balance:  %s\n", state.HomeLedger.UserBalance.String())
-		fmt.Printf("  Node Balance:  %s\n", state.HomeLedger.NodeBalance.String())
-		fmt.Printf("  Transitions:   %d\n", len(state.Transitions))
-		if len(state.Transitions) > 0 {
-			lastTransition := state.Transitions[len(state.Transitions)-1]
-			fmt.Printf("  Last Action:   %s\n", lastTransition.Type.String())
-		}
-	}
-}
 
 // ============================================================================
 // Low-Level App Sessions (Base Client)
 // ============================================================================
 
 func (o *Operator) listAppSessions(ctx context.Context) {
-	sessions, meta, err := o.baseClient.GetAppSessions(ctx, nil)
+	sessions, meta, err := o.client.GetAppSessions(ctx, nil)
 	if err != nil {
 		fmt.Printf("❌ Failed to list app sessions: %v\n", err)
 		return
@@ -680,11 +656,6 @@ func generatePrivateKey() (string, error) {
 }
 
 func (o *Operator) interactiveSubmitState(ctx context.Context) {
-	if err := o.ensureSmartClient(ctx); err != nil {
-		fmt.Printf("❌ %v\n", err)
-		return
-	}
-
 	fmt.Println("🔧 Interactive State Builder")
 	fmt.Println("=============================")
 	fmt.Println()
@@ -695,7 +666,7 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 	fmt.Scanln(&wallet)
 	wallet = strings.TrimSpace(wallet)
 	if wallet == "" {
-		wallet = o.sdkClient.GetUserAddress()
+		wallet = o.client.GetUserAddress()
 		fmt.Printf("Using your wallet: %s\n", wallet)
 	}
 
@@ -711,7 +682,7 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 
 	// Step 3: Get latest state
 	fmt.Printf("\n📊 Fetching latest state for %s (%s)...\n", wallet, asset)
-	state, err := o.baseClient.GetLatestState(ctx, wallet, asset, false)
+	state, err := o.client.GetLatestState(ctx, wallet, asset, false)
 	if err != nil {
 		fmt.Printf("❌ Failed to get latest state: %v\n", err)
 		return
@@ -984,7 +955,7 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 
 		// Sign user state
 		fmt.Println("\n✍️  Signing user state...")
-		sig, err := o.sdkClient.SignState(nextState)
+		sig, err := o.client.SignState(nextState)
 		if err != nil {
 			fmt.Printf("❌ Failed to sign state: %v\n", err)
 			return
@@ -1003,7 +974,7 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 
 		// Submit deposit state
 		fmt.Println("📤 Submitting commit state to node...")
-		nodeSig, err := o.baseClient.SubmitDepositState(ctx, appStateUpdate, quorumSigs, *nextState)
+		nodeSig, err := o.client.SubmitDepositState(ctx, appStateUpdate, quorumSigs, *nextState)
 		if err != nil {
 			fmt.Printf("❌ Failed to submit deposit state: %v\n", err)
 			return
@@ -1046,7 +1017,7 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 
 	// Step 7: Sign and submit
 	fmt.Println("\n✍️  Signing state...")
-	sig, err := o.sdkClient.SignState(nextState)
+	sig, err := o.client.SignState(nextState)
 	if err != nil {
 		fmt.Printf("❌ Failed to sign state: %v\n", err)
 		return
@@ -1055,7 +1026,7 @@ func (o *Operator) interactiveSubmitState(ctx context.Context) {
 	fmt.Printf("✅ State signed: %s\n", sig[:min(20, len(sig))]+"...")
 
 	fmt.Println("📤 Submitting state to node...")
-	nodeSig, err := o.baseClient.SubmitState(ctx, *nextState)
+	nodeSig, err := o.client.SubmitState(ctx, *nextState)
 	if err != nil {
 		fmt.Printf("❌ Failed to submit state: %v\n", err)
 		return

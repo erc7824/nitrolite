@@ -14,30 +14,58 @@ import (
 )
 
 type Operator struct {
-	wsURL      string
-	store      *Storage
-	baseClient *sdk.Client
-	sdkClient  *sdk.SDKClient
-	exitCh     chan struct{}
+	wsURL   string
+	store   *Storage
+	client  *sdk.Client
+	exitCh  chan struct{}
 }
 
 func NewOperator(wsURL string, store *Storage) (*Operator, error) {
-	// Create base client
-	baseClient, err := sdk.NewClient(wsURL)
+	// Get private key to create full client
+	privateKey, err := store.GetPrivateKey()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create base client: %w", err)
+		return nil, fmt.Errorf("no wallet imported (use 'import wallet' first): %w", err)
+	}
+
+	// Create signers
+	stateSigner, err := sign.NewEthereumMsgSigner(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create state signer: %w", err)
+	}
+
+	txSigner, err := sign.NewEthereumRawSigner(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tx signer: %w", err)
+	}
+
+	// Get all RPCs
+	rpcs, err := store.GetAllRPCs()
+	if err != nil {
+		// No RPCs configured is okay, some operations will fail but basic queries work
+		rpcs = make(map[uint64]string)
+	}
+
+	// Create unified client with all configured RPCs
+	opts := []sdk.Option{}
+	for chainID, rpcURL := range rpcs {
+		opts = append(opts, sdk.WithBlockchainRPC(chainID, rpcURL))
+	}
+
+	client, err := sdk.NewClient(wsURL, stateSigner, txSigner, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
 	op := &Operator{
-		wsURL:      wsURL,
-		store:      store,
-		baseClient: baseClient,
-		exitCh:     make(chan struct{}),
+		wsURL:  wsURL,
+		store:  store,
+		client: client,
+		exitCh: make(chan struct{}),
 	}
 
 	// Monitor WebSocket connection - exit if connection is lost
 	go func() {
-		<-baseClient.WaitCh()
+		<-client.WaitCh()
 		fmt.Println("\n⚠️  WebSocket connection lost. Exiting...")
 		select {
 		case <-op.exitCh:
@@ -83,12 +111,12 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 
 			// User queries
 			{Text: "balances", Description: "💵 Get user balances"},
-			{Text: "channels", Description: "📡 List user channels"},
 			{Text: "transactions", Description: "📋 Get transaction history"},
 
 			// State management
 			{Text: "state", Description: "📊 Get latest state"},
-			{Text: "states", Description: "📚 Get state history"},
+			{Text: "home-channel", Description: "🏠 Get home channel"},
+			{Text: "escrow-channel", Description: "🔒 Get escrow channel"},
 			{Text: "submit-state", Description: "🔧 Build and submit state interactively"},
 
 			// App sessions (Base Client - Low-level)
@@ -113,7 +141,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 		}
 	}
 
-	// Third level - chain IDs for import rpc
+	// Third level - chain IDs for import rpc, or wallet addresses, or assets
 	if len(args) < 4 {
 		switch args[0] {
 		case "import":
@@ -122,18 +150,43 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			}
 		case "deposit", "withdraw":
 			return o.getChainSuggestions()
-		case "transfer", "balances", "channels", "transactions", "state", "states":
-			// These need wallet address
+		case "balances", "transactions":
+			// Suggest wallet address
+			return o.getWalletSuggestion()
+		case "transfer":
+			// For transfer, third arg is recipient (no suggestion)
+			return nil
+		case "state":
+			// If user already typed wallet (or we have 2 args), suggest assets
+			// Otherwise suggest wallet address
+			if len(args) == 3 {
+				return o.getAssetSuggestions()
+			}
+			// Could be wallet or asset - suggest wallet first
+			return o.getWalletSuggestion()
+		case "home-channel":
+			// If user already typed wallet (or we have 2 args), suggest assets
+			// Otherwise suggest wallet address
+			if len(args) == 3 {
+				return o.getAssetSuggestions()
+			}
+			// Could be wallet or asset - suggest wallet first
+			return o.getWalletSuggestion()
+		case "escrow-channel":
+			// Escrow channel ID (no suggestion)
 			return nil
 		case "assets":
 			return o.getChainSuggestions()
 		}
 	}
 
-	// Fourth level - assets
+	// Fourth level - assets or amounts
 	if len(args) < 5 {
 		switch args[0] {
 		case "deposit", "withdraw", "transfer":
+			return o.getAssetSuggestions()
+		case "state", "home-channel":
+			// Asset for state/home-channel commands (when wallet was explicitly provided)
 			return o.getAssetSuggestions()
 		}
 	}
@@ -213,37 +266,87 @@ func (o *Operator) Execute(s string) {
 
 	// User queries
 	case "balances":
-		if len(args) < 2 {
-			fmt.Println("❌ Usage: balances <wallet_address>")
-			return
+		wallet := ""
+		if len(args) >= 2 {
+			wallet = args[1]
+		} else {
+			// Auto-fill with imported wallet
+			wallet = o.getImportedWalletAddress()
+			if wallet == "" {
+				fmt.Println("❌ Usage: balances <wallet_address>")
+				fmt.Println("💡 No wallet imported. Use 'import wallet' first or specify a wallet address.")
+				return
+			}
+			fmt.Printf("📍 Using your wallet: %s\n", wallet)
 		}
-		o.getBalances(ctx, args[1])
-	case "channels":
-		if len(args) < 2 {
-			fmt.Println("❌ Usage: channels <wallet_address>")
-			return
-		}
-		o.listChannels(ctx, args[1])
+		o.getBalances(ctx, wallet)
 	case "transactions":
-		if len(args) < 2 {
-			fmt.Println("❌ Usage: transactions <wallet_address>")
-			return
+		wallet := ""
+		if len(args) >= 2 {
+			wallet = args[1]
+		} else {
+			// Auto-fill with imported wallet
+			wallet = o.getImportedWalletAddress()
+			if wallet == "" {
+				fmt.Println("❌ Usage: transactions <wallet_address>")
+				fmt.Println("💡 No wallet imported. Use 'import wallet' first or specify a wallet address.")
+				return
+			}
+			fmt.Printf("📍 Using your wallet: %s\n", wallet)
 		}
-		o.listTransactions(ctx, args[1])
+		o.listTransactions(ctx, wallet)
 
 	// State management (low-level)
 	case "state":
-		if len(args) < 3 {
+		wallet := ""
+		asset := ""
+		if len(args) >= 3 {
+			wallet = args[1]
+			asset = args[2]
+		} else if len(args) == 2 {
+			// Auto-fill wallet, user provided asset
+			wallet = o.getImportedWalletAddress()
+			if wallet == "" {
+				fmt.Println("❌ Usage: state <wallet_address> <asset>")
+				fmt.Println("💡 No wallet imported. Use 'import wallet' first or specify a wallet address.")
+				return
+			}
+			asset = args[1]
+			fmt.Printf("📍 Using your wallet: %s\n", wallet)
+		} else {
 			fmt.Println("❌ Usage: state <wallet_address> <asset>")
+			fmt.Println("💡 Or: state <asset> (uses your imported wallet)")
 			return
 		}
-		o.getLatestState(ctx, args[1], args[2])
-	case "states":
-		if len(args) < 3 {
-			fmt.Println("❌ Usage: states <wallet_address> <asset>")
+		o.getLatestState(ctx, wallet, asset)
+	case "home-channel":
+		wallet := ""
+		asset := ""
+		if len(args) >= 3 {
+			wallet = args[1]
+			asset = args[2]
+		} else if len(args) == 2 {
+			// Auto-fill wallet, user provided asset
+			wallet = o.getImportedWalletAddress()
+			if wallet == "" {
+				fmt.Println("❌ Usage: home-channel <wallet_address> <asset>")
+				fmt.Println("💡 No wallet imported. Use 'import wallet' first or specify a wallet address.")
+				return
+			}
+			asset = args[1]
+			fmt.Printf("📍 Using your wallet: %s\n", wallet)
+		} else {
+			fmt.Println("❌ Usage: home-channel <wallet_address> <asset>")
+			fmt.Println("💡 Or: home-channel <asset> (uses your imported wallet)")
 			return
 		}
-		o.getStates(ctx, args[1], args[2])
+		o.getHomeChannel(ctx, wallet, asset)
+	case "escrow-channel":
+		if len(args) < 2 {
+			fmt.Println("❌ Usage: escrow-channel <escrow_channel_id>")
+			return
+		}
+		o.getEscrowChannel(ctx, args[1])
 	case "submit-state":
 		o.interactiveSubmitState(ctx)
 
@@ -263,7 +366,7 @@ func (o *Operator) getChainSuggestions() []prompt.Suggest {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	chains, err := o.baseClient.GetBlockchains(ctx)
+	chains, err := o.client.GetBlockchains(ctx)
 	if err != nil {
 		return nil
 	}
@@ -282,7 +385,7 @@ func (o *Operator) getAssetSuggestions() []prompt.Suggest {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	assets, err := o.baseClient.GetAssets(ctx, nil)
+	assets, err := o.client.GetAssets(ctx, nil)
 	if err != nil {
 		return nil
 	}
@@ -297,62 +400,29 @@ func (o *Operator) getAssetSuggestions() []prompt.Suggest {
 	return suggestions
 }
 
-func (o *Operator) ensureSmartClient(ctx context.Context) error {
-	if o.sdkClient != nil {
-		return nil
-	}
-
+func (o *Operator) getWalletSuggestion() []prompt.Suggest {
 	// Get private key
 	privateKey, err := o.store.GetPrivateKey()
 	if err != nil {
-		return fmt.Errorf("no wallet imported (use 'import wallet' first)")
+		return nil
 	}
 
-	// Create stateSigner
-	txSigner, err := sign.NewEthereumRawSigner(privateKey)
+	// Create signer to get address
+	signer, err := sign.NewEthereumRawSigner(privateKey)
 	if err != nil {
-		return fmt.Errorf("failed to create signer: %w", err)
+		return nil
 	}
 
-	// Create signer
-	stateSigner, err := sign.NewEthereumMsgSigner(privateKey)
-	if err != nil {
-		return fmt.Errorf("failed to create signer: %w", err)
+	address := signer.PublicKey().Address().String()
+
+	return []prompt.Suggest{
+		{
+			Text:        address,
+			Description: "Your imported wallet",
+		},
 	}
-
-	// Get all RPCs
-	rpcs, err := o.store.GetAllRPCs()
-	if err != nil {
-		return fmt.Errorf("failed to get RPCs: %w", err)
-	}
-
-	// Create smart client with all configured RPCs
-	opts := []sdk.Option{}
-	for chainID, rpcURL := range rpcs {
-		opts = append(opts, sdk.WithBlockchainRPC(chainID, rpcURL))
-	}
-
-	sdkClient, err := sdk.NewSDKClient(o.wsURL, stateSigner, txSigner, opts...)
-	if err != nil {
-		return fmt.Errorf("failed to create smart client: %w", err)
-	}
-
-	o.sdkClient = sdkClient
-
-	// Monitor SDK client connection - exit if connection is lost
-	go func() {
-		<-sdkClient.WaitCh()
-		fmt.Println("\n⚠️  WebSocket connection lost. Exiting...")
-		select {
-		case <-o.exitCh:
-			// Already closed
-		default:
-			close(o.exitCh)
-		}
-	}()
-
-	return nil
 }
+
 
 func (o *Operator) parseChainID(chainIDStr string) (uint64, error) {
 	chainID, err := strconv.ParseUint(chainIDStr, 10, 64)
@@ -368,4 +438,20 @@ func (o *Operator) parseAmount(amountStr string) (decimal.Decimal, error) {
 		return decimal.Zero, fmt.Errorf("invalid amount: %s", amountStr)
 	}
 	return amount, nil
+}
+
+func (o *Operator) getImportedWalletAddress() string {
+	// Get private key
+	privateKey, err := o.store.GetPrivateKey()
+	if err != nil {
+		return ""
+	}
+
+	// Create signer to get address
+	signer, err := sign.NewEthereumRawSigner(privateKey)
+	if err != nil {
+		return ""
+	}
+
+	return signer.PublicKey().Address().String()
 }

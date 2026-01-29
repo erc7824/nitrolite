@@ -69,6 +69,9 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 	if err != nil {
 		return nil, rpc.Errorf("failed to get last %s user state for transfer receiver with address %s", senderState.Asset, incomingTransition.AccountID)
 	}
+	if currentState == nil {
+		currentState = core.NewVoidState(senderState.Asset, receiverWallet)
+	}
 	newState := currentState.NextState()
 
 	_, err = newState.ApplyTransferReceiveTransition(

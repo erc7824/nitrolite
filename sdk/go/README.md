@@ -4,6 +4,54 @@ Go SDK for Clearnode payment channels providing both high-level and low-level op
 - **High-Level Operations**: `Deposit`, `Withdraw`, `Transfer` with automatic state management
 - **Low-Level Operations**: Direct RPC access for custom flows and advanced use cases
 
+## Method Cheat Sheet
+
+### High-Level Operations (Blockchain Interaction)
+```go
+client.Deposit(ctx, blockchainID, asset, amount)      // Deposit to channel
+client.Withdraw(ctx, blockchainID, asset, amount)     // Withdraw from channel
+client.Transfer(ctx, recipientWallet, asset, amount)  // Off-chain transfer
+```
+
+### Node Information
+```go
+client.Ping(ctx)                    // Health check
+client.GetConfig(ctx)               // Node configuration
+client.GetBlockchains(ctx)          // Supported blockchains
+client.GetAssets(ctx, blockchainID) // Supported assets
+```
+
+### User Queries
+```go
+client.GetBalances(ctx, wallet)             // User balances
+client.GetTransactions(ctx, wallet, opts)   // Transaction history
+```
+
+### Channel Queries
+```go
+client.GetHomeChannel(ctx, wallet, asset)       // Home channel info
+client.GetEscrowChannel(ctx, escrowChannelID)   // Escrow channel info
+client.GetLatestState(ctx, wallet, asset, onlySigned) // Latest state
+```
+
+### App Sessions
+```go
+client.GetAppSessions(ctx, opts)                              // List sessions
+client.GetAppDefinition(ctx, appSessionID)                    // Session definition
+client.CreateAppSession(ctx, definition, sessionData, sigs)   // Create session
+client.SubmitAppSessionDeposit(ctx, update, sigs, userState)  // Deposit to session
+client.SubmitAppState(ctx, update, sigs)                      // Update session
+client.RebalanceAppSessions(ctx, signedUpdates)               // Atomic rebalance
+```
+
+### Shared Utilities
+```go
+client.Close()              // Close connection
+client.WaitCh()             // Connection monitor channel
+client.SignState(state)     // Sign a state (advanced)
+client.GetUserAddress()     // Get signer's address
+```
+
 ## Installation
 
 ```bash
@@ -56,7 +104,11 @@ func main() {
 
 ```
 sdk/go/
-├── client.go         # Unified client with all methods
+├── client.go         # Core client, constructors, high-level operations
+├── node.go           # Node information methods
+├── user.go           # User query methods
+├── channel.go        # Channel and state management
+├── app_session.go    # App session methods
 ├── config.go         # Configuration options
 └── transform.go      # Type conversions
 ```
@@ -67,6 +119,7 @@ sdk/go/
 - Uses `pkg/sign` for state signing (no SDK-specific signing wrapper)
 - Automatic flow management for high-level operations (channel creation, state building, signing)
 - Direct RPC access for low-level operations
+- Code organized by domain for readability
 
 ## Client API
 
@@ -163,15 +216,10 @@ txs, meta, err := client.GetTransactions(ctx, wallet, opts)
 ```go
 channel, err := client.GetHomeChannel(ctx, wallet, asset)
 channel, err := client.GetEscrowChannel(ctx, escrowChannelID)
-```
-
-### State Management (Low-Level)
-
-```go
 state, err := client.GetLatestState(ctx, wallet, asset, onlySigned)
-nodeSig, err := client.SubmitState(ctx, state)
-nodeSig, err := client.RequestChannelCreation(ctx, state, channelDef)
 ```
+
+**Note:** State submission and channel creation are handled internally by high-level operations (Deposit, Withdraw, Transfer).
 
 ### App Sessions (Low-Level)
 
@@ -179,7 +227,7 @@ nodeSig, err := client.RequestChannelCreation(ctx, state, channelDef)
 sessions, meta, err := client.GetAppSessions(ctx, opts)
 def, err := client.GetAppDefinition(ctx, appSessionID)
 sessionID, version, status, err := client.CreateAppSession(ctx, def, data, sigs)
-nodeSig, err := client.SubmitDepositState(ctx, update, sigs, userState)
+nodeSig, err := client.SubmitAppSessionDeposit(ctx, update, sigs, userState)
 err := client.SubmitAppState(ctx, update, sigs)
 batchID, err := client.RebalanceAppSessions(ctx, signedUpdates)
 ```
@@ -192,18 +240,20 @@ Payment channels use versioned states signed by both user and node:
 
 ```go
 // High-level operations handle state management automatically
-client.Deposit(...)  // Creates/updates state, signs, submits
-
-// Low-level operations require manual state building
-state, _ := client.GetLatestState(ctx, wallet, asset, false)
-nextState := state.NextState()
-transition, _ := nextState.ApplyHomeDepositTransition(amount)
-nextState.ID = core.GetStateID(nextState.UserWallet, nextState.Asset,
-                                nextState.Epoch, nextState.Version)
-sig, _ := client.SignState(nextState)
-nextState.UserSig = &sig
-nodeSig, _ := client.SubmitState(ctx, *nextState)
+client.Deposit(...)   // Creates/updates state, signs, submits
+client.Withdraw(...)  // Updates state, signs, submits
+client.Transfer(...)  // Updates state, signs, submits
 ```
+
+**State Flow (Internal):**
+1. Get latest state with `GetLatestState()`
+2. Create next state with `state.NextState()`
+3. Apply transition (deposit, withdraw, transfer, etc.)
+4. Calculate state ID with `core.GetStateID()`
+5. Sign state with `SignState()`
+6. Submit to node (internal method)
+
+State submission and channel creation are handled automatically by high-level operations.
 
 ### Signing
 

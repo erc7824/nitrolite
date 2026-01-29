@@ -117,7 +117,6 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "state", Description: "📊 Get latest state"},
 			{Text: "home-channel", Description: "🏠 Get home channel"},
 			{Text: "escrow-channel", Description: "🔒 Get escrow channel"},
-			{Text: "submit-state", Description: "🔧 Build and submit state interactively"},
 
 			// App sessions (Base Client - Low-level)
 			{Text: "app-sessions", Description: "🎮 List app sessions"},
@@ -347,8 +346,6 @@ func (o *Operator) Execute(s string) {
 			return
 		}
 		o.getEscrowChannel(ctx, args[1])
-	case "submit-state":
-		o.interactiveSubmitState(ctx)
 
 	// App sessions
 	case "app-sessions":

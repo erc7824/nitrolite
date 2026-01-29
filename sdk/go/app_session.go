@@ -119,7 +119,7 @@ func (c *Client) CreateAppSession(ctx context.Context, definition app.AppDefinit
 	return resp.AppSessionID, resp.Version, resp.Status, nil
 }
 
-// SubmitDepositState submits a deposit to an app session.
+// SubmitAppSessionDeposit submits a deposit to an app session.
 // This updates both the app session state and the user's channel state.
 //
 // Parameters:
@@ -139,8 +139,8 @@ func (c *Client) CreateAppSession(ctx context.Context, definition app.AppDefinit
 //	    Version: 2,
 //	    Allocations: []app.AppAllocationV1{...},
 //	}
-//	nodeSig, err := client.SubmitDepositState(ctx, appUpdate, []string{"sig1"}, userState)
-func (c *Client) SubmitDepositState(ctx context.Context, appStateUpdate app.AppStateUpdateV1, quorumSigs []string, userState core.State) (string, error) {
+//	nodeSig, err := client.SubmitAppSessionDeposit(ctx, appUpdate, []string{"sig1"}, userState)
+func (c *Client) SubmitAppSessionDeposit(ctx context.Context, appStateUpdate app.AppStateUpdateV1, quorumSigs []string, userState core.State) (string, error) {
 	appUpdate := transformAppStateUpdateToRPC(appStateUpdate)
 
 	req := rpc.AppSessionsV1SubmitDepositStateRequest{
@@ -157,7 +157,7 @@ func (c *Client) SubmitDepositState(ctx context.Context, appStateUpdate app.AppS
 
 // SubmitAppState submits an app session state update.
 // This method handles operate, withdraw, and close intents.
-// For deposits, use SubmitDepositState instead.
+// For deposits, use SubmitAppSessionDeposit instead.
 //
 // Parameters:
 //   - appStateUpdate: The app state update (intent: operate, withdraw, or close)

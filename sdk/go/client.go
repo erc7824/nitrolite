@@ -274,7 +274,7 @@ func (c *Client) signAndSubmitState(ctx context.Context, state *core.State) (str
 	state.UserSig = &sig
 
 	// Submit to node
-	nodeSig, err := c.SubmitState(ctx, *state)
+	nodeSig, err := c.submitState(ctx, *state)
 	if err != nil {
 		return "", fmt.Errorf("failed to submit state: %w", err)
 	}
@@ -516,7 +516,7 @@ func (c *Client) Deposit(ctx context.Context, blockchainID uint64, asset string,
 		newState.UserSig = &sig
 
 		// Request channel creation from node
-		nodeSig, err := c.RequestChannelCreation(ctx, *newState, channelDef)
+		nodeSig, err := c.requestChannelCreation(ctx, *newState, channelDef)
 		if err != nil {
 			return "", fmt.Errorf("failed to request channel creation: %w", err)
 		}

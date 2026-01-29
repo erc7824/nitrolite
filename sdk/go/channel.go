@@ -100,21 +100,10 @@ func (c *Client) GetLatestState(ctx context.Context, wallet, asset string, onlyS
 	return &state, nil
 }
 
-// SubmitState submits a signed state update to the node.
+// submitState submits a signed state update to the node.
 // The state must be properly signed by the user before submission.
-//
-// Parameters:
-//   - state: The state to submit (must include valid signatures and transitions)
-//
-// Returns:
-//   - Node's signature of the state
-//   - Error if the request fails
-//
-// Example:
-//
-//	nodeSig, err := client.SubmitState(ctx, myState)
-//	fmt.Printf("State submitted, node signature: %s\n", nodeSig)
-func (c *Client) SubmitState(ctx context.Context, state core.State) (string, error) {
+// This is an internal method used by high-level operations.
+func (c *Client) submitState(ctx context.Context, state core.State) (string, error) {
 	req := rpc.ChannelsV1SubmitStateRequest{
 		State: transformStateToRPC(state),
 	}
@@ -125,25 +114,10 @@ func (c *Client) SubmitState(ctx context.Context, state core.State) (string, err
 	return resp.Signature, nil
 }
 
-// RequestChannelCreation requests the node to sign a channel creation.
+// requestChannelCreation requests the node to sign a channel creation.
 // This is typically the first step when creating a new payment channel.
-//
-// Parameters:
-//   - state: The initial state for the channel
-//   - channelDef: The channel definition with nonce and challenge period
-//
-// Returns:
-//   - Node's signature for the channel creation
-//   - Error if the request fails
-//
-// Example:
-//
-//	channelDef := core.ChannelDefinition{
-//	    Nonce: 1,
-//	    Challenge: 3600,
-//	}
-//	nodeSig, err := client.RequestChannelCreation(ctx, initialState, channelDef)
-func (c *Client) RequestChannelCreation(ctx context.Context, state core.State, channelDef core.ChannelDefinition) (string, error) {
+// This is an internal method used by the Deposit operation.
+func (c *Client) requestChannelCreation(ctx context.Context, state core.State, channelDef core.ChannelDefinition) (string, error) {
 	req := rpc.ChannelsV1RequestCreationRequest{
 		State:             transformStateToRPC(state),
 		ChannelDefinition: transformChannelDefinitionToRPC(channelDef),

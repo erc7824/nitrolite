@@ -3,7 +3,6 @@ package sdk
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/shopspring/decimal"
 )
@@ -314,7 +314,7 @@ func (c *SDKClient) SignState(state *core.State) (string, error) {
 	}
 
 	// Return hex-encoded signature with 0x prefix
-	return "0x" + hex.EncodeToString(signature), nil
+	return hexutil.Encode(signature), nil
 }
 
 // GetUserAddress returns the Ethereum address associated with the signer.

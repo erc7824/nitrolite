@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/sign"
 	sdk "github.com/erc7824/nitrolite/sdk/go"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 )
@@ -674,7 +674,7 @@ func generatePrivateKey() (string, error) {
 
 	// Convert to hex string
 	privateKeyBytes := crypto.FromECDSA(privateKey)
-	privateKeyHex := "0x" + hex.EncodeToString(privateKeyBytes)
+	privateKeyHex := hexutil.Encode(privateKeyBytes)
 
 	return privateKeyHex, nil
 }

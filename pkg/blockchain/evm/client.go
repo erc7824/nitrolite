@@ -1,11 +1,11 @@
 package evm
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
@@ -97,7 +97,7 @@ func (c *Client) GetOpenChannels(user string) ([]string, error) {
 
 	result := make([]string, len(channelIDs))
 	for i, id := range channelIDs {
-		result[i] = hex.EncodeToString(id[:])
+		result[i] = hexutil.Encode(id[:])
 	}
 	return result, nil
 }

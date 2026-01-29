@@ -49,10 +49,10 @@ func main() {
 		return
 	}
 
-	fmt.Println("🚀 Clearnode CLI - Developer Tool for Clearnode SDK")
-	fmt.Printf("📡 Connected to: %s\n", wsURL)
-	fmt.Printf("💾 Config directory: %s\n", configDir)
-	fmt.Println("\n💡 Type 'help' for available commands or 'exit' to quit")
+	fmt.Println("Clearnode CLI - SDK Development Tool")
+	fmt.Printf("Connected to: %s\n", wsURL)
+	fmt.Printf("Config directory: %s\n", configDir)
+	fmt.Println("\nType 'help' for available commands or 'exit' to quit")
 
 	// Terminal handling
 	initialState, _ := term.GetState(int(os.Stdin.Fd()))
@@ -66,7 +66,7 @@ func main() {
 		prompt.OptionAddKeyBind(prompt.KeyBind{
 			Key: prompt.ControlC,
 			Fn: func(buf *prompt.Buffer) {
-				fmt.Println("\n👋 Exiting Clearnode CLI")
+				fmt.Println("\nExiting Clearnode CLI")
 				handleExit()
 				os.Exit(0)
 			},
@@ -91,13 +91,13 @@ func main() {
 
 	select {
 	case <-operator.Wait():
-		fmt.Println("Operator exited.")
+		fmt.Println("Connection closed.")
 	case <-promptExitCh:
-		fmt.Println("Prompt exited.")
+		fmt.Println("Session ended.")
 	}
 
 	handleExit()
-	fmt.Println("👋 Goodbye!")
+	fmt.Println("Exiting.")
 }
 
 func getStyleOptions() []prompt.Option {

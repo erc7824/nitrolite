@@ -20,15 +20,15 @@ import (
 
 func (o *Operator) showHelp() {
 	fmt.Println(`
-🚀 Clearnode CLI - Developer Tool for Clearnode SDK
-====================================================
+Clearnode CLI - SDK Development Tool
+=====================================
 
 SETUP COMMANDS
-  help                          Show this help message
-  config                        Show current configuration
-  wallet                        Show your wallet address
-  import wallet                 Setup wallet (import existing or generate new)
-  import rpc <chain_id> <url>   Import blockchain RPC URL
+  help                          Display this help message
+  config                        Display current configuration
+  wallet                        Display wallet address
+  import wallet                 Configure wallet (import or generate)
+  import rpc <chain_id> <url>   Configure blockchain RPC endpoint
 
 HIGH-LEVEL OPERATIONS (Smart Client)
   deposit <chain_id> <asset> <amount>          Deposit to channel (auto-create if needed)
@@ -36,18 +36,18 @@ HIGH-LEVEL OPERATIONS (Smart Client)
   transfer <recipient> <asset> <amount>        Transfer to another wallet
 
 NODE INFORMATION (Base Client)
-  ping                          Ping the Clearnode server
+  ping                          Test node connection
   node info                     Get node configuration
   chains                        List supported blockchains
   assets [chain_id]             List supported assets (optionally filter by chain)
 
 USER QUERIES (Base Client)
-  balances [wallet]             Get user balances (defaults to your wallet)
-  transactions [wallet]         Get transaction history (defaults to your wallet)
+  balances [wallet]             Get user balances (defaults to configured wallet)
+  transactions [wallet]         Get transaction history (defaults to configured wallet)
 
 LOW-LEVEL STATE MANAGEMENT (Base Client)
-  state [wallet] <asset>        Get latest state (wallet defaults to yours)
-  home-channel [wallet] <asset> Get home channel (wallet defaults to yours)
+  state [wallet] <asset>        Get latest state (wallet defaults to configured)
+  home-channel [wallet] <asset> Get home channel (wallet defaults to configured)
   escrow-channel <channel_id>   Get escrow channel by ID
 
 LOW-LEVEL APP SESSIONS (Base Client)
@@ -61,37 +61,37 @@ EXAMPLES
   import rpc 80002 https://polygon-amoy.g.alchemy.com/v2/KEY
   deposit 80002 usdc 100
   transfer 0x1234... usdc 50
-  balances              # Uses your imported wallet
-  balances 0x1234...    # Check another wallet
-  state usdc            # Get your state for USDC
+  balances              # Uses configured wallet
+  balances 0x1234...    # Query specific wallet
+  state usdc            # Get state for USDC
   chains`)
 }
 
 func (o *Operator) showConfig(ctx context.Context) {
-	fmt.Println("📋 Current Configuration")
-	fmt.Println("========================")
+	fmt.Println("Current Configuration")
+	fmt.Println("=====================")
 
 	// Private key status
 	_, err := o.store.GetPrivateKey()
 	if err != nil {
-		fmt.Println("🔑 Wallet:     ❌ Not imported")
+		fmt.Println("Wallet:     Not configured")
 	} else {
 		// Get signer to show address
 		privateKey, _ := o.store.GetPrivateKey()
 		signer, err := sign.NewEthereumRawSigner(privateKey)
 		if err == nil {
-			fmt.Printf("🔑 Wallet:     ✅ Imported (%s)\n", signer.PublicKey().Address().String())
+			fmt.Printf("Wallet:     Configured (%s)\n", signer.PublicKey().Address().String())
 		} else {
-			fmt.Println("🔑 Wallet:     ✅ Imported")
+			fmt.Println("Wallet:     Configured")
 		}
 	}
 
 	// RPC status
 	rpcs, err := o.store.GetAllRPCs()
 	if err != nil || len(rpcs) == 0 {
-		fmt.Println("🌐 RPCs:       ❌ None configured")
+		fmt.Println("RPCs:       None configured")
 	} else {
-		fmt.Printf("🌐 RPCs:       ✅ %d configured\n", len(rpcs))
+		fmt.Printf("RPCs:       %d configured\n", len(rpcs))
 		for chainID, rpcURL := range rpcs {
 			// Truncate URL for display
 			displayURL := rpcURL
@@ -105,7 +105,7 @@ func (o *Operator) showConfig(ctx context.Context) {
 	// Node info
 	nodeConfig, err := o.client.GetConfig(ctx)
 	if err == nil {
-		fmt.Printf("\n📡 Node Info\n")
+		fmt.Printf("\nNode Info\n")
 		fmt.Printf("   Address:   %s\n", nodeConfig.NodeAddress)
 		fmt.Printf("   Version:   %s\n", nodeConfig.NodeVersion)
 		fmt.Printf("   Chains:    %d\n", len(nodeConfig.Blockchains))
@@ -116,26 +116,26 @@ func (o *Operator) showConfig(ctx context.Context) {
 // Wallet Commands
 // ============================================================================
 
-func (o *Operator) showWallet(ctx context.Context) {
+func (o *Operator) showWallet(_ context.Context) {
 	// Get private key
 	privateKey, err := o.store.GetPrivateKey()
 	if err != nil {
-		fmt.Println("❌ No wallet imported")
-		fmt.Println("💡 Use 'import wallet' to setup your wallet")
+		fmt.Println("ERROR: No wallet configured")
+		fmt.Println("INFO: Use 'import wallet' to configure wallet")
 		return
 	}
 
 	// Create signer to get address
 	signer, err := sign.NewEthereumRawSigner(privateKey)
 	if err != nil {
-		fmt.Printf("❌ Failed to get wallet address: %v\n", err)
+		fmt.Printf("ERROR: Failed to get wallet address: %v\n", err)
 		return
 	}
 
 	address := signer.PublicKey().Address().String()
 
-	fmt.Println("🔑 Your Wallet")
-	fmt.Println("==============")
+	fmt.Println("Wallet Configuration")
+	fmt.Println("====================")
 	fmt.Printf("Address: %s\n", address)
 }
 
@@ -143,9 +143,9 @@ func (o *Operator) showWallet(ctx context.Context) {
 // Import Commands
 // ============================================================================
 
-func (o *Operator) importWallet(ctx context.Context) {
-	fmt.Println("🔑 Wallet Setup")
-	fmt.Println("===============")
+func (o *Operator) importWallet(_ context.Context) {
+	fmt.Println("Wallet Configuration")
+	fmt.Println("====================")
 	fmt.Println()
 	fmt.Println("Choose an option:")
 	fmt.Println("  1. Import existing private key")
@@ -165,44 +165,44 @@ func (o *Operator) importWallet(ctx context.Context) {
 	case "1":
 		// Import existing key
 		fmt.Println()
-		fmt.Println("📥 Import Existing Wallet")
+		fmt.Println("Import Existing Wallet")
 		fmt.Print("Enter private key (with or without 0x prefix): ")
 		fmt.Scanln(&privateKey)
 
 		privateKey = strings.TrimSpace(privateKey)
 		if privateKey == "" {
-			fmt.Println("❌ Private key cannot be empty")
+			fmt.Println("ERROR: Private key cannot be empty")
 			return
 		}
 
 		// Validate by creating signer
 		signer, err = sign.NewEthereumRawSigner(privateKey)
 		if err != nil {
-			fmt.Printf("❌ Invalid private key: %v\n", err)
+			fmt.Printf("ERROR: Invalid private key: %v\n", err)
 			return
 		}
 
 	case "2":
 		// Generate new wallet
 		fmt.Println()
-		fmt.Println("🆕 Generate New Wallet")
+		fmt.Println("Generate New Wallet")
 		privateKey, err = generatePrivateKey()
 		if err != nil {
-			fmt.Printf("❌ Failed to generate private key: %v\n", err)
+			fmt.Printf("ERROR: Failed to generate private key: %v\n", err)
 			return
 		}
 
 		signer, err = sign.NewEthereumRawSigner(privateKey)
 		if err != nil {
-			fmt.Printf("❌ Failed to create signer: %v\n", err)
+			fmt.Printf("ERROR: Failed to create signer: %v\n", err)
 			return
 		}
 
 		fmt.Println()
-		fmt.Println("⚠️  IMPORTANT: Save your private key securely!")
-		fmt.Println("=====================================")
+		fmt.Println("WARNING: Save your private key securely!")
+		fmt.Println("=========================================")
 		fmt.Printf("Private Key: %s\n", privateKey)
-		fmt.Println("=====================================")
+		fmt.Println("=========================================")
 		fmt.Println()
 		fmt.Print("Type 'I have saved my private key' to continue: ")
 
@@ -210,46 +210,46 @@ func (o *Operator) importWallet(ctx context.Context) {
 		fmt.Scanln(&confirmation)
 		// Read the full line
 		if confirmation == "" {
-			fmt.Println("❌ You must confirm that you saved the private key")
+			fmt.Println("ERROR: You must confirm that you saved the private key")
 			return
 		}
 
 	default:
-		fmt.Println("❌ Invalid choice")
+		fmt.Println("ERROR: Invalid choice")
 		return
 	}
 
 	// Save to storage
 	if err := o.store.SetPrivateKey(privateKey); err != nil {
-		fmt.Printf("❌ Failed to save private key: %v\n", err)
+		fmt.Printf("ERROR: Failed to save private key: %v\n", err)
 		return
 	}
 
-	fmt.Printf("✅ Wallet setup completed successfully\n")
-	fmt.Printf("📍 Address: %s\n", signer.PublicKey().Address().String())
+	fmt.Printf("SUCCESS: Wallet configured successfully\n")
+	fmt.Printf("Address: %s\n", signer.PublicKey().Address().String())
 
 	if choice == "2" {
 		fmt.Println()
-		fmt.Println("💡 Tips:")
+		fmt.Println("Security Recommendations:")
 		fmt.Println("   - Store your private key in a secure location")
 		fmt.Println("   - Never share your private key with anyone")
 		fmt.Println("   - Consider using a hardware wallet for large amounts")
 	}
 }
 
-func (o *Operator) importRPC(ctx context.Context, chainIDStr, rpcURL string) {
+func (o *Operator) importRPC(_ context.Context, chainIDStr, rpcURL string) {
 	chainID, err := o.parseChainID(chainIDStr)
 	if err != nil {
-		fmt.Printf("❌ %v\n", err)
+		fmt.Printf("ERROR: %v\n", err)
 		return
 	}
 
 	if err := o.store.SetRPC(chainID, rpcURL); err != nil {
-		fmt.Printf("❌ Failed to save RPC: %v\n", err)
+		fmt.Printf("ERROR: Failed to save RPC: %v\n", err)
 		return
 	}
 
-	fmt.Printf("✅ RPC imported for chain %d\n", chainID)
+	fmt.Printf("SUCCESS: RPC configured for chain %d\n", chainID)
 }
 
 // ============================================================================
@@ -259,70 +259,70 @@ func (o *Operator) importRPC(ctx context.Context, chainIDStr, rpcURL string) {
 func (o *Operator) deposit(ctx context.Context, chainIDStr, asset, amountStr string) {
 	chainID, err := o.parseChainID(chainIDStr)
 	if err != nil {
-		fmt.Printf("❌ %v\n", err)
+		fmt.Printf("ERROR: %v\n", err)
 		return
 	}
 
 	amount, err := o.parseAmount(amountStr)
 	if err != nil {
-		fmt.Printf("❌ %v\n", err)
+		fmt.Printf("ERROR: %v\n", err)
 		return
 	}
 
-	fmt.Printf("💰 Depositing %s %s on chain %d...\n", amount.String(), asset, chainID)
+	fmt.Printf("Depositing %s %s on chain %d...\n", amount.String(), asset, chainID)
 
 	txHash, err := o.client.Deposit(ctx, chainID, asset, amount)
 	if err != nil {
-		fmt.Printf("❌ Deposit failed: %v\n", err)
+		fmt.Printf("ERROR: Deposit failed: %v\n", err)
 		return
 	}
 
-	fmt.Printf("✅ Deposit successful!\n")
-	fmt.Printf("📝 Transaction: %s\n", txHash)
+	fmt.Printf("SUCCESS: Deposit completed\n")
+	fmt.Printf("Transaction: %s\n", txHash)
 }
 
 func (o *Operator) withdraw(ctx context.Context, chainIDStr, asset, amountStr string) {
 	chainID, err := o.parseChainID(chainIDStr)
 	if err != nil {
-		fmt.Printf("❌ %v\n", err)
+		fmt.Printf("ERROR: %v\n", err)
 		return
 	}
 
 	amount, err := o.parseAmount(amountStr)
 	if err != nil {
-		fmt.Printf("❌ %v\n", err)
+		fmt.Printf("ERROR: %v\n", err)
 		return
 	}
 
-	fmt.Printf("💸 Withdrawing %s %s from chain %d...\n", amount.String(), asset, chainID)
+	fmt.Printf("Withdrawing %s %s from chain %d...\n", amount.String(), asset, chainID)
 
 	txHash, err := o.client.Withdraw(ctx, chainID, asset, amount)
 	if err != nil {
-		fmt.Printf("❌ Withdrawal failed: %v\n", err)
+		fmt.Printf("ERROR: Withdrawal failed: %v\n", err)
 		return
 	}
 
-	fmt.Printf("✅ Withdrawal successful!\n")
-	fmt.Printf("📝 Transaction: %s\n", txHash)
+	fmt.Printf("SUCCESS: Withdrawal completed\n")
+	fmt.Printf("Transaction: %s\n", txHash)
 }
 
 func (o *Operator) transfer(ctx context.Context, recipient, asset, amountStr string) {
 	amount, err := o.parseAmount(amountStr)
 	if err != nil {
-		fmt.Printf("❌ %v\n", err)
+		fmt.Printf("ERROR: %v\n", err)
 		return
 	}
 
-	fmt.Printf("📤 Transferring %s %s to %s...\n", amount.String(), asset, recipient)
+	fmt.Printf("Transferring %s %s to %s...\n", amount.String(), asset, recipient)
 
 	txID, err := o.client.Transfer(ctx, recipient, asset, amount)
 	if err != nil {
-		fmt.Printf("❌ Transfer failed: %v\n", err)
+		fmt.Printf("ERROR: Transfer failed: %v\n", err)
 		return
 	}
 
-	fmt.Printf("✅ Transfer successful!\n")
-	fmt.Printf("📝 Transaction ID: %s\n", txID)
+	fmt.Printf("SUCCESS: Transfer completed\n")
+	fmt.Printf("Transaction ID: %s\n", txID)
 }
 
 // ============================================================================
@@ -330,30 +330,30 @@ func (o *Operator) transfer(ctx context.Context, recipient, asset, amountStr str
 // ============================================================================
 
 func (o *Operator) ping(ctx context.Context) {
-	fmt.Print("🏓 Pinging node... ")
+	fmt.Print("Pinging node... ")
 	err := o.client.Ping(ctx)
 	if err != nil {
-		fmt.Printf("❌ Failed: %v\n", err)
+		fmt.Printf("ERROR: Failed: %v\n", err)
 		return
 	}
-	fmt.Println("✅ Pong!")
+	fmt.Println("Success")
 }
 
 func (o *Operator) nodeInfo(ctx context.Context) {
 	config, err := o.client.GetConfig(ctx)
 	if err != nil {
-		fmt.Printf("❌ Failed to get node info: %v\n", err)
+		fmt.Printf("ERROR: Failed to get node info: %v\n", err)
 		return
 	}
 
-	fmt.Println("🖥️  Node Information")
-	fmt.Println("===================")
+	fmt.Println("Node Information")
+	fmt.Println("================")
 	fmt.Printf("Address:   %s\n", config.NodeAddress)
 	fmt.Printf("Version:   %s\n", config.NodeVersion)
 	fmt.Printf("Chains:    %d\n", len(config.Blockchains))
 	fmt.Println("\nSupported Blockchains:")
 	for _, bc := range config.Blockchains {
-		fmt.Printf("  • %s (ID: %d)\n", bc.Name, bc.ID)
+		fmt.Printf("  - %s (ID: %d)\n", bc.Name, bc.ID)
 		fmt.Printf("    Contract: %s\n", bc.ContractAddress)
 	}
 }
@@ -361,23 +361,23 @@ func (o *Operator) nodeInfo(ctx context.Context) {
 func (o *Operator) listChains(ctx context.Context) {
 	chains, err := o.client.GetBlockchains(ctx)
 	if err != nil {
-		fmt.Printf("❌ Failed to list chains: %v\n", err)
+		fmt.Printf("ERROR: Failed to list chains: %v\n", err)
 		return
 	}
 
-	fmt.Printf("⛓️  Supported Blockchains (%d)\n", len(chains))
-	fmt.Println("===========================")
+	fmt.Printf("Supported Blockchains (%d)\n", len(chains))
+	fmt.Println("==========================")
 	for _, chain := range chains {
-		fmt.Printf("• %s\n", chain.Name)
+		fmt.Printf("- %s\n", chain.Name)
 		fmt.Printf("  Chain ID:  %d\n", chain.ID)
 		fmt.Printf("  Contract:  %s\n", chain.ContractAddress)
 
 		// Check if RPC is configured
 		_, err := o.store.GetRPC(chain.ID)
 		if err == nil {
-			fmt.Printf("  RPC:       ✅ Configured\n")
+			fmt.Printf("  RPC:       Configured\n")
 		} else {
-			fmt.Printf("  RPC:       ❌ Not configured\n")
+			fmt.Printf("  RPC:       Not configured\n")
 		}
 		fmt.Println()
 	}
@@ -388,7 +388,7 @@ func (o *Operator) listAssets(ctx context.Context, chainIDStr string) {
 	if chainIDStr != "" {
 		parsed, err := o.parseChainID(chainIDStr)
 		if err != nil {
-			fmt.Printf("❌ %v\n", err)
+			fmt.Printf("ERROR: %v\n", err)
 			return
 		}
 		chainID = &parsed
@@ -396,7 +396,7 @@ func (o *Operator) listAssets(ctx context.Context, chainIDStr string) {
 
 	assets, err := o.client.GetAssets(ctx, chainID)
 	if err != nil {
-		fmt.Printf("❌ Failed to list assets: %v\n", err)
+		fmt.Printf("ERROR: Failed to list assets: %v\n", err)
 		return
 	}
 
@@ -408,7 +408,7 @@ func (o *Operator) listAssets(ctx context.Context, chainIDStr string) {
 	fmt.Println("==========================")
 
 	for _, asset := range assets {
-		fmt.Printf("• %s (%s)\n", asset.Name, asset.Symbol)
+		fmt.Printf("- %s (%s)\n", asset.Name, asset.Symbol)
 		fmt.Printf("  Decimals:  %d\n", asset.Decimals)
 		fmt.Printf("  Tokens:    %d connected\n", len(asset.Tokens))
 
@@ -417,13 +417,13 @@ func (o *Operator) listAssets(ctx context.Context, chainIDStr string) {
 			if chainID != nil {
 				// When filtering by chain, show detailed info for each token
 				for _, token := range asset.Tokens {
-					fmt.Printf("    • Chain %d: %s\n", token.BlockchainID, token.Address)
+					fmt.Printf("    - Chain %d: %s\n", token.BlockchainID, token.Address)
 					fmt.Printf("      Decimals: %d\n", token.Decimals)
 				}
 			} else {
 				// When showing all assets, list chains with their token details
 				for _, token := range asset.Tokens {
-					fmt.Printf("    • Chain %d: %s (decimals: %d)\n", token.BlockchainID, token.Address, token.Decimals)
+					fmt.Printf("    - Chain %d: %s (decimals: %d)\n", token.BlockchainID, token.Address, token.Decimals)
 				}
 			}
 		}
@@ -438,11 +438,11 @@ func (o *Operator) listAssets(ctx context.Context, chainIDStr string) {
 func (o *Operator) getBalances(ctx context.Context, wallet string) {
 	balances, err := o.client.GetBalances(ctx, wallet)
 	if err != nil {
-		fmt.Printf("❌ Failed to get balances: %v\n", err)
+		fmt.Printf("ERROR: Failed to get balances: %v\n", err)
 		return
 	}
 
-	fmt.Printf("💵 Balances for %s\n", wallet)
+	fmt.Printf("Balances for %s\n", wallet)
 	fmt.Println("========================================")
 	if len(balances) == 0 {
 		fmt.Println("No balances found")
@@ -450,21 +450,22 @@ func (o *Operator) getBalances(ctx context.Context, wallet string) {
 	}
 
 	for _, balance := range balances {
-		fmt.Printf("• %s: %s\n", balance.Asset, balance.Balance.String())
+		fmt.Printf("- %s: %s\n", balance.Asset, balance.Balance.String())
 	}
 }
 
 func (o *Operator) getHomeChannel(ctx context.Context, wallet, asset string) {
 	channel, err := o.client.GetHomeChannel(ctx, wallet, asset)
 	if err != nil {
-		fmt.Printf("❌ Failed to get home channel: %v\n", err)
+		fmt.Printf("ERROR: Failed to get home channel: %v\n", err)
 		return
 	}
 
 	typeStr := "unknown"
-	if channel.Type == core.ChannelTypeHome {
+	switch channel.Type {
+	case core.ChannelTypeHome:
 		typeStr = "Home"
-	} else if channel.Type == core.ChannelTypeEscrow {
+	case core.ChannelTypeEscrow:
 		typeStr = "Escrow"
 	}
 
@@ -480,8 +481,8 @@ func (o *Operator) getHomeChannel(ctx context.Context, wallet, asset string) {
 		statusStr = "Closed"
 	}
 
-	fmt.Printf("📡 Home Channel for %s (%s)\n", wallet, asset)
-	fmt.Println("==========================================")
+	fmt.Printf("Home Channel for %s (%s)\n", wallet, asset)
+	fmt.Println("=========================================")
 	fmt.Printf("Channel ID:  %s\n", channel.ChannelID)
 	fmt.Printf("Type:        %s\n", typeStr)
 	fmt.Printf("Status:      %s\n", statusStr)
@@ -495,14 +496,15 @@ func (o *Operator) getHomeChannel(ctx context.Context, wallet, asset string) {
 func (o *Operator) getEscrowChannel(ctx context.Context, escrowChannelID string) {
 	channel, err := o.client.GetEscrowChannel(ctx, escrowChannelID)
 	if err != nil {
-		fmt.Printf("❌ Failed to get escrow channel: %v\n", err)
+		fmt.Printf("ERROR: Failed to get escrow channel: %v\n", err)
 		return
 	}
 
 	typeStr := "unknown"
-	if channel.Type == core.ChannelTypeHome {
+	switch channel.Type {
+	case core.ChannelTypeHome:
 		typeStr = "Home"
-	} else if channel.Type == core.ChannelTypeEscrow {
+	case core.ChannelTypeEscrow:
 		typeStr = "Escrow"
 	}
 
@@ -518,8 +520,8 @@ func (o *Operator) getEscrowChannel(ctx context.Context, escrowChannelID string)
 		statusStr = "Closed"
 	}
 
-	fmt.Printf("📡 Escrow Channel %s\n", escrowChannelID)
-	fmt.Println("==========================================")
+	fmt.Printf("Escrow Channel %s\n", escrowChannelID)
+	fmt.Println("=========================================")
 	fmt.Printf("Channel ID:  %s\n", channel.ChannelID)
 	fmt.Printf("User Wallet: %s\n", channel.UserWallet)
 	fmt.Printf("Type:        %s\n", typeStr)
@@ -541,19 +543,20 @@ func (o *Operator) listTransactions(ctx context.Context, wallet string) {
 
 	txs, meta, err := o.client.GetTransactions(ctx, wallet, opts)
 	if err != nil {
-		fmt.Printf("❌ Failed to list transactions: %v\n", err)
+		fmt.Printf("ERROR: Failed to list transactions: %v\n", err)
 		return
 	}
 
-	fmt.Printf("📋 Recent Transactions for %s (Showing %d of %d)\n", wallet, len(txs), meta.TotalCount)
-	fmt.Println("==================================================")
+	fmt.Printf("Recent Transactions for %s (Showing %d of %d)\n", wallet, len(txs), meta.TotalCount)
+	fmt.Println("=================================================")
 	if len(txs) == 0 {
 		fmt.Println("No transactions found")
 		return
 	}
 
 	for _, tx := range txs {
-		fmt.Printf("\n• %s\n", tx.TxType.String())
+		fmt.Printf("\n- %s\n", tx.TxType.String())
+		fmt.Printf("  Hash:      %s\n", tx.ID)
 		fmt.Printf("  From:      %s\n", tx.FromAccount)
 		fmt.Printf("  To:        %s\n", tx.ToAccount)
 		fmt.Printf("  Amount:    %s %s\n", tx.Amount.String(), tx.Asset)
@@ -568,12 +571,12 @@ func (o *Operator) listTransactions(ctx context.Context, wallet string) {
 func (o *Operator) getLatestState(ctx context.Context, wallet, asset string) {
 	state, err := o.client.GetLatestState(ctx, wallet, asset, false)
 	if err != nil {
-		fmt.Printf("❌ Failed to get state: %v\n", err)
+		fmt.Printf("ERROR: Failed to get state: %v\n", err)
 		return
 	}
 
-	fmt.Printf("📊 Latest State for %s (%s)\n", wallet, asset)
-	fmt.Println("=====================================")
+	fmt.Printf("Latest State for %s (%s)\n", wallet, asset)
+	fmt.Println("====================================")
 	fmt.Printf("Version:    %d\n", state.Version)
 	fmt.Printf("Epoch:      %d\n", state.Epoch)
 	fmt.Printf("State ID:   %s\n", state.ID)
@@ -598,19 +601,19 @@ func (o *Operator) getLatestState(ctx context.Context, wallet, asset string) {
 func (o *Operator) listAppSessions(ctx context.Context) {
 	sessions, meta, err := o.client.GetAppSessions(ctx, nil)
 	if err != nil {
-		fmt.Printf("❌ Failed to list app sessions: %v\n", err)
+		fmt.Printf("ERROR: Failed to list app sessions: %v\n", err)
 		return
 	}
 
-	fmt.Printf("🎮 App Sessions (Total: %d)\n", meta.TotalCount)
-	fmt.Println("============================")
+	fmt.Printf("App Sessions (Total: %d)\n", meta.TotalCount)
+	fmt.Println("=========================")
 	if len(sessions) == 0 {
 		fmt.Println("No app sessions found")
 		return
 	}
 
 	for _, session := range sessions {
-		fmt.Printf("\n• Session %s\n", session.AppSessionID)
+		fmt.Printf("\n- Session %s\n", session.AppSessionID)
 		fmt.Printf("  Version:      %d\n", session.Version)
 		fmt.Printf("  Nonce:        %d\n", session.Nonce)
 		fmt.Printf("  Quorum:       %d\n", session.Quorum)

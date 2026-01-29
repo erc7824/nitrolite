@@ -66,7 +66,7 @@ func NewOperator(wsURL string, store *Storage) (*Operator, error) {
 	// Monitor WebSocket connection - exit if connection is lost
 	go func() {
 		<-client.WaitCh()
-		fmt.Println("\n⚠️  WebSocket connection lost. Exiting...")
+		fmt.Println("\nWARNING: WebSocket connection lost. Exiting...")
 		select {
 		case <-op.exitCh:
 			// Already closed
@@ -95,33 +95,33 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			// Setup
 			{Text: "help", Description: "Show help information"},
 			{Text: "config", Description: "Show current configuration"},
-			{Text: "wallet", Description: "🔑 Show your wallet address"},
+			{Text: "wallet", Description: "Show wallet address"},
 			{Text: "import", Description: "Import wallet or blockchain RPC"},
 
 			// High-level operations
-			{Text: "deposit", Description: "💰 Deposit funds to channel"},
-			{Text: "withdraw", Description: "💸 Withdraw funds from channel"},
-			{Text: "transfer", Description: "📤 Transfer funds to another wallet"},
+			{Text: "deposit", Description: "Deposit funds to channel"},
+			{Text: "withdraw", Description: "Withdraw funds from channel"},
+			{Text: "transfer", Description: "Transfer funds to another wallet"},
 
 			// Node information
-			{Text: "ping", Description: "🏓 Ping the Clearnode server"},
-			{Text: "node", Description: "🖥️  Get node information"},
-			{Text: "chains", Description: "⛓️  List supported blockchains"},
-			{Text: "assets", Description: "💎 List supported assets"},
+			{Text: "ping", Description: "Test node connection"},
+			{Text: "node", Description: "Get node information"},
+			{Text: "chains", Description: "List supported blockchains"},
+			{Text: "assets", Description: "List supported assets"},
 
 			// User queries
-			{Text: "balances", Description: "💵 Get user balances"},
-			{Text: "transactions", Description: "📋 Get transaction history"},
+			{Text: "balances", Description: "Get user balances"},
+			{Text: "transactions", Description: "Get transaction history"},
 
 			// State management
-			{Text: "state", Description: "📊 Get latest state"},
-			{Text: "home-channel", Description: "🏠 Get home channel"},
-			{Text: "escrow-channel", Description: "🔒 Get escrow channel"},
+			{Text: "state", Description: "Get latest state"},
+			{Text: "home-channel", Description: "Get home channel"},
+			{Text: "escrow-channel", Description: "Get escrow channel"},
 
 			// App sessions (Base Client - Low-level)
-			{Text: "app-sessions", Description: "🎮 List app sessions"},
+			{Text: "app-sessions", Description: "List app sessions"},
 
-			{Text: "exit", Description: "👋 Exit the CLI"},
+			{Text: "exit", Description: "Exit the CLI"},
 		}
 	}
 
@@ -211,7 +211,7 @@ func (o *Operator) Execute(s string) {
 		o.showWallet(ctx)
 	case "import":
 		if len(args) < 2 {
-			fmt.Println("❌ Usage: import <wallet|rpc> ...")
+			fmt.Println("ERROR: Usage: import <wallet|rpc> ...")
 			return
 		}
 		switch args[1] {
@@ -219,30 +219,30 @@ func (o *Operator) Execute(s string) {
 			o.importWallet(ctx)
 		case "rpc":
 			if len(args) < 4 {
-				fmt.Println("❌ Usage: import rpc <chain_id> <rpc_url>")
+				fmt.Println("ERROR: Usage: import rpc <chain_id> <rpc_url>")
 				return
 			}
 			o.importRPC(ctx, args[2], args[3])
 		default:
-			fmt.Printf("❌ Unknown import type: %s\n", args[1])
+			fmt.Printf("ERROR: Unknown import type: %s\n", args[1])
 		}
 
 	// High-level operations
 	case "deposit":
 		if len(args) < 4 {
-			fmt.Println("❌ Usage: deposit <chain_id> <asset> <amount>")
+			fmt.Println("ERROR: Usage: deposit <chain_id> <asset> <amount>")
 			return
 		}
 		o.deposit(ctx, args[1], args[2], args[3])
 	case "withdraw":
 		if len(args) < 4 {
-			fmt.Println("❌ Usage: withdraw <chain_id> <asset> <amount>")
+			fmt.Println("ERROR: Usage: withdraw <chain_id> <asset> <amount>")
 			return
 		}
 		o.withdraw(ctx, args[1], args[2], args[3])
 	case "transfer":
 		if len(args) < 4 {
-			fmt.Println("❌ Usage: transfer <recipient_address> <asset> <amount>")
+			fmt.Println("ERROR: Usage: transfer <recipient_address> <asset> <amount>")
 			return
 		}
 		o.transfer(ctx, args[1], args[2], args[3])
@@ -272,11 +272,11 @@ func (o *Operator) Execute(s string) {
 			// Auto-fill with imported wallet
 			wallet = o.getImportedWalletAddress()
 			if wallet == "" {
-				fmt.Println("❌ Usage: balances <wallet_address>")
-				fmt.Println("💡 No wallet imported. Use 'import wallet' first or specify a wallet address.")
+				fmt.Println("ERROR: Usage: balances <wallet_address>")
+				fmt.Println("INFO: No wallet configured. Use 'import wallet' first or specify a wallet address.")
 				return
 			}
-			fmt.Printf("📍 Using your wallet: %s\n", wallet)
+			fmt.Printf("INFO: Using configured wallet: %s\n", wallet)
 		}
 		o.getBalances(ctx, wallet)
 	case "transactions":
@@ -287,11 +287,11 @@ func (o *Operator) Execute(s string) {
 			// Auto-fill with imported wallet
 			wallet = o.getImportedWalletAddress()
 			if wallet == "" {
-				fmt.Println("❌ Usage: transactions <wallet_address>")
-				fmt.Println("💡 No wallet imported. Use 'import wallet' first or specify a wallet address.")
+				fmt.Println("ERROR: Usage: transactions <wallet_address>")
+				fmt.Println("INFO: No wallet configured. Use 'import wallet' first or specify a wallet address.")
 				return
 			}
-			fmt.Printf("📍 Using your wallet: %s\n", wallet)
+			fmt.Printf("INFO: Using configured wallet: %s\n", wallet)
 		}
 		o.listTransactions(ctx, wallet)
 
@@ -306,15 +306,15 @@ func (o *Operator) Execute(s string) {
 			// Auto-fill wallet, user provided asset
 			wallet = o.getImportedWalletAddress()
 			if wallet == "" {
-				fmt.Println("❌ Usage: state <wallet_address> <asset>")
-				fmt.Println("💡 No wallet imported. Use 'import wallet' first or specify a wallet address.")
+				fmt.Println("ERROR: Usage: state <wallet_address> <asset>")
+				fmt.Println("INFO: No wallet configured. Use 'import wallet' first or specify a wallet address.")
 				return
 			}
 			asset = args[1]
-			fmt.Printf("📍 Using your wallet: %s\n", wallet)
+			fmt.Printf("INFO: Using configured wallet: %s\n", wallet)
 		} else {
-			fmt.Println("❌ Usage: state <wallet_address> <asset>")
-			fmt.Println("💡 Or: state <asset> (uses your imported wallet)")
+			fmt.Println("ERROR: Usage: state <wallet_address> <asset>")
+			fmt.Println("INFO: Or: state <asset> (uses configured wallet)")
 			return
 		}
 		o.getLatestState(ctx, wallet, asset)
@@ -328,21 +328,21 @@ func (o *Operator) Execute(s string) {
 			// Auto-fill wallet, user provided asset
 			wallet = o.getImportedWalletAddress()
 			if wallet == "" {
-				fmt.Println("❌ Usage: home-channel <wallet_address> <asset>")
-				fmt.Println("💡 No wallet imported. Use 'import wallet' first or specify a wallet address.")
+				fmt.Println("ERROR: Usage: home-channel <wallet_address> <asset>")
+				fmt.Println("INFO: No wallet configured. Use 'import wallet' first or specify a wallet address.")
 				return
 			}
 			asset = args[1]
-			fmt.Printf("📍 Using your wallet: %s\n", wallet)
+			fmt.Printf("INFO: Using configured wallet: %s\n", wallet)
 		} else {
-			fmt.Println("❌ Usage: home-channel <wallet_address> <asset>")
-			fmt.Println("💡 Or: home-channel <asset> (uses your imported wallet)")
+			fmt.Println("ERROR: Usage: home-channel <wallet_address> <asset>")
+			fmt.Println("INFO: Or: home-channel <asset> (uses configured wallet)")
 			return
 		}
 		o.getHomeChannel(ctx, wallet, asset)
 	case "escrow-channel":
 		if len(args) < 2 {
-			fmt.Println("❌ Usage: escrow-channel <escrow_channel_id>")
+			fmt.Println("ERROR: Usage: escrow-channel <escrow_channel_id>")
 			return
 		}
 		o.getEscrowChannel(ctx, args[1])
@@ -352,10 +352,10 @@ func (o *Operator) Execute(s string) {
 		o.listAppSessions(ctx)
 
 	case "exit":
-		fmt.Println("👋 Exiting...")
+		fmt.Println("Exiting...")
 		close(o.exitCh)
 	default:
-		fmt.Printf("❌ Unknown command: %s (type 'help' for available commands)\n", args[0])
+		fmt.Printf("ERROR: Unknown command: %s (type 'help' for available commands)\n", args[0])
 	}
 }
 

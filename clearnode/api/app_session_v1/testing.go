@@ -149,7 +149,7 @@ func (m *MockStatePacker) PackState(state core.State) ([]byte, error) {
 // NewMockSigner creates a mock signer for testing
 func NewMockSigner() sign.Signer {
 	key, _ := crypto.GenerateKey()
-	signer, _ := sign.NewEthereumRawSigner(hexutil.Encode(crypto.FromECDSA(key)))
+	signer, _ := sign.NewEthereumMsgSigner(hexutil.Encode(crypto.FromECDSA(key)))
 	return signer
 }
 

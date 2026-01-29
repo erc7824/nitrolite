@@ -13,7 +13,6 @@ import (
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/shopspring/decimal"
 )
@@ -308,11 +307,8 @@ func (c *SDKClient) SignState(state *core.State) (string, error) {
 		return "", fmt.Errorf("failed to pack state: %w", err)
 	}
 
-	// Hash the packed state with Keccak256
-	stateHash := crypto.Keccak256Hash(packedState).Bytes()
-
 	// Sign the hash
-	signature, err := c.stateSigner.Sign(stateHash)
+	signature, err := c.stateSigner.Sign(packedState)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign state hash: %w", err)
 	}

@@ -1,6 +1,8 @@
 import { Account, Address, PublicClient, WalletClient, Hash } from 'viem';
 import { Erc20Abi } from '../../abis/token';
 import { Errors } from '../../errors';
+import { ContractCallParams, ContractWriter } from '../contract_writer/types';
+import { EOAContractWriter } from '../contract_writer/eoa';
 
 /**
  * Type utility to properly type the request object from simulateContract
@@ -17,7 +19,7 @@ type PreparedContractRequest = any;
  * @returns Promise<Hash> - The transaction hash
  */
 const executeWriteContract = async (
-    walletClient: WalletClient,
+    contractWriter: ContractWriter,
     request: PreparedContractRequest,
     account: Account | Address,
 ): Promise<Hash> => {
@@ -29,10 +31,22 @@ const executeWriteContract = async (
     //
     // Note: Type assertion is necessary due to viem's complex union types for transaction parameters.
     // The runtime behavior is correct - simulateContract returns compatible parameters for writeContract.
-    return walletClient.writeContract({
-        ...request,
-        account,
-    } as any);
+    const calls = [
+        {
+            ...request,
+            account,
+        },
+    ];
+
+    const result = await contractWriter.write({
+        calls,
+    });
+
+    if (result.txHashes.length < 1) {
+        throw new Error('No transaction hashes returned from write operation');
+    }
+
+    return result.txHashes[result.txHashes.length - 1];
 };
 
 /**
@@ -41,26 +55,39 @@ const executeWriteContract = async (
  */
 export class Erc20Service {
     private readonly publicClient: PublicClient;
-    private readonly walletClient?: WalletClient;
     private readonly account?: Account | Address;
+    private readonly contractWriter?: ContractWriter;
 
-    constructor(publicClient: PublicClient, walletClient?: WalletClient, account?: Account | Address) {
+    constructor(
+        publicClient: PublicClient,
+        walletClient?: WalletClient,
+        account?: Account | Address,
+        contractWriter?: ContractWriter,
+    ) {
         if (!publicClient) {
             throw new Errors.MissingParameterError('publicClient');
         }
 
+        if (contractWriter) {
+            this.contractWriter = contractWriter;
+        } else if (walletClient) {
+            this.contractWriter = new EOAContractWriter({
+                publicClient,
+                // @ts-ignore
+                walletClient,
+            });
+        }
+
         this.publicClient = publicClient;
-        this.walletClient = walletClient;
         this.account = account || walletClient?.account;
     }
 
-    /** Ensures a WalletClient is available for write operations. */
-    private ensureWalletClient(): WalletClient {
-        if (!this.walletClient) {
-            throw new Errors.WalletClientRequiredError();
+    /** Ensures a ContractWriter is available for write operations. */
+    private ensureContractWriter(): ContractWriter {
+        if (!this.contractWriter) {
+            throw new Errors.ContractWriterRequiredError();
         }
-
-        return this.walletClient;
+        return this.contractWriter;
     }
 
     /** Ensures an Account is available for write/simulation operations. */
@@ -123,6 +150,26 @@ export class Erc20Service {
     }
 
     /**
+     * Prepares contract call parameters for an ERC20 approve operation.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param tokenAddress Address of the ERC20 token.
+     * @param spender Address of the spender.
+     * @param amount Amount to approve.
+     * @returns Contract call parameters ready for execution.
+     */
+    prepareApproveCallParams(tokenAddress: Address, spender: Address, amount: bigint): ContractCallParams {
+        const account = this.ensureAccount();
+
+        return {
+            address: tokenAddress,
+            abi: Erc20Abi,
+            functionName: 'approve',
+            args: [spender, amount],
+            account: account,
+        };
+    }
+
+    /**
      * Prepares the request data for an ERC20 approve transaction.
      * Useful for batching multiple calls in a single UserOperation.
      * @param tokenAddress Address of the ERC20 token.
@@ -133,17 +180,11 @@ export class Erc20Service {
      * @throws {AccountRequiredError} If no account is available for simulation.
      */
     async prepareApprove(tokenAddress: Address, spender: Address, amount: bigint): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareApprove';
 
         try {
-            const { request } = await this.publicClient.simulateContract({
-                address: tokenAddress,
-                abi: Erc20Abi,
-                functionName: 'approve',
-                args: [spender, amount],
-                account: account,
-            });
+            const params = this.prepareApproveCallParams(tokenAddress, spender, amount);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {
@@ -165,12 +206,12 @@ export class Erc20Service {
      * @throws {WalletClientRequiredError | AccountRequiredError} If wallet/account is missing.
      */
     async approve(tokenAddress: Address, spender: Address, amount: bigint): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
+        const contractWriter = this.ensureContractWriter();
         const account = this.ensureAccount();
         const operationName = 'approve';
         try {
             const request = await this.prepareApprove(tokenAddress, spender, amount);
-            return await executeWriteContract(walletClient, request, account);
+            return await executeWriteContract(contractWriter, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { tokenAddress, spender, amount });

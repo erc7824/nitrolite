@@ -252,6 +252,21 @@ func (o *Operator) importRPC(_ context.Context, chainIDStr, rpcURL string) {
 	fmt.Printf("SUCCESS: RPC configured for chain %d\n", chainID)
 }
 
+func (o *Operator) setHomeBlockchain(_ context.Context, asset, chainIDStr string) {
+	chainID, err := o.parseChainID(chainIDStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	if err := o.client.SetHomeBlockchain(asset, chainID); err != nil {
+		fmt.Printf("ERROR: Failed to set home blockchain: %v\n", err)
+		return
+	}
+
+	fmt.Printf("SUCCESS: Home blockchain for asset %s is set to %d\n", asset, chainID)
+}
+
 // ============================================================================
 // High-Level Operations (Smart Client)
 // ============================================================================
@@ -586,8 +601,10 @@ func (o *Operator) getLatestState(ctx context.Context, wallet, asset string) {
 	fmt.Printf("\nHome Ledger:\n")
 	fmt.Printf("  Chain:      %d\n", state.HomeLedger.BlockchainID)
 	fmt.Printf("  Token:      %s\n", state.HomeLedger.TokenAddress)
+	fmt.Printf("  User NetFlow:   %s\n", state.HomeLedger.UserNetFlow.String())
 	fmt.Printf("  User Bal:   %s\n", state.HomeLedger.UserBalance.String())
 	fmt.Printf("  Node Bal:   %s\n", state.HomeLedger.NodeBalance.String())
+	fmt.Printf("  Node NetFlow:   %s\n", state.HomeLedger.NodeNetFlow.String())
 	fmt.Printf("\nTransitions: %d\n", len(state.Transitions))
 	for i, t := range state.Transitions {
 		fmt.Printf("  %d. %s (Amount: %s)\n", i+1, t.Type.String(), t.Amount.String())

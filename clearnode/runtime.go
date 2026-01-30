@@ -33,7 +33,8 @@ type Backbone struct {
 	DbStore     database.DatabaseStore
 	MemoryStore memory.MemoryStore
 	RpcNode     rpc.Node
-	Signer      sign.Signer
+	StateSigner sign.Signer
+	TxSigner    sign.Signer
 	Logger      log.Logger
 }
 
@@ -101,11 +102,15 @@ func InitBackbone() *Backbone {
 	// Signer
 	// ------------------------------------------------
 
-	signer, err := sign.NewEthereumSigner(conf.SignerKey)
+	stateSigner, err := sign.NewEthereumMsgSigner(conf.SignerKey)
 	if err != nil {
-		logger.Fatal("failed to initialise signer", "error", err)
+		logger.Fatal("failed to initialise state signer", "error", err)
 	}
-	logger.Info("signer initialized", "address", signer.PublicKey().Address())
+	txSigner, err := sign.NewEthereumRawSigner(conf.SignerKey)
+	if err != nil {
+		logger.Fatal("failed to initialise tx signer", "error", err)
+	}
+	logger.Info("signer initialized", "address", stateSigner.PublicKey().Address())
 
 	// ------------------------------------------------
 	// RPC Node
@@ -147,7 +152,8 @@ func InitBackbone() *Backbone {
 		DbStore:     dbStore,
 		MemoryStore: memoryStore,
 		RpcNode:     rpcNode,
-		Signer:      signer,
+		StateSigner: stateSigner,
+		TxSigner:    txSigner,
 		Logger:      logger,
 	}
 }

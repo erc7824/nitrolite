@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -55,6 +56,11 @@ func (s *DBStore) CreateChannel(channel core.Channel) error {
 
 // GetChannelByID retrieves a channel by its unique identifier.
 func (s *DBStore) GetChannelByID(channelID string) (*core.Channel, error) {
+	// Ensure channelID has 0x prefix
+	if !strings.HasPrefix(channelID, "0x") {
+		channelID = "0x" + channelID
+	}
+
 	var dbChannel Channel
 	if err := s.db.Where("channel_id = ?", channelID).First(&dbChannel).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -111,7 +117,6 @@ func (s *DBStore) CheckOpenChannel(wallet, asset string) (bool, error) {
 			AND s.asset = ?
 			AND c.status = ?
 			AND c.type = ?
-		ORDER BY s.epoch DESC, s.version DESC
 		LIMIT 1
 	`, wallet, asset, core.ChannelStatusOpen, core.ChannelTypeHome).Scan(&count).Error
 

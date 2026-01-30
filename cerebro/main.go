@@ -8,31 +8,25 @@ import (
 
 	"github.com/c-bata/go-prompt"
 	"golang.org/x/term"
-
-	"github.com/erc7824/nitrolite/examples/cerebro/clearnet"
-	"github.com/erc7824/nitrolite/examples/cerebro/storage"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Printf("Usage: cerebro <clearnode_ws_url>\n")
+		fmt.Printf("Usage: clearnode-cli <clearnode_ws_url>\n")
+		fmt.Printf("Example: clearnode-cli wss://clearnode.example.com/ws\n")
 		return
 	}
 
-	clearnodeWSURL := os.Args[1]
-	clearnode, err := clearnet.NewClearnodeClient(clearnodeWSURL)
-	if err != nil {
-		fmt.Printf("Failed to connect to Clearnode WebSocket: %s\n", err.Error())
-		return
-	}
+	wsURL := os.Args[1]
 
+	// Get config directory
 	userConfDir, err := os.UserConfigDir()
 	if err != nil {
 		fmt.Printf("Failed to get user config directory: %s\n", err.Error())
 		return
 	}
-	configDir := path.Join(userConfDir, "cerebro")
-	if customDir := os.Getenv("CEREBRO_CONFIG_DIR"); customDir != "" {
+	configDir := path.Join(userConfDir, "clearnode-cli")
+	if customDir := os.Getenv("CLEARNODE_CLI_CONFIG_DIR"); customDir != "" {
 		configDir = customDir
 	}
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -40,19 +34,27 @@ func main() {
 		return
 	}
 
-	storagePath := path.Join(configDir, "storage.db")
-	store, err := storage.NewStorage(storagePath)
+	// Initialize storage
+	storagePath := path.Join(configDir, "config.db")
+	store, err := NewStorage(storagePath)
 	if err != nil {
 		fmt.Printf("Failed to initialize storage: %s\n", err.Error())
 		return
 	}
 
-	operator, err := NewOperator(clearnode, store)
+	// Create operator
+	operator, err := NewOperator(wsURL, store)
 	if err != nil {
 		fmt.Printf("Failed to create operator: %s\n", err.Error())
 		return
 	}
 
+	fmt.Println("Clearnode CLI - SDK Development Tool")
+	fmt.Printf("Connected to: %s\n", wsURL)
+	fmt.Printf("Config directory: %s\n", configDir)
+	fmt.Println("\nType 'help' for available commands or 'exit' to quit")
+
+	// Terminal handling
 	initialState, _ := term.GetState(int(os.Stdin.Fd()))
 	handleExit := func() {
 		term.Restore(int(os.Stdin.Fd()), initialState)
@@ -60,12 +62,11 @@ func main() {
 	}
 
 	options := append(getStyleOptions(),
-		prompt.OptionPrefix(">>> "),
-
+		prompt.OptionPrefix("clearnode> "),
 		prompt.OptionAddKeyBind(prompt.KeyBind{
 			Key: prompt.ControlC,
 			Fn: func(buf *prompt.Buffer) {
-				fmt.Println("Exiting Cerebro CLI.")
+				fmt.Println("\nExiting Clearnode CLI")
 				handleExit()
 				os.Exit(0)
 			},
@@ -75,6 +76,7 @@ func main() {
 			Fn:  func(buf *prompt.Buffer) {},
 		}),
 	)
+
 	p := prompt.New(
 		operator.Execute,
 		operator.Complete,
@@ -88,35 +90,30 @@ func main() {
 	}()
 
 	select {
-	case <-clearnode.WaitCh():
-		fmt.Println("Clearnode client disconnected.")
 	case <-operator.Wait():
-		fmt.Println("Operator exited.")
+		fmt.Println("Connection closed.")
 	case <-promptExitCh:
-		fmt.Println("Prompt exited.")
+		fmt.Println("Session ended.")
 	}
-	handleExit()
-	fmt.Println("Exiting Cerebro CLI.")
-}
 
-func emptyCompleter(d prompt.Document) []prompt.Suggest {
-	return []prompt.Suggest{}
+	handleExit()
+	fmt.Println("Exiting.")
 }
 
 func getStyleOptions() []prompt.Option {
 	return []prompt.Option{
-		prompt.OptionTitle("Cerebro CLI"),
-		prompt.OptionPrefixTextColor(prompt.Yellow),
-		prompt.OptionPreviewSuggestionTextColor(prompt.Cyan),
+		prompt.OptionTitle("Clearnode CLI"),
+		prompt.OptionPrefixTextColor(prompt.Green),
+		prompt.OptionPreviewSuggestionTextColor(prompt.Blue),
 
 		prompt.OptionSuggestionTextColor(prompt.White),
-		prompt.OptionSuggestionBGColor(prompt.DarkBlue),
+		prompt.OptionSuggestionBGColor(prompt.DarkGray),
 
 		prompt.OptionDescriptionTextColor(prompt.Black),
-		prompt.OptionDescriptionBGColor(prompt.Yellow),
+		prompt.OptionDescriptionBGColor(prompt.Cyan),
 
 		prompt.OptionSelectedSuggestionTextColor(prompt.Black),
-		prompt.OptionSelectedSuggestionBGColor(prompt.Yellow),
+		prompt.OptionSelectedSuggestionBGColor(prompt.Green),
 
 		prompt.OptionSelectedDescriptionTextColor(prompt.White),
 		prompt.OptionSelectedDescriptionBGColor(prompt.DarkBlue),

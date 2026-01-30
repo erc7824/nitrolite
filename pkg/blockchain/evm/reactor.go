@@ -2,11 +2,11 @@ package evm
 
 import (
 	"context"
-	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 
@@ -51,9 +51,15 @@ func NewReactor(blockchainID uint64, eventHandler core.BlockchainEventHandler, s
 
 func (r *Reactor) HandleEvent(ctx context.Context, l types.Log) {
 	logger := log.FromContext(ctx)
-	logger.Debug("received event", "blockNumber", l.BlockNumber, "txHash", l.TxHash.String(), "logIndex", l.Index)
 
 	eventID := l.Topics[0]
+	eventName, ok := eventMapping[eventID]
+	if !ok {
+		logger.Warn("unknown event ID", "eventID", eventID.Hex(), "blockNumber", l.BlockNumber, "txHash", l.TxHash.String(), "logIndex", l.Index)
+		return
+	}
+	logger.Debug("received event", "name", eventName, "blockNumber", l.BlockNumber, "txHash", l.TxHash.String(), "logIndex", l.Index)
+
 	var err error
 	switch eventID {
 	case contractAbi.Events["ChannelCreated"].ID:
@@ -108,12 +114,6 @@ func (r *Reactor) HandleEvent(ctx context.Context, l types.Log) {
 	}
 	if err != nil {
 		logger.Warn("error processing event", "error", err)
-		return
-	}
-
-	eventName, ok := eventMapping[eventID]
-	if !ok {
-		eventName = "unknown"
 	}
 
 	if err := r.storeContractEvent(core.BlockchainEvent{
@@ -137,7 +137,7 @@ func (r *Reactor) handleHomeChannelCreated(ctx context.Context, l types.Log) err
 	}
 
 	ev := core.HomeChannelCreatedEvent{
-		ChannelID:    hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:    hexutil.Encode(event.ChannelId[:]),
 		StateVersion: event.InitialState.Version,
 	}
 	return r.eventHandler.HandleHomeChannelCreated(ctx, &ev)
@@ -150,7 +150,7 @@ func (r *Reactor) handleHomeChannelMigrated(ctx context.Context, l types.Log) er
 	}
 
 	ev := core.HomeChannelMigratedEvent{
-		ChannelID:    hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:    hexutil.Encode(event.ChannelId[:]),
 		StateVersion: event.State.Version,
 	}
 	return r.eventHandler.HandleHomeChannelMigrated(ctx, &ev)
@@ -163,7 +163,7 @@ func (r *Reactor) handleHomeChannelCheckpointed(ctx context.Context, l types.Log
 	}
 
 	ev := core.HomeChannelCheckpointedEvent{
-		ChannelID:    hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:    hexutil.Encode(event.ChannelId[:]),
 		StateVersion: event.Candidate.Version,
 	}
 	return r.eventHandler.HandleHomeChannelCheckpointed(ctx, &ev)
@@ -176,7 +176,7 @@ func (r *Reactor) handleChannelDeposited(ctx context.Context, l types.Log) error
 	}
 
 	ev := core.HomeChannelCheckpointedEvent{
-		ChannelID:    hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:    hexutil.Encode(event.ChannelId[:]),
 		StateVersion: event.Candidate.Version,
 	}
 	return r.eventHandler.HandleHomeChannelCheckpointed(ctx, &ev)
@@ -189,7 +189,7 @@ func (r *Reactor) handleChannelWithdrawn(ctx context.Context, l types.Log) error
 	}
 
 	ev := core.HomeChannelCheckpointedEvent{
-		ChannelID:    hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:    hexutil.Encode(event.ChannelId[:]),
 		StateVersion: event.Candidate.Version,
 	}
 	return r.eventHandler.HandleHomeChannelCheckpointed(ctx, &ev)
@@ -202,7 +202,7 @@ func (r *Reactor) handleHomeChannelChallenged(ctx context.Context, l types.Log) 
 	}
 
 	ev := core.HomeChannelChallengedEvent{
-		ChannelID:       hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:       hexutil.Encode(event.ChannelId[:]),
 		StateVersion:    event.Candidate.Version,
 		ChallengeExpiry: event.ChallengeExpireAt,
 	}
@@ -216,7 +216,7 @@ func (r *Reactor) handleHomeChannelClosed(ctx context.Context, l types.Log) erro
 	}
 
 	ev := core.HomeChannelClosedEvent{
-		ChannelID:    hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:    hexutil.Encode(event.ChannelId[:]),
 		StateVersion: event.FinalState.Version,
 	}
 	return r.eventHandler.HandleHomeChannelClosed(ctx, &ev)
@@ -229,7 +229,7 @@ func (r *Reactor) handleEscrowDepositInitiated(ctx context.Context, l types.Log)
 	}
 
 	ev := core.EscrowDepositInitiatedEvent{
-		ChannelID:    hex.EncodeToString(event.EscrowId[:]),
+		ChannelID:    hexutil.Encode(event.EscrowId[:]),
 		StateVersion: event.State.Version,
 	}
 	return r.eventHandler.HandleEscrowDepositInitiated(ctx, &ev)
@@ -242,7 +242,7 @@ func (r *Reactor) handleEscrowDepositChallenged(ctx context.Context, l types.Log
 	}
 
 	ev := core.EscrowDepositChallengedEvent{
-		ChannelID:       hex.EncodeToString(event.EscrowId[:]),
+		ChannelID:       hexutil.Encode(event.EscrowId[:]),
 		StateVersion:    event.State.Version,
 		ChallengeExpiry: event.ChallengeExpireAt,
 	}
@@ -256,7 +256,7 @@ func (r *Reactor) handleEscrowDepositFinalized(ctx context.Context, l types.Log)
 	}
 
 	ev := core.EscrowDepositFinalizedEvent{
-		ChannelID:    hex.EncodeToString(event.EscrowId[:]),
+		ChannelID:    hexutil.Encode(event.EscrowId[:]),
 		StateVersion: event.State.Version,
 	}
 	return r.eventHandler.HandleEscrowDepositFinalized(ctx, &ev)
@@ -269,7 +269,7 @@ func (r *Reactor) handleEscrowWithdrawalInitiated(ctx context.Context, l types.L
 	}
 
 	ev := core.EscrowWithdrawalInitiatedEvent{
-		ChannelID:    hex.EncodeToString(event.EscrowId[:]),
+		ChannelID:    hexutil.Encode(event.EscrowId[:]),
 		StateVersion: event.State.Version,
 	}
 	return r.eventHandler.HandleEscrowWithdrawalInitiated(ctx, &ev)
@@ -282,7 +282,7 @@ func (r *Reactor) handleEscrowWithdrawalChallenged(ctx context.Context, l types.
 	}
 
 	ev := core.EscrowWithdrawalChallengedEvent{
-		ChannelID:       hex.EncodeToString(event.EscrowId[:]),
+		ChannelID:       hexutil.Encode(event.EscrowId[:]),
 		StateVersion:    event.State.Version,
 		ChallengeExpiry: event.ChallengeExpireAt,
 	}
@@ -296,7 +296,7 @@ func (r *Reactor) handleEscrowWithdrawalFinalized(ctx context.Context, l types.L
 	}
 
 	ev := core.EscrowWithdrawalFinalizedEvent{
-		ChannelID:    hex.EncodeToString(event.EscrowId[:]),
+		ChannelID:    hexutil.Encode(event.EscrowId[:]),
 		StateVersion: event.State.Version,
 	}
 	return r.eventHandler.HandleEscrowWithdrawalFinalized(ctx, &ev)
@@ -309,7 +309,7 @@ func (r *Reactor) handleEscrowDepositInitiatedOnHome(ctx context.Context, l type
 	}
 
 	ev := core.HomeChannelCheckpointedEvent{
-		ChannelID:    hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:    hexutil.Encode(event.ChannelId[:]),
 		StateVersion: event.State.Version,
 	}
 	return r.eventHandler.HandleHomeChannelCheckpointed(ctx, &ev)
@@ -322,7 +322,7 @@ func (r *Reactor) handleEscrowDepositFinalizedOnHome(ctx context.Context, l type
 	}
 
 	ev := core.HomeChannelCheckpointedEvent{
-		ChannelID:    hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:    hexutil.Encode(event.ChannelId[:]),
 		StateVersion: event.State.Version,
 	}
 	return r.eventHandler.HandleHomeChannelCheckpointed(ctx, &ev)
@@ -335,7 +335,7 @@ func (r *Reactor) handleEscrowWithdrawalInitiatedOnHome(ctx context.Context, l t
 	}
 
 	ev := core.HomeChannelCheckpointedEvent{
-		ChannelID:    hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:    hexutil.Encode(event.ChannelId[:]),
 		StateVersion: event.State.Version,
 	}
 	return r.eventHandler.HandleHomeChannelCheckpointed(ctx, &ev)
@@ -348,7 +348,7 @@ func (r *Reactor) handleEscrowWithdrawalFinalizedOnHome(ctx context.Context, l t
 	}
 
 	ev := core.HomeChannelCheckpointedEvent{
-		ChannelID:    hex.EncodeToString(event.ChannelId[:]),
+		ChannelID:    hexutil.Encode(event.ChannelId[:]),
 		StateVersion: event.State.Version,
 	}
 	return r.eventHandler.HandleHomeChannelCheckpointed(ctx, &ev)
@@ -363,7 +363,7 @@ func (r *Reactor) handleMigrationInFinalized(ctx context.Context, l types.Log) e
 	}
 	logger := log.FromContext(ctx)
 	logger.Info("MigrationInFinalized event",
-		"channelId", hex.EncodeToString(event.ChannelId[:]),
+		"channelId", hexutil.Encode(event.ChannelId[:]),
 		"stateVersion", event.State.Version)
 	// TODO: Add handler method to core.BlockchainEventHandler interface and implement
 	return nil
@@ -376,7 +376,7 @@ func (r *Reactor) handleMigrationOutInitiated(ctx context.Context, l types.Log) 
 	}
 	logger := log.FromContext(ctx)
 	logger.Info("MigrationOutInitiated event",
-		"channelId", hex.EncodeToString(event.ChannelId[:]),
+		"channelId", hexutil.Encode(event.ChannelId[:]),
 		"stateVersion", event.State.Version)
 	// TODO: Add handler method to core.BlockchainEventHandler interface and implement
 	return nil
@@ -389,7 +389,7 @@ func (r *Reactor) handleMigrationOutFinalized(ctx context.Context, l types.Log) 
 	}
 	logger := log.FromContext(ctx)
 	logger.Info("MigrationOutFinalized event",
-		"channelId", hex.EncodeToString(event.ChannelId[:]),
+		"channelId", hexutil.Encode(event.ChannelId[:]),
 		"stateVersion", event.State.Version)
 	// TODO: Add handler method to core.BlockchainEventHandler interface and implement
 	return nil

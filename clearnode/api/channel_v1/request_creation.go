@@ -7,7 +7,6 @@ import (
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // RequestCreation processes channel creation requests from users.
@@ -140,8 +139,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		}
 
 		// Provide node's signature
-		stateHash := crypto.Keccak256Hash(packedState).Bytes()
-		_nodeSig, err := h.signer.Sign(stateHash)
+		_nodeSig, err := h.signer.Sign(packedState)
 		if err != nil {
 			return rpc.Errorf("failed to sign state: %v", err)
 		}

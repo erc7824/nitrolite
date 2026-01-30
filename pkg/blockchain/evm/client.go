@@ -1,10 +1,9 @@
 package evm
 
 import (
-	"encoding/hex"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
@@ -27,8 +26,9 @@ type Client struct {
 func NewClient(
 	contractAddress common.Address,
 	backend bind.ContractBackend,
-	signer sign.Signer,
+	txSigner sign.Signer,
 	blockchainID uint64,
+	nodeAddress string,
 	assetStore core.AssetStore,
 ) (*Client, error) {
 	contract, err := NewChannelHub(contractAddress, backend)
@@ -38,8 +38,8 @@ func NewClient(
 
 	return &Client{
 		contract:        contract,
-		transactOpts:    signerTxOpts(signer, blockchainID),
-		nodeAddress:     common.HexToAddress(signer.PublicKey().Address().String()),
+		transactOpts:    signerTxOpts(txSigner, blockchainID),
+		nodeAddress:     common.HexToAddress(nodeAddress),
 		contractAddress: contractAddress,
 		blockchainID:    blockchainID,
 		assetStore:      assetStore,
@@ -95,7 +95,7 @@ func (c *Client) GetOpenChannels(user string) ([]string, error) {
 
 	result := make([]string, len(channelIDs))
 	for i, id := range channelIDs {
-		result[i] = hex.EncodeToString(id[:])
+		result[i] = hexutil.Encode(id[:])
 	}
 	return result, nil
 }

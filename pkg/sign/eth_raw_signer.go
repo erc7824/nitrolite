@@ -10,8 +10,8 @@ import (
 )
 
 // Ensure our types implement the interfaces at compile time.
-var _ Signer = (*EthereumSigner)(nil)
-var _ AddressRecoverer = (*EthereumAddressRecoverer)(nil)
+var _ Signer = (*EthereumRawSigner)(nil)
+var _ AddressRecoverer = (*EthereumRawAddressRecoverer)(nil)
 var _ PublicKey = (*EthereumPublicKey)(nil)
 var _ Address = (*EthereumAddress)(nil)
 
@@ -61,16 +61,16 @@ func NewEthereumPublicKeyFromBytes(pubBytes []byte) (EthereumPublicKey, error) {
 	return EthereumPublicKey{pub}, nil
 }
 
-// EthereumSigner is the Ethereum implementation of the Signer interface.
-type EthereumSigner struct {
+// EthereumRawSigner is the Ethereum implementation of the Signer interface.
+type EthereumRawSigner struct {
 	privateKey *ecdsa.PrivateKey
 	publicKey  EthereumPublicKey
 }
 
-func (s *EthereumSigner) PublicKey() PublicKey { return s.publicKey }
+func (s *EthereumRawSigner) PublicKey() PublicKey { return s.publicKey }
 
 // Sign expects the input data to be a hash (e.g., Keccak256 hash).
-func (s *EthereumSigner) Sign(hash []byte) (Signature, error) {
+func (s *EthereumRawSigner) Sign(hash []byte) (Signature, error) {
 	sig, err := ethcrypto.Sign(hash, s.privateKey)
 	if err != nil {
 		return nil, err
@@ -82,24 +82,24 @@ func (s *EthereumSigner) Sign(hash []byte) (Signature, error) {
 	return Signature(sig), nil
 }
 
-// NewEthereumSigner creates a new Ethereum signer from a hex-encoded private key.
-func NewEthereumSigner(privateKeyHex string) (Signer, error) {
+// NewEthereumRawSigner creates a new Ethereum signer from a hex-encoded private key.
+func NewEthereumRawSigner(privateKeyHex string) (Signer, error) {
 	privateKeyHex = strings.TrimPrefix(privateKeyHex, "0x")
 	key, err := ethcrypto.HexToECDSA(privateKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse ethereum private key: %w", err)
 	}
-	return &EthereumSigner{
+	return &EthereumRawSigner{
 		privateKey: key,
 		publicKey:  EthereumPublicKey{key.Public().(*ecdsa.PublicKey)},
 	}, nil
 }
 
-// EthereumAddressRecoverer implements the AddressRecoverer interface for Ethereum.
-type EthereumAddressRecoverer struct{}
+// EthereumRawAddressRecoverer implements the AddressRecoverer interface for Ethereum.
+type EthereumRawAddressRecoverer struct{}
 
 // RecoverAddress implements the AddressRecoverer interface.
-func (r *EthereumAddressRecoverer) RecoverAddress(message []byte, signature Signature) (Address, error) {
+func (r *EthereumRawAddressRecoverer) RecoverAddress(message []byte, signature Signature) (Address, error) {
 	hash := ethcrypto.Keccak256Hash(message)
 	return RecoverAddressFromHash(hash.Bytes(), signature)
 }

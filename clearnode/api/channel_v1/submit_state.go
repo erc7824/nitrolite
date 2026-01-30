@@ -5,7 +5,6 @@ import (
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // SubmitState processes user-submitted state transitions, validates them against the current state,
@@ -113,8 +112,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 		}
 
 		// Provide node's signature
-		stateHash := crypto.Keccak256Hash(packedState).Bytes()
-		_nodeSig, err := h.signer.Sign(stateHash)
+		_nodeSig, err := h.signer.Sign(packedState)
 		if err != nil {
 			return rpc.Errorf("failed to sign incoming state: %v", err)
 		}

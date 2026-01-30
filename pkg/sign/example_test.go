@@ -8,12 +8,12 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
-// ExampleNewEthereumSigner demonstrates creating an Ethereum signer and signing a message.
-func ExampleNewEthereumSigner() {
+// ExampleNewEthereumRawSigner demonstrates creating an Ethereum signer and signing a message.
+func ExampleNewEthereumRawSigner() {
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" // Example private key
 
 	// Create a new Ethereum signer. It returns the generic sign.Signer interface.
-	signer, err := sign.NewEthereumSigner(pkHex)
+	signer, err := sign.NewEthereumRawSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func ExampleRecoverAddressFromHash() {
 
 	// Create a signature using our signer
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	signer, err := sign.NewEthereumSigner(pkHex)
+	signer, err := sign.NewEthereumRawSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,12 +75,12 @@ func ExampleRecoverAddressFromHash() {
 }
 
 // ExampleEthereumAddressRecoverer demonstrates using the generic AddressRecoverer interface.
-func ExampleEthereumAddressRecoverer() {
+func ExampleEthereumRawAddressRecoverer() {
 	message := []byte("hello world")
 
 	// Create a signer
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	signer, err := sign.NewEthereumSigner(pkHex)
+	signer, err := sign.NewEthereumRawSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func ExampleEthereumAddressRecoverer() {
 	}
 
 	// Use the dedicated AddressRecoverer implementation
-	var recoverer sign.AddressRecoverer = &sign.EthereumAddressRecoverer{}
+	var recoverer sign.AddressRecoverer = &sign.EthereumRawAddressRecoverer{}
 	// The recoverer implementation will hash the raw message internally
 	recoveredAddr, err := recoverer.RecoverAddress(message, signature)
 	if err != nil {

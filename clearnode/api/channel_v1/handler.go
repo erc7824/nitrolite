@@ -2,6 +2,7 @@ package channel_v1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
@@ -92,9 +93,10 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 	}
 
 	if newState.HomeChannelID != nil && !(lastStateTransition != nil && (lastStateTransition.Type == core.TransitionTypeMutualLock || lastStateTransition.Type == core.TransitionTypeEscrowLock)) {
+		fmt.Println("New receiver state:", newState)
 		packedState, err := h.statePacker.PackState(*newState)
 		if err != nil {
-			return nil, rpc.Errorf("failed to pack receiver state")
+			return nil, rpc.Errorf("failed to pack receiver state: %v", err)
 		}
 
 		_nodeSig, err := h.signer.Sign(packedState)

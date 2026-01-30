@@ -47,6 +47,7 @@ type Client struct {
 	config            Config
 	exitCh            chan struct{}
 	blockchainClients map[uint64]*evm.Client
+	homeBlockchains   map[string]uint64
 	stateSigner       sign.Signer
 	txSigner          sign.Signer
 	assetStore        *clientAssetStore
@@ -116,6 +117,45 @@ func (s *clientAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress st
 	return 0, fmt.Errorf("token %s on blockchain %d not found", tokenAddress, blockchainID)
 }
 
+// AssetExistsOnBlockchain checks if a specific asset is supported on a specific blockchain.
+func (s *clientAssetStore) AssetExistsOnBlockchain(blockchainID uint64, asset string) (bool, error) {
+	// 1. Search existing cache first (handling case-insensitivity)
+	for _, a := range s.cache {
+		if strings.EqualFold(a.Symbol, asset) {
+			for _, token := range a.Tokens {
+				if token.BlockchainID == blockchainID {
+					return true, nil
+				}
+			}
+			// Asset found in cache, but not on this chain
+			return false, nil
+		}
+	}
+
+	// 2. If not found in cache, fetch fresh data from node
+	assets, err := s.client.GetAssets(context.Background(), nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch assets: %w", err)
+	}
+
+	// 3. Update cache and search again
+	for _, a := range assets {
+		s.cache[a.Symbol] = a
+		if strings.EqualFold(a.Symbol, asset) {
+			for _, token := range a.Tokens {
+				if token.BlockchainID == blockchainID {
+					return true, nil
+				}
+			}
+			// Asset found after fetch, but not on this chain
+			return false, nil
+		}
+	}
+
+	// Asset symbol not found at all
+	return false, nil
+}
+
 // NewClient creates a new Clearnode client with both high-level and low-level methods.
 // This is the recommended constructor for most use cases.
 //
@@ -164,6 +204,7 @@ func NewClient(wsURL string, stateSigner, txSigner sign.Signer, opts ...Option) 
 		config:            config,
 		exitCh:            make(chan struct{}),
 		blockchainClients: make(map[uint64]*evm.Client),
+		homeBlockchains:   make(map[string]uint64),
 		stateSigner:       stateSigner,
 		txSigner:          txSigner,
 	}
@@ -186,6 +227,44 @@ func NewClient(wsURL string, stateSigner, txSigner sign.Signer, opts ...Option) 
 	}
 
 	return client, nil
+}
+
+// SetHomeBlockchain configures the primary blockchain network for a specific asset.
+// This is required for operations like Transfer which may trigger channel creation
+// but do not accept a blockchain ID as a parameter.
+//
+// Validation:
+//   - Checks if the asset is actually supported on the specified blockchain.
+//   - Verifies that a home blockchain hasn't already been set for this asset.
+//
+// Constraints:
+//   - This mapping is immutable once set for the client instance.
+//   - To move an asset to a different blockchain, use the Migrate() method instead.
+//
+// Parameters:
+//   - asset: The asset symbol (e.g., "usdc")
+//   - blockchainId: The chain ID to associate with the asset (e.g., 80002)
+//
+// Example:
+//
+//	// Set USDC to settle on Polygon Amoy
+//	if err := client.SetHomeBlockchain("usdc", 80002); err != nil {
+//	    log.Fatal(err)
+//	}
+func (c *Client) SetHomeBlockchain(asset string, blockchainId uint64) error {
+	blockchainID, homeBlockchainIsSet := c.homeBlockchains[asset]
+	if homeBlockchainIsSet {
+		return fmt.Errorf("home blockchain is already set for asset %s to %d, please use Migrate() if you want to change home blockchain", asset, blockchainID)
+	}
+	ok, err := c.assetStore.AssetExistsOnBlockchain(blockchainId, asset)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("asset %s not supported on blockchain %d", asset, blockchainId)
+	}
+	c.homeBlockchains[asset] = blockchainId
+	return nil
 }
 
 // ============================================================================
@@ -479,34 +558,21 @@ func (c *Client) Deposit(ctx context.Context, blockchainID uint64, asset string,
 			Challenge: 86400, // 1 day challenge period
 		}
 
-		// Create void state
-		newState := core.NewVoidState(asset, userWallet).NextState()
-
-		// Set home ledger
-		newState.HomeLedger.TokenAddress = tokenAddress
-		newState.HomeLedger.BlockchainID = blockchainID
-
-		// Calculate home channel ID
-		homeChannelID, err := core.GetHomeChannelID(
-			nodeAddress,
-			userWallet,
-			asset,
-			channelDef.Nonce,
-			channelDef.Challenge,
-		)
-		if err != nil {
-			return "", fmt.Errorf("failed to calculate home channel ID: %w", err)
+		if state == nil {
+			state = core.NewVoidState(asset, userWallet)
 		}
-		newState.HomeChannelID = &homeChannelID
+		newState := state.NextState()
+
+		_, err := newState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
+		if err != nil {
+			return "", fmt.Errorf("failed to apply channel creation: %w", err)
+		}
 
 		// Apply deposit transition
 		_, err = newState.ApplyHomeDepositTransition(amount)
 		if err != nil {
 			return "", fmt.Errorf("failed to apply deposit transition: %w", err)
 		}
-
-		// Calculate state ID
-		newState.ID = core.GetStateID(newState.UserWallet, newState.Asset, newState.Epoch, newState.Version)
 
 		// Sign state
 		sig, err := c.SignState(newState)
@@ -541,9 +607,6 @@ func (c *Client) Deposit(ctx context.Context, blockchainID uint64, asset string,
 		return "", fmt.Errorf("failed to apply deposit transition: %w", err)
 	}
 
-	// Calculate state ID
-	nextState.ID = core.GetStateID(nextState.UserWallet, nextState.Asset, nextState.Epoch, nextState.Version)
-
 	// Sign and submit state to node
 	_, err = c.signAndSubmitState(ctx, nextState)
 	if err != nil {
@@ -560,7 +623,9 @@ func (c *Client) Deposit(ctx context.Context, blockchainID uint64, asset string,
 }
 
 // Withdraw removes funds from the user's channel and returns them to the blockchain wallet.
-// This operation requires an existing channel with sufficient balance.
+// This operation handles two scenarios automatically:
+//  1. If no channel exists: Creates a new channel and executes the withdrawal in one transaction
+//  2. If channel exists: Checkpoints the withdrawal to the existing channel
 //
 // Parameters:
 //   - ctx: Context for the operation
@@ -591,15 +656,68 @@ func (c *Client) Withdraw(ctx context.Context, blockchainID uint64, asset string
 
 	blockchainClient := c.blockchainClients[blockchainID]
 
-	// Get latest state (must exist for withdrawal)
-	state, err := c.GetLatestState(ctx, userWallet, asset, false)
+	// Get node address (Required for channel creation flow)
+	nodeAddress, err := c.getNodeAddress(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to get latest state: %w", err)
+		return "", err
 	}
 
-	// Check if channel exists
-	if state.HomeChannelID == nil {
-		return "", fmt.Errorf("channel does not exist, cannot withdraw")
+	// Get token address for this asset on this blockchain (Required for channel creation flow)
+	tokenAddress, err := c.getTokenAddress(ctx, blockchainID, asset)
+	if err != nil {
+		return "", err
+	}
+
+	// Try to get latest state to determine if channel exists
+	state, err := c.GetLatestState(ctx, userWallet, asset, false)
+
+	// Channel doesn't exist - create it and withdraw
+	if err != nil || state.HomeChannelID == nil {
+		// Create channel definition
+		channelDef := core.ChannelDefinition{
+			Nonce:     generateNonce(),
+			Challenge: 86400, // 1 day challenge period
+		}
+
+		if state == nil {
+			state = core.NewVoidState(asset, userWallet)
+		}
+		newState := state.NextState()
+
+		_, err := newState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
+		if err != nil {
+			return "", fmt.Errorf("failed to apply channel creation: %w", err)
+		}
+
+		// Apply withdrawal transition
+		// Note: Ensure your core logic allows withdrawal on a fresh state
+		// (assuming the smart contract handles the net balance check)
+		_, err = newState.ApplyHomeWithdrawalTransition(amount)
+		if err != nil {
+			return "", fmt.Errorf("failed to apply withdrawal transition: %w", err)
+		}
+
+		// Sign state
+		sig, err := c.SignState(newState)
+		if err != nil {
+			return "", fmt.Errorf("failed to sign state: %w", err)
+		}
+		newState.UserSig = &sig
+
+		// Request channel creation from node
+		nodeSig, err := c.requestChannelCreation(ctx, *newState, channelDef)
+		if err != nil {
+			return "", fmt.Errorf("failed to request channel creation: %w", err)
+		}
+		newState.NodeSig = &nodeSig
+
+		// Create channel on blockchain (Smart Contract handles Creation + Withdrawal)
+		txHash, err := blockchainClient.Create(channelDef, *newState)
+		if err != nil {
+			return "", fmt.Errorf("failed to create channel on blockchain: %w", err)
+		}
+
+		return txHash, nil
 	}
 
 	// Create next state
@@ -610,9 +728,6 @@ func (c *Client) Withdraw(ctx context.Context, blockchainID uint64, asset string
 	if err != nil {
 		return "", fmt.Errorf("failed to apply withdrawal transition: %w", err)
 	}
-
-	// Calculate state ID
-	nextState.ID = core.GetStateID(nextState.UserWallet, nextState.Asset, nextState.Epoch, nextState.Version)
 
 	// Sign and submit state to node
 	_, err = c.signAndSubmitState(ctx, nextState)
@@ -655,13 +770,82 @@ func (c *Client) Transfer(ctx context.Context, recipientWallet string, asset str
 	// Get sender's latest state
 	senderWallet := c.GetUserAddress()
 	state, err := c.GetLatestState(ctx, senderWallet, asset, false)
-	if err != nil {
-		return "", fmt.Errorf("failed to get latest state: %w", err)
-	}
+	if err != nil || state.HomeChannelID == nil {
+		// Create channel definition
+		channelDef := core.ChannelDefinition{
+			Nonce:     generateNonce(),
+			Challenge: 86400, // 1 day challenge period
+		}
 
-	// Check if channel exists
-	if state.HomeChannelID == nil {
-		return "", fmt.Errorf("channel not created, deposit first")
+		if state == nil {
+			state = core.NewVoidState(asset, senderWallet)
+		}
+		newState := state.NextState()
+
+		blockchainID, ok := c.homeBlockchains[asset]
+		if !ok {
+			return "", fmt.Errorf("home blockchain not set for asset %s", asset)
+		}
+
+		// Get node address (Required for channel creation flow)
+		nodeAddress, err := c.getNodeAddress(ctx)
+		if err != nil {
+			return "", err
+		}
+
+		// Get token address for this asset on this blockchain
+		tokenAddress, err := c.getTokenAddress(ctx, blockchainID, asset)
+		if err != nil {
+			return "", err
+		}
+
+		// Initialize blockchain client if needed
+		if err := c.initializeBlockchainClient(ctx, blockchainID); err != nil {
+			return "", err
+		}
+
+		blockchainClient := c.blockchainClients[blockchainID]
+
+		_, err = newState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
+		if err != nil {
+			return "", fmt.Errorf("failed to apply channel creation: %w", err)
+		}
+
+		// &{0x1afffc764a989ba7879c9d68b83eaa0c76320f7d72a0e92c7c5e36e387cb3b77
+		// 	[{transfer_send 0x33281ad4bb1830a7536b7d287b81b8e8a9414944ca89d30745513c3460332c5a
+		// 		 0x053aEAD7d3eebE4359300fDE849bCD9E77384989 0.1}]
+		// 		  usdc 0xaB5670b44cb4A3B5535BD637cb600DA572148c98 0 2 0x140004e3850 <nil>
+		// 		  {0x6E2C4707DA119425dF2c722E2695300154652f56 11155111 0.3 0 0 0.3} <nil> <nil> <nil>}
+
+		// Apply withdrawal transition
+		// Note: Ensure your core logic allows withdrawal on a fresh state
+		// (assuming the smart contract handles the net balance check)
+		_, err = newState.ApplyTransferSendTransition(recipientWallet, amount)
+		if err != nil {
+			return "", fmt.Errorf("failed to apply withdrawal transition: %w", err)
+		}
+		fmt.Println(newState)
+		// Sign state
+		sig, err := c.SignState(newState)
+		if err != nil {
+			return "", fmt.Errorf("failed to sign state: %w", err)
+		}
+		newState.UserSig = &sig
+
+		// Request channel creation from node
+		nodeSig, err := c.requestChannelCreation(ctx, *newState, channelDef)
+		if err != nil {
+			return "", fmt.Errorf("failed to request channel creation: %w", err)
+		}
+		newState.NodeSig = &nodeSig
+
+		// Create channel on blockchain (Smart Contract handles Creation + Withdrawal)
+		txHash, err := blockchainClient.Create(channelDef, *newState)
+		if err != nil {
+			return "", fmt.Errorf("failed to create channel on blockchain: %w", err)
+		}
+
+		return txHash, nil
 	}
 
 	// Create next state
@@ -672,9 +856,6 @@ func (c *Client) Transfer(ctx context.Context, recipientWallet string, asset str
 	if err != nil {
 		return "", fmt.Errorf("failed to apply transfer transition: %w", err)
 	}
-
-	// Calculate state ID
-	nextState.ID = core.GetStateID(nextState.UserWallet, nextState.Asset, nextState.Epoch, nextState.Version)
 
 	// Sign and submit state
 	_, err = c.signAndSubmitState(ctx, nextState)

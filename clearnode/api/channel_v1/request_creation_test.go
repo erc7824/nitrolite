@@ -59,18 +59,12 @@ func TestRequestCreation_Success(t *testing.T) {
 	// Create next state from void
 	initialState := voidState.NextState()
 
-	// Calculate and set the home channel ID
-	homeChannelID, err := core.GetHomeChannelID(
-		nodeAddress,
-		userWallet,
-		asset,
-		nonce,
-		challenge,
-	)
+	channelDef := core.ChannelDefinition{
+		Nonce:     nonce,
+		Challenge: challenge,
+	}
+	_, err := initialState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
 	require.NoError(t, err)
-	initialState.HomeChannelID = &homeChannelID
-	initialState.HomeLedger.TokenAddress = tokenAddress
-	initialState.HomeLedger.BlockchainID = blockchainID
 
 	// Apply the home deposit transition to update balances
 	_, err = initialState.ApplyHomeDepositTransition(depositAmount)

@@ -64,16 +64,20 @@ func ValidateDecimalPrecision(amount decimal.Decimal, maxDecimals uint8) error {
 // For example, 1.23 USDC (6 decimals) becomes 1230000.
 // This is used when preparing amounts for smart contract calls.
 func DecimalToBigInt(amount decimal.Decimal, decimals uint8) (*big.Int, error) {
-	// Multiply by 10^decimals to convert to smallest unit
+	// 1. Calculate the multiplier (e.g., 10^6)
 	multiplier := decimal.New(1, int32(decimals))
+
+	// 2. Scale the amount
 	scaled := amount.Mul(multiplier)
 
-	err := ValidateDecimalPrecision(scaled, 0)
-	if err != nil {
-		return nil, err
+	// 3. STRICT VALIDATION: Check if we have any fractional "dust" left.
+	// We check if the scaled number is a whole integer.
+	// If IsInteger() is not available in your version, use: scaled.Mod(decimal.NewFromInt(1)).IsZero() == false
+	if !scaled.IsInteger() {
+		return nil, fmt.Errorf("amount %s exceeds maximum decimal precision: max %d decimals allowed", amount.String(), decimals)
 	}
 
-	// Convert to big.Int, truncating any remaining fractional part
+	// 4. Safe to convert
 	return scaled.BigInt(), nil
 }
 

@@ -14,10 +14,10 @@ import (
 )
 
 type Operator struct {
-	wsURL   string
-	store   *Storage
-	client  *sdk.Client
-	exitCh  chan struct{}
+	wsURL  string
+	store  *Storage
+	client *sdk.Client
+	exitCh chan struct{}
 }
 
 func NewOperator(wsURL string, store *Storage) (*Operator, error) {
@@ -97,6 +97,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "config", Description: "Show current configuration"},
 			{Text: "wallet", Description: "Show wallet address"},
 			{Text: "import", Description: "Import wallet or blockchain RPC"},
+			{Text: "set-home-blockchain", Description: "Set home blockchain for channels"},
 
 			// High-level operations
 			{Text: "deposit", Description: "Deposit funds to channel"},
@@ -133,6 +134,8 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 				{Text: "wallet", Description: "Import private key for signing"},
 				{Text: "rpc", Description: "Import blockchain RPC URL"},
 			}
+		case "set-home-blockchain":
+			return o.getAssetSuggestions()
 		case "node":
 			return []prompt.Suggest{
 				{Text: "info", Description: "Get node configuration"},
@@ -147,6 +150,8 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			if args[1] == "rpc" {
 				return o.getChainSuggestions()
 			}
+		case "set-home-blockchain":
+			return o.getChainSuggestions()
 		case "deposit", "withdraw":
 			return o.getChainSuggestions()
 		case "balances", "transactions":
@@ -226,6 +231,13 @@ func (o *Operator) Execute(s string) {
 		default:
 			fmt.Printf("ERROR: Unknown import type: %s\n", args[1])
 		}
+
+	case "set-home-blockchain":
+		if len(args) < 3 {
+			fmt.Println("ERROR: Usage: set-home-blockchain <asset> <chain_id>")
+			return
+		}
+		o.setHomeBlockchain(ctx, args[1], args[2])
 
 	// High-level operations
 	case "deposit":
@@ -419,7 +431,6 @@ func (o *Operator) getWalletSuggestion() []prompt.Suggest {
 		},
 	}
 }
-
 
 func (o *Operator) parseChainID(chainIDStr string) (uint64, error) {
 	chainID, err := strconv.ParseUint(chainIDStr, 10, 64)

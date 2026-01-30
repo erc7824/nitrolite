@@ -167,6 +167,28 @@ func (state State) NextState() *State {
 	return nextState
 }
 
+// ApplyChannelCreation applies channel creation parameters to the state and returns the calculated home channel ID.
+func (state *State) ApplyChannelCreation(channelDef ChannelDefinition, blockchainID uint64, tokenAddress, nodeAddress string) (string, error) {
+	// Set home ledger
+	state.HomeLedger.TokenAddress = tokenAddress
+	state.HomeLedger.BlockchainID = blockchainID
+
+	// Calculate home channel ID
+	homeChannelID, err := GetHomeChannelID(
+		nodeAddress,
+		state.UserWallet,
+		state.Asset,
+		channelDef.Nonce,
+		channelDef.Challenge,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to calculate home channel ID: %w", err)
+	}
+	state.HomeChannelID = &homeChannelID
+
+	return homeChannelID, nil
+}
+
 func (state *State) IsFinal() bool {
 	if state.GetLastTransition() != nil && state.GetLastTransition().Type == TransitionTypeFinalize {
 		return true
@@ -223,10 +245,14 @@ func (state *State) ApplyHomeWithdrawalTransition(amount decimal.Decimal) (Trans
 		return Transition{}, err
 	}
 
+	fmt.Println("previous user balance:", state.HomeLedger.UserBalance)
+	fmt.Println("previous user net flow:", state.HomeLedger.UserNetFlow)
 	newTransition := NewTransition(TransitionTypeHomeWithdrawal, txID, accountID, amount)
 	state.Transitions = append(state.Transitions, *newTransition)
 	state.HomeLedger.UserNetFlow = state.HomeLedger.UserNetFlow.Sub(newTransition.Amount)
 	state.HomeLedger.UserBalance = state.HomeLedger.UserBalance.Sub(newTransition.Amount)
+	fmt.Println("new user balance:", state.HomeLedger.UserBalance)
+	fmt.Println("new user net flow:", state.HomeLedger.UserNetFlow)
 
 	return *newTransition, nil
 }

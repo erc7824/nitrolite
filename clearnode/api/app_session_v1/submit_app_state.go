@@ -220,6 +220,28 @@ func (h *Handler) handleOperateIntent(
 		}
 	}
 
+	// Record ledger entries for new allocations (participants that didn't have this asset before)
+	for participant, assets := range incomingAllocations {
+		for asset, incomingAmount := range assets {
+			if incomingAmount.IsZero() {
+				continue
+			}
+
+			// Check if this is a new allocation (not in current allocations)
+			currentAmount := decimal.Zero
+			if currentAllocations[participant] != nil {
+				currentAmount = currentAllocations[participant][asset]
+			}
+
+			// If current amount is zero and incoming amount is non-zero, this is a new allocation
+			if currentAmount.IsZero() && !incomingAmount.IsZero() {
+				if err := tx.RecordLedgerEntry(participant, appStateUpd.AppSessionID, asset, incomingAmount); err != nil {
+					return rpc.Errorf("failed to record new allocation ledger entry: %v", err)
+				}
+			}
+		}
+	}
+
 	// Verify that total allocations per asset match session balances
 	for asset, totalAlloc := range allocationSum {
 		sessionBalance, ok := sessionBalances[asset]

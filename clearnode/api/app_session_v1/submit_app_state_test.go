@@ -1150,3 +1150,112 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 	mockStore.AssertExpectations(t)
 	mockSigValidator.AssertExpectations(t)
 }
+
+func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *testing.T) {
+	// Test redistributing funds to a participant who didn't have any allocation before
+	mockStore := new(MockStore)
+	mockSigValidator := new(MockSigValidator)
+
+	storeTxProvider := func(fn StoreTxHandler) error {
+		return fn(mockStore)
+	}
+
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
+	handler := NewHandler(
+		storeTxProvider,
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
+		map[SigType]SigValidator{
+			EcdsaSigType: mockSigValidator,
+		},
+		"0xNode",
+	)
+
+	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+	participant1 := "0x1111111111111111111111111111111111111111"
+	participant2 := "0x2222222222222222222222222222222222222222"
+
+	existingSession := &app.AppSessionV1{
+		SessionID:   appSessionID,
+		Application: "test-app",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: participant1, SignatureWeight: 50},
+			{WalletAddress: participant2, SignatureWeight: 50},
+		},
+		Quorum:  100,
+		Version: 1,
+		Status:  app.AppSessionStatusOpen,
+	}
+
+	// Current state: participant1 has 0.015 WETH, participant2 has nothing
+	currentAllocations := map[string]map[string]decimal.Decimal{
+		participant1: {
+			"WETH": decimal.NewFromFloat(0.015),
+		},
+	}
+
+	sessionBalances := map[string]decimal.Decimal{
+		"WETH": decimal.NewFromFloat(0.015),
+	}
+
+	// New state: redistribute 0.015 WETH to participant1=0.01, participant2=0.005
+	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
+		AppStateUpdate: rpc.AppStateUpdateV1{
+			AppSessionID: appSessionID,
+			Intent:       app.AppStateUpdateIntentOperate,
+			Version:      2,
+			Allocations: []rpc.AppAllocationV1{
+				{Participant: participant1, Asset: "WETH", Amount: "0.01"},
+				{Participant: participant2, Asset: "WETH", Amount: "0.005"},
+			},
+			SessionData: "",
+		},
+		QuorumSigs: []string{
+			"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00",
+			"0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef123456789000",
+		},
+	}
+
+	// Mock expectations
+	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
+	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
+	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
+	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
+	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant2, nil).Once()
+	mockAssetStore.On("GetAssetDecimals", "WETH").Return(uint8(18), nil)
+
+	// Expect ledger entries:
+	// 1. participant1 WETH: 0.01 - 0.015 = -0.005 (sending to participant2)
+	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "WETH", decimal.NewFromFloat(-0.005)).Return(nil)
+	// 2. participant2 WETH: 0.005 - 0 = 0.005 (receiving from participant1)
+	mockStore.On("RecordLedgerEntry", participant2, appSessionID, "WETH", decimal.NewFromFloat(0.005)).Return(nil)
+
+	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
+		return session.SessionID == appSessionID && session.Version == 2
+	})).Return(nil)
+
+	// Create RPC context
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1SubmitAppStateMethod), payload),
+	}
+
+	// Execute
+	handler.SubmitAppState(ctx)
+
+	// Assert - should succeed
+	require.NotNil(t, ctx.Response)
+	require.Nil(t, ctx.Response.Error(), "Expected no error for valid redistribution to new participant")
+
+	mockStore.AssertExpectations(t)
+	mockSigValidator.AssertExpectations(t)
+	mockAssetStore.AssertExpectations(t)
+}

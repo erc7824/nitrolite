@@ -30,9 +30,9 @@ func main() {
 
 	// --- 0. Setup Wallets ---
 	// Replace these strings with your actual hex private keys
-	wallet1PrivateKey := "0x7d6071201765d2630ca9eb83cbe3e2e2e76f9b56ea3ed13a49a00208ebcdf843"
-	wallet2PrivateKey := "0x9b6521133af49807e72b8ecc68ef79706fe374685214130079c375810ec47fe3"
-	wallet3PrivateKey := "0xf636952f9d68984a78ef45ea82480723b8a2c40127111cf83d384f8dcd3b77f8"
+	wallet1PrivateKey := "0x7d60..."
+	wallet2PrivateKey := "0x9b65..."
+	wallet3PrivateKey := "0xf636..."
 
 	// Create signers from private keys
 	wallet1Signer, err := sign.NewEthereumMsgSigner(wallet1PrivateKey)
@@ -57,7 +57,7 @@ func main() {
 	fmt.Printf("Wallet 1 Address: %s\n", wallet1Address)
 	fmt.Printf("Wallet 2 Address: %s\n", wallet2Address)
 	fmt.Printf("Wallet 3 Address: %s\n", wallet3Address)
-	fmt.Println("------------------------\n")
+	fmt.Println("------------------------")
 
 	// Create SDK clients (in a real app, these would be separate instances)
 	wallet1Client, err := sdk.NewClient(wsURL, wallet1Signer, wallet1Signer)
@@ -242,7 +242,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Redistribution failed: %v", err)
 	}
-	fmt.Println("✓ Redistributed WETH: Wallet 2 (0.01) -> Wallet 3 (0.005)\n")
+	fmt.Println("✓ Redistributed WETH: Wallet 2 (0.01) -> Wallet 3 (0.005)")
 
 	// --- 6. Rebalance Both App Sessions Atomically ---
 	fmt.Println("=== Step 6: Atomic Rebalance Across Sessions ===")
@@ -346,7 +346,7 @@ func main() {
 	if err != nil {
 		log.Printf("⚠ Withdraw Error: %v", err)
 	} else {
-		fmt.Println("✓ Wallet 3 successfully withdrew 0.004 WETH back to channel\n")
+		fmt.Println("✓ Wallet 3 successfully withdrew 0.004 WETH back to channel")
 	}
 
 	// --- 8. Close Both App Sessions ---

@@ -121,7 +121,12 @@ func (h *Handler) issueReleaseReceiverState(ctx context.Context, tx Store, recei
 
 	// TODO: move to DB query
 	shouldSign := true
+
 	if lastSignedState != nil {
+		if lastSignedState.HomeChannelID != nil {
+			shouldSign = false
+		}
+
 		lastStateTransition := lastSignedState.GetLastTransition()
 		if lastStateTransition != nil {
 			if lastStateTransition.Type == core.TransitionTypeMutualLock ||

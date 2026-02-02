@@ -103,6 +103,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "deposit", Description: "Deposit funds to channel"},
 			{Text: "withdraw", Description: "Withdraw funds from channel"},
 			{Text: "transfer", Description: "Transfer funds to another wallet"},
+			{Text: "close-channel", Description: "Close home channel on-chain"},
 
 			// Node information
 			{Text: "ping", Description: "Test node connection"},
@@ -134,7 +135,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 				{Text: "wallet", Description: "Import private key for signing"},
 				{Text: "rpc", Description: "Import blockchain RPC URL"},
 			}
-		case "set-home-blockchain":
+		case "set-home-blockchain", "close-channel":
 			return o.getAssetSuggestions()
 		case "node":
 			return []prompt.Suggest{
@@ -238,7 +239,6 @@ func (o *Operator) Execute(s string) {
 			return
 		}
 		o.setHomeBlockchain(ctx, args[1], args[2])
-
 	// High-level operations
 	case "deposit":
 		if len(args) < 4 {
@@ -258,6 +258,12 @@ func (o *Operator) Execute(s string) {
 			return
 		}
 		o.transfer(ctx, args[1], args[2], args[3])
+	case "close-channel":
+		if len(args) < 2 {
+			fmt.Println("ERROR: Usage: close-channel <asset>")
+			return
+		}
+		o.closeChannel(ctx, args[1])
 
 	// Node information
 	case "ping":

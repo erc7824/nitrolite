@@ -74,6 +74,7 @@ func (s *DBStore) GetChannelByID(channelID string) (*core.Channel, error) {
 
 // GetActiveHomeChannel retrieves the active home channel for a user's wallet and asset.
 func (s *DBStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, error) {
+	// TODO: rewrite the query
 	var state State
 	err := s.db.Where("user_wallet = ? AND asset = ?", wallet, asset).
 		Order("epoch DESC, version DESC").

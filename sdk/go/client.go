@@ -863,3 +863,67 @@ func (c *Client) Transfer(ctx context.Context, recipientWallet string, asset str
 	// Return transaction ID from the transition
 	return transition.TxID, nil
 }
+
+// CloseChannel finalizes and closes the user's channel for a specific asset.
+// This operation creates a final state and submits it to the node.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - asset: The asset symbol to transfer (e.g., "usdc")
+//
+// Returns:
+//   - Transaction ID for tracking
+//   - Error if the operation fails
+//
+// Errors:
+//   - Returns error if channel doesn't exist (user must deposit first)
+//   - Returns error if state submission fails
+//
+// Example:
+//
+//	txID, err := client.CloseHomeChannel(ctx, "usdc")
+//	fmt.Printf("TransCloseHomeChannelfer successful: %s\n", txID)
+func (c *Client) CloseHomeChannel(ctx context.Context, asset string) (string, error) {
+	// Get sender's latest state
+	senderWallet := c.GetUserAddress()
+
+	state, err := c.GetLatestState(ctx, senderWallet, asset, false)
+	if err != nil {
+		return "", err
+	}
+
+	if state.HomeChannelID == nil {
+		return "", fmt.Errorf("no channel exists for asset %s", asset)
+	}
+	blockchainID := state.HomeLedger.BlockchainID
+
+	// Initialize blockchain client if needed
+	if err := c.initializeBlockchainClient(ctx, blockchainID); err != nil {
+		return "", err
+	}
+
+	blockchainClient := c.blockchainClients[blockchainID]
+
+	// Create next state
+	nextState := state.NextState()
+
+	// Apply transfer send transition
+	_, err = nextState.ApplyFinalizeTransition()
+	if err != nil {
+		return "", fmt.Errorf("failed to apply transfer transition: %w", err)
+	}
+
+	// Sign and submit state
+	_, err = c.signAndSubmitState(ctx, nextState)
+	if err != nil {
+		return "", err
+	}
+
+	// Checkpoint on blockchain
+	txHash, err := blockchainClient.Close(*nextState, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to checkpoint withdrawal on blockchain: %w", err)
+	}
+
+	return txHash, nil
+}

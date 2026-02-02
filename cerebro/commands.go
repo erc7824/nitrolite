@@ -340,6 +340,20 @@ func (o *Operator) transfer(ctx context.Context, recipient, asset, amountStr str
 	fmt.Printf("Transaction ID: %s\n", txID)
 }
 
+func (o *Operator) closeChannel(ctx context.Context, asset string) {
+	fmt.Printf("Initiating channel closure for asset: %s...\n", asset)
+	fmt.Println("INFO: This involves signing a final state and submitting a transaction to the blockchain.")
+
+	txID, err := o.client.CloseHomeChannel(ctx, asset)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to close channel: %v\n", err)
+		return
+	}
+
+	fmt.Printf("SUCCESS: Channel closed successfully.\n")
+	fmt.Printf("Transaction Hash: %s\n", txID)
+}
+
 // ============================================================================
 // Node Information (Base Client)
 // ============================================================================

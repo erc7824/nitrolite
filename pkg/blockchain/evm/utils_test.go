@@ -1,7 +1,6 @@
 package evm
 
 import (
-	"encoding/hex"
 	"math/big"
 	"testing"
 
@@ -22,7 +21,7 @@ func TestHexToBytes32_Success(t *testing.T) {
 	for i := 0; i < 32; i++ {
 		expected[i] = byte(i)
 	}
-	hexStr := "0x" + hex.EncodeToString(expected[:])
+	hexStr := hexutil.Encode(expected[:])
 
 	result, err := hexToBytes32(hexStr)
 	require.NoError(t, err)
@@ -38,13 +37,13 @@ func TestHexToBytes32_InvalidHex(t *testing.T) {
 
 func TestHexToBytes32_InvalidLength(t *testing.T) {
 	// 16 bytes instead of 32
-	shortHex := "0x" + hex.EncodeToString(make([]byte, 16))
+	shortHex := hexutil.Encode(make([]byte, 16))
 	_, err := hexToBytes32(shortHex)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid length: expected 32 bytes, got 16")
 
 	// 64 bytes instead of 32
-	longHex := "0x" + hex.EncodeToString(make([]byte, 64))
+	longHex := hexutil.Encode(make([]byte, 64))
 	_, err = hexToBytes32(longHex)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid length: expected 32 bytes, got 64")

@@ -57,7 +57,7 @@ func main() {
 	fmt.Printf("Wallet 1 Address: %s\n", wallet1Address)
 	fmt.Printf("Wallet 2 Address: %s\n", wallet2Address)
 	fmt.Printf("Wallet 3 Address: %s\n", wallet3Address)
-	fmt.Println("------------------------\n")
+	fmt.Println("------------------------")
 
 	// Create SDK clients (in a real app, these would be separate instances)
 	wallet1Client, err := sdk.NewClient(wsURL, wallet1Signer, wallet1Signer)
@@ -242,7 +242,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Redistribution failed: %v", err)
 	}
-	fmt.Println("✓ Redistributed WETH: Wallet 2 (0.01) -> Wallet 3 (0.005)\n")
+	fmt.Println("✓ Redistributed WETH: Wallet 2 (0.01) -> Wallet 3 (0.005)")
 
 	// --- 6. Rebalance Both App Sessions Atomically ---
 	fmt.Println("=== Step 6: Atomic Rebalance Across Sessions ===")
@@ -346,7 +346,7 @@ func main() {
 	if err != nil {
 		log.Printf("⚠ Withdraw Error: %v", err)
 	} else {
-		fmt.Println("✓ Wallet 3 successfully withdrew 0.004 WETH back to channel\n")
+		fmt.Println("✓ Wallet 3 successfully withdrew 0.004 WETH back to channel")
 	}
 
 	// --- 8. Close Both App Sessions ---

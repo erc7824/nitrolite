@@ -51,6 +51,8 @@ func (c *Client) GetAppSessions(ctx context.Context, opts *GetAppSessionsOptions
 		req.Participant = opts.Participant
 		req.Status = opts.Status
 		req.Pagination = transformPaginationParams(opts.Pagination)
+	} else {
+		return nil, core.PaginationMetadata{}, fmt.Errorf("no options provided: participant or app_session_id required")
 	}
 	resp, err := c.rpcClient.AppSessionsV1GetAppSessions(ctx, req)
 	if err != nil {
@@ -73,6 +75,9 @@ func (c *Client) GetAppSessions(ctx context.Context, opts *GetAppSessionsOptions
 //	def, err := client.GetAppDefinition(ctx, "session123")
 //	fmt.Printf("App: %s, Quorum: %d\n", def.Application, def.Quorum)
 func (c *Client) GetAppDefinition(ctx context.Context, appSessionID string) (*app.AppDefinitionV1, error) {
+	if appSessionID == "" {
+		return nil, fmt.Errorf("app session ID required")
+	}
 	req := rpc.AppSessionsV1GetAppDefinitionRequest{
 		AppSessionID: appSessionID,
 	}
@@ -141,6 +146,7 @@ func (c *Client) CreateAppSession(ctx context.Context, definition app.AppDefinit
 //	}
 //	nodeSig, err := client.SubmitAppSessionDeposit(ctx, appUpdate, []string{"sig1"}, userState)
 func (c *Client) SubmitAppSessionDeposit(ctx context.Context, appStateUpdate app.AppStateUpdateV1, quorumSigs []string, userState core.State) (string, error) {
+	// TODO: Would be good to only have appStateUpdate and quorumSigs here, as userState can be built inside.
 	appUpdate := transformAppStateUpdateToRPC(appStateUpdate)
 
 	req := rpc.AppSessionsV1SubmitDepositStateRequest{

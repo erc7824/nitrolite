@@ -86,12 +86,21 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 	if err != nil {
 		return nil, rpc.Errorf("failed to get last %s user state for transfer receiver with address %s", senderState.Asset, incomingTransition.AccountID)
 	}
-	var lastStateTransition *core.Transition
+
+	// TODO: move to DB query
+	shouldSign := true
 	if lastSignedState != nil {
-		lastStateTransition = lastSignedState.GetLastTransition()
+		lastStateTransition := lastSignedState.GetLastTransition()
+		if lastStateTransition != nil {
+			if lastStateTransition.Type == core.TransitionTypeMutualLock ||
+				lastStateTransition.Type == core.TransitionTypeEscrowLock ||
+				newState.HomeChannelID != nil {
+				shouldSign = false
+			}
+		}
 	}
 
-	if newState.HomeChannelID != nil && !(lastStateTransition != nil && (lastStateTransition.Type == core.TransitionTypeMutualLock || lastStateTransition.Type == core.TransitionTypeEscrowLock)) {
+	if shouldSign {
 		packedState, err := h.statePacker.PackState(*newState)
 		if err != nil {
 			return nil, rpc.Errorf("failed to pack receiver state: %v", err)

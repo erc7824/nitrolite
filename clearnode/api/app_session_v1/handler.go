@@ -125,7 +125,8 @@ func (h *Handler) issueReleaseReceiverState(ctx context.Context, tx Store, recei
 		lastStateTransition := lastSignedState.GetLastTransition()
 		if lastStateTransition != nil {
 			if lastStateTransition.Type == core.TransitionTypeMutualLock ||
-				lastStateTransition.Type == core.TransitionTypeEscrowLock {
+				lastStateTransition.Type == core.TransitionTypeEscrowLock ||
+				newState.HomeChannelID != nil {
 				shouldSign = false
 			}
 		}

@@ -93,7 +93,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		Participants: appDef.Participants,
 		Quorum:       appDef.Quorum,
 		Nonce:        appDef.Nonce,
-		Status:       app.AppSessionStatusClosed,
+		Status:       app.AppSessionStatusOpen,
 		Version:      1,
 		SessionData:  reqPayload.SessionData,
 		CreatedAt:    time.Now(),

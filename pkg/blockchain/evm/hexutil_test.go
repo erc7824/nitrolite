@@ -22,7 +22,7 @@ func TestHexutilDecode_WithAndWithoutPrefix(t *testing.T) {
 
 // TestHexutilDecode_SDK_SignatureFormat tests the exact format produced by SDK
 func TestHexutilDecode_SDK_SignatureFormat(t *testing.T) {
-	// Simulate SDK SignState output: "0x" + hex.EncodeToString(signature)
+	// Simulate SDK SignState output: hexutil.Encode(signature)
 	// This is a 65-byte ECDSA signature (r=32, s=32, v=1)
 	mockSignatureBytes := make([]byte, 65)
 	for i := range mockSignatureBytes {

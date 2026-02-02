@@ -51,6 +51,8 @@ func (c *Client) GetAppSessions(ctx context.Context, opts *GetAppSessionsOptions
 		req.Participant = opts.Participant
 		req.Status = opts.Status
 		req.Pagination = transformPaginationParams(opts.Pagination)
+	} else {
+		return nil, core.PaginationMetadata{}, fmt.Errorf("no options provided: participant or app_session_id required")
 	}
 	resp, err := c.rpcClient.AppSessionsV1GetAppSessions(ctx, req)
 	if err != nil {
@@ -73,6 +75,9 @@ func (c *Client) GetAppSessions(ctx context.Context, opts *GetAppSessionsOptions
 //	def, err := client.GetAppDefinition(ctx, "session123")
 //	fmt.Printf("App: %s, Quorum: %d\n", def.Application, def.Quorum)
 func (c *Client) GetAppDefinition(ctx context.Context, appSessionID string) (*app.AppDefinitionV1, error) {
+	if appSessionID == "" {
+		return nil, fmt.Errorf("app session ID required")
+	}
 	req := rpc.AppSessionsV1GetAppDefinitionRequest{
 		AppSessionID: appSessionID,
 	}

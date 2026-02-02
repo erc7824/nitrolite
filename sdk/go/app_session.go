@@ -56,7 +56,13 @@ func (c *Client) GetAppSessions(ctx context.Context, opts *GetAppSessionsOptions
 	if err != nil {
 		return nil, core.PaginationMetadata{}, fmt.Errorf("failed to get app sessions: %w", err)
 	}
-	return transformAppSessions(resp.AppSessions), transformPaginationMetadata(resp.Metadata), nil
+
+	appSessions, err := transformAppSessions(resp.AppSessions)
+	if err != nil {
+		return nil, core.PaginationMetadata{}, fmt.Errorf("failed to transform app sessions: %w", err)
+	}
+
+	return appSessions, transformPaginationMetadata(resp.Metadata), nil
 }
 
 // GetAppDefinition retrieves the definition for a specific app session.
@@ -73,6 +79,9 @@ func (c *Client) GetAppSessions(ctx context.Context, opts *GetAppSessionsOptions
 //	def, err := client.GetAppDefinition(ctx, "session123")
 //	fmt.Printf("App: %s, Quorum: %d\n", def.Application, def.Quorum)
 func (c *Client) GetAppDefinition(ctx context.Context, appSessionID string) (*app.AppDefinitionV1, error) {
+	if appSessionID == "" {
+		return nil, fmt.Errorf("app session ID required")
+	}
 	req := rpc.AppSessionsV1GetAppDefinitionRequest{
 		AppSessionID: appSessionID,
 	}
@@ -141,6 +150,7 @@ func (c *Client) CreateAppSession(ctx context.Context, definition app.AppDefinit
 //	}
 //	nodeSig, err := client.SubmitAppSessionDeposit(ctx, appUpdate, []string{"sig1"}, userState)
 func (c *Client) SubmitAppSessionDeposit(ctx context.Context, appStateUpdate app.AppStateUpdateV1, quorumSigs []string, userState core.State) (string, error) {
+	// TODO: Would be good to only have appStateUpdate and quorumSigs here, as userState can be built inside.
 	appUpdate := transformAppStateUpdateToRPC(appStateUpdate)
 
 	req := rpc.AppSessionsV1SubmitDepositStateRequest{

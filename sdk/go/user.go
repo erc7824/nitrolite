@@ -35,7 +35,11 @@ func (c *Client) GetBalances(ctx context.Context, wallet string) ([]core.Balance
 	if err != nil {
 		return nil, fmt.Errorf("failed to get balances: %w", err)
 	}
-	return transformBalances(resp.Balances), nil
+	bals, err := transformBalances(resp.Balances)
+	if err != nil {
+		return nil, err
+	}
+	return bals, nil
 }
 
 // GetTransactionsOptions contains optional filters for GetTransactions.
@@ -76,5 +80,9 @@ func (c *Client) GetTransactions(ctx context.Context, wallet string, opts *GetTr
 	if err != nil {
 		return nil, core.PaginationMetadata{}, fmt.Errorf("failed to get transactions: %w", err)
 	}
-	return transformTransactions(resp.Transactions), transformPaginationMetadata(resp.Metadata), nil
+	txs, err := transformTransactions(resp.Transactions)
+	if err != nil {
+		return nil, core.PaginationMetadata{}, err
+	}
+	return txs, transformPaginationMetadata(resp.Metadata), nil
 }

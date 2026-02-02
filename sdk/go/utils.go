@@ -67,16 +67,19 @@ func transformAssets(assets []rpc.AssetV1) []core.Asset {
 // ============================================================================
 
 // transformBalances converts RPC BalanceEntryV1 slice to core.BalanceEntry slice.
-func transformBalances(balances []rpc.BalanceEntryV1) []core.BalanceEntry {
+func transformBalances(balances []rpc.BalanceEntryV1) ([]core.BalanceEntry, error) {
 	result := make([]core.BalanceEntry, 0, len(balances))
 	for _, balance := range balances {
-		amount, _ := decimal.NewFromString(balance.Amount)
+		amount, err := decimal.NewFromString(balance.Amount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse balance amount: %w", err)
+		}
 		result = append(result, core.BalanceEntry{
 			Asset:   balance.Asset,
 			Balance: amount,
 		})
 	}
-	return result
+	return result, nil
 }
 
 // ============================================================================
@@ -129,28 +132,22 @@ func transformChannel(channel rpc.ChannelV1) core.Channel {
 	}
 }
 
-// transformChannels converts RPC ChannelV1 slice to core.Channel slice.
-func transformChannels(channels []rpc.ChannelV1) []core.Channel {
-	result := make([]core.Channel, 0, len(channels))
-	for _, channel := range channels {
-		result = append(result, transformChannel(channel))
-	}
-	return result
-}
-
 // ============================================================================
 // Transaction Transformations
 // ============================================================================
 
 // transformTransactions converts RPC TransactionV1 slice to core.Transaction slice.
-func transformTransactions(transactions []rpc.TransactionV1) []core.Transaction {
+func transformTransactions(transactions []rpc.TransactionV1) ([]core.Transaction, error) {
 	result := make([]core.Transaction, 0, len(transactions))
 	for _, tx := range transactions {
-		amount, _ := decimal.NewFromString(tx.Amount)
-
-		// Parse timestamp
-		createdAt, _ := time.Parse(time.RFC3339, tx.CreatedAt)
-
+		amount, err := decimal.NewFromString(tx.Amount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse balance amount: %w", err)
+		}
+		createdAt, err := time.Parse(time.RFC3339, tx.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse time: %w", err)
+		}
 		result = append(result, core.Transaction{
 			ID:                 tx.ID,
 			Asset:              tx.Asset,
@@ -163,7 +160,7 @@ func transformTransactions(transactions []rpc.TransactionV1) []core.Transaction 
 			CreatedAt:          createdAt,
 		})
 	}
-	return result
+	return result, nil
 }
 
 // ============================================================================
@@ -255,19 +252,6 @@ func transformState(state rpc.StateV1) (core.State, error) {
 		// Note: IsFinal is computed from transitions, not stored
 	}
 
-	return result, nil
-}
-
-// transformStates converts RPC StateV1 slice to core.State slice.
-func transformStates(states []rpc.StateV1) ([]core.State, error) {
-	result := make([]core.State, 0, len(states))
-	for _, state := range states {
-		s, err := transformState(state)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, s)
-	}
 	return result, nil
 }
 
@@ -369,7 +353,7 @@ func transformChannelDefinitionToRPC(def core.ChannelDefinition) rpc.ChannelDefi
 // ============================================================================
 
 // transformAppSessions converts RPC AppSessionInfoV1 slice to app.AppSessionInfoV1 slice.
-func transformAppSessions(sessions []rpc.AppSessionInfoV1) []app.AppSessionInfoV1 {
+func transformAppSessions(sessions []rpc.AppSessionInfoV1) ([]app.AppSessionInfoV1, error) {
 	result := make([]app.AppSessionInfoV1, 0, len(sessions))
 	for _, s := range sessions {
 		// Transform participants
@@ -384,7 +368,11 @@ func transformAppSessions(sessions []rpc.AppSessionInfoV1) []app.AppSessionInfoV
 		// Transform allocations
 		allocations := make([]app.AppAllocationV1, 0, len(s.Allocations))
 		for _, a := range s.Allocations {
-			amount, _ := decimal.NewFromString(a.Amount)
+			amount, err := decimal.NewFromString(a.Amount)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse allocation amount: %w", err)
+			}
+
 			allocations = append(allocations, app.AppAllocationV1{
 				Participant: a.Participant,
 				Asset:       a.Asset,
@@ -412,7 +400,7 @@ func transformAppSessions(sessions []rpc.AppSessionInfoV1) []app.AppSessionInfoV
 			Allocations:  allocations,
 		})
 	}
-	return result
+	return result, nil
 }
 
 // transformAppDefinition converts RPC AppDefinitionV1 to app.AppDefinitionV1.

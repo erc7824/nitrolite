@@ -248,6 +248,7 @@ func (o *Operator) importRPC(_ context.Context, chainIDStr, rpcURL string) {
 		fmt.Printf("ERROR: Failed to save RPC: %v\n", err)
 		return
 	}
+	// TODO: add to SDK Client dynamically
 
 	fmt.Printf("SUCCESS: RPC configured for chain %d\n", chainID)
 }

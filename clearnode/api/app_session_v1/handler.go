@@ -131,7 +131,7 @@ func (h *Handler) issueReleaseReceiverState(ctx context.Context, tx Store, recei
 		}
 	}
 
-	if shouldSign {
+	if newState.HomeChannelID != nil && shouldSign {
 		// Pack and sign the state
 		packedState, err := h.statePacker.PackState(*newState)
 		if err != nil {

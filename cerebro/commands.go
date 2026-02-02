@@ -629,8 +629,14 @@ func (o *Operator) getLatestState(ctx context.Context, wallet, asset string) {
 // Low-Level App Sessions (Base Client)
 // ============================================================================
 
-func (o *Operator) listAppSessions(ctx context.Context) {
-	sessions, meta, err := o.client.GetAppSessions(ctx, nil)
+func (o *Operator) listAppSessions(ctx context.Context, wallet string) {
+	limit := uint32(20)
+	sessions, meta, err := o.client.GetAppSessions(ctx, &sdk.GetAppSessionsOptions{
+		Participant: &wallet,
+		Pagination: &core.PaginationParams{
+			Limit: &limit,
+		},
+	})
 	if err != nil {
 		fmt.Printf("ERROR: Failed to list app sessions: %v\n", err)
 		return

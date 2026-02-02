@@ -42,7 +42,6 @@ import (
 //	config, _ := client.GetConfig(ctx)
 //	balances, _ := client.GetBalances(ctx, walletAddress)
 type Client struct {
-	rpcDialer         rpc.Dialer
 	rpcClient         *rpc.Client
 	config            Config
 	exitCh            chan struct{}
@@ -115,6 +114,52 @@ func (s *clientAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress st
 	}
 
 	return 0, fmt.Errorf("token %s on blockchain %d not found", tokenAddress, blockchainID)
+}
+
+// GetTokenAddress returns the token address for a given asset on a specific blockchain.
+func (s *clientAssetStore) GetTokenAddress(asset string, blockchainID uint64) (string, error) {
+	// Fetch all assets if cache is empty
+	if len(s.cache) == 0 {
+		assets, err := s.client.GetAssets(context.Background(), nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to fetch assets: %w", err)
+		}
+		for _, a := range assets {
+			s.cache[a.Symbol] = a
+		}
+	}
+
+	// Search for the asset and its token on the specified blockchain
+	for _, a := range s.cache {
+		if strings.EqualFold(a.Symbol, asset) {
+			for _, token := range a.Tokens {
+				if token.BlockchainID == blockchainID {
+					return token.Address, nil
+				}
+			}
+			return "", fmt.Errorf("asset %s not available on blockchain %d", asset, blockchainID)
+		}
+	}
+
+	// Asset not found in cache, try fetching again
+	assets, err := s.client.GetAssets(context.Background(), nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch assets: %w", err)
+	}
+
+	for _, a := range assets {
+		s.cache[a.Symbol] = a
+		if strings.EqualFold(a.Symbol, asset) {
+			for _, token := range a.Tokens {
+				if token.BlockchainID == blockchainID {
+					return token.Address, nil
+				}
+			}
+			return "", fmt.Errorf("asset %s not available on blockchain %d", asset, blockchainID)
+		}
+	}
+
+	return "", fmt.Errorf("asset %s not found", asset)
 }
 
 // AssetExistsOnBlockchain checks if a specific asset is supported on a specific blockchain.
@@ -196,7 +241,6 @@ func NewClient(wsURL string, stateSigner, txSigner sign.Signer, opts ...Option) 
 
 	// Create client instance
 	client := &Client{
-		rpcDialer:         dialer,
 		rpcClient:         rpcClient,
 		config:            config,
 		exitCh:            make(chan struct{}),

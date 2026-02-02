@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/erc7824/nitrolite/pkg/core"
+	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -17,4 +19,12 @@ type AssetStore interface {
 
 	// GetTokenDecimals returns the decimals for a token on a specific blockchain
 	GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error)
+
+	// GetTokenAddress returns the token address for a given asset on a specific blockchain
+	GetTokenAddress(asset string, blockchainID uint64) (string, error)
+}
+
+type EVMClient interface {
+	ethereum.ChainStateReader
+	bind.ContractBackend
 }

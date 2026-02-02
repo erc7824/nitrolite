@@ -1,7 +1,7 @@
 # Clearnode Go SDK
 
 Go SDK for Clearnode payment channels providing both high-level and low-level operations in a unified client:
-- **High-Level Operations**: `Deposit`, `Withdraw`, `Transfer` with automatic state management
+- **High-Level Operations**: `Deposit`, `Withdraw`, `Transfer`, `CloseHomeChannel` with automatic state management
 - **Low-Level Operations**: Direct RPC access for custom flows and advanced use cases
 
 ## Method Cheat Sheet
@@ -11,6 +11,7 @@ Go SDK for Clearnode payment channels providing both high-level and low-level op
 client.Deposit(ctx, blockchainID, asset, amount)      // Deposit to channel
 client.Withdraw(ctx, blockchainID, asset, amount)     // Withdraw from channel
 client.Transfer(ctx, recipientWallet, asset, amount)  // Off-chain transfer
+client.CloseHomeChannel(ctx, asset)                   // Close and finalize channel
 ```
 
 ### Node Information
@@ -46,10 +47,11 @@ client.RebalanceAppSessions(ctx, signedUpdates)               // Atomic rebalanc
 
 ### Shared Utilities
 ```go
-client.Close()              // Close connection
-client.WaitCh()             // Connection monitor channel
-client.SignState(state)     // Sign a state (advanced)
-client.GetUserAddress()     // Get signer's address
+client.Close()                          // Close connection
+client.WaitCh()                         // Connection monitor channel
+client.SignState(state)                 // Sign a state (advanced)
+client.GetUserAddress()                 // Get signer's address
+client.SetHomeBlockchain(asset, chainID) // Set default blockchain for asset
 ```
 
 ## Installation
@@ -110,16 +112,8 @@ sdk/go/
 ├── channel.go        # Channel and state management
 ├── app_session.go    # App session methods
 ├── config.go         # Configuration options
-└── transform.go      # Type conversions
+└── utils.go      # Type conversions
 ```
-
-**Design Principles:**
-- Zero SDK-specific types - all types from `pkg/core`, `pkg/app`, and `pkg/sign`
-- Single unified client with both high-level and low-level methods
-- Uses `pkg/sign` for state signing (no SDK-specific signing wrapper)
-- Automatic flow management for high-level operations (channel creation, state building, signing)
-- Direct RPC access for low-level operations
-- Code organized by domain for readability
 
 ## Client API
 
@@ -146,7 +140,32 @@ client, err := sdk.NewClient(
     sdk.WithHandshakeTimeout(10*time.Second),
     sdk.WithPingInterval(5*time.Second),
 )
+
+// Step 3: (Optional) Set home blockchain for assets
+// Required for Transfer operations that may trigger channel creation
+err = client.SetHomeBlockchain("usdc", 80002)
+if err != nil {
+    log.Fatal(err)
+}
 ```
+
+### Configuring Home Blockchain
+
+#### `SetHomeBlockchain(asset, blockchainID) error`
+
+Sets the default blockchain network for a specific asset. This is required for `Transfer()` operations that may trigger channel creation, as Transfer doesn't accept a blockchain ID parameter.
+
+```go
+err := client.SetHomeBlockchain("usdc", 80002)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**Important Notes:**
+- This mapping is immutable once set for the client instance
+- The asset must be supported on the specified blockchain
+- Required before calling `Transfer()` on a new channel
 
 ### High-Level Operations
 
@@ -176,7 +195,8 @@ txID, err := client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(5
 ```
 
 **Requirements:**
-- Existing channel with sufficient balance
+- Existing channel with sufficient balance OR
+- Home blockchain configured via `SetHomeBlockchain()` (for new channels)
 
 #### `Withdraw(ctx, blockchainID, asset, amount) (txHash, error)`
 
@@ -188,6 +208,19 @@ txHash, err := client.Withdraw(ctx, 80002, "usdc", decimal.NewFromInt(25))
 
 **Requirements:**
 - Existing channel with sufficient balance
+- Blockchain RPC configured
+- Sufficient gas for transaction
+
+#### `CloseHomeChannel(ctx, asset) (txHash, error)`
+
+Finalizes and closes the user's channel for a specific asset.
+
+```go
+txHash, err := client.CloseHomeChannel(ctx, "usdc")
+```
+
+**Requirements:**
+- Existing channel (user must have deposited first)
 - Blockchain RPC configured
 - Sufficient gas for transaction
 
@@ -314,6 +347,7 @@ if err != nil {
 
 Common errors:
 - `"channel not created, deposit first"` - Transfer before deposit
+- `"home blockchain not set for asset"` - Missing `SetHomeBlockchain` for new channel creation
 - `"blockchain client not configured"` - Missing `WithBlockchainRPC`
 - `"insufficient balance"` - Not enough funds in channel/wallet
 - `"failed to sign state"` - Invalid private key or state
@@ -329,32 +363,26 @@ sdk.WithErrorHandler(func(error))          // Connection error handler
 
 ## Examples
 
-### 1. Interactive CLI Tool (Recommended for Development)
+### App Sessions Example
 
-Comprehensive command-line interface with autocomplete, perfect for development and testing.
+Comprehensive example demonstrating app session lifecycle and operations.
 
-See [examples/cli/](examples/cli/)
+See [examples/app_sessions/app_session.go](examples/app_sessions/app_session.go)
 
 ```bash
-cd examples/cli
-go build -o clearnode-cli
-./clearnode-cli wss://clearnode.example.com/ws
+cd examples/app_sessions
+go run app_session.go
 ```
 
-Features:
-- Interactive prompt with autocomplete
-- All high-level operations (deposit, withdraw, transfer)
-- All low-level operations (states, channels, balances)
-- Wallet and RPC management
-- Colorful, easy-to-use interface
+This example demonstrates:
+- Creating app sessions with multiple participants
+- Depositing assets into app sessions
+- Operating on app session state (redistributing allocations)
+- Atomic rebalancing across multiple app sessions
+- Withdrawing from app sessions
+- Closing app sessions
 
-### 2. Programmatic Example
-
-Basic usage of both high-level and low-level operations.
-
-See [examples/basic/main.go](examples/basic/main.go) for examples of:
-- High-level operations (Deposit, Withdraw, Transfer)
-- Low-level operations (GetConfig, GetBalances, GetLatestState, etc.)
+The example walks through a complete multi-party app session scenario with three wallets.
 
 ## Types
 
@@ -417,6 +445,16 @@ For understanding how high-level operations work:
 5. Submit to node
 6. Checkpoint on blockchain
 7. Return transaction hash
+
+### CloseHomeChannel Flow
+1. Get latest state
+2. Verify channel exists
+3. Create next state
+4. Apply finalize transition
+5. Sign state
+6. Submit to node
+7. Close channel on blockchain
+8. Return transaction hash
 
 ## Requirements
 

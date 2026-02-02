@@ -367,7 +367,8 @@ func (o *Operator) Execute(s string) {
 
 	// App sessions
 	case "app-sessions":
-		o.listAppSessions(ctx)
+		wallet := o.getImportedWalletAddress()
+		o.listAppSessions(ctx, wallet)
 
 	case "exit":
 		fmt.Println("Exiting...")

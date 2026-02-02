@@ -14,6 +14,9 @@ type MemoryStore interface {
 	// If blockchainID is provided, filters assets to only include tokens on that blockchain.
 	GetAssets(blockchainID *uint64) ([]core.Asset, error)
 
+	// GetTokenAddress retrieves the token address for a given asset on a specific blockchain.
+	GetTokenAddress(asset string, blockchainID uint64) (string, error)
+
 	// IsAssetSupported checks if a given asset (token) is supported on the specified blockchain.
 	IsAssetSupported(asset, tokenAddress string, blockchainID uint64) (bool, error)
 

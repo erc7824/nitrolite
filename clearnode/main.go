@@ -68,7 +68,13 @@ func main() {
 
 		// For the node itself, the node address is the signer's address
 		nodeAddress := bb.StateSigner.PublicKey().Address().String()
-		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ContractAddress), client, bb.TxSigner, b.ID, nodeAddress, bb.MemoryStore)
+
+		clientOpts := []evm.ClientOption{
+			evm.ClientBalanceCheck{RequireBalanceCheck: false},
+			evm.ClientAllowanceCheck{RequireAllowanceCheck: false},
+		}
+
+		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ContractAddress), client, bb.TxSigner, b.ID, nodeAddress, bb.MemoryStore, clientOpts...)
 		if err != nil {
 			logger.Fatal("failed to create EVM client")
 		}

@@ -129,15 +129,6 @@ func transformChannel(channel rpc.ChannelV1) core.Channel {
 	}
 }
 
-// transformChannels converts RPC ChannelV1 slice to core.Channel slice.
-func transformChannels(channels []rpc.ChannelV1) []core.Channel {
-	result := make([]core.Channel, 0, len(channels))
-	for _, channel := range channels {
-		result = append(result, transformChannel(channel))
-	}
-	return result
-}
-
 // ============================================================================
 // Transaction Transformations
 // ============================================================================
@@ -255,19 +246,6 @@ func transformState(state rpc.StateV1) (core.State, error) {
 		// Note: IsFinal is computed from transitions, not stored
 	}
 
-	return result, nil
-}
-
-// transformStates converts RPC StateV1 slice to core.State slice.
-func transformStates(states []rpc.StateV1) ([]core.State, error) {
-	result := make([]core.State, 0, len(states))
-	for _, state := range states {
-		s, err := transformState(state)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, s)
-	}
 	return result, nil
 }
 

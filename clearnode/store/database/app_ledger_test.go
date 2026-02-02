@@ -221,9 +221,9 @@ func TestDBStore_GetParticipantAllocations(t *testing.T) {
 		require.NoError(t, store.CreateAppSession(session))
 
 		// Record ledger entries for participant
-		err := store.RecordLedgerEntry("0xuser123", "0xuser123", "USDC", decimal.NewFromInt(1000))
+		err := store.RecordLedgerEntry("0xuser123", "session123", "USDC", decimal.NewFromInt(1000))
 		require.NoError(t, err)
-		err = store.RecordLedgerEntry("0xuser123", "0xuser123", "USDC", decimal.NewFromInt(-200))
+		err = store.RecordLedgerEntry("0xuser123", "session123", "USDC", decimal.NewFromInt(-200))
 		require.NoError(t, err)
 
 		allocations, err := store.GetParticipantAllocations("session123")
@@ -263,9 +263,9 @@ func TestDBStore_GetParticipantAllocations(t *testing.T) {
 		require.NoError(t, store.CreateAppSession(session))
 
 		// Record ledger entries for participants
-		err := store.RecordLedgerEntry("0xuser123", "0xuser123", "USDC", decimal.NewFromInt(1000))
+		err := store.RecordLedgerEntry("0xuser123", "session456", "USDC", decimal.NewFromInt(1000))
 		require.NoError(t, err)
-		err = store.RecordLedgerEntry("0xuser456", "0xuser456", "USDC", decimal.NewFromInt(500))
+		err = store.RecordLedgerEntry("0xuser456", "session456", "USDC", decimal.NewFromInt(500))
 		require.NoError(t, err)
 
 		allocations, err := store.GetParticipantAllocations("session456")
@@ -303,9 +303,9 @@ func TestDBStore_GetParticipantAllocations(t *testing.T) {
 		require.NoError(t, store.CreateAppSession(session))
 
 		// Record ledger entries for multiple assets
-		err := store.RecordLedgerEntry("0xuser123", "0xuser123", "USDC", decimal.NewFromInt(1000))
+		err := store.RecordLedgerEntry("0xuser123", "session789", "USDC", decimal.NewFromInt(1000))
 		require.NoError(t, err)
-		err = store.RecordLedgerEntry("0xuser123", "0xuser123", "ETH", decimal.NewFromInt(5))
+		err = store.RecordLedgerEntry("0xuser123", "session789", "ETH", decimal.NewFromInt(5))
 		require.NoError(t, err)
 
 		allocations, err := store.GetParticipantAllocations("session789")
@@ -383,9 +383,9 @@ func TestDBStore_GetParticipantAllocations(t *testing.T) {
 		require.NoError(t, store.CreateAppSession(session))
 
 		// Record ledger entries for both participant and non-participant
-		err := store.RecordLedgerEntry("0xuser123", "0xuser123", "USDC", decimal.NewFromInt(1000))
+		err := store.RecordLedgerEntry("0xuser123", "session200", "USDC", decimal.NewFromInt(1000))
 		require.NoError(t, err)
-		err = store.RecordLedgerEntry("0xotheruser", "0xotheruser", "USDC", decimal.NewFromInt(500))
+		err = store.RecordLedgerEntry("0xotheruser", "session200", "USDC", decimal.NewFromInt(500))
 		require.NoError(t, err)
 
 		allocations, err := store.GetParticipantAllocations("session200")
@@ -396,5 +396,67 @@ func TestDBStore_GetParticipantAllocations(t *testing.T) {
 		assert.Contains(t, allocations, "0xuser123")
 		assert.NotContains(t, allocations, "0xotheruser")
 		assert.True(t, decimal.NewFromInt(1000).Equal(allocations["0xuser123"]["USDC"]))
+	})
+
+	t.Run("Success - Isolates allocations by app session", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		// Create two app sessions with the same participant
+		session1 := app.AppSessionV1{
+			SessionID:   "session300",
+			Application: "poker",
+			Nonce:       1,
+			Participants: []app.AppParticipantV1{
+				{
+					WalletAddress:   "0xuser123",
+					SignatureWeight: 100,
+				},
+			},
+			SessionData: `{"state": "active"}`,
+			Quorum:      100,
+			Version:     1,
+			Status:      app.AppSessionStatusOpen,
+		}
+		require.NoError(t, store.CreateAppSession(session1))
+
+		session2 := app.AppSessionV1{
+			SessionID:   "session400",
+			Application: "poker",
+			Nonce:       2,
+			Participants: []app.AppParticipantV1{
+				{
+					WalletAddress:   "0xuser123",
+					SignatureWeight: 100,
+				},
+			},
+			SessionData: `{"state": "active"}`,
+			Quorum:      100,
+			Version:     1,
+			Status:      app.AppSessionStatusOpen,
+		}
+		require.NoError(t, store.CreateAppSession(session2))
+
+		// Record different amounts for the same wallet in different sessions
+		err := store.RecordLedgerEntry("0xuser123", "session300", "USDC", decimal.NewFromInt(1000))
+		require.NoError(t, err)
+		err = store.RecordLedgerEntry("0xuser123", "session400", "USDC", decimal.NewFromInt(500))
+		require.NoError(t, err)
+
+		// Get allocations for session1 - should only see session1 amounts
+		allocations1, err := store.GetParticipantAllocations("session300")
+		require.NoError(t, err)
+		assert.Len(t, allocations1, 1)
+		assert.Contains(t, allocations1, "0xuser123")
+		assert.True(t, decimal.NewFromInt(1000).Equal(allocations1["0xuser123"]["USDC"]))
+
+		// Get allocations for session2 - should only see session2 amounts
+		allocations2, err := store.GetParticipantAllocations("session400")
+		require.NoError(t, err)
+		assert.Len(t, allocations2, 1)
+		assert.Contains(t, allocations2, "0xuser123")
+		assert.True(t, decimal.NewFromInt(500).Equal(allocations2["0xuser123"]["USDC"]))
 	})
 }

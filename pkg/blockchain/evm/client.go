@@ -1,10 +1,11 @@
 package evm
 
 import (
-	"encoding/hex"
+	"context"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"
@@ -21,29 +22,49 @@ type Client struct {
 	nodeAddress     common.Address
 	contractAddress common.Address
 	blockchainID    uint64
-	assetStore      core.AssetStore
+	assetStore      AssetStore
+	evmClient       EVMClient
+
+	requireCheckAllowance bool
+	requireCheckBalance   bool
+	checkFeeFn            func(ctx context.Context, account common.Address) error
+}
+
+type ClientOption interface {
+	apply(c *Client)
 }
 
 func NewClient(
 	contractAddress common.Address,
-	backend bind.ContractBackend,
-	signer sign.Signer,
+	evmClient EVMClient,
+	txSigner sign.Signer,
 	blockchainID uint64,
-	assetStore core.AssetStore,
+	nodeAddress string,
+	assetStore AssetStore,
+	opts ...ClientOption,
 ) (*Client, error) {
-	contract, err := NewChannelHub(contractAddress, backend)
+	contract, err := NewChannelHub(contractAddress, evmClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create ChannelHub contract instance")
 	}
-
-	return &Client{
+	client := &Client{
 		contract:        contract,
-		transactOpts:    signerTxOpts(signer, blockchainID),
-		nodeAddress:     common.HexToAddress(signer.PublicKey().Address().String()),
+		transactOpts:    signerTxOpts(txSigner, blockchainID),
+		nodeAddress:     common.HexToAddress(nodeAddress),
 		contractAddress: contractAddress,
 		blockchainID:    blockchainID,
 		assetStore:      assetStore,
-	}, nil
+		evmClient:       evmClient,
+
+		requireCheckAllowance: true,
+		requireCheckBalance:   true,
+		checkFeeFn:            getDefaultCheckFeeFn(evmClient),
+	}
+	for _, opt := range opts {
+		opt.apply(client)
+	}
+
+	return client, nil
 }
 
 // ========= Getters - IVault =========
@@ -71,6 +92,55 @@ func (c *Client) GetAccountsBalances(accounts []string, tokens []string) ([][]de
 	return result, nil
 }
 
+func (c *Client) getAllowance(asset string, owner string) (decimal.Decimal, error) {
+	tokenAddrHex, err := c.assetStore.GetTokenAddress(asset, c.blockchainID)
+	if err != nil {
+		return decimal.Zero, errors.Wrap(err, "failed to get token address")
+	}
+	tokenAddr := common.HexToAddress(tokenAddrHex)
+	ownerAddr := common.HexToAddress(owner)
+	erc20Contract, err := NewIERC20(tokenAddr, c.evmClient)
+	if err != nil {
+		return decimal.Zero, errors.Wrap(err, "failed to instantiate token contract")
+	}
+	allowance, err := erc20Contract.Allowance(&bind.CallOpts{}, ownerAddr, c.contractAddress)
+	if err != nil {
+		return decimal.Zero, errors.Wrapf(err, "failed to get allowance for token %s", asset)
+	}
+
+	decimals, err := c.assetStore.GetTokenDecimals(c.blockchainID, tokenAddrHex)
+	if err != nil {
+		return decimal.Zero, errors.Wrapf(err, "failed to get token decimals")
+	}
+
+	return decimal.NewFromBigInt(allowance, -int32(decimals)), nil
+}
+
+func (c *Client) getTokenBalance(asset string, account string) (decimal.Decimal, error) {
+	tokenAddrHex, err := c.assetStore.GetTokenAddress(asset, c.blockchainID)
+	if err != nil {
+		return decimal.Zero, errors.Wrap(err, "failed to get token address")
+	}
+
+	tokenAddr := common.HexToAddress(tokenAddrHex)
+	accountAddr := common.HexToAddress(account)
+	tokenContract, err := NewIERC20(tokenAddr, c.evmClient)
+	if err != nil {
+		return decimal.Zero, errors.Wrap(err, "failed to instantiate token contract")
+	}
+
+	balance, err := tokenContract.BalanceOf(&bind.CallOpts{}, accountAddr)
+	if err != nil {
+		return decimal.Zero, errors.Wrapf(err, "failed to get balance for account %s on token %s", account, tokenAddrHex)
+	}
+	decimals, err := c.assetStore.GetTokenDecimals(c.blockchainID, tokenAddrHex)
+	if err != nil {
+		return decimal.Zero, errors.Wrapf(err, "failed to get token decimals for %s", tokenAddrHex)
+	}
+
+	return decimal.NewFromBigInt(balance, -int32(decimals)), nil
+}
+
 // ========= Getters - ChannelsHub =========
 
 func (c *Client) GetNodeBalance(token string) (decimal.Decimal, error) {
@@ -95,7 +165,7 @@ func (c *Client) GetOpenChannels(user string) ([]string, error) {
 
 	result := make([]string, len(channelIDs))
 	for i, id := range channelIDs {
-		result[i] = hex.EncodeToString(id[:])
+		result[i] = hexutil.Encode(id[:])
 	}
 	return result, nil
 }
@@ -190,6 +260,10 @@ func (c *Client) Deposit(node, token string, amount decimal.Decimal) (string, er
 		return "", errors.Wrapf(err, "failed to convert amount %s to big.Int", amount.String())
 	}
 
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
+	}
+
 	tx, err := c.contract.DepositToVault(c.transactOpts, nodeAddr, tokenAddr, amountBig)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to deposit to vault")
@@ -209,6 +283,10 @@ func (c *Client) Withdraw(node, token string, amount decimal.Decimal) (string, e
 	amountBig, err := core.DecimalToBigInt(amount, decimals)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to convert amount %s to big.Int", amount.String())
+	}
+
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
 	}
 
 	tx, err := c.contract.WithdrawFromVault(c.transactOpts, nodeAddr, tokenAddr, amountBig)
@@ -233,9 +311,36 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 	}
 
 	switch contractState.Intent {
-	case core.INTENT_OPERATE, core.INTENT_DEPOSIT, core.INTENT_WITHDRAW:
+	case core.INTENT_OPERATE:
+	case core.INTENT_WITHDRAW:
+	case core.INTENT_DEPOSIT:
+		// TODO: check for native tokens
+		if c.requireCheckAllowance {
+			allowance, err := c.getAllowance(initCCS.Asset, initCCS.UserWallet)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to get allowance")
+			}
+			if allowance.LessThan(initCCS.GetLastTransition().Amount) {
+				return "", errors.New("allowance is not sufficient to cover the deposit amount")
+			}
+
+		}
+		if c.requireCheckBalance {
+			tokenBalance, err := c.getTokenBalance(initCCS.Asset, initCCS.UserWallet)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to check token balance")
+			}
+			if tokenBalance.LessThan(initCCS.GetLastTransition().Amount) {
+				return "", errors.New("balance is not sufficient to cover the deposit amount")
+			}
+		}
+
 	default:
 		return "", errors.New("unsupported intent for create: " + string(contractState.Intent))
+	}
+
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
 	}
 
 	tx, err := c.contract.CreateChannel(c.transactOpts, contractDef, contractState)
@@ -255,6 +360,10 @@ func (c *Client) MigrateChannelHere(def core.ChannelDefinition, candidate core.S
 	contractCandidate, err := coreStateToContractState(candidate, c.assetStore.GetTokenDecimals)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to convert candidate state")
+	}
+
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
 	}
 
 	tx, err := c.contract.InitiateMigration(c.transactOpts, contractDef, contractCandidate)
@@ -280,12 +389,37 @@ func (c *Client) Checkpoint(candidate core.State, _ []core.State) (string, error
 		return "", errors.Wrap(err, "failed to convert candidate state")
 	}
 
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
+	}
+
 	var tx *types.Transaction
 	switch contractCandidate.Intent {
 	case core.INTENT_OPERATE:
 		// TODO: recheck proofs logic
 		tx, err = c.contract.CheckpointChannel(c.transactOpts, channelIDBytes, contractCandidate, []State{})
 	case core.INTENT_DEPOSIT:
+		// TODO: check for native tokens
+		if c.requireCheckAllowance {
+			allowance, err := c.getAllowance(candidate.Asset, candidate.UserWallet)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to get allowance")
+			}
+			if allowance.LessThan(candidate.GetLastTransition().Amount) {
+				return "", errors.New("allowance is not sufficient to cover the deposit amount")
+			}
+
+		}
+		if c.requireCheckBalance {
+			tokenBalance, err := c.getTokenBalance(candidate.Asset, candidate.UserWallet)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to check token balance")
+			}
+			if tokenBalance.LessThan(candidate.GetLastTransition().Amount) {
+				return "", errors.New("balance is not sufficient to cover the deposit amount")
+			}
+		}
+
 		tx, err = c.contract.DepositToChannel(c.transactOpts, channelIDBytes, contractCandidate)
 	case core.INTENT_WITHDRAW:
 		tx, err = c.contract.WithdrawFromChannel(c.transactOpts, channelIDBytes, contractCandidate)
@@ -312,6 +446,10 @@ func (c *Client) Challenge(candidate core.State, _ []core.State, challengerSig [
 	contractCandidate, err := coreStateToContractState(candidate, c.assetStore.GetTokenDecimals)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to convert candidate state")
+	}
+
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
 	}
 
 	// TODO: recheck proofs logic
@@ -342,6 +480,10 @@ func (c *Client) Close(candidate core.State, _ []core.State) (string, error) {
 		return "", errors.New("unsupported intent for close: " + string(contractCandidate.Intent))
 	}
 
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
+	}
+
 	// TODO: recheck proof logic
 	tx, err := c.contract.CloseChannel(c.transactOpts, channelIDBytes, contractCandidate, []State{})
 	if err != nil {
@@ -368,6 +510,10 @@ func (c *Client) InitiateEscrowDeposit(def core.ChannelDefinition, initCCS core.
 		return "", errors.New("unsupported intent for initiate escrow deposit: " + string(contractState.Intent))
 	}
 
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
+	}
+
 	tx, err := c.contract.InitiateEscrowDeposit(c.transactOpts, contractDef, contractState)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to initiate escrow deposit")
@@ -384,6 +530,10 @@ func (c *Client) ChallengeEscrowDeposit(candidate core.State, _ []core.State, ch
 	escrowIDBytes, err := hexToBytes32(*candidate.EscrowChannelID)
 	if err != nil {
 		return "", errors.Wrap(err, "invalid escrow ID")
+	}
+
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
 	}
 
 	tx, err := c.contract.ChallengeEscrowDeposit(c.transactOpts, escrowIDBytes, challengerSig)
@@ -413,6 +563,10 @@ func (c *Client) FinalizeEscrowDeposit(candidate core.State, _ [2]core.State) (s
 		return "", errors.New("unsupported intent for finalize escrow deposit: " + string(contractCandidate.Intent))
 	}
 
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
+	}
+
 	tx, err := c.contract.FinalizeEscrowDeposit(c.transactOpts, escrowIDBytes, contractCandidate)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to finalize escrow deposit")
@@ -438,6 +592,10 @@ func (c *Client) InitiateEscrowWithdrawal(def core.ChannelDefinition, initCCS co
 		return "", errors.New("unsupported intent for initiate escrow withdrawal: " + string(contractState.Intent))
 	}
 
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
+	}
+
 	tx, err := c.contract.InitiateEscrowWithdrawal(c.transactOpts, contractDef, contractState)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to initiate escrow withdrawal")
@@ -454,6 +612,10 @@ func (c *Client) ChallengeEscrowWithdrawal(candidate core.State, _ []core.State,
 	escrowIDBytes, err := hexToBytes32(*candidate.EscrowChannelID)
 	if err != nil {
 		return "", errors.Wrap(err, "invalid escrow ID")
+	}
+
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
 	}
 
 	tx, err := c.contract.ChallengeEscrowWithdrawal(c.transactOpts, escrowIDBytes, challengerSig)
@@ -484,6 +646,10 @@ func (c *Client) FinalizeEscrowWithdrawal(candidate core.State) (string, error) 
 
 	if contractCandidate.Intent != core.INTENT_INITIATE_ESCROW_WITHDRAWAL {
 		return "", errors.New("unsupported intent for initiate escrow withdrawal: " + string(contractCandidate.Intent))
+	}
+
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
 	}
 
 	tx, err := c.contract.FinalizeEscrowWithdrawal(c.transactOpts, escrowIDBytes, contractCandidate)

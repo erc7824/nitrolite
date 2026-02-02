@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -132,15 +131,14 @@ func (h *Handler) issueReleaseReceiverState(ctx context.Context, tx Store, recei
 		}
 	}
 
-	if shouldSign {
+	if newState.HomeChannelID != nil && shouldSign {
 		// Pack and sign the state
 		packedState, err := h.statePacker.PackState(*newState)
 		if err != nil {
 			return rpc.Errorf("failed to pack receiver state: %v", err)
 		}
 
-		stateHash := crypto.Keccak256Hash(packedState).Bytes()
-		nodeSig, err := h.signer.Sign(stateHash)
+		nodeSig, err := h.signer.Sign(packedState)
 		if err != nil {
 			return rpc.Errorf("failed to sign receiver state: %v", err)
 		}

@@ -222,6 +222,8 @@ type AssetV1 struct {
 	Name string `json:"name"`
 	// Symbol is the asset symbol
 	Symbol string `json:"symbol"`
+	// Decimals is the number of decimal places for the asset
+	Decimals uint8 `json:"decimals"`
 	// Tokens is the list of supported tokens for the asset
 	Tokens []TokenV1 `json:"tokens"`
 }

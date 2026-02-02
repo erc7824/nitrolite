@@ -3,8 +3,6 @@ package channel_v1
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -71,6 +69,9 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 	if err != nil {
 		return nil, rpc.Errorf("failed to get last %s user state for transfer receiver with address %s", senderState.Asset, incomingTransition.AccountID)
 	}
+	if currentState == nil {
+		currentState = core.NewVoidState(senderState.Asset, receiverWallet)
+	}
 	newState := currentState.NextState()
 
 	_, err = newState.ApplyTransferReceiveTransition(
@@ -85,19 +86,26 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 	if err != nil {
 		return nil, rpc.Errorf("failed to get last %s user state for transfer receiver with address %s", senderState.Asset, incomingTransition.AccountID)
 	}
-	var lastStateTransition *core.Transition
+
+	// TODO: move to DB query
+	shouldSign := true
 	if lastSignedState != nil {
-		lastStateTransition = lastSignedState.GetLastTransition()
+		lastStateTransition := lastSignedState.GetLastTransition()
+		if lastStateTransition != nil {
+			if lastStateTransition.Type == core.TransitionTypeMutualLock ||
+				lastStateTransition.Type == core.TransitionTypeEscrowLock {
+				shouldSign = false
+			}
+		}
 	}
 
-	if !(lastStateTransition != nil && (lastStateTransition.Type == core.TransitionTypeMutualLock || lastStateTransition.Type == core.TransitionTypeEscrowLock)) {
+	if newState.HomeChannelID != nil && shouldSign {
 		packedState, err := h.statePacker.PackState(*newState)
 		if err != nil {
-			return nil, rpc.Errorf("failed to pack receiver state")
+			return nil, rpc.Errorf("failed to pack receiver state: %v", err)
 		}
 
-		stateHash := crypto.Keccak256Hash(packedState).Bytes()
-		_nodeSig, err := h.signer.Sign(stateHash)
+		_nodeSig, err := h.signer.Sign(packedState)
 		if err != nil {
 			return nil, rpc.Errorf("failed to sign receiver state")
 		}
@@ -144,8 +152,7 @@ func (h *Handler) issueExtraState(ctx context.Context, tx Store, incomingState c
 		return nil, rpc.Errorf("failed to pack extra state")
 	}
 
-	stateHash := crypto.Keccak256Hash(packedState).Bytes()
-	_nodeSig, err := h.signer.Sign(stateHash)
+	_nodeSig, err := h.signer.Sign(packedState)
 	if err != nil {
 		return nil, rpc.Errorf("failed to sign extra state")
 	}

@@ -10,9 +10,9 @@ import (
 type MemoryStoreV1 struct {
 	blockchains     []core.Blockchain
 	assets          []core.Asset
-	supportedAssets map[string]map[uint64]map[string]struct{} // map[asset]map[blockchain_id]map[token_address]struct{}
-	tokenDecimals   map[uint64]map[string]uint8               // map[blockchain_id]map[token_address]decimals
-	assetDecimals   map[string]uint8                          // map[asset]decimals
+	supportedAssets map[string]map[uint64]string // map[asset]map[blockchain_id]string
+	tokenDecimals   map[uint64]map[string]uint8  // map[blockchain_id]map[token_address]decimals
+	assetDecimals   map[string]uint8             // map[asset]decimals
 }
 
 func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]BlockchainConfig) MemoryStore {
@@ -40,7 +40,7 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 		return 0
 	})
 
-	supportedAssets := make(map[string]map[uint64]map[string]struct{})
+	supportedAssets := make(map[string]map[uint64]string)
 	tokenDecimals := make(map[uint64]map[string]uint8)
 	assetDecimals := make(map[string]uint8)
 	assets := make([]core.Asset, 0, len(assetsConfig.Assets))
@@ -67,12 +67,9 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 			})
 
 			if _, ok := supportedAssets[asset.Symbol]; !ok {
-				supportedAssets[asset.Symbol] = make(map[uint64]map[string]struct{})
+				supportedAssets[asset.Symbol] = make(map[uint64]string)
 			}
-			if _, ok := supportedAssets[asset.Symbol][token.BlockchainID]; !ok {
-				supportedAssets[asset.Symbol][token.BlockchainID] = make(map[string]struct{})
-			}
-			supportedAssets[asset.Symbol][token.BlockchainID][token.Address] = struct{}{}
+			supportedAssets[asset.Symbol][token.BlockchainID] = token.Address
 
 			if _, ok := tokenDecimals[token.BlockchainID]; !ok {
 				tokenDecimals[token.BlockchainID] = make(map[string]uint8)
@@ -163,18 +160,29 @@ func (ms *MemoryStoreV1) GetAssets(blockchainID *uint64) ([]core.Asset, error) {
 	return filteredAssets, nil
 }
 
+func (ms *MemoryStoreV1) GetTokenAddress(asset string, blockchainID uint64) (string, error) {
+	tokensOnchain, ok := ms.supportedAssets[asset]
+	if !ok {
+		return "", fmt.Errorf("asset '%s' is not supported", asset)
+	}
+	tokenAddress, ok := tokensOnchain[blockchainID]
+	if !ok {
+		return "", fmt.Errorf("asset '%s' is not supported on blockchain with ID '%d'", asset, blockchainID)
+	}
+	return tokenAddress, nil
+}
+
 // IsAssetSupported checks if a given asset (token) is supported on the specified blockchain.
 func (ms *MemoryStoreV1) IsAssetSupported(asset, tokenAddress string, blockchainID uint64) (bool, error) {
-	assetsOnChain, ok := ms.supportedAssets[asset]
+	tokensOnchain, ok := ms.supportedAssets[asset]
 	if !ok {
 		return false, nil
 	}
-	tokensOnChain, ok := assetsOnChain[blockchainID]
+	_tokenAddress, ok := tokensOnchain[blockchainID]
 	if !ok {
 		return false, nil
 	}
-	_, supported := tokensOnChain[tokenAddress]
-	return supported, nil
+	return tokenAddress == _tokenAddress, nil
 }
 
 // GetAssetDecimals checks if an asset exists and returns its decimals in YN

@@ -24,10 +24,9 @@ assets:
       - blockchain_id: 0
         address: "0x0000000000000000000000000000000000000000"
         decimals: 18
- 
   - name: "Wrapped Bitcoin"
     symbol: "wbtc"
     tokens:
       - blockchain_id: 11155111  # Sepolia
         address: "0x7d36f97fefac3d3ecffc7b45157b8ec1c01e8a57"
-        decimals: 18
+        decimals: 8

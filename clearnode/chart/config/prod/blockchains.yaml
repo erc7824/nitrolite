@@ -33,6 +33,10 @@ blockchains:
   disabled: true
   contract_addresses:
     balance_checker: "0x714698e8fe7896bb84A46c0705944c4a48580819"
+- name: kaia
+  id: 8217
+  contract_addresses:
+    balance_checker: "0x714698e8fe7896bb84A46c0705944c4a48580819"
 - name: base
   id: 8453
   contract_addresses:

@@ -12,8 +12,14 @@ library Utils {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
 
-    function getChannelId(ChannelDefinition memory def) internal pure returns (bytes32) {
-        return keccak256(abi.encode(def));
+    function getChannelId(ChannelDefinition memory def, uint8 version) internal pure returns (bytes32 channelId) {
+        bytes32 baseId = keccak256(abi.encode(def));
+
+        assembly ("memory-safe") {
+            // Store the version in the first byte (most significant byte) of the channelId
+            // Clear the first byte of baseId, then set it to version
+            channelId := or(and(baseId, 0x00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff), shl(248, version))
+        }
     }
 
     function getEscrowId(bytes32 channelId, uint64 version) internal pure returns (bytes32) {

@@ -19,7 +19,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             challengeDuration: CHALLENGE_DURATION, user: bob, node: node, nonce: NONCE, metadata: bytes32(0)
         });
 
-        bobChannelId = Utils.getChannelId(bobDef);
+        bobChannelId = Utils.getChannelId(bobDef, CHANNEL_HUB_VERSION);
     }
 
     function test_happyPath_homeChain() public {
@@ -27,7 +27,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
         });
 
-        bytes32 channelId = Utils.getChannelId(def);
+        bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
 
         // Check VOID status before channel creation
         (ChannelStatus status,,,,) = cHub.getChannelData(channelId);

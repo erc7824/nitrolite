@@ -32,6 +32,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
     using {Utils.validateSignatures, Utils.validateChallengerSignature} for State;
     using {Utils.isEmpty} for Ledger;
 
+    uint8 public constant VERSION = 1;
+
     event EscrowDepositsPurged(uint256 purgedCount);
 
     event ChannelCreated(
@@ -356,7 +358,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
             "invalid state intent for channel creation"
         );
 
-        bytes32 channelId = Utils.getChannelId(def);
+        bytes32 channelId = Utils.getChannelId(def, VERSION);
 
         _requireValidDefinition(def);
 
@@ -513,7 +515,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     function initiateEscrowDeposit(ChannelDefinition calldata def, State calldata candidate) external payable {
         require(candidate.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, "invalid intent");
 
-        bytes32 channelId = Utils.getChannelId(def);
+        bytes32 channelId = Utils.getChannelId(def, VERSION);
 
         candidate.validateSignatures(channelId, def.user, def.node);
 
@@ -611,7 +613,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     function initiateEscrowWithdrawal(ChannelDefinition calldata def, State calldata candidate) external {
         require(candidate.intent == StateIntent.INITIATE_ESCROW_WITHDRAWAL, "invalid intent");
 
-        bytes32 channelId = Utils.getChannelId(def);
+        bytes32 channelId = Utils.getChannelId(def, VERSION);
         candidate.validateSignatures(channelId, def.user, def.node);
 
         bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
@@ -708,7 +710,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     function initiateMigration(ChannelDefinition calldata def, State calldata candidate) external {
         require(candidate.intent == StateIntent.INITIATE_MIGRATION, "invalid intent");
 
-        bytes32 channelId = Utils.getChannelId(def);
+        bytes32 channelId = Utils.getChannelId(def, VERSION);
         candidate.validateSignatures(channelId, def.user, def.node);
 
         State memory targetCandidate = candidate;

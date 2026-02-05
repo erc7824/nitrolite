@@ -225,7 +225,6 @@ func TestClientV1_ChannelsV1GetLatestState(t *testing.T) {
 				UserBalance:  "1000",
 				NodeBalance:  "500",
 			},
-			IsFinal: false,
 		},
 	}
 

@@ -288,7 +288,6 @@ func transformStateToRPC(state core.State) rpc.StateV1 {
 		EscrowChannelID: state.EscrowChannelID,
 		HomeLedger:      homeLedger,
 		EscrowLedger:    escrowLedger,
-		IsFinal:         state.IsFinal(), // Computed method, not field
 		UserSig:         state.UserSig,
 		NodeSig:         state.NodeSig,
 	}

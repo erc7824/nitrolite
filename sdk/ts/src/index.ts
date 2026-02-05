@@ -1,10 +1,49 @@
-export * from './types';
+// ============================================================================
+// Main SDK Exports
+// ============================================================================
+
+// Export SDK Client (main entry point)
+export { Client, DEFAULT_CHALLENGE_PERIOD, type StateSigner, type TransactionSigner } from './client';
+
+// Export signers
+export {
+  EthereumMsgSigner,
+  EthereumRawSigner,
+  createSigners,
+} from './signers';
+
+// Export configuration
+export {
+  type Config,
+  DefaultConfig,
+  type Option,
+  withHandshakeTimeout,
+  withPingInterval,
+  withErrorHandler,
+  withBlockchainRPC
+} from './config';
+
+// Export asset store
+export { ClientAssetStore } from './asset_store';
+
+// Export utility functions
 export * from './utils';
-export * from './errors';
-export * from './client';
-export * from './client/services';
-export * from './client/types';
-export * from './client/state';
-export * from './client/signer';
+
+// ============================================================================
+// Core Modules (types, state management, utilities)
+// ============================================================================
+
+export * from './core';
+export * from './app';
+
+// ============================================================================
+// Blockchain Modules
+// ============================================================================
+
+export * from './blockchain';
+
+// ============================================================================
+// RPC Modules
+// ============================================================================
+
 export * from './rpc';
-export * from './abis';

@@ -1,826 +1,344 @@
-import { Address, Hex, keccak256, stringToBytes, toHex, WalletClient } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
+/**
+ * RPC API request and response definitions
+ * This file implements the API request and response definitions
+ * with versioned types organized by functional groups
+ */
+
+import { Address } from 'viem';
 import {
-    MessageSigner,
-    AccountID,
-    RequestID,
-    Timestamp,
-    CreateAppSessionRequest,
-    AuthRequestParams,
-    PartialEIP712AuthMessage,
-    EIP712AuthTypes,
-    EIP712AuthDomain,
-    EIP712AuthMessage,
-    AuthChallengeResponse,
-    RPCMethod,
-    RPCData,
-    GetLedgerTransactionsFilters,
-    RPCChannelStatus,
-    RPCProtocolVersion,
+  ChannelV1,
+  ChannelDefinitionV1,
+  StateV1,
+  BalanceEntryV1,
+  TransactionV1,
+  PaginationParamsV1,
+  PaginationMetadataV1,
+  AssetV1,
+  BlockchainInfoV1,
 } from './types';
-import { NitroliteRPC } from './nitrolite';
-import { generateRequestId, getCurrentTimestamp } from './utils';
 import {
-    CloseAppSessionRequestParams,
-    CreateAppSessionRequestParams,
-    SubmitAppStateParamsPerProtocol,
-    ResizeChannelRequestParams,
-    GetLedgerTransactionsRequestParams,
-    TransferRequestParams,
-    CreateChannelRequestParams,
-} from './types/request';
-import { signRawECDSAMessage } from '../utils/sign';
+  AppDefinitionV1,
+  AppStateUpdateV1,
+  AppSessionInfoV1,
+  AppAllocationV1,
+  AssetAllowanceV1,
+  SessionKeyV1,
+  SignedAppStateUpdateV1,
+} from '../app/types';
+import { TransactionType } from '../core/types';
 
-/**
- * Creates the signed, stringified message body for an 'auth_request'.
- * This request is sent in the context of a specific direct channel with the broker.
- *
- * @param clientAddress - The Ethereum address of the client authenticating.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- */
-export async function createAuthRequestMessage(
-    params: AuthRequestParams,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.AuthRequest,
-        params,
-        requestId,
-        timestamp,
-    });
-    return JSON.stringify(request, (_, value) => (typeof value === 'bigint' ? Number(value) : value));
+// ============================================================================
+// Channels Group - V1 API
+// ============================================================================
+
+export interface ChannelsV1GetHomeChannelRequest {
+  /** User's wallet address */
+  wallet: Address;
+  /** Asset symbol */
+  asset: string;
 }
 
-/**
- * Creates the signed, stringified message body for an 'auth_verify' request
- * using an explicitly provided challenge string.
- * Use this if you have already parsed the 'auth_challenge' response yourself.
- *
- * @param signer - The function to sign the 'auth_verify' request payload.
- * @param challenge - The challenge string received from the broker in the 'auth_challenge' response.
- * @param requestId - Optional request ID for the 'auth_verify' request. Defaults to a generated ID.
- * @param timestamp - Optional timestamp for the 'auth_verify' request. Defaults to the current time.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage for 'auth_verify'.
- */
-export async function createAuthVerifyMessageFromChallenge(
-    signer: MessageSigner,
-    challenge: string,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const params = { challenge: challenge };
-
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.AuthVerify,
-        params,
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface ChannelsV1GetHomeChannelResponse {
+  /** On-chain channel information */
+  channel: ChannelV1;
 }
 
-/**
- * Creates the signed, stringified message body for an 'auth_verify' request
- * by parsing the challenge from the raw 'auth_challenge' response received from the broker.
- *
- * @param signer - The function to sign the 'auth_verify' request payload.
- * @param rawChallengeResponse - The raw JSON string or object received from the broker containing the 'auth_challenge'.
- * @param requestId - Optional request ID for the 'auth_verify' request. Defaults to a generated ID.
- * @param timestamp - Optional timestamp for the 'auth_verify' request. Defaults to the current time.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage for 'auth_verify'.
- * @throws Error if the rawChallengeResponse is invalid, not an 'auth_challenge', or missing required data.
- */
-export async function createAuthVerifyMessage(
-    signer: MessageSigner,
-    challenge: AuthChallengeResponse,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const params = { challenge: challenge.params.challengeMessage };
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.AuthVerify,
-        params,
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-    return JSON.stringify(signedRequest);
+export interface ChannelsV1GetEscrowChannelRequest {
+  /** Escrow channel ID */
+  escrowChannelId: string;
 }
 
-/**
- * Creates the signed, stringified message body for an 'auth_verify' request
- * by providing JWT token received from the broker.
- *
- * @param jwtToken - The JWT token to use for the 'auth_verify' request.
- * @param requestId - Optional request ID for the 'auth_verify' request. Defaults to a generated ID.
- * @param timestamp - Optional timestamp for the 'auth_verify' request. Defaults to the current time.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage for 'auth_verify'.
- */
-export async function createAuthVerifyMessageWithJWT(
-    jwtToken: string,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const params = { jwt: jwtToken };
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.AuthVerify,
-        params,
-        requestId,
-        timestamp,
-    });
-    return JSON.stringify(request);
+export interface ChannelsV1GetEscrowChannelResponse {
+  /** On-chain channel information */
+  channel: ChannelV1;
 }
 
-/**
- * Creates the stringified message body for a 'ping' request.
- *
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
- */
-export async function createPingMessage(
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.Ping,
-        params: {},
-        requestId,
-        timestamp,
-    });
-
-    return JSON.stringify(request);
+export interface ChannelsV1GetChannelsRequest {
+  /** User's wallet address */
+  wallet: Address;
+  /** Status filter */
+  status?: string;
+  /** Asset filter */
+  asset?: string;
+  /** Pagination parameters */
+  pagination?: PaginationParamsV1;
 }
 
-/**
- * Creates the stringified message body for a 'get_config' request.
- *
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
- */
-export async function createGetConfigMessage(
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetConfig,
-        params: {},
-        requestId,
-        timestamp,
-    });
-
-    return JSON.stringify(request);
+export interface ChannelsV1GetChannelsResponse {
+  /** List of channels */
+  channels: ChannelV1[];
+  /** Pagination information */
+  metadata: PaginationMetadataV1;
 }
 
-/**
- * Creates the signed, stringified message body for a 'get_user_tag' request.
- *
- * @param signer - The function to sign the request payload.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- */
-export async function createGetUserTagMessage(
-    signer: MessageSigner,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetUserTag,
-        params: {},
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface ChannelsV1GetLatestStateRequest {
+  /** User's wallet address */
+  wallet: Address;
+  /** Asset symbol */
+  asset: string;
+  /** Enable to get the latest signed state */
+  onlySigned: boolean;
 }
 
-/**
- * Creates the signed, stringified message body for a 'get_session_keys' request.
- * Retrieves all active (non-expired) session keys for the authenticated user.
- *
- * @param signer - The function to sign the request payload.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- */
-export async function createGetSessionKeysMessage(
-    signer: MessageSigner,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetSessionKeys,
-        params: {},
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface ChannelsV1GetLatestStateResponse {
+  /** Current state of the user */
+  state: StateV1;
 }
 
-/**
- * Creates the signed, stringified message body for a 'get_ledger_balances' request.
- *
- * @param signer - The function to sign the request payload.
- * @param accountId - Optional account ID to filter balances.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- */
-export async function createGetLedgerBalancesMessage(
-    signer: MessageSigner,
-    accountId?: string,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const params = accountId ? { account_id: accountId } : {};
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetLedgerBalances,
-        params,
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface ChannelsV1GetStatesRequest {
+  /** User's wallet address */
+  wallet: Address;
+  /** Asset symbol */
+  asset: string;
+  /** User epoch index filter */
+  epoch?: bigint; // uint64
+  /** Home/Escrow Channel ID filter */
+  channelId?: string;
+  /** Return only signed states */
+  onlySigned: boolean;
+  /** Pagination parameters */
+  pagination?: PaginationParamsV1;
 }
 
-/**
- * Creates the stringified message body for a 'get_ledger_entries' request.
- *
- * @param accountId - The account ID to get entries for.
- * @param asset - Optional asset symbol to filter entries.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
- */
-export async function createGetLedgerEntriesMessage(
-    accountId: string,
-    asset?: string,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const params = {
-        account_id: accountId,
-        ...(asset ? { asset } : {}),
-    };
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetLedgerEntries,
-        params,
-        requestId,
-        timestamp,
-    });
-
-    return JSON.stringify(request);
+export interface ChannelsV1GetStatesResponse {
+  /** List of states */
+  states: StateV1[];
+  /** Pagination information */
+  metadata: PaginationMetadataV1;
 }
 
-/**
- * Creates the stringified message body for a 'get_ledger_transactions' request.
- *
- * @param accountId - The account ID to get transactions for.
- * @param filters - Optional filters to apply to the transactions.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
- */
-export async function createGetLedgerTransactionsMessage(
-    accountId: string,
-    filters?: GetLedgerTransactionsFilters,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    // Build filtered parameters object
-    const filteredParams: Partial<GetLedgerTransactionsFilters> = {};
-    if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '') {
-                (filteredParams as any)[key] = value;
-            }
-        });
-    }
-
-    const params: GetLedgerTransactionsRequestParams = {
-        account_id: accountId,
-        ...filteredParams,
-    };
-
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetLedgerTransactions,
-        params,
-        requestId,
-        timestamp,
-    });
-
-    return JSON.stringify(request);
+export interface ChannelsV1RequestCreationRequest {
+  /** State to be submitted */
+  state: StateV1;
+  /** Definition of the channel to be created */
+  channelDefinition: ChannelDefinitionV1;
 }
 
-/**
- * Creates the stringified message body for a 'get_app_definition' request.
- *
- * @param appSessionId - The Application Session ID to get the definition for.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
- */
-export async function createGetAppDefinitionMessage(
-    appSessionId: AccountID,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const params = { app_session_id: appSessionId };
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetAppDefinition,
-        params,
-        requestId,
-        timestamp,
-    });
-
-    return JSON.stringify(request);
+export interface ChannelsV1RequestCreationResponse {
+  /** Node's signature for the state */
+  signature: string;
 }
 
-/**
- * Creates the stringified message body for a 'get_app_sessions' request.
- *
- * @param participant - Participant address to filter sessions.
- * @param status - Optional status to filter sessions.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
- */
-export async function createGetAppSessionsMessage(
-    participant: Address,
-    status?: RPCChannelStatus,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const params = {
-        participant,
-        ...(status ? { status } : {}),
-    };
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetAppSessions,
-        params,
-        requestId,
-        timestamp,
-    });
-
-    return JSON.stringify(request);
+export interface ChannelsV1SubmitStateRequest {
+  /** State to be submitted */
+  state: StateV1;
 }
 
-/**
- * Creates the signed, stringified message body for a 'create_app_session' request.
- *
- * @param signer - The function to sign the request payload.
- * @param params - The specific parameters required by 'create_app_session'. See {@link CreateAppSessionRequest} for details.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- */
-export async function createAppSessionMessage(
-    signer: MessageSigner,
-    params: CreateAppSessionRequestParams,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.CreateAppSession,
-        params,
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface ChannelsV1SubmitStateResponse {
+  /** Node's signature for the state */
+  signature: string;
 }
 
-/**
- * Creates the signed, stringified message body for a 'submit_state' request.
- * Use the generic parameter to specify the protocol version and get type-safe parameter validation.
- *
- * @template P - The protocol version (use RPCProtocolVersion enum) to determine the required parameters structure.
- * @param signer - The function to sign the request payload.
- * @param params - The specific parameters required by 'submit_state' for the given protocol version.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- *
- * @example
- * // For NitroRPC/0.2
- * await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_2>(signer, {
- *   app_session_id: '0x...',
- *   allocations: [...]
- * });
- *
- * @example
- * // For NitroRPC/0.4
- * await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_4>(signer, {
- *   app_session_id: '0x...',
- *   intent: RPCAppStateIntent.Operate,
- *   version: 1,
- *   allocations: [...]
- * });
- */
-export async function createSubmitAppStateMessage<P extends RPCProtocolVersion>(
-    signer: MessageSigner,
-    params: SubmitAppStateParamsPerProtocol[P],
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.SubmitAppState,
-        params,
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface ChannelsV1HomeChannelCreatedEvent {
+  /** Created home channel information */
+  channel: ChannelV1;
+  /** Initial state of the home channel */
+  initialState: StateV1;
 }
 
-/**
- * Creates the signed, stringified message body for a 'close_app_session' request.
- * Note: This function only adds the *caller's* signature. Multi-sig coordination happens externally.
- *
- * @param signer - The function to sign the request payload.
- * @param params - The specific parameters required by 'close_app_session' (e.g., final allocations).
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage (with single signature).
- */
-export async function createCloseAppSessionMessage(
-    signer: MessageSigner,
-    params: CloseAppSessionRequestParams,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.CloseAppSession,
-        params,
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+// ============================================================================
+// App Sessions Group - V1 API
+// ============================================================================
 
-    return JSON.stringify(signedRequest);
+export interface AppSessionsV1SubmitDepositStateRequest {
+  /** Application session state update to be submitted */
+  appStateUpdate: AppStateUpdateV1;
+  /** List of participant signatures for the app state update */
+  quorumSigs: string[];
+  /** User state */
+  userState: StateV1;
 }
 
-/**
- * Creates the signed, stringified message body for sending a generic 'message' within an application.
- *
- * @param signer - The function to sign the request payload.
- * @param appSessionId - The Application Session ID the message is scoped to.
- * @param messageParams - The actual message content/parameters being sent.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- */
-export async function createApplicationMessage(
-    signer: MessageSigner,
-    appSessionId: Hex,
-    messageParams: any,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createAppRequest(
-        {
-            method: RPCMethod.Message,
-            params: messageParams,
-            requestId,
-            timestamp,
-        },
-        appSessionId,
-    );
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface AppSessionsV1SubmitDepositStateResponse {
+  /** Node's signature for the deposit state */
+  stateNodeSig: string;
 }
 
-export async function createCreateChannelMessage(
-    signer: MessageSigner,
-    params: CreateChannelRequestParams,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.CreateChannel,
-        params,
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-    return JSON.stringify(signedRequest, (_, value) => (typeof value === 'bigint' ? value.toString() : value));
+export interface AppSessionsV1SubmitAppStateRequest {
+  /** Application session state update to be submitted */
+  appStateUpdate: AppStateUpdateV1;
+  /** Signature quorum for the application session */
+  quorumSigs: string[];
 }
 
-/**
- * Creates the signed, stringified message body for a 'close_channel' request.
- *
- * @param signer - The function to sign the request payload.
- * @param channelId - The Channel ID to close.
- * @param params - Any specific parameters required by 'close_channel'.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- */
-export async function createCloseChannelMessage(
-    signer: MessageSigner,
-    channelId: AccountID,
-    fundDestination: Address,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const params = { channel_id: channelId, funds_destination: fundDestination };
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.CloseChannel,
-        params,
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+export interface AppSessionsV1SubmitAppStateResponse {}
 
-    return JSON.stringify(signedRequest);
+export interface AppSessionsV1RebalanceAppSessionsRequest {
+  /** List of signed application session state updates */
+  signedUpdates: SignedAppStateUpdateV1[];
 }
 
-/**
- * Creates the signed, stringified message body for a 'resize_channel' request.
- *
- * @param signer - The function to sign the request payload.
- * @param params - Any specific parameters required by 'resize_channel'. See {@link ResizeChannelRequestParams} for details.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- */
-export async function createResizeChannelMessage(
-    signer: MessageSigner,
-    params: ResizeChannelRequestParams,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.ResizeChannel,
-        params,
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest, (_, value) => (typeof value === 'bigint' ? value.toString() : value));
+export interface AppSessionsV1RebalanceAppSessionsResponse {
+  /** Unique identifier for this rebalancing operation */
+  batchId: string;
 }
 
-/**
- * Creates the stringified message body for a 'get_channels' request.
- *
- * @param participant - Optional participant address to filter channels.
- * @param status - Optional status to filter channels.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
- */
-export async function createGetChannelsMessage(
-    participant?: Address,
-    status?: RPCChannelStatus,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const params = {
-        ...(participant ? { participant } : {}),
-        ...(status ? { status } : {}),
-    };
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetChannels,
-        params,
-        requestId,
-        timestamp,
-    });
-    return JSON.stringify(request);
+export interface AppSessionsV1GetAppDefinitionRequest {
+  /** Application session ID */
+  appSessionId: string;
 }
 
-/**
- * Creates the signed, stringified message body for a 'get_rpc_history' request.
- *
- * @param signer - The function to sign the request payload.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- */
-export async function createGetRPCHistoryMessage(
-    signer: MessageSigner,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetRPCHistory,
-        params: {},
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface AppSessionsV1GetAppDefinitionResponse {
+  /** Application definition */
+  definition: AppDefinitionV1;
 }
 
-/**
- * Creates the stringified message body for a 'get_assets' request.
- *
- * @param chainId - Optional chain ID to filter assets.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
- */
-export async function createGetAssetsMessage(
-    chainId?: number,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const params = {
-        ...(chainId ? { chain_id: chainId } : {}),
-    };
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.GetAssets,
-        params,
-        requestId,
-        timestamp,
-    });
-
-    return JSON.stringify(request);
+export interface AppSessionsV1GetAppSessionsRequest {
+  /** Application session ID filter */
+  appSessionId?: string;
+  /** Participant wallet address filter */
+  participant?: Address;
+  /** Status filter (open/closed) */
+  status?: string;
+  /** Pagination parameters */
+  pagination?: PaginationParamsV1;
 }
 
-/**
- * Creates the signed, stringified message body for a 'transfer' request.
- *
- * @param signer - The function to sign the request payload.
- * @param transferParams - The transfer parameters including destination/destination_user_tag and allocations.
- * @param requestId - Optional request ID.
- * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
- */
-export async function createTransferMessage(
-    signer: MessageSigner,
-    params: TransferRequestParams,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    // Validate that exactly one destination type is provided (XOR logic)
-    const hasDestination = !!params.destination;
-    const hasDestinationTag = !!params.destination_user_tag;
-
-    if (hasDestination === hasDestinationTag) {
-        throw new Error(
-            hasDestination
-                ? 'Cannot provide both destination and destination_user_tag'
-                : 'Either destination or destination_user_tag must be provided',
-        );
-    }
-
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.Transfer,
-        params,
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface AppSessionsV1GetAppSessionsResponse {
+  /** List of application sessions */
+  appSessions: AppSessionInfoV1[];
+  /** Pagination information */
+  metadata: PaginationMetadataV1;
 }
 
-/**
- * Creates a revoke session key message
- *
- * @param signer - The message signer to sign the request
- * @param sessionKey - The session key address to revoke
- * @param requestId - Optional request ID (auto-generated if not provided)
- * @param timestamp - Optional timestamp (auto-generated if not provided)
- * @returns JSON string of the signed RPC message
- */
-export async function createRevokeSessionKeyMessage(
-    signer: MessageSigner,
-    sessionKey: Address,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.RevokeSessionKey,
-        params: { session_key: sessionKey },
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface AppSessionsV1CreateAppSessionRequest {
+  /** Application definition including participants and quorum */
+  definition: AppDefinitionV1;
+  /** Optional JSON stringified session data */
+  sessionData: string;
+  /** Participant signatures for the app session creation */
+  quorumSigs?: string[];
 }
 
-/**
- * Creates a cleanup session key cache message
- *
- * @param signer - The message signer to sign the request
- * @param requestId - Optional request ID (auto-generated if not provided)
- * @param timestamp - Optional timestamp (auto-generated if not provided)
- * @returns JSON string of the signed RPC message
- */
-export async function createCleanupSessionKeyCacheMessage(
-    signer: MessageSigner,
-    requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
-    const request = NitroliteRPC.createRequest({
-        method: RPCMethod.CleanupSessionKeyCache,
-        params: {},
-        requestId,
-        timestamp,
-    });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+export interface AppSessionsV1CreateAppSessionResponse {
+  /** Created application session ID */
+  appSessionId: string;
+  /** Initial version of the session */
+  version: string;
+  /** Status of the session */
+  status: string;
 }
 
-/**
- * Creates EIP-712 signing function for challenge verification with proper challenge extraction
- *
- * @param walletClient - The WalletClient instance to use for signing.
- * @param partialMessage - The partial EIP-712 message structure to complete with the challenge.
- * @param authDomain - The domain name for the EIP-712 signing context.
- * @returns A MessageSigner function that takes the challenge data and returns the EIP-712 signature.
- */
-export function createEIP712AuthMessageSigner(
-    walletClient: WalletClient,
-    partialMessage: PartialEIP712AuthMessage,
-    domain: EIP712AuthDomain,
-): MessageSigner {
-    return async (payload: RPCData): Promise<Hex> => {
-        const address = walletClient.account?.address;
-        if (!address) {
-            throw new Error('Wallet client is not connected or does not have an account.');
-        }
-
-        const method = payload[1];
-        if (method !== RPCMethod.AuthVerify) {
-            throw new Error(
-                `This EIP-712 signer is designed only for the '${RPCMethod.AuthVerify}' method, but received '${method}'.`,
-            );
-        }
-
-        // Safely extract the challenge from the payload for an AuthVerify request.
-        // The expected structure is `[id, 'auth_verify', [{ challenge: '...' }], ts]`
-        const params = payload[2];
-        if (!('challenge' in params) || typeof params.challenge !== 'string') {
-            throw new Error('Invalid payload for AuthVerify: The challenge string is missing or malformed.');
-        }
-
-        // After the check, TypeScript knows `params` is an object with a `challenge` property of type string.
-        const challengeUUID: string = params.challenge;
-
-        const message: EIP712AuthMessage = {
-            ...partialMessage,
-            challenge: challengeUUID,
-            wallet: address,
-        };
-
-        try {
-            // The message for signTypedData must be a plain object.
-            const untypedMessage: Record<string, unknown> = { ...message };
-
-            // Sign with EIP-712
-            const signature = await walletClient.signTypedData({
-                account: walletClient.account!,
-                domain,
-                types: EIP712AuthTypes,
-                primaryType: 'Policy',
-                message: untypedMessage,
-            });
-
-            return signature;
-        } catch (eip712Error) {
-            const errorMessage = eip712Error instanceof Error ? eip712Error.message : String(eip712Error);
-            console.error('EIP-712 signing failed:', errorMessage);
-            throw new Error(`EIP-712 signing failed: ${errorMessage}`);
-        }
-    };
+export interface AppSessionsV1CloseAppSessionRequest {
+  /** Application session ID to close */
+  appSessionId: string;
+  /** Final asset allocations when closing the session */
+  allocations: AppAllocationV1[];
+  /** Optional final JSON stringified session data */
+  sessionData?: string;
 }
 
-/**
- * Creates a message signer function that uses ECDSA signing with a provided private key.
- *
- * Note: for session key signing only, do not use this method with EOA keys.
- * @param privateKey - The private key to use for ECDSA signing.
- * @returns A MessageSigner function that signs the payload using ECDSA.
- */
-export function createECDSAMessageSigner(privateKey: Hex): MessageSigner {
-    return async (payload: RPCData): Promise<Hex> => {
-        try {
-            const message = toHex(JSON.stringify(payload, (_, v) => (typeof v === 'bigint' ? v.toString() : v)));
+export interface AppSessionsV1CloseAppSessionResponse {
+  /** Closed application session ID */
+  appSessionId: string;
+  /** Final version of the session */
+  version: string;
+  /** Status of the session (closed) */
+  status: string;
+}
 
-            return signRawECDSAMessage(message, privateKey);
-        } catch (error) {
-            console.error('ECDSA signing failed:', error);
-            throw new Error(`ECDSA signing failed: ${error}`);
-        }
-    };
+// ============================================================================
+// Session Keys Group - V1 API
+// ============================================================================
+
+export interface SessionKeysV1RegisterRequest {
+  /** User wallet address */
+  address: Address;
+  /** Session key address for delegation */
+  sessionKey?: string;
+  /** Application name for analytics */
+  application?: string;
+  /** Asset allowances for the session */
+  allowances?: AssetAllowanceV1[];
+  /** Permission scope */
+  scope?: string;
+  /** Session expiration timestamp */
+  expiresAt?: bigint; // uint64
+}
+
+export interface SessionKeysV1RegisterResponse {}
+
+export interface SessionKeysV1RevokeSessionKeyRequest {
+  /** Address of the session key to revoke */
+  sessionKey: string;
+}
+
+export interface SessionKeysV1RevokeSessionKeyResponse {
+  /** Address of the revoked session key */
+  sessionKey: string;
+}
+
+export interface SessionKeysV1GetSessionKeysRequest {
+  /** User's wallet address */
+  wallet: Address;
+}
+
+export interface SessionKeysV1GetSessionKeysResponse {
+  /** List of active session keys */
+  sessionKeys: SessionKeyV1[];
+}
+
+// ============================================================================
+// User Group - V1 API
+// ============================================================================
+
+export interface UserV1GetBalancesRequest {
+  /** User's wallet address */
+  wallet: Address;
+}
+
+export interface UserV1GetBalancesResponse {
+  /** List of asset balances */
+  balances: BalanceEntryV1[];
+}
+
+export interface UserV1GetTransactionsRequest {
+  /** User's wallet address */
+  wallet: Address;
+  /** Asset symbol filter */
+  asset?: string;
+  /** Transaction type filter */
+  txType?: TransactionType;
+  /** Pagination parameters */
+  pagination?: PaginationParamsV1;
+  /** Start time filter (Unix timestamp) */
+  fromTime?: bigint; // uint64
+  /** End time filter (Unix timestamp) */
+  toTime?: bigint; // uint64
+}
+
+export interface UserV1GetTransactionsResponse {
+  /** List of transactions */
+  transactions: TransactionV1[];
+  /** Pagination information */
+  metadata: PaginationMetadataV1;
+}
+
+// ============================================================================
+// Node Group - V1 API
+// ============================================================================
+
+export interface NodeV1PingRequest {}
+
+export interface NodeV1PingResponse {}
+
+export interface NodeV1GetConfigRequest {}
+
+export interface NodeV1GetConfigResponse {
+  /** Node wallet address */
+  node_address: Address;
+  /** Node software version */
+  node_version: string;
+  /** List of supported networks */
+  blockchains: BlockchainInfoV1[];
+}
+
+export interface NodeV1GetAssetsRequest {
+  /** Blockchain network ID filter */
+  blockchainId?: bigint; // uint64
+}
+
+export interface NodeV1GetAssetsResponse {
+  /** List of supported assets */
+  assets: AssetV1[];
 }

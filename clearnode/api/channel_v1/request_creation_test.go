@@ -225,7 +225,6 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 				NodeBalance:  "0",
 				NodeNetFlow:  "0",
 			},
-			IsFinal: false,
 		},
 		ChannelDefinition: rpc.ChannelDefinitionV1{
 			Nonce:     nonce,

@@ -22,6 +22,7 @@ contract ChannelHubTest_Base is Test {
     address alice;
     address bob;
 
+    uint8 constant CHANNEL_HUB_VERSION = 1;
     uint32 constant CHALLENGE_DURATION = 86400; // 1 day
     uint64 constant NONCE = 1;
     uint256 constant DEPOSIT_AMOUNT = 1000;

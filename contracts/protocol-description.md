@@ -521,6 +521,7 @@ This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
 * **Authorization**: all state changes require valid signatures.
 * **Monotonicity**: `version` strictly increases.
 * **Replay resistance**: no two states with the same version can coexist.
+* **Cross-deployment replay protection**: Each ChannelHub deployment has a `VERSION` constant. The version is encoded as the first byte of `channelId`, ensuring that signatures are bound to a specific ChannelHub version. This prevents replay attacks across different ChannelHub deployments on the same chain. The `escrowId` inherits this protection as it is derived from `channelId`.
 * **Liquidity safety**: absolute allocations must be collateral-backed.
 * **Optimistic safety**:
 

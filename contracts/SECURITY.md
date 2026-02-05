@@ -67,9 +67,10 @@ e.g. when processing "receive X, withdraw Y", increase `lockedFunds` (and "lock"
 ### Channel identity and authorization
 
 1. **Channel uniqueness**: A channel identified by `channelId = hash(Definition)` can be created at most once.
-2. **Signature authorization**: Every enforceable state must be signed by both User and Node (unless explicitly relaxed in future versions).
-3. **Version monotonicity**: For a given channel, every valid state has a strictly increasing `version`.
-4. **Version uniqueness**: No two different states with the same `version` may exist for the same channel.
+2. **Cross-deployment replay protection**: Each ChannelHub deployment has a `VERSION` constant (currently 1). The version is encoded as the first byte of `channelId = setFirstByte(hash(Definition), VERSION)`, ensuring that the same channel definition produces different `channelId` values across different ChannelHub versions. This prevents signature replay attacks across different ChannelHub deployments on the same chain. Only one ChannelHub deployment per version per chain is intended. The `escrowId = hash(channelId, stateVersion)` inherits this protection.
+3. **Signature authorization**: Every enforceable state must be signed by both User and Node (unless explicitly relaxed in future versions).
+4. **Version monotonicity**: For a given channel, every valid state has a strictly increasing `version`.
+5. **Version uniqueness**: No two different states with the same `version` may exist for the same channel.
 
 ---
 

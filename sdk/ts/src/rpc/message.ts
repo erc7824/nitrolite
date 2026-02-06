@@ -55,11 +55,21 @@ export interface Message {
 
 /**
  * Helper to convert BigInt to string during serialization
+ * Also ensures blockchain_id, epoch, version, and nonce fields are strings
  */
-function bigIntReplacer(_key: string, value: any): any {
+function bigIntReplacer(key: string, value: any): any {
+  // Convert bigint to string
   if (typeof value === 'bigint') {
     return value.toString();
   }
+
+  // Ensure uint64 fields are strings (in case they're numbers)
+  if (key === 'blockchain_id' || key === 'epoch' || key === 'version' || key === 'nonce') {
+    if (typeof value === 'number' || typeof value === 'bigint') {
+      return value.toString();
+    }
+  }
+
   return value;
 }
 
@@ -70,9 +80,7 @@ export function newPayload(v: unknown): Payload {
   if (v === null || v === undefined) {
     return {};
   }
-  if (typeof v === 'object' && !Array.isArray(v)) {
-    return v as Payload;
-  }
+  // Always apply bigIntReplacer to ensure bigint values are converted to strings
   return JSON.parse(JSON.stringify(v, bigIntReplacer)) as Payload;
 }
 

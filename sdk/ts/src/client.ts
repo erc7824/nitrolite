@@ -5,7 +5,7 @@
  * low-level RPC access for advanced use cases.
  */
 
-import { Address, Hex, createPublicClient, createWalletClient, http, keccak256 } from 'viem';
+import { Address, Hex, createPublicClient, createWalletClient, http } from 'viem';
 import Decimal from 'decimal.js';
 import * as core from './core/types';
 import * as app from './app/types';
@@ -259,11 +259,8 @@ export class Client {
     // Pack the state into ABI-encoded bytes
     const packed = await packState(state, this.assetStore);
 
-    // Hash the packed state
-    const hash = keccak256(packed);
-
-    // Sign the hash using the state signer (adds Ethereum message prefix)
-    const signature = await this.stateSigner.signMessage(hash);
+    // Sign the packed state using the state signer (adds Ethereum message prefix and hashes internally)
+    const signature = await this.stateSigner.signMessage(packed);
 
     return signature;
   }
@@ -668,7 +665,7 @@ export class Client {
   async getAssets(blockchainId?: bigint): Promise<core.Asset[]> {
     const req: API.NodeV1GetAssetsRequest = {};
     if (blockchainId !== undefined) {
-      req.blockchainId = blockchainId;
+      req.blockchain_id = blockchainId;
     }
     const resp = await this.rpcClient.nodeV1GetAssets(req);
     return transformAssets(resp.assets);
@@ -779,7 +776,7 @@ export class Client {
    */
   async getEscrowChannel(escrowChannelId: string): Promise<core.Channel> {
     const req: API.ChannelsV1GetEscrowChannelRequest = {
-      escrowChannelId,
+      escrow_channel_id: escrowChannelId,
     };
     const resp = await this.rpcClient.channelsV1GetEscrowChannel(req);
     return transformChannel(resp.channel);
@@ -803,7 +800,7 @@ export class Client {
     const req: API.ChannelsV1GetLatestStateRequest = {
       wallet,
       asset,
-      onlySigned,
+      only_signed: onlySigned,
     };
     const resp = await this.rpcClient.channelsV1GetLatestState(req);
     return transformState(resp.state);
@@ -837,7 +834,7 @@ export class Client {
     pageSize?: number;
   }): Promise<{ sessions: app.AppSessionInfoV1[]; metadata: core.PaginationMetadata }> {
     const req: API.AppSessionsV1GetAppSessionsRequest = {
-      appSessionId: options?.appSessionId,
+      app_session_id: options?.appSessionId,
       participant: options?.wallet,
       status: options?.status,
       pagination: options?.page && options?.pageSize ? {
@@ -847,7 +844,7 @@ export class Client {
     };
     const resp = await this.rpcClient.appSessionsV1GetAppSessions(req);
     return {
-      sessions: resp.appSessions, // Already in correct format
+      sessions: resp.app_sessions,
       metadata: transformPaginationMetadata(resp.metadata),
     };
   }
@@ -866,7 +863,7 @@ export class Client {
    */
   async getAppDefinition(appSessionId: string): Promise<app.AppDefinitionV1> {
     const req: API.AppSessionsV1GetAppDefinitionRequest = {
-      appSessionId,
+      app_session_id: appSessionId,
     };
     const resp = await this.rpcClient.appSessionsV1GetAppDefinition(req);
     return resp.definition; // Already in correct format
@@ -906,12 +903,12 @@ export class Client {
   ): Promise<{ appSessionId: string; version: string; status: string }> {
     const req: API.AppSessionsV1CreateAppSessionRequest = {
       definition: transformAppDefinitionToRPC(definition) as any, // RPC type
-      sessionData,
-      quorumSigs,
+      session_data: sessionData,
+      quorum_sigs: quorumSigs,
     };
     const resp = await this.rpcClient.appSessionsV1CreateAppSession(req);
     return {
-      appSessionId: resp.appSessionId,
+      appSessionId: resp.app_session_id,
       version: resp.version,
       status: resp.status,
     };
@@ -967,13 +964,13 @@ export class Client {
 
     // Submit deposit
     const req: API.AppSessionsV1SubmitDepositStateRequest = {
-      appStateUpdate: appUpdate as any, // RPC type
-      quorumSigs,
-      userState: this.transformStateToRPC(newState),
+      app_state_update: appUpdate as any, // RPC type
+      quorum_sigs: quorumSigs,
+      user_state: this.transformStateToRPC(newState),
     };
 
     const resp = await this.rpcClient.appSessionsV1SubmitDepositState(req);
-    return resp.stateNodeSig;
+    return resp.state_node_sig;
   }
 
   /**
@@ -1006,8 +1003,8 @@ export class Client {
     const appUpdate = transformAppStateUpdateToRPC(appStateUpdate);
 
     const req: API.AppSessionsV1SubmitAppStateRequest = {
-      appStateUpdate: appUpdate as any, // RPC type
-      quorumSigs,
+      app_state_update: appUpdate as any, // RPC type
+      quorum_sigs: quorumSigs,
     };
 
     await this.rpcClient.appSessionsV1SubmitAppState(req);
@@ -1045,11 +1042,11 @@ export class Client {
     const rpcUpdates = signedUpdates.map(transformSignedAppStateUpdateToRPC);
 
     const req: API.AppSessionsV1RebalanceAppSessionsRequest = {
-      signedUpdates: rpcUpdates as any, // RPC type
+      signed_updates: rpcUpdates as any, // RPC type
     };
 
     const resp = await this.rpcClient.appSessionsV1RebalanceAppSessions(req);
-    return resp.batchId;
+    return resp.batch_id;
   }
 
   // ============================================================================
@@ -1134,7 +1131,7 @@ export class Client {
   ): Promise<string> {
     const req: API.ChannelsV1RequestCreationRequest = {
       state: this.transformStateToRPC(state),
-      channelDefinition: this.transformChannelDefinitionToRPC(channelDef),
+      channel_definition: this.transformChannelDefinitionToRPC(channelDef),
     };
     const resp = await this.rpcClient.channelsV1RequestCreation(req);
     return resp.signature;

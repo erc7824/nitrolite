@@ -2,6 +2,8 @@ package channel_v1
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -14,6 +16,52 @@ import (
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
+
+func Test_parseRequestCreation(t *testing.T) {
+	var payload rpc.Payload
+	jsonStr := `
+    {
+        "state": {
+            "id": "0x59c28c20c7676b8d42ab220a8caeef2a9c795e05dec42cb1e05f14f32b7ff836",
+            "transitions": [
+                {
+                    "type": 30,
+                    "tx_id": "0xd245bd97aab68a53980565db77f0abf893378d3358c8d57a34289364a293e8cb",
+                    "account_id": "0x053aEAD7d3eebE4359300fDE849bCD9E77384989",
+                    "amount": "0.1"
+                }
+            ],
+            "asset": "usdc",
+            "user_wallet": "0x8a395641469fab5ebf10feb5b33c493c99e251c4",
+            "epoch": "0",
+            "version": "2",
+            "home_channel_id": "0x220337be1fb67e3e5935d548389dbd535bb039e8e0bfc2e30d51db2bbefb47e0",
+            "home_ledger": {
+                "token_address": "0x6E2C4707DA119425dF2c722E2695300154652f56",
+                "blockchain_id": "11155111",
+                "user_balance": "0.1",
+                "user_net_flow": "0",
+                "node_balance": "0",
+                "node_net_flow": "0.1"
+            },
+            "user_sig": "0xe04d98afcf53eb6b249298e827122f251ee01547092b3a23280a1ba266daa9a50309bf782e0f1afcbb12cf6c0db02213631b38a31edfe3c033b07af94d1109e41b"
+        },
+        "channel_definition": {
+            "nonce": "1770377043089581224",
+            "challenge": 86400
+        }
+    }`
+	err := json.Unmarshal([]byte(jsonStr), &payload)
+	require.NoError(t, err)
+
+	var reqPayload rpc.ChannelsV1RequestCreationRequest
+	err = payload.Translate(&reqPayload)
+	require.NoError(t, err)
+
+	fmt.Printf("Parsed Request Creation Payload: %+v\n", reqPayload)
+	_, err = toCoreChannelDefinition(reqPayload.ChannelDefinition)
+	require.NoError(t, err)
+}
 
 func TestRequestCreation_Success(t *testing.T) {
 	// Setup

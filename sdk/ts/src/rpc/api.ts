@@ -45,7 +45,7 @@ export interface ChannelsV1GetHomeChannelResponse {
 
 export interface ChannelsV1GetEscrowChannelRequest {
   /** Escrow channel ID */
-  escrowChannelId: string;
+  escrow_channel_id: string;
 }
 
 export interface ChannelsV1GetEscrowChannelResponse {
@@ -77,7 +77,7 @@ export interface ChannelsV1GetLatestStateRequest {
   /** Asset symbol */
   asset: string;
   /** Enable to get the latest signed state */
-  onlySigned: boolean;
+  only_signed: boolean;
 }
 
 export interface ChannelsV1GetLatestStateResponse {
@@ -93,9 +93,9 @@ export interface ChannelsV1GetStatesRequest {
   /** User epoch index filter */
   epoch?: bigint; // uint64
   /** Home/Escrow Channel ID filter */
-  channelId?: string;
+  channel_id?: string;
   /** Return only signed states */
-  onlySigned: boolean;
+  only_signed: boolean;
   /** Pagination parameters */
   pagination?: PaginationParamsV1;
 }
@@ -111,7 +111,7 @@ export interface ChannelsV1RequestCreationRequest {
   /** State to be submitted */
   state: StateV1;
   /** Definition of the channel to be created */
-  channelDefinition: ChannelDefinitionV1;
+  channel_definition: ChannelDefinitionV1;
 }
 
 export interface ChannelsV1RequestCreationResponse {
@@ -133,7 +133,7 @@ export interface ChannelsV1HomeChannelCreatedEvent {
   /** Created home channel information */
   channel: ChannelV1;
   /** Initial state of the home channel */
-  initialState: StateV1;
+  initial_state: StateV1;
 }
 
 // ============================================================================
@@ -142,40 +142,40 @@ export interface ChannelsV1HomeChannelCreatedEvent {
 
 export interface AppSessionsV1SubmitDepositStateRequest {
   /** Application session state update to be submitted */
-  appStateUpdate: AppStateUpdateV1;
+  app_state_update: AppStateUpdateV1;
   /** List of participant signatures for the app state update */
-  quorumSigs: string[];
+  quorum_sigs: string[];
   /** User state */
-  userState: StateV1;
+  user_state: StateV1;
 }
 
 export interface AppSessionsV1SubmitDepositStateResponse {
   /** Node's signature for the deposit state */
-  stateNodeSig: string;
+  state_node_sig: string;
 }
 
 export interface AppSessionsV1SubmitAppStateRequest {
   /** Application session state update to be submitted */
-  appStateUpdate: AppStateUpdateV1;
+  app_state_update: AppStateUpdateV1;
   /** Signature quorum for the application session */
-  quorumSigs: string[];
+  quorum_sigs: string[];
 }
 
 export interface AppSessionsV1SubmitAppStateResponse {}
 
 export interface AppSessionsV1RebalanceAppSessionsRequest {
   /** List of signed application session state updates */
-  signedUpdates: SignedAppStateUpdateV1[];
+  signed_updates: SignedAppStateUpdateV1[];
 }
 
 export interface AppSessionsV1RebalanceAppSessionsResponse {
   /** Unique identifier for this rebalancing operation */
-  batchId: string;
+  batch_id: string;
 }
 
 export interface AppSessionsV1GetAppDefinitionRequest {
   /** Application session ID */
-  appSessionId: string;
+  app_session_id: string;
 }
 
 export interface AppSessionsV1GetAppDefinitionResponse {
@@ -185,7 +185,7 @@ export interface AppSessionsV1GetAppDefinitionResponse {
 
 export interface AppSessionsV1GetAppSessionsRequest {
   /** Application session ID filter */
-  appSessionId?: string;
+  app_session_id?: string;
   /** Participant wallet address filter */
   participant?: Address;
   /** Status filter (open/closed) */
@@ -196,7 +196,7 @@ export interface AppSessionsV1GetAppSessionsRequest {
 
 export interface AppSessionsV1GetAppSessionsResponse {
   /** List of application sessions */
-  appSessions: AppSessionInfoV1[];
+  app_sessions: AppSessionInfoV1[];
   /** Pagination information */
   metadata: PaginationMetadataV1;
 }
@@ -205,14 +205,14 @@ export interface AppSessionsV1CreateAppSessionRequest {
   /** Application definition including participants and quorum */
   definition: AppDefinitionV1;
   /** Optional JSON stringified session data */
-  sessionData: string;
+  session_data: string;
   /** Participant signatures for the app session creation */
-  quorumSigs?: string[];
+  quorum_sigs?: string[];
 }
 
 export interface AppSessionsV1CreateAppSessionResponse {
   /** Created application session ID */
-  appSessionId: string;
+  app_session_id: string;
   /** Initial version of the session */
   version: string;
   /** Status of the session */
@@ -221,16 +221,16 @@ export interface AppSessionsV1CreateAppSessionResponse {
 
 export interface AppSessionsV1CloseAppSessionRequest {
   /** Application session ID to close */
-  appSessionId: string;
+  app_session_id: string;
   /** Final asset allocations when closing the session */
   allocations: AppAllocationV1[];
   /** Optional final JSON stringified session data */
-  sessionData?: string;
+  session_data?: string;
 }
 
 export interface AppSessionsV1CloseAppSessionResponse {
   /** Closed application session ID */
-  appSessionId: string;
+  app_session_id: string;
   /** Final version of the session */
   version: string;
   /** Status of the session (closed) */
@@ -245,7 +245,7 @@ export interface SessionKeysV1RegisterRequest {
   /** User wallet address */
   address: Address;
   /** Session key address for delegation */
-  sessionKey?: string;
+  session_key?: string;
   /** Application name for analytics */
   application?: string;
   /** Asset allowances for the session */
@@ -253,19 +253,19 @@ export interface SessionKeysV1RegisterRequest {
   /** Permission scope */
   scope?: string;
   /** Session expiration timestamp */
-  expiresAt?: bigint; // uint64
+  expires_at?: bigint; // uint64
 }
 
 export interface SessionKeysV1RegisterResponse {}
 
 export interface SessionKeysV1RevokeSessionKeyRequest {
   /** Address of the session key to revoke */
-  sessionKey: string;
+  session_key: string;
 }
 
 export interface SessionKeysV1RevokeSessionKeyResponse {
   /** Address of the revoked session key */
-  sessionKey: string;
+  session_key: string;
 }
 
 export interface SessionKeysV1GetSessionKeysRequest {
@@ -275,7 +275,7 @@ export interface SessionKeysV1GetSessionKeysRequest {
 
 export interface SessionKeysV1GetSessionKeysResponse {
   /** List of active session keys */
-  sessionKeys: SessionKeyV1[];
+  session_keys: SessionKeyV1[];
 }
 
 // ============================================================================
@@ -298,13 +298,13 @@ export interface UserV1GetTransactionsRequest {
   /** Asset symbol filter */
   asset?: string;
   /** Transaction type filter */
-  txType?: TransactionType;
+  tx_type?: TransactionType;
   /** Pagination parameters */
   pagination?: PaginationParamsV1;
   /** Start time filter (Unix timestamp) */
-  fromTime?: bigint; // uint64
+  from_time?: bigint; // uint64
   /** End time filter (Unix timestamp) */
-  toTime?: bigint; // uint64
+  to_time?: bigint; // uint64
 }
 
 export interface UserV1GetTransactionsResponse {
@@ -335,7 +335,7 @@ export interface NodeV1GetConfigResponse {
 
 export interface NodeV1GetAssetsRequest {
   /** Blockchain network ID filter */
-  blockchainId?: bigint; // uint64
+  blockchain_id?: bigint; // uint64
 }
 
 export interface NodeV1GetAssetsResponse {

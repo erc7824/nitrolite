@@ -215,7 +215,6 @@ export function getStateId(
  * @returns Hash as bytes32 (hex string)
  */
 export function getStateTransitionsHash(transitions: Transition[]): string {
-  // Convert transitions to contract format
   const contractTransitions = transitions.map((t) => ({
     type: t.type,
     txId: hexToBytes32(t.txId),
@@ -240,7 +239,6 @@ export function getStateTransitionsHash(transitions: Transition[]): string {
 
   return keccak256(packed);
 }
-
 // ============================================================================
 // Transaction ID Generation
 // ============================================================================
@@ -301,15 +299,35 @@ export function generateChannelMetadata(asset: string): `0x${string}` {
 
 /**
  * hexToBytes32 converts a hex string (with or without 0x prefix) to bytes32
+ * Matches Go's common.HexToHash behavior: attempts to decode hex, returns zeros on failure
  * @param hexStr - Hex string representing a 32-byte hash
  * @returns Normalized bytes32 hex string
  */
 function hexToBytes32(hexStr: string): `0x${string}` {
-  // Ensure 0x prefix
-  const normalized = hexStr.startsWith('0x') ? hexStr : `0x${hexStr}`;
+  // Remove 0x prefix if present
+  let cleaned = hexStr.startsWith('0x') ? hexStr.slice(2) : hexStr;
 
-  // Pad to 32 bytes (64 hex chars + 0x prefix = 66 chars total)
-  return pad(normalized as `0x${string}`, { size: 32 });
+  // If odd length, prepend '0' (matches Go's FromHex behavior)
+  if (cleaned.length % 2 === 1) {
+    cleaned = '0' + cleaned;
+  }
+
+  // Try to decode hex - if any character is invalid, this will parse what it can
+  // Match Go's behavior: decode valid hex pairs, stop at first invalid character
+  const bytes: number[] = [];
+  for (let i = 0; i < cleaned.length; i += 2) {
+    const hexPair = cleaned.slice(i, i + 2);
+    // Strictly validate that both characters are valid hex
+    if (!/^[0-9a-fA-F]{2}$/.test(hexPair)) {
+      // Invalid hex pair - stop here (matches Go's behavior)
+      break;
+    }
+    bytes.push(parseInt(hexPair, 16));
+  }
+
+  // Convert to hex string and right-pad to 32 bytes (matches Go's BytesToHash)
+  const hexResult = bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+  return pad(`0x${hexResult}` as `0x${string}`, { dir: 'left', size: 32 });
 }
 
 /**
@@ -318,24 +336,51 @@ function hexToBytes32(hexStr: string): `0x${string}` {
  * - If the input is a 32-byte hash (64 hex chars), it's used as-is
  * In Ethereum, when an address is stored in bytes32, it occupies the rightmost 20 bytes,
  * with the leftmost 12 bytes being zeros.
+ * Matches Go's behavior for invalid hex strings.
  * @param accountId - Account ID (address or hash)
  * @returns Normalized bytes32 hex string
  */
 function parseAccountIdToBytes32(accountId: string): `0x${string}` {
-  // Ensure 0x prefix
-  const normalized = accountId.startsWith('0x') ? accountId : `0x${accountId}`;
+  // Remove 0x prefix if present
+  let cleaned = accountId.startsWith('0x') ? accountId.slice(2) : accountId;
 
-  // Check length to determine if it's an address (40 hex chars) or hash (64 hex chars)
-  const hexLength = normalized.length - 2; // Remove 0x prefix
+  // Check length to determine if it's a valid address (40 hex chars) or hash (64 hex chars)
+  const hexLength = cleaned.length;
 
-  if (hexLength === 40) {
-    // It's an address (20 bytes) - left-pad with zeros to 32 bytes
-    return pad(normalized as Address, { size: 32 });
-  } else if (hexLength === 64) {
-    // It's already a 32-byte hash
-    return normalized as `0x${string}`;
-  } else {
-    // Try to pad it to 32 bytes anyway
-    return pad(normalized as `0x${string}`, { size: 32 });
+  if (hexLength === 40 || hexLength === 64) {
+    // Try to validate it's proper hex
+    if (/^[0-9a-fA-F]+$/.test(cleaned)) {
+      // Valid hex - pad accordingly
+      if (hexLength === 40) {
+        // Address - left-pad with zeros
+        return pad((`0x${cleaned}`) as Address, { size: 32 });
+      } else {
+        // Already 32-byte hash
+        return `0x${cleaned}` as `0x${string}`;
+      }
+    }
   }
+
+  // Not a standard address or hash, or contains invalid hex
+  // Match Go's behavior: try to parse as hex, decode what we can
+  // If odd length, prepend '0'
+  if (cleaned.length % 2 === 1) {
+    cleaned = '0' + cleaned;
+  }
+
+  // Decode valid hex pairs, stop at first invalid character
+  const bytes: number[] = [];
+  for (let i = 0; i < cleaned.length; i += 2) {
+    const hexPair = cleaned.slice(i, i + 2);
+    // Strictly validate that both characters are valid hex
+    if (!/^[0-9a-fA-F]{2}$/.test(hexPair)) {
+      // Invalid hex pair - stop here (matches Go's behavior)
+      break;
+    }
+    bytes.push(parseInt(hexPair, 16));
+  }
+
+  // Convert to hex string and left-pad to 32 bytes (matches Go's behavior)
+  const hexResult = bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+  return pad(`0x${hexResult}` as `0x${string}`, { dir: 'left', size: 32 });
 }

@@ -58,6 +58,10 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 		return nil, rpc.Errorf("incoming state doesn't have 'transfer_send' transition")
 	}
 	receiverWallet := incomingTransition.AccountID
+	if senderState.UserWallet == receiverWallet {
+		return nil, rpc.Errorf("sender and receiver wallets are the same")
+	}
+
 	logger = logger.
 		WithKV("sender", senderState.UserWallet).
 		WithKV("receiver", receiverWallet).

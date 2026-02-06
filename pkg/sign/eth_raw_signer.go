@@ -18,7 +18,7 @@ var _ Address = (*EthereumAddress)(nil)
 // EthereumAddress implements the Address interface for Ethereum.
 type EthereumAddress struct{ common.Address }
 
-func (a EthereumAddress) String() string { return a.Address.Hex() }
+func (a EthereumAddress) String() string { return strings.ToLower(a.Address.Hex()) }
 
 // NewEthereumAddress creates a new Ethereum address from a common.Address.
 func NewEthereumAddress(addr common.Address) EthereumAddress {

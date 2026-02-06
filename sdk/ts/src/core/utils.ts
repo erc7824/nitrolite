@@ -340,7 +340,12 @@ function hexToBytes32(hexStr: string): `0x${string}` {
  * @param accountId - Account ID (address or hash)
  * @returns Normalized bytes32 hex string
  */
-function parseAccountIdToBytes32(accountId: string): `0x${string}` {
+function parseAccountIdToBytes32(accountId: string | undefined): `0x${string}` {
+  // Handle undefined, null, or empty string - return zero bytes32
+  if (!accountId || accountId === '') {
+    return '0x0000000000000000000000000000000000000000000000000000000000000000';
+  }
+
   // Remove 0x prefix if present
   let cleaned = accountId.startsWith('0x') ? accountId.slice(2) : accountId;
 

@@ -267,42 +267,45 @@ import * as RPCApp from './rpc/api';
 
 /**
  * Transform SDK AppDefinitionV1 to RPC AppDefinitionV1 for requests
+ * Converts camelCase SDK fields to snake_case RPC fields
  */
-export function transformAppDefinitionToRPC(def: AppDefinitionV1): RPCApp.AppSessionsV1CreateAppSessionRequest['definition'] {
+export function transformAppDefinitionToRPC(def: AppDefinitionV1): any {
   return {
     application: def.application,
     participants: def.participants.map(p => ({
-      walletAddress: p.walletAddress,
-      signatureWeight: p.signatureWeight,
+      wallet_address: p.walletAddress,
+      signature_weight: p.signatureWeight,
     })),
     quorum: def.quorum,
-    nonce: def.nonce,
+    nonce: def.nonce.toString(),
   };
 }
 
 /**
  * Transform SDK AppStateUpdateV1 to RPC AppStateUpdateV1 for requests
+ * Converts camelCase SDK fields to snake_case RPC fields
  */
 export function transformAppStateUpdateToRPC(update: AppStateUpdateV1) {
   return {
-    appSessionId: update.appSessionId,
+    app_session_id: update.appSessionId,
     intent: update.intent,
-    version: update.version,
+    version: update.version.toString(),
     allocations: update.allocations.map(a => ({
       participant: a.participant,
       asset: a.asset,
       amount: a.amount.toString(),
     })),
-    sessionData: update.sessionData,
+    session_data: update.sessionData,
   };
 }
 
 /**
  * Transform SDK SignedAppStateUpdateV1 to RPC SignedAppStateUpdateV1 for requests
+ * Converts camelCase SDK fields to snake_case RPC fields
  */
 export function transformSignedAppStateUpdateToRPC(signed: SignedAppStateUpdateV1) {
   return {
-    appStateUpdate: transformAppStateUpdateToRPC(signed.appStateUpdate),
-    quorumSigs: signed.quorumSigs,
+    app_state_update: transformAppStateUpdateToRPC(signed.appStateUpdate),
+    quorum_sigs: signed.quorumSigs,
   };
 }

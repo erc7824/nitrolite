@@ -105,7 +105,7 @@ export interface Ledger {
 export interface Transition {
   type: TransitionType;
   txId: string;
-  accountId: string;
+  accountId?: string; // Optional - may be undefined for certain transition types
   amount: Decimal;
 }
 

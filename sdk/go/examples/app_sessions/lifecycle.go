@@ -107,26 +107,7 @@ func main() {
 
 	wallet1DepositSig, _ := wallet1Signer.Sign(session1DepositRequest)
 
-	// Build channel state for deposit
-	wallet1USDCState, err := wallet1Client.GetLatestState(ctx, wallet1Address, "usdc", false)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	wallet1USDCNextState := wallet1USDCState.NextState()
-
-	_, err = wallet1USDCNextState.ApplyCommitTransition(session1ID, session1DepositAmount)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	wallet1USDCStateSig, err := wallet1Client.SignState(wallet1USDCNextState)
-	if err != nil {
-		log.Fatal(err)
-	}
-	wallet1USDCNextState.UserSig = &wallet1USDCStateSig
-
-	_, err = wallet1Client.SubmitAppSessionDeposit(ctx, session1DepositUpdate, []string{wallet1DepositSig.String()}, *wallet1USDCNextState)
+	_, err = wallet1Client.SubmitAppSessionDeposit(ctx, session1DepositUpdate, []string{wallet1DepositSig.String()}, "usdc", session1DepositAmount)
 	if err != nil {
 		log.Printf("⚠ Deposit warning: %v", err)
 	}
@@ -182,26 +163,7 @@ func main() {
 	wallet2DepositSig, _ := wallet2Signer.Sign(session2DepositRequest)
 	wallet3DepositSig, _ := wallet3Signer.Sign(session2DepositRequest)
 
-	// Build channel state for deposit
-	wallet2WETHState, err := wallet2Client.GetLatestState(ctx, wallet2Address, "weth", false)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	wallet2WETHNextState := wallet2WETHState.NextState()
-
-	_, err = wallet2WETHNextState.ApplyCommitTransition(session2ID, session2DepositAmount)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	wallet2WETHStateSig, err := wallet2Client.SignState(wallet2WETHNextState)
-	if err != nil {
-		log.Fatal(err)
-	}
-	wallet2WETHNextState.UserSig = &wallet2WETHStateSig
-
-	nodeSig, err := wallet2Client.SubmitAppSessionDeposit(ctx, session2DepositUpdate, []string{wallet2DepositSig.String(), wallet3DepositSig.String()}, *wallet2WETHNextState)
+	nodeSig, err := wallet2Client.SubmitAppSessionDeposit(ctx, session2DepositUpdate, []string{wallet2DepositSig.String(), wallet3DepositSig.String()}, "weth", session2DepositAmount)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,6 +1,8 @@
 package app_session_v1
 
 import (
+	"strconv"
+
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
@@ -37,7 +39,7 @@ func (h *Handler) GetAppDefinition(c *rpc.Context) {
 			Application:  session.Application,
 			Participants: participants,
 			Quorum:       session.Quorum,
-			Nonce:        session.Nonce,
+			Nonce:        strconv.FormatUint(session.Nonce, 10),
 		}
 
 		return nil

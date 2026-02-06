@@ -94,7 +94,7 @@ func TestGetAppDefinition_Success(t *testing.T) {
 	assert.Equal(t, participant2, response.Definition.Participants[1].WalletAddress)
 	assert.Equal(t, uint8(1), response.Definition.Participants[1].SignatureWeight)
 	assert.Equal(t, uint8(2), response.Definition.Quorum)
-	assert.Equal(t, uint64(1), response.Definition.Nonce)
+	assert.Equal(t, "1", response.Definition.Nonce)
 
 	// Verify all mock expectations
 	mockStore.AssertExpectations(t)

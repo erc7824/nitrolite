@@ -2,6 +2,7 @@ package channel_v1
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -1240,13 +1241,13 @@ func toRPCState(state core.State) rpc.StateV1 {
 		Transitions:     transitions,
 		Asset:           state.Asset,
 		UserWallet:      state.UserWallet,
-		Epoch:           decimal.NewFromInt(int64(state.Epoch)).String(),
-		Version:         decimal.NewFromInt(int64(state.Version)).String(),
+		Epoch:           strconv.FormatUint(state.Epoch, 10),
+		Version:         strconv.FormatUint(state.Version, 10),
 		HomeChannelID:   state.HomeChannelID,
 		EscrowChannelID: state.EscrowChannelID,
 		HomeLedger: rpc.LedgerV1{
 			TokenAddress: state.HomeLedger.TokenAddress,
-			BlockchainID: state.HomeLedger.BlockchainID,
+			BlockchainID: strconv.FormatUint(state.HomeLedger.BlockchainID, 10),
 			UserBalance:  state.HomeLedger.UserBalance.String(),
 			UserNetFlow:  state.HomeLedger.UserNetFlow.String(),
 			NodeBalance:  state.HomeLedger.NodeBalance.String(),
@@ -1259,7 +1260,7 @@ func toRPCState(state core.State) rpc.StateV1 {
 	if state.EscrowLedger != nil {
 		rpcState.EscrowLedger = &rpc.LedgerV1{
 			TokenAddress: state.EscrowLedger.TokenAddress,
-			BlockchainID: state.EscrowLedger.BlockchainID,
+			BlockchainID: strconv.FormatUint(state.EscrowLedger.BlockchainID, 10),
 			UserBalance:  state.EscrowLedger.UserBalance.String(),
 			UserNetFlow:  state.EscrowLedger.UserNetFlow.String(),
 			NodeBalance:  state.EscrowLedger.NodeBalance.String(),

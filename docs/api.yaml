@@ -102,9 +102,6 @@ types:
           type: ledger
           description: User and node balances for the escrow channel
           optional: true
-        - name: is_final
-          type: boolean
-          description: Indicates if the state is final
         - name: user_sig
           type: string
           description: User signature for the state

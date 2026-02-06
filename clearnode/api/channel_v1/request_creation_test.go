@@ -2,6 +2,7 @@ package channel_v1
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -118,7 +119,7 @@ func TestRequestCreation_Success(t *testing.T) {
 	reqPayload := rpc.ChannelsV1RequestCreationRequest{
 		State: rpcState,
 		ChannelDefinition: rpc.ChannelDefinitionV1{
-			Nonce:     nonce,
+			Nonce:     strconv.FormatUint(nonce, 10),
 			Challenge: challenge,
 		},
 	}
@@ -219,16 +220,15 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 			HomeChannelID: &homeChannelID,
 			HomeLedger: rpc.LedgerV1{
 				TokenAddress: tokenAddress,
-				BlockchainID: 1,
+				BlockchainID: "1",
 				UserBalance:  "0",
 				UserNetFlow:  "0",
 				NodeBalance:  "0",
 				NodeNetFlow:  "0",
 			},
-			IsFinal: false,
 		},
 		ChannelDefinition: rpc.ChannelDefinitionV1{
-			Nonce:     nonce,
+			Nonce:     strconv.FormatUint(nonce, 10),
 			Challenge: lowChallenge,
 		},
 	}

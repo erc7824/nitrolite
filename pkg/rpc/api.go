@@ -80,7 +80,7 @@ type ChannelsV1GetStatesRequest struct {
 	// Asset filters by asset symbol
 	Asset string `json:"asset"`
 	// Epoch filters by user epoch index
-	Epoch *uint64 `json:"epoch,omitempty"`
+	Epoch *string `json:"epoch,omitempty"`
 	// ChannelID filters by Home/Escrow Channel ID
 	ChannelID *string `json:"channel_id,omitempty"`
 	// OnlySigned returns only signed states
@@ -255,7 +255,7 @@ type AppSessionsV1CloseAppSessionResponse struct {
 }
 
 // ============================================================================
-// Session Keys Group - V1 API (DRAFT)
+// Session Keys Group - V1 API
 // ============================================================================
 
 // SessionKeysV1RegisterRequest initiates session key registration.
@@ -368,7 +368,7 @@ type NodeV1GetConfigResponse struct {
 // NodeV1GetAssetsRequest retrieves all supported assets with optional chain filter.
 type NodeV1GetAssetsRequest struct {
 	// BlockchainID filters by blockchain network ID
-	BlockchainID *uint64 `json:"blockchain_id,omitempty"`
+	BlockchainID *string `json:"blockchain_id,omitempty"`
 }
 
 // NodeV1GetAssetsResponse returns the list of supported assets.

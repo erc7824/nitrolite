@@ -7,6 +7,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/shopspring/decimal"
 )
 
 // ============================================================================
@@ -89,7 +90,11 @@ func (c *Client) GetAppDefinition(ctx context.Context, appSessionID string) (*ap
 	if err != nil {
 		return nil, fmt.Errorf("failed to get app definition: %w", err)
 	}
-	def := transformAppDefinition(resp.Definition)
+
+	def, err := transformAppDefinition(resp.Definition)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform app definition: %w", err)
+	}
 	return &def, nil
 }
 
@@ -149,15 +154,34 @@ func (c *Client) CreateAppSession(ctx context.Context, definition app.AppDefinit
 //	    Allocations: []app.AppAllocationV1{...},
 //	}
 //	nodeSig, err := client.SubmitAppSessionDeposit(ctx, appUpdate, []string{"sig1"}, userState)
-func (c *Client) SubmitAppSessionDeposit(ctx context.Context, appStateUpdate app.AppStateUpdateV1, quorumSigs []string, userState core.State) (string, error) {
+func (c *Client) SubmitAppSessionDeposit(ctx context.Context, appStateUpdate app.AppStateUpdateV1, quorumSigs []string, asset string, depositAmount decimal.Decimal) (string, error) {
 	// TODO: Would be good to only have appStateUpdate and quorumSigs here, as userState can be built inside.
 	appUpdate := transformAppStateUpdateToRPC(appStateUpdate)
 
+	currentState, err := c.GetLatestState(ctx, c.GetUserAddress(), asset, false)
+	if err != nil {
+		return "", fmt.Errorf("failed to get latest state: %w", err)
+	}
+
+	nextState := currentState.NextState()
+
+	_, err = nextState.ApplyCommitTransition(appUpdate.AppSessionID, depositAmount)
+	if err != nil {
+		return "", fmt.Errorf("failed to apply commit transition: %w", err)
+	}
+
+	stateSig, err := c.SignState(nextState)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign state: %w", err)
+	}
+
+	nextState.UserSig = &stateSig
 	req := rpc.AppSessionsV1SubmitDepositStateRequest{
 		AppStateUpdate: appUpdate,
 		QuorumSigs:     quorumSigs,
-		UserState:      transformStateToRPC(userState),
+		UserState:      transformStateToRPC(*nextState),
 	}
+
 	resp, err := c.rpcClient.AppSessionsV1SubmitDepositState(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("failed to submit deposit state: %w", err)

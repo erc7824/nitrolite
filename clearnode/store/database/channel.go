@@ -33,11 +33,11 @@ func (Channel) TableName() string {
 // CreateChannel creates a new channel entity in the database.
 func (s *DBStore) CreateChannel(channel core.Channel) error {
 	dbChannel := Channel{
-		ChannelID:          channel.ChannelID,
-		UserWallet:         channel.UserWallet,
+		ChannelID:          strings.ToLower(channel.ChannelID),
+		UserWallet:         strings.ToLower(channel.UserWallet),
 		Type:               channel.Type,
 		BlockchainID:       channel.BlockchainID,
-		Token:              channel.TokenAddress,
+		Token:              strings.ToLower(channel.TokenAddress),
 		ChallengeDuration:  channel.ChallengeDuration,
 		ChallengeExpiresAt: channel.ChallengeExpiresAt,
 		Nonce:              channel.Nonce,
@@ -56,6 +56,8 @@ func (s *DBStore) CreateChannel(channel core.Channel) error {
 
 // GetChannelByID retrieves a channel by its unique identifier.
 func (s *DBStore) GetChannelByID(channelID string) (*core.Channel, error) {
+	channelID = strings.ToLower(channelID)
+
 	// Ensure channelID has 0x prefix
 	if !strings.HasPrefix(channelID, "0x") {
 		channelID = "0x" + channelID
@@ -76,7 +78,7 @@ func (s *DBStore) GetChannelByID(channelID string) (*core.Channel, error) {
 func (s *DBStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, error) {
 	// TODO: rewrite the query
 	var state State
-	err := s.db.Where("user_wallet = ? AND asset = ?", wallet, asset).
+	err := s.db.Where("user_wallet = ? AND asset = ?", strings.ToLower(wallet), asset).
 		Order("epoch DESC, version DESC").
 		First(&state).Error
 	if err != nil {
@@ -119,7 +121,7 @@ func (s *DBStore) CheckOpenChannel(wallet, asset string) (bool, error) {
 			AND c.status = ?
 			AND c.type = ?
 		LIMIT 1
-	`, wallet, asset, core.ChannelStatusOpen, core.ChannelTypeHome).Scan(&count).Error
+	`, strings.ToLower(wallet), asset, core.ChannelStatusOpen, core.ChannelTypeHome).Scan(&count).Error
 
 	if err != nil {
 		return false, fmt.Errorf("failed to check open channel: %w", err)
@@ -134,13 +136,13 @@ func (s *DBStore) UpdateChannel(channel core.Channel) error {
 		"status":               channel.Status,
 		"state_version":        channel.StateVersion,
 		"blockchain_id":        channel.BlockchainID,
-		"token":                channel.TokenAddress,
+		"token":                strings.ToLower(channel.TokenAddress),
 		"nonce":                channel.Nonce,
 		"challenge_expires_at": channel.ChallengeExpiresAt,
 		"updated_at":           time.Now(),
 	}
 
-	if err := s.db.Model(&Channel{}).Where("channel_id = ?", channel.ChannelID).Updates(updates).Error; err != nil {
+	if err := s.db.Model(&Channel{}).Where("channel_id = ?", strings.ToLower(channel.ChannelID)).Updates(updates).Error; err != nil {
 		return fmt.Errorf("failed to update channel: %w", err)
 	}
 

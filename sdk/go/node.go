@@ -3,6 +3,7 @@ package sdk
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -45,7 +46,7 @@ func (c *Client) GetConfig(ctx context.Context) (*core.NodeConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get config: %w", err)
 	}
-	return transformNodeConfig(resp), nil
+	return transformNodeConfig(resp)
 }
 
 // GetBlockchains retrieves the list of supported blockchain networks.
@@ -85,12 +86,14 @@ func (c *Client) GetBlockchains(ctx context.Context) ([]core.Blockchain, error) 
 //	    fmt.Printf("%s (%s): %d tokens\n", asset.Name, asset.Symbol, len(asset.Tokens))
 //	}
 func (c *Client) GetAssets(ctx context.Context, blockchainID *uint64) ([]core.Asset, error) {
-	req := rpc.NodeV1GetAssetsRequest{
-		BlockchainID: blockchainID,
+	req := rpc.NodeV1GetAssetsRequest{}
+	if blockchainID != nil {
+		blockchainIDStr := strconv.FormatUint(*blockchainID, 10)
+		req.BlockchainID = &blockchainIDStr
 	}
 	resp, err := c.rpcClient.NodeV1GetAssets(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get assets: %w", err)
 	}
-	return transformAssets(resp.Assets), nil
+	return transformAssets(resp.Assets)
 }

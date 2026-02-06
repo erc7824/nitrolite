@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -29,7 +30,7 @@ func (ContractEvent) TableName() string {
 // This function matches the signature required by pkg/blockchain/evm.StoreContractEvent.
 func (s *DBStore) StoreContractEvent(ev core.BlockchainEvent) error {
 	contractEvent := &ContractEvent{
-		ContractAddress: ev.ContractAddress,
+		ContractAddress: strings.ToLower(ev.ContractAddress),
 		BlockchainID:    ev.BlockchainID,
 		Name:            ev.Name,
 		BlockNumber:     ev.BlockNumber,
@@ -45,7 +46,7 @@ func (s *DBStore) StoreContractEvent(ev core.BlockchainEvent) error {
 // This function matches the signature required by pkg/blockchain/evm.GetLatestEvent.
 func (s *DBStore) GetLatestEvent(contractAddress string, blockchainID uint64) (core.BlockchainEvent, error) {
 	var ev ContractEvent
-	err := s.db.Where("blockchain_id = ? AND contract_address = ?", blockchainID, contractAddress).
+	err := s.db.Where("blockchain_id = ? AND contract_address = ?", blockchainID, strings.ToLower(contractAddress)).
 		Order("block_number DESC, log_index DESC").
 		First(&ev).Error
 

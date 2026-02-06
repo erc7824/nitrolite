@@ -88,8 +88,13 @@ func toCoreLedger(ledger *rpc.LedgerV1) (*core.Ledger, error) {
 		return nil, fmt.Errorf("failed to parse node net-flow: %w", err)
 	}
 
+	blockchainID, err := strconv.ParseUint(ledger.BlockchainID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse blockchain ID: %w", err)
+	}
+
 	return &core.Ledger{
-		BlockchainID: ledger.BlockchainID,
+		BlockchainID: blockchainID,
 		TokenAddress: ledger.TokenAddress,
 		UserBalance:  userBalance,
 		UserNetFlow:  userNetFlow,
@@ -100,8 +105,13 @@ func toCoreLedger(ledger *rpc.LedgerV1) (*core.Ledger, error) {
 
 // toCoreChannelDefinition converts RPC channel definition to core type.
 func toCoreChannelDefinition(def rpc.ChannelDefinitionV1) (core.ChannelDefinition, error) {
+	nonce, err := strconv.ParseUint(def.Nonce, 10, 64)
+	if err != nil {
+		return core.ChannelDefinition{}, fmt.Errorf("failed to parse nonce: %w", err)
+	}
+
 	return core.ChannelDefinition{
-		Nonce:     def.Nonce,
+		Nonce:     nonce,
 		Challenge: def.Challenge,
 	}, nil
 }
@@ -140,11 +150,11 @@ func coreChannelToRPC(channel core.Channel) rpc.ChannelV1 {
 		ChannelID:          channel.ChannelID,
 		UserWallet:         channel.UserWallet,
 		Type:               channelTypeToString(channel.Type),
-		BlockchainID:       channel.BlockchainID,
+		BlockchainID:       strconv.FormatUint(channel.BlockchainID, 10),
 		TokenAddress:       channel.TokenAddress,
 		ChallengeDuration:  channel.ChallengeDuration,
 		ChallengeExpiresAt: channel.ChallengeExpiresAt,
-		Nonce:              channel.Nonce,
+		Nonce:              strconv.FormatUint(channel.Nonce, 10),
 		Status:             channelStatusToString(channel.Status),
 		StateVersion:       strconv.FormatUint(channel.StateVersion, 10),
 	}
@@ -164,7 +174,7 @@ func coreStateToRPC(state core.State) rpc.StateV1 {
 
 	homeLedger := rpc.LedgerV1{
 		TokenAddress: state.HomeLedger.TokenAddress,
-		BlockchainID: state.HomeLedger.BlockchainID,
+		BlockchainID: strconv.FormatUint(state.HomeLedger.BlockchainID, 10),
 		UserBalance:  state.HomeLedger.UserBalance.String(),
 		UserNetFlow:  state.HomeLedger.UserNetFlow.String(),
 		NodeBalance:  state.HomeLedger.NodeBalance.String(),
@@ -175,7 +185,7 @@ func coreStateToRPC(state core.State) rpc.StateV1 {
 	if state.EscrowLedger != nil {
 		escrowLedger = &rpc.LedgerV1{
 			TokenAddress: state.EscrowLedger.TokenAddress,
-			BlockchainID: state.EscrowLedger.BlockchainID,
+			BlockchainID: strconv.FormatUint(state.EscrowLedger.BlockchainID, 10),
 			UserBalance:  state.EscrowLedger.UserBalance.String(),
 			UserNetFlow:  state.EscrowLedger.UserNetFlow.String(),
 			NodeBalance:  state.EscrowLedger.NodeBalance.String(),

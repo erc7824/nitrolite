@@ -108,7 +108,7 @@ func TestRebalanceAppSessions_Success_TwoSessions(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID1,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      6,
+					Version:      "6",
 					Allocations: []rpc.AppAllocationV1{
 						{Participant: participant1, Asset: "USDC", Amount: "100"},
 					},
@@ -120,7 +120,7 @@ func TestRebalanceAppSessions_Success_TwoSessions(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID2,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      4,
+					Version:      "4",
 					Allocations: []rpc.AppAllocationV1{
 						{Participant: participant2, Asset: "USDC", Amount: "150"},
 					},
@@ -252,7 +252,7 @@ func TestRebalanceAppSessions_Success_MultiAsset(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID1,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 					Allocations: []rpc.AppAllocationV1{
 						{Participant: participant1, Asset: "USDC", Amount: "100"},
 						{Participant: participant1, Asset: "ETH", Amount: "1.5"},
@@ -264,7 +264,7 @@ func TestRebalanceAppSessions_Success_MultiAsset(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID2,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 					Allocations: []rpc.AppAllocationV1{
 						{Participant: participant2, Asset: "USDC", Amount: "150"},
 						{Participant: participant2, Asset: "ETH", Amount: "1.5"},
@@ -339,7 +339,7 @@ func TestRebalanceAppSessions_Error_InsufficientSessions(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: "0x1111111111111111111111111111111111111111111111111111111111111111",
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 				},
 				QuorumSigs: []string{validSig1},
 			},
@@ -386,7 +386,7 @@ func TestRebalanceAppSessions_Error_InvalidIntent(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: "0x1111111111111111111111111111111111111111111111111111111111111111",
 					Intent:       app.AppStateUpdateIntentOperate, // Wrong intent
-					Version:      2,
+					Version:      "2",
 				},
 				QuorumSigs: []string{validSig1},
 			},
@@ -394,7 +394,7 @@ func TestRebalanceAppSessions_Error_InvalidIntent(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: "0x2222222222222222222222222222222222222222222222222222222222222222",
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 				},
 				QuorumSigs: []string{validSig2},
 			},
@@ -443,7 +443,7 @@ func TestRebalanceAppSessions_Error_DuplicateSession(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 				},
 				QuorumSigs: []string{validSig1},
 			},
@@ -451,7 +451,7 @@ func TestRebalanceAppSessions_Error_DuplicateSession(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID, // Duplicate
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      3,
+					Version:      "3",
 				},
 				QuorumSigs: []string{validSig2},
 			},
@@ -541,7 +541,7 @@ func TestRebalanceAppSessions_Error_ConservationViolation(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID1,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 					Allocations: []rpc.AppAllocationV1{
 						{Participant: participant1, Asset: "USDC", Amount: "100"},
 					},
@@ -552,7 +552,7 @@ func TestRebalanceAppSessions_Error_ConservationViolation(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID2,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 					Allocations: []rpc.AppAllocationV1{
 						{Participant: participant2, Asset: "USDC", Amount: "250"}, // Conservation violation
 					},
@@ -624,7 +624,7 @@ func TestRebalanceAppSessions_Error_SessionNotFound(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID1,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 				},
 				QuorumSigs: []string{validSig1},
 			},
@@ -632,7 +632,7 @@ func TestRebalanceAppSessions_Error_SessionNotFound(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID2,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 				},
 				QuorumSigs: []string{validSig2},
 			},
@@ -694,7 +694,7 @@ func TestRebalanceAppSessions_Error_ClosedSession(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID1,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 				},
 				QuorumSigs: []string{validSig1},
 			},
@@ -702,7 +702,7 @@ func TestRebalanceAppSessions_Error_ClosedSession(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID2,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 				},
 				QuorumSigs: []string{validSig2},
 			},
@@ -763,7 +763,7 @@ func TestRebalanceAppSessions_Error_InvalidVersion(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID1,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      10, // Wrong version (should be 6)
+					Version:      "10", // Wrong version (should be 6)
 				},
 				QuorumSigs: []string{validSig1},
 			},
@@ -771,7 +771,7 @@ func TestRebalanceAppSessions_Error_InvalidVersion(t *testing.T) {
 				AppStateUpdate: rpc.AppStateUpdateV1{
 					AppSessionID: sessionID2,
 					Intent:       app.AppStateUpdateIntentRebalance,
-					Version:      2,
+					Version:      "2",
 				},
 				QuorumSigs: []string{validSig2},
 			},

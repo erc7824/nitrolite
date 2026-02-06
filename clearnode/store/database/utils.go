@@ -3,6 +3,7 @@ package database
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/app"
@@ -112,25 +113,41 @@ func databaseStateToCore(dbState *State) (*core.State, error) {
 
 // coreStateToDB converts core.State to database.State
 func coreStateToDB(state *core.State) (*State, error) {
-	bytes, err := json.Marshal(state.Transitions)
+	transitions := make([]core.Transition, len(state.Transitions))
+	for i, t := range state.Transitions {
+		transitions[i] = core.Transition{
+			Type:      t.Type,
+			TxID:      strings.ToLower(t.TxID),
+			AccountID: strings.ToLower(t.TxID),
+			Amount:    t.Amount,
+		}
+	}
+
+	bytes, err := json.Marshal(transitions)
 	if err != nil {
 		return nil, fmt.Errorf("marshal checkpoint data: %w", err)
 	}
 
 	dbState := &State{
-		ID:              state.ID,
+		ID:              strings.ToLower(state.ID),
 		Transitions:     bytes,
 		Asset:           state.Asset,
-		UserWallet:      state.UserWallet,
+		UserWallet:      strings.ToLower(state.UserWallet),
 		Epoch:           state.Epoch,
 		Version:         state.Version,
-		HomeChannelID:   state.HomeChannelID,
-		EscrowChannelID: state.EscrowChannelID,
 		HomeUserBalance: state.HomeLedger.UserBalance,
 		HomeUserNetFlow: state.HomeLedger.UserNetFlow,
 		HomeNodeBalance: state.HomeLedger.NodeBalance,
 		HomeNodeNetFlow: state.HomeLedger.NodeNetFlow,
 		CreatedAt:       time.Now(),
+	}
+	if state.HomeChannelID != nil {
+		lowered := strings.ToLower(*state.HomeChannelID)
+		dbState.HomeChannelID = &lowered
+	}
+	if state.EscrowChannelID != nil {
+		lowered := strings.ToLower(*state.EscrowChannelID)
+		dbState.EscrowChannelID = &lowered
 	}
 
 	if state.EscrowLedger != nil {

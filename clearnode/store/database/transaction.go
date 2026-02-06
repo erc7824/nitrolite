@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -37,15 +38,21 @@ func (Transaction) TableName() string {
 // RecordTransaction creates a transaction record linking state transitions.
 func (s *DBStore) RecordTransaction(tx core.Transaction) error {
 	dbTx := Transaction{
-		ID:                 tx.ID,
-		Type:               tx.TxType,
-		AssetSymbol:        tx.Asset,
-		FromAccount:        tx.FromAccount,
-		ToAccount:          tx.ToAccount,
-		SenderNewStateID:   tx.SenderNewStateID,
-		ReceiverNewStateID: tx.ReceiverNewStateID,
-		Amount:             tx.Amount,
-		CreatedAt:          tx.CreatedAt,
+		ID:          strings.ToLower(tx.ID),
+		Type:        tx.TxType,
+		AssetSymbol: tx.Asset,
+		FromAccount: strings.ToLower(tx.FromAccount),
+		ToAccount:   strings.ToLower(tx.ToAccount),
+		Amount:      tx.Amount,
+		CreatedAt:   tx.CreatedAt,
+	}
+	if tx.SenderNewStateID != nil {
+		lowered := strings.ToLower(*tx.SenderNewStateID)
+		dbTx.SenderNewStateID = &lowered
+	}
+	if tx.ReceiverNewStateID != nil {
+		lowered := strings.ToLower(*tx.ReceiverNewStateID)
+		dbTx.ReceiverNewStateID = &lowered
 	}
 
 	if err := s.db.Create(&dbTx).Error; err != nil {
@@ -60,6 +67,7 @@ func (s *DBStore) GetUserTransactions(accountID string, asset *string, txType *c
 	query := s.db.Model(&Transaction{})
 
 	// Filter by wallet (from or to account)
+	accountID = strings.ToLower(accountID)
 	query = query.Where("from_account = ? OR to_account = ?", accountID, accountID)
 
 	// Filter by asset if provided

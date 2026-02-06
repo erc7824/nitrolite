@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -11,7 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func unmapAppDefinitionV1(def rpc.AppDefinitionV1) app.AppDefinitionV1 {
+func unmapAppDefinitionV1(def rpc.AppDefinitionV1) (app.AppDefinitionV1, error) {
 	participants := make([]app.AppParticipantV1, len(def.Participants))
 	for i, p := range def.Participants {
 		participants[i] = app.AppParticipantV1{
@@ -20,12 +21,17 @@ func unmapAppDefinitionV1(def rpc.AppDefinitionV1) app.AppDefinitionV1 {
 		}
 	}
 
+	nonce, err := strconv.ParseUint(def.Nonce, 10, 64)
+	if err != nil {
+		return app.AppDefinitionV1{}, fmt.Errorf("invalid nonce: %w", err)
+	}
+
 	return app.AppDefinitionV1{
 		Application:  def.Application,
 		Participants: participants,
 		Quorum:       def.Quorum,
-		Nonce:        def.Nonce,
-	}
+		Nonce:        nonce,
+	}, nil
 }
 
 // unmapStateV1 converts an RPC StateV1 to a core.State.
@@ -107,8 +113,13 @@ func unmapLedgerV1(ledger *rpc.LedgerV1) (*core.Ledger, error) {
 		return nil, fmt.Errorf("failed to parse node net-flow: %w", err)
 	}
 
+	blockchainID, err := strconv.ParseUint(ledger.BlockchainID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse blockchain ID: %w", err)
+	}
+
 	return &core.Ledger{
-		BlockchainID: ledger.BlockchainID,
+		BlockchainID: blockchainID,
 		TokenAddress: ledger.TokenAddress,
 		UserBalance:  userBalance,
 		UserNetFlow:  userNetFlow,
@@ -126,16 +137,21 @@ func unmapAppStateUpdateV1(upd *rpc.AppStateUpdateV1) (app.AppStateUpdateV1, err
 		}
 
 		allocations[i] = app.AppAllocationV1{
-			Participant: alloc.Participant,
+			Participant: strings.ToLower(alloc.Participant),
 			Asset:       alloc.Asset,
 			Amount:      decAmount,
 		}
 	}
 
+	version, err := strconv.ParseUint(upd.Version, 10, 64)
+	if err != nil {
+		return app.AppStateUpdateV1{}, fmt.Errorf("failed to parse version: %w", err)
+	}
+
 	return app.AppStateUpdateV1{
 		AppSessionID: upd.AppSessionID,
 		Intent:       upd.Intent,
-		Version:      upd.Version,
+		Version:      version,
 		Allocations:  allocations,
 		SessionData:  upd.SessionData,
 	}, nil
@@ -209,8 +225,8 @@ func mapAppSessionInfoV1(session app.AppSessionV1, allocations map[string]map[st
 		Participants: participants,
 		SessionData:  sessionData,
 		Quorum:       session.Quorum,
-		Version:      session.Version,
-		Nonce:        session.Nonce,
+		Version:      strconv.FormatUint(session.Version, 10),
+		Nonce:        strconv.FormatUint(session.Nonce, 10),
 		Allocations:  rpcAllocations,
 	}
 }
@@ -222,4 +238,51 @@ func mapPaginationMetadataV1(meta core.PaginationMetadata) rpc.PaginationMetadat
 		TotalCount: meta.TotalCount,
 		PageCount:  meta.PageCount,
 	}
+}
+
+// toRPCState converts a core.State to rpc.StateV1 for testing
+func toRPCState(state core.State) rpc.StateV1 {
+	transitions := make([]rpc.TransitionV1, len(state.Transitions))
+	for i, t := range state.Transitions {
+		transitions[i] = rpc.TransitionV1{
+			Type:      t.Type,
+			TxID:      t.TxID,
+			AccountID: t.AccountID,
+			Amount:    t.Amount.String(),
+		}
+	}
+
+	rpcState := rpc.StateV1{
+		ID:              state.ID,
+		Transitions:     transitions,
+		Asset:           state.Asset,
+		UserWallet:      state.UserWallet,
+		Epoch:           strconv.FormatUint(state.Epoch, 10),
+		Version:         strconv.FormatUint(state.Version, 10),
+		HomeChannelID:   state.HomeChannelID,
+		EscrowChannelID: state.EscrowChannelID,
+		HomeLedger: rpc.LedgerV1{
+			TokenAddress: state.HomeLedger.TokenAddress,
+			BlockchainID: strconv.FormatUint(state.HomeLedger.BlockchainID, 10),
+			UserBalance:  state.HomeLedger.UserBalance.String(),
+			UserNetFlow:  state.HomeLedger.UserNetFlow.String(),
+			NodeBalance:  state.HomeLedger.NodeBalance.String(),
+			NodeNetFlow:  state.HomeLedger.NodeNetFlow.String(),
+		},
+		UserSig: state.UserSig,
+		NodeSig: state.NodeSig,
+	}
+
+	if state.EscrowLedger != nil {
+		rpcState.EscrowLedger = &rpc.LedgerV1{
+			TokenAddress: state.EscrowLedger.TokenAddress,
+			BlockchainID: strconv.FormatUint(state.EscrowLedger.BlockchainID, 10),
+			UserBalance:  state.EscrowLedger.UserBalance.String(),
+			UserNetFlow:  state.EscrowLedger.UserNetFlow.String(),
+			NodeBalance:  state.EscrowLedger.NodeBalance.String(),
+			NodeNetFlow:  state.EscrowLedger.NodeNetFlow.String(),
+		}
+	}
+
+	return rpcState
 }

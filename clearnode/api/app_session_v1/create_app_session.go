@@ -2,6 +2,7 @@ package app_session_v1
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/app"
@@ -22,7 +23,11 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		return
 	}
 
-	appDef := unmapAppDefinitionV1(reqPayload.Definition)
+	appDef, err := unmapAppDefinitionV1(reqPayload.Definition)
+	if err != nil {
+		c.Fail(err, "invalid app definition")
+		return
+	}
 
 	logger.Debug("processing app session creation request",
 		"application", reqPayload.Definition.Application,
@@ -31,7 +36,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		"nonce", reqPayload.Definition.Nonce)
 
 	// Validate nonce
-	if reqPayload.Definition.Nonce == 0 {
+	if reqPayload.Definition.Nonce == "" || reqPayload.Definition.Nonce == "0" {
 		c.Fail(nil, "nonce is zero or not provided")
 		return
 	}
@@ -46,13 +51,15 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 	var totalWeights uint8
 	participantWeights := make(map[string]uint8)
 	for _, participant := range reqPayload.Definition.Participants {
+		participantWallet := strings.ToLower(participant.WalletAddress)
+
 		// Check for duplicate participant addresses
-		if _, exists := participantWeights[participant.WalletAddress]; exists {
+		if _, exists := participantWeights[participantWallet]; exists {
 			c.Fail(rpc.Errorf("duplicate participant address: %s", participant.WalletAddress), "")
 			return
 		}
 		totalWeights += participant.SignatureWeight
-		participantWeights[participant.WalletAddress] = participant.SignatureWeight
+		participantWeights[participantWallet] = participant.SignatureWeight
 	}
 
 	if reqPayload.Definition.Quorum > totalWeights {

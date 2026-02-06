@@ -445,10 +445,8 @@ func TestGetHomeChannelID(t *testing.T) {
 		v2Hash := common.HexToHash(channelIDV2)
 		v255Hash := common.HexToHash(channelIDV255)
 
-		for i := 1; i < 32; i++ {
-			assert.Equal(t, v1Hash[i], v2Hash[i], "Byte %d should be the same for V1 and V2", i)
-			assert.Equal(t, v1Hash[i], v255Hash[i], "Byte %d should be the same for V1 and V255", i)
-		}
+		assert.Equal(t, v1Hash[1:], v2Hash[1:], "Bytes 1-31 should be the same for V1 and V2")
+		assert.Equal(t, v1Hash[1:], v255Hash[1:], "Bytes 1-31 should be the same for V1 and V255")
 	})
 
 	t.Run("different_assets_produce_different_ids", func(t *testing.T) {

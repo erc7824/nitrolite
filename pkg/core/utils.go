@@ -89,7 +89,7 @@ func DecimalToBigInt(amount decimal.Decimal, decimals uint8) (*big.Int, error) {
 // based on its definition and version. This matches the Solidity getChannelId function which computes
 // keccak256(abi.encode(ChannelDefinition)) and then sets the first byte to the version.
 // The metadata is derived from the asset: first 8 bytes of keccak256(asset) padded to 32 bytes.
-func getHomeChannelID(node, user, asset string, nonce uint64, challengeDuration uint32, version uint8) (string, error) {
+func getHomeChannelID(node, user, asset string, nonce uint64, challengeDuration uint32, channelHubVersion uint8) (string, error) {
 	// Generate metadata from asset
 	userAddr := common.HexToAddress(user)
 	nodeAddr := common.HexToAddress(node)
@@ -137,10 +137,8 @@ func getHomeChannelID(node, user, asset string, nonce uint64, challengeDuration 
 	baseId := crypto.Keccak256Hash(packed)
 
 	// Set the first byte (most significant byte) to the version
-	// This matches the Solidity implementation:
-	// versionedId := or(and(baseId, 0x00ff...), shl(248, version))
 	versionedId := baseId
-	versionedId[0] = version
+	versionedId[0] = channelHubVersion
 
 	return versionedId.Hex(), nil
 }

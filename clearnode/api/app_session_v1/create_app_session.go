@@ -51,13 +51,15 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 	var totalWeights uint8
 	participantWeights := make(map[string]uint8)
 	for _, participant := range reqPayload.Definition.Participants {
+		participantWallet := strings.ToLower(participant.WalletAddress)
+
 		// Check for duplicate participant addresses
-		if _, exists := participantWeights[participant.WalletAddress]; exists {
+		if _, exists := participantWeights[participantWallet]; exists {
 			c.Fail(rpc.Errorf("duplicate participant address: %s", participant.WalletAddress), "")
 			return
 		}
 		totalWeights += participant.SignatureWeight
-		participantWeights[strings.ToLower(participant.WalletAddress)] = participant.SignatureWeight
+		participantWeights[participantWallet] = participant.SignatureWeight
 	}
 
 	if reqPayload.Definition.Quorum > totalWeights {

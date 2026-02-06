@@ -1,6 +1,8 @@
 package node_v1
 
 import (
+	"strconv"
+
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
@@ -12,7 +14,18 @@ func (h *Handler) GetAssets(c *rpc.Context) {
 		return
 	}
 
-	assets, err := h.memoryStore.GetAssets(req.BlockchainID)
+	// Convert string BlockchainID to uint64 if provided
+	var blockchainIDPtr *uint64
+	if req.BlockchainID != nil {
+		blockchainID, err := strconv.ParseUint(*req.BlockchainID, 10, 64)
+		if err != nil {
+			c.Fail(err, "invalid blockchain_id")
+			return
+		}
+		blockchainIDPtr = &blockchainID
+	}
+
+	assets, err := h.memoryStore.GetAssets(blockchainIDPtr)
 	if err != nil {
 		c.Fail(err, "failed to retrieve assets")
 		return

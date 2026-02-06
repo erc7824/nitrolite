@@ -1,6 +1,8 @@
 package node_v1
 
 import (
+	"strconv"
+
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
@@ -8,7 +10,7 @@ import (
 func mapBlockchainV1(blockchain core.Blockchain) rpc.BlockchainInfoV1 {
 	return rpc.BlockchainInfoV1{
 		Name:            blockchain.Name,
-		BlockchainID:    blockchain.ID,
+		BlockchainID:    strconv.FormatUint(blockchain.ID, 10),
 		ContractAddress: blockchain.ContractAddress,
 	}
 }
@@ -32,7 +34,7 @@ func mapTokenV1(token core.Token) rpc.TokenV1 {
 		Name:         token.Name,
 		Symbol:       token.Symbol,
 		Address:      token.Address,
-		BlockchainID: token.BlockchainID,
+		BlockchainID: strconv.FormatUint(token.BlockchainID, 10),
 		Decimals:     token.Decimals,
 	}
 }

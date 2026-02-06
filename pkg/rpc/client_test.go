@@ -16,7 +16,7 @@ var (
 	testCtxV1      = context.Background()
 	testWalletV1   = "0x1234"
 	testWallet2V1  = "0x5678"
-	testChainIDV1  = uint64(1)
+	testChainIDV1  = "1"
 	testTokenV1    = "0xUSDC"
 	testSymbolV1   = "USDC"
 	testAssetV1    = "usdc"
@@ -94,7 +94,7 @@ func TestClientV1_NodeV1GetAssets(t *testing.T) {
 			Symbol: testSymbolV1,
 			Tokens: []rpc.TokenV1{
 				{Name: "USDC on Ethereum", Symbol: testSymbolV1, Address: testTokenV1, BlockchainID: testChainIDV1, Decimals: 6},
-				{Name: "USDC on Polygon", Symbol: testSymbolV1, Address: "0xUSDC2", BlockchainID: 137, Decimals: 6},
+				{Name: "USDC on Polygon", Symbol: testSymbolV1, Address: "0xUSDC2", BlockchainID: "137", Decimals: 6},
 			},
 		},
 		{
@@ -108,7 +108,7 @@ func TestClientV1_NodeV1GetAssets(t *testing.T) {
 			Name:   "DAI",
 			Symbol: "DAI",
 			Tokens: []rpc.TokenV1{
-				{Name: "DAI on Polygon", Symbol: "DAI", Address: "0xDAI", BlockchainID: 137, Decimals: 18},
+				{Name: "DAI on Polygon", Symbol: "DAI", Address: "0xDAI", BlockchainID: "137", Decimals: 18},
 			},
 		},
 	}
@@ -139,7 +139,7 @@ func TestClientV1_ChannelsV1GetHomeChannel(t *testing.T) {
 			BlockchainID:      testChainIDV1,
 			TokenAddress:      testTokenV1,
 			ChallengeDuration: 3600,
-			Nonce:             1,
+			Nonce:             "1",
 			Status:            "open",
 			StateVersion:      "1",
 		},
@@ -287,7 +287,7 @@ func TestClientV1_ChannelsV1RequestCreation(t *testing.T) {
 			Asset:      testAssetV1,
 		},
 		ChannelDefinition: rpc.ChannelDefinitionV1{
-			Nonce:     1,
+			Nonce:     "1",
 			Challenge: 3600,
 		},
 	})
@@ -333,7 +333,7 @@ func TestClientV1_AppSessionsV1GetAppDefinition(t *testing.T) {
 				{WalletAddress: testWallet2V1, SignatureWeight: 1},
 			},
 			Quorum: 2,
-			Nonce:  1,
+			Nonce:  "1",
 		},
 	}
 
@@ -361,8 +361,8 @@ func TestClientV1_AppSessionsV1GetAppSessions(t *testing.T) {
 					{WalletAddress: testWalletV1, SignatureWeight: 1},
 				},
 				Quorum:  1,
-				Version: 1,
-				Nonce:   1,
+				Version: "1",
+				Nonce:   "1",
 			},
 		},
 		Metadata: rpc.PaginationMetadataV1{
@@ -401,7 +401,7 @@ func TestClientV1_AppSessionsV1CreateAppSession(t *testing.T) {
 				{WalletAddress: testWalletV1, SignatureWeight: 1},
 			},
 			Quorum: 1,
-			Nonce:  1,
+			Nonce:  "1",
 		},
 	})
 	require.NoError(t, err)
@@ -448,7 +448,7 @@ func TestClientV1_AppSessionsV1SubmitDepositState(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: testAppSession,
 			Intent:       app.AppStateUpdateIntentDeposit,
-			Version:      2,
+			Version:      "2",
 		},
 		UserState: rpc.StateV1{ID: "state123"},
 	})
@@ -469,7 +469,7 @@ func TestClientV1_AppSessionsV1SubmitAppState(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: testAppSession,
 			Intent:       app.AppStateUpdateIntentOperate,
-			Version:      3,
+			Version:      "3",
 		},
 		QuorumSigs: []string{"0xsig1", "0xsig2"},
 	})

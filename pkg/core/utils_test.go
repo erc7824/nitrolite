@@ -565,7 +565,10 @@ func TestGetStateTransitionsHash(t *testing.T) {
 
 	t.Run("print_hash_for_single_transition", func(t *testing.T) {
 		transitions := []Transition{
-			*NewTransition(TransitionTypeHomeDeposit, "tx123", "account456", decimal.NewFromInt(1000)),
+			*NewTransition(TransitionTypeHomeDeposit,
+				"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef", // 32-byte txId
+				"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0",                         // 20-byte address
+				decimal.NewFromInt(1000)),
 		}
 		hash, err := GetStateTransitionsHash(transitions)
 		assert.NoError(t, err)
@@ -577,9 +580,18 @@ func TestGetStateTransitionsHash(t *testing.T) {
 
 	t.Run("print_hash_for_multiple_transitions", func(t *testing.T) {
 		transitions := []Transition{
-			*NewTransition(TransitionTypeHomeDeposit, "tx1", "account1", decimal.NewFromInt(100)),
-			*NewTransition(TransitionTypeTransferSend, "tx2", "account2", decimal.NewFromInt(50)),
-			*NewTransition(TransitionTypeCommit, "tx3", "account3", decimal.NewFromInt(25)),
+			*NewTransition(TransitionTypeHomeDeposit,
+				"0x1111111111111111111111111111111111111111111111111111111111111111", // 32-byte txId
+				"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0",                         // 20-byte address
+				decimal.NewFromInt(100)),
+			*NewTransition(TransitionTypeTransferSend,
+				"0x2222222222222222222222222222222222222222222222222222222222222222", // 32-byte txId
+				"0x8626f6940e2eb28930efb4cef49b2d1f2c9c1199",                         // 20-byte address
+				decimal.NewFromInt(50)),
+			*NewTransition(TransitionTypeCommit,
+				"0x3333333333333333333333333333333333333333333333333333333333333333", // 32-byte txId
+				"0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", // 32-byte hash
+				decimal.NewFromInt(25)),
 		}
 		hash, err := GetStateTransitionsHash(transitions)
 		assert.NoError(t, err)
@@ -593,8 +605,14 @@ func TestGetStateTransitionsHash(t *testing.T) {
 
 	t.Run("print_hash_with_negative_amounts", func(t *testing.T) {
 		transitions := []Transition{
-			*NewTransition(TransitionTypeHomeWithdrawal, "tx1", "account1", decimal.NewFromInt(-100)),
-			*NewTransition(TransitionTypeEscrowWithdraw, "tx2", "account2", decimal.NewFromInt(-50)),
+			*NewTransition(TransitionTypeHomeWithdrawal,
+				"0x4444444444444444444444444444444444444444444444444444444444444444", // 32-byte txId
+				"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0",                         // 20-byte address
+				decimal.NewFromInt(-100)),
+			*NewTransition(TransitionTypeEscrowWithdraw,
+				"0x5555555555555555555555555555555555555555555555555555555555555555", // 32-byte txId
+				"0x8626f6940e2eb28930efb4cef49b2d1f2c9c1199",                         // 20-byte address
+				decimal.NewFromInt(-50)),
 		}
 		hash, err := GetStateTransitionsHash(transitions)
 		assert.NoError(t, err)

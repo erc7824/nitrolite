@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +31,9 @@ func (AppLedgerEntryV1) TableName() string {
 
 // RecordLedgerEntry logs a movement of funds within the internal ledger.
 func (s *DBStore) RecordLedgerEntry(userWallet, accountID, asset string, amount decimal.Decimal) error {
+	userWallet = strings.ToLower(userWallet)
+	accountID = strings.ToLower(accountID)
+
 	entry := &AppLedgerEntryV1{
 		ID:          uuid.New(),
 		AccountID:   accountID,
@@ -57,6 +61,8 @@ func (s *DBStore) RecordLedgerEntry(userWallet, accountID, asset string, amount 
 
 // GetAppSessionBalances retrieves the total balances associated with a session.
 func (s *DBStore) GetAppSessionBalances(appSessionID string) (map[string]decimal.Decimal, error) {
+	appSessionID = strings.ToLower(appSessionID)
+
 	type row struct {
 		Asset   string          `gorm:"column:asset_symbol"`
 		Balance decimal.Decimal `gorm:"column:balance"`
@@ -82,6 +88,8 @@ func (s *DBStore) GetAppSessionBalances(appSessionID string) (map[string]decimal
 // GetParticipantAllocations retrieves specific asset allocations per participant.
 // This will only return participants who have non-zero balances.
 func (s *DBStore) GetParticipantAllocations(appSessionID string) (map[string]map[string]decimal.Decimal, error) {
+	appSessionID = strings.ToLower(appSessionID)
+
 	type AllocationRow struct {
 		Wallet      string          `gorm:"column:wallet"`
 		AssetSymbol string          `gorm:"column:asset_symbol"`

@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/app"
@@ -43,14 +44,14 @@ func (s *DBStore) CreateAppSession(session app.AppSessionV1) error {
 	participants := make([]AppParticipantV1, len(session.Participants))
 	for i, p := range session.Participants {
 		participants[i] = AppParticipantV1{
-			AppSessionID:    session.SessionID,
-			WalletAddress:   p.WalletAddress,
+			AppSessionID:    strings.ToLower(session.SessionID),
+			WalletAddress:   strings.ToLower(p.WalletAddress),
 			SignatureWeight: p.SignatureWeight,
 		}
 	}
 
 	dbSession := AppSessionV1{
-		ID:           session.SessionID,
+		ID:           strings.ToLower(session.SessionID),
 		Application:  session.Application,
 		Nonce:        session.Nonce,
 		Participants: participants,
@@ -71,6 +72,8 @@ func (s *DBStore) CreateAppSession(session app.AppSessionV1) error {
 
 // GetAppSession retrieves a specific session by ID.
 func (s *DBStore) GetAppSession(sessionID string) (*app.AppSessionV1, error) {
+	sessionID = strings.ToLower(sessionID)
+
 	var dbSession AppSessionV1
 	err := s.db.Where("id = ?", sessionID).
 		Preload("Participants").
@@ -91,13 +94,13 @@ func (s *DBStore) GetAppSessions(appSessionID *string, participant *string, stat
 	query := s.db.Model(&AppSessionV1{})
 
 	if appSessionID != nil && *appSessionID != "" {
-		query = query.Where("id = ?", *appSessionID)
+		query = query.Where("id = ?", strings.ToLower(*appSessionID))
 	}
 
 	if participant != nil && *participant != "" {
 		// Join with participants table to filter by participant
 		query = query.Joins("JOIN app_session_participants_v1 ON app_sessions_v1.id = app_session_participants_v1.app_session_id").
-			Where("app_session_participants_v1.wallet_address = ?", *participant)
+			Where("app_session_participants_v1.wallet_address = ?", strings.ToLower(*participant))
 	}
 
 	if status != app.AppSessionStatusVoid {
@@ -138,7 +141,7 @@ func (s *DBStore) UpdateAppSession(session app.AppSessionV1) error {
 			"updated_at":   time.Now(),
 		}
 
-		if err := tx.Model(&AppSessionV1{}).Where("id = ?", session.SessionID).Updates(updates).Error; err != nil {
+		if err := tx.Model(&AppSessionV1{}).Where("id = ?", strings.ToLower(session.SessionID)).Updates(updates).Error; err != nil {
 			return fmt.Errorf("failed to update app session: %w", err)
 		}
 

@@ -532,7 +532,12 @@ describe('getStateTransitionsHash', () => {
 
   test('hash_for_single_transition', () => {
     const transitions = [
-      newTransition(TransitionType.HomeDeposit, 'tx123', 'account456', new Decimal(1000)),
+      newTransition(
+        TransitionType.HomeDeposit,
+        '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef', // 32-byte txId
+        '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0', // 20-byte address
+        new Decimal(1000)
+      ),
     ];
     const hash = getStateTransitionsHash(transitions);
     expect(hash).toBeDefined();
@@ -540,9 +545,24 @@ describe('getStateTransitionsHash', () => {
 
   test('hash_for_multiple_transitions', () => {
     const transitions = [
-      newTransition(TransitionType.HomeDeposit, 'tx1', 'account1', new Decimal(100)),
-      newTransition(TransitionType.TransferSend, 'tx2', 'account2', new Decimal(50)),
-      newTransition(TransitionType.Commit, 'tx3', 'account3', new Decimal(25)),
+      newTransition(
+        TransitionType.HomeDeposit,
+        '0x1111111111111111111111111111111111111111111111111111111111111111', // 32-byte txId
+        '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0', // 20-byte address
+        new Decimal(100)
+      ),
+      newTransition(
+        TransitionType.TransferSend,
+        '0x2222222222222222222222222222222222222222222222222222222222222222', // 32-byte txId
+        '0x8626f6940e2eb28930efb4cef49b2d1f2c9c1199', // 20-byte address
+        new Decimal(50)
+      ),
+      newTransition(
+        TransitionType.Commit,
+        '0x3333333333333333333333333333333333333333333333333333333333333333', // 32-byte txId
+        '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890', // 32-byte hash
+        new Decimal(25)
+      ),
     ];
     const hash = getStateTransitionsHash(transitions);
     expect(hash).toBeDefined();
@@ -550,8 +570,18 @@ describe('getStateTransitionsHash', () => {
 
   test('hash_with_negative_amounts', () => {
     const transitions = [
-      newTransition(TransitionType.HomeWithdrawal, 'tx1', 'account1', new Decimal(-100)),
-      newTransition(TransitionType.EscrowWithdraw, 'tx2', 'account2', new Decimal(-50)),
+      newTransition(
+        TransitionType.HomeWithdrawal,
+        '0x4444444444444444444444444444444444444444444444444444444444444444', // 32-byte txId
+        '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0', // 20-byte address
+        new Decimal(-100)
+      ),
+      newTransition(
+        TransitionType.EscrowWithdraw,
+        '0x5555555555555555555555555555555555555555555555555555555555555555', // 32-byte txId
+        '0x8626f6940e2eb28930efb4cef49b2d1f2c9c1199', // 20-byte address
+        new Decimal(-50)
+      ),
     ];
     const hash = getStateTransitionsHash(transitions);
     expect(hash).toBeDefined();

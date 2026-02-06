@@ -56,7 +56,7 @@ func TestCreateAppSession_Success(t *testing.T) {
 				},
 			},
 			Quorum: 1, // Only need 1 signature
-			Nonce:  12345,
+			Nonce:  "12345",
 		},
 		QuorumSigs: []string{
 			"0x1234567890abcdef", // Mock signature from participant1
@@ -155,7 +155,7 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 				},
 			},
 			Quorum: 3, // Need total weight of 3
-			Nonce:  12345,
+			Nonce:  "12345",
 		},
 		QuorumSigs: []string{
 			"0x1234", // participant1 (weight 2)
@@ -234,7 +234,7 @@ func TestCreateAppSession_ZeroNonce(t *testing.T) {
 				},
 			},
 			Quorum: 1,
-			Nonce:  0, // Zero nonce - invalid
+			Nonce:  "0", // Zero nonce - invalid
 		},
 		QuorumSigs: []string{"0x1234567890abcdef"},
 	}
@@ -307,7 +307,7 @@ func TestCreateAppSession_QuorumExceedsTotalWeights(t *testing.T) {
 				},
 			},
 			Quorum: 5, // Total weights = 2, but quorum = 5
-			Nonce:  12345,
+			Nonce:  "12345",
 		},
 		QuorumSigs: []string{"0x1234567890abcdef"},
 	}
@@ -376,7 +376,7 @@ func TestCreateAppSession_NoSignatures(t *testing.T) {
 				},
 			},
 			Quorum: 1,
-			Nonce:  12345,
+			Nonce:  "12345",
 		},
 		QuorumSigs: []string{}, // Empty signatures
 	}
@@ -445,7 +445,7 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 				},
 			},
 			Quorum: 1,
-			Nonce:  12345,
+			Nonce:  "12345",
 		},
 		QuorumSigs: []string{"0x1234567890abcdef"},
 	}
@@ -526,7 +526,7 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 				},
 			},
 			Quorum: 3, // Need all 3
-			Nonce:  12345,
+			Nonce:  "12345",
 		},
 		QuorumSigs: []string{
 			"0x1234", // Only one signature, need 3 total weight
@@ -604,7 +604,7 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 				},
 			},
 			Quorum: 2, // Need both participants
-			Nonce:  12345,
+			Nonce:  "12345",
 		},
 		QuorumSigs: []string{
 			"0x1234", // participant1
@@ -680,7 +680,7 @@ func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 				},
 			},
 			Quorum: 1,
-			Nonce:  12345,
+			Nonce:  "12345",
 		},
 		QuorumSigs: []string{"not-valid-hex"}, // Invalid hex string
 	}
@@ -748,7 +748,7 @@ func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 				},
 			},
 			Quorum: 1,
-			Nonce:  12345,
+			Nonce:  "12345",
 		},
 		QuorumSigs: []string{"0x1234567890abcdef"},
 	}

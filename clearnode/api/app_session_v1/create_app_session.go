@@ -22,7 +22,11 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		return
 	}
 
-	appDef := unmapAppDefinitionV1(reqPayload.Definition)
+	appDef, err := unmapAppDefinitionV1(reqPayload.Definition)
+	if err != nil {
+		c.Fail(err, "invalid app definition")
+		return
+	}
 
 	logger.Debug("processing app session creation request",
 		"application", reqPayload.Definition.Application,
@@ -31,7 +35,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		"nonce", reqPayload.Definition.Nonce)
 
 	// Validate nonce
-	if reqPayload.Definition.Nonce == 0 {
+	if reqPayload.Definition.Nonce == "" || reqPayload.Definition.Nonce == "0" {
 		c.Fail(nil, "nonce is zero or not provided")
 		return
 	}

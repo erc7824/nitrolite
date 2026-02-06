@@ -218,8 +218,8 @@ export function getStateTransitionsHash(transitions: Transition[]): string {
   // Convert transitions to contract format
   const contractTransitions = transitions.map((t) => ({
     type: t.type,
-    txId: t.txId,
-    accountId: t.accountId,
+    txId: hexToBytes32(t.txId),
+    accountId: parseAccountIdToBytes32(t.accountId),
     amount: t.amount.toString(),
   }));
 
@@ -229,8 +229,8 @@ export function getStateTransitionsHash(transitions: Transition[]): string {
         type: 'tuple[]',
         components: [
           { name: 'type', type: 'uint8' },
-          { name: 'txId', type: 'string' },
-          { name: 'accountId', type: 'string' },
+          { name: 'txId', type: 'bytes32' },
+          { name: 'accountId', type: 'bytes32' },
           { name: 'amount', type: 'string' },
         ],
       },
@@ -293,4 +293,49 @@ export function generateChannelMetadata(asset: string): `0x${string}` {
   const metadata = pad(first8Bytes, { dir: 'right', size: 32 });
 
   return metadata;
+}
+
+// ============================================================================
+// Helper Functions for Bytes32 Conversion
+// ============================================================================
+
+/**
+ * hexToBytes32 converts a hex string (with or without 0x prefix) to bytes32
+ * @param hexStr - Hex string representing a 32-byte hash
+ * @returns Normalized bytes32 hex string
+ */
+function hexToBytes32(hexStr: string): `0x${string}` {
+  // Ensure 0x prefix
+  const normalized = hexStr.startsWith('0x') ? hexStr : `0x${hexStr}`;
+
+  // Pad to 32 bytes (64 hex chars + 0x prefix = 66 chars total)
+  return pad(normalized as `0x${string}`, { size: 32 });
+}
+
+/**
+ * parseAccountIdToBytes32 converts an account ID (address or hash) to bytes32
+ * - If the input is a 20-byte address (40 hex chars), it's left-padded with zeros
+ * - If the input is a 32-byte hash (64 hex chars), it's used as-is
+ * In Ethereum, when an address is stored in bytes32, it occupies the rightmost 20 bytes,
+ * with the leftmost 12 bytes being zeros.
+ * @param accountId - Account ID (address or hash)
+ * @returns Normalized bytes32 hex string
+ */
+function parseAccountIdToBytes32(accountId: string): `0x${string}` {
+  // Ensure 0x prefix
+  const normalized = accountId.startsWith('0x') ? accountId : `0x${accountId}`;
+
+  // Check length to determine if it's an address (40 hex chars) or hash (64 hex chars)
+  const hexLength = normalized.length - 2; // Remove 0x prefix
+
+  if (hexLength === 40) {
+    // It's an address (20 bytes) - left-pad with zeros to 32 bytes
+    return pad(normalized as Address, { size: 32 });
+  } else if (hexLength === 64) {
+    // It's already a 32-byte hash
+    return normalized as `0x${string}`;
+  } else {
+    // Try to pad it to 32 bytes anyway
+    return pad(normalized as `0x${string}`, { size: 32 });
+  }
 }

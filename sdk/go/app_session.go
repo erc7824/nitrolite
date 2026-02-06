@@ -90,7 +90,11 @@ func (c *Client) GetAppDefinition(ctx context.Context, appSessionID string) (*ap
 	if err != nil {
 		return nil, fmt.Errorf("failed to get app definition: %w", err)
 	}
-	def := transformAppDefinition(resp.Definition)
+
+	def, err := transformAppDefinition(resp.Definition)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform app definition: %w", err)
+	}
 	return &def, nil
 }
 

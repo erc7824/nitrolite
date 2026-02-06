@@ -129,7 +129,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	appStateUpdate := rpc.AppStateUpdateV1{
 		AppSessionID: appSessionID,
 		Intent:       app.AppStateUpdateIntentDeposit,
-		Version:      2, // Next version
+		Version:      "2", // Next version
 		Allocations: []rpc.AppAllocationV1{
 			{
 				Participant: participant1,
@@ -308,7 +308,7 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 	appStateUpdate := rpc.AppStateUpdateV1{
 		AppSessionID: appSessionID,
 		Intent:       app.AppStateUpdateIntentDeposit,
-		Version:      2,
+		Version:      "2",
 		Allocations: []rpc.AppAllocationV1{
 			{
 				Participant: participant1,
@@ -454,7 +454,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	appStateUpdate := rpc.AppStateUpdateV1{
 		AppSessionID: appSessionID,
 		Intent:       app.AppStateUpdateIntentDeposit,
-		Version:      2,
+		Version:      "2",
 		Allocations: []rpc.AppAllocationV1{
 			{
 				Participant: participant1,

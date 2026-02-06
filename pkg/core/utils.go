@@ -171,14 +171,14 @@ func GetStateTransitionsHash(transitions []Transition) ([32]byte, error) {
 	hash := [32]byte{}
 	type contractTransition struct {
 		Type      uint8
-		TxId      string
-		AccountId string
+		TxId      [32]byte
+		AccountId [32]byte
 		Amount    string
 	}
 	transitionType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{Name: "type", Type: "uint8"},
-		{Name: "txId", Type: "string"},
-		{Name: "accountId", Type: "string"},
+		{Name: "txId", Type: "bytes32"},
+		{Name: "accountId", Type: "bytes32"},
 		{Name: "amount", Type: "string"},
 	})
 	if err != nil {
@@ -192,10 +192,20 @@ func GetStateTransitionsHash(transitions []Transition) ([32]byte, error) {
 	contractsTransitions := make([]contractTransition, len(transitions))
 
 	for i, t := range transitions {
+		txIdBytes, err := hexToBytes32(t.TxID)
+		if err != nil {
+			return hash, fmt.Errorf("invalid txId at transition %d: %w", i, err)
+		}
+
+		accountIdBytes, err := parseAccountIdToBytes32(t.AccountID)
+		if err != nil {
+			return hash, fmt.Errorf("invalid accountId at transition %d: %w", i, err)
+		}
+
 		contractsTransitions[i] = contractTransition{
 			Type:      uint8(t.Type),
-			TxId:      t.TxID,
-			AccountId: t.AccountID,
+			TxId:      txIdBytes,
+			AccountId: accountIdBytes,
 			Amount:    t.Amount.String(),
 		}
 	}
@@ -243,4 +253,38 @@ func GenerateChannelMetadata(asset string) [32]byte {
 	var metadata [32]byte
 	copy(metadata[:8], assetHash[:8])
 	return metadata
+}
+
+// hexToBytes32 converts a hex string (with or without 0x prefix) to [32]byte
+func hexToBytes32(hexStr string) ([32]byte, error) {
+	var result [32]byte
+
+	// Use common.HexToHash which handles 0x prefix and validates length
+	hash := common.HexToHash(hexStr)
+	copy(result[:], hash[:])
+
+	return result, nil
+}
+
+// parseAccountIdToBytes32 converts an account ID (address or hash) to [32]byte
+// - If the input is a 20-byte address (40 hex chars), it's left-padded with zeros
+// - If the input is a 32-byte hash (64 hex chars), it's used as-is
+// In Ethereum, when an address is stored in bytes32, it occupies the rightmost 20 bytes,
+// with the leftmost 12 bytes being zeros.
+func parseAccountIdToBytes32(accountId string) ([32]byte, error) {
+	var result [32]byte
+
+	// Check if it's an address (20 bytes) or hash (32 bytes)
+	if common.IsHexAddress(accountId) {
+		// It's an address - convert to address type and then to bytes32
+		addr := common.HexToAddress(accountId)
+		// Left-pad with zeros: [12 zeros][20 address bytes]
+		copy(result[12:], addr[:])
+	} else {
+		// Try to parse as a 32-byte hash
+		hash := common.HexToHash(accountId)
+		copy(result[:], hash[:])
+	}
+
+	return result, nil
 }

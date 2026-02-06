@@ -8,7 +8,6 @@ import (
 
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
-	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
@@ -151,51 +150,4 @@ func NewMockSigner() sign.Signer {
 	key, _ := crypto.GenerateKey()
 	signer, _ := sign.NewEthereumMsgSigner(hexutil.Encode(crypto.FromECDSA(key)))
 	return signer
-}
-
-// toRPCState converts a core.State to rpc.StateV1 for testing
-func toRPCState(state core.State) rpc.StateV1 {
-	transitions := make([]rpc.TransitionV1, len(state.Transitions))
-	for i, t := range state.Transitions {
-		transitions[i] = rpc.TransitionV1{
-			Type:      t.Type,
-			TxID:      t.TxID,
-			AccountID: t.AccountID,
-			Amount:    t.Amount.String(),
-		}
-	}
-
-	rpcState := rpc.StateV1{
-		ID:              state.ID,
-		Transitions:     transitions,
-		Asset:           state.Asset,
-		UserWallet:      state.UserWallet,
-		Epoch:           decimal.NewFromInt(int64(state.Epoch)).String(),
-		Version:         decimal.NewFromInt(int64(state.Version)).String(),
-		HomeChannelID:   state.HomeChannelID,
-		EscrowChannelID: state.EscrowChannelID,
-		HomeLedger: rpc.LedgerV1{
-			TokenAddress: state.HomeLedger.TokenAddress,
-			BlockchainID: state.HomeLedger.BlockchainID,
-			UserBalance:  state.HomeLedger.UserBalance.String(),
-			UserNetFlow:  state.HomeLedger.UserNetFlow.String(),
-			NodeBalance:  state.HomeLedger.NodeBalance.String(),
-			NodeNetFlow:  state.HomeLedger.NodeNetFlow.String(),
-		},
-		UserSig: state.UserSig,
-		NodeSig: state.NodeSig,
-	}
-
-	if state.EscrowLedger != nil {
-		rpcState.EscrowLedger = &rpc.LedgerV1{
-			TokenAddress: state.EscrowLedger.TokenAddress,
-			BlockchainID: state.EscrowLedger.BlockchainID,
-			UserBalance:  state.EscrowLedger.UserBalance.String(),
-			UserNetFlow:  state.EscrowLedger.UserNetFlow.String(),
-			NodeBalance:  state.EscrowLedger.NodeBalance.String(),
-			NodeNetFlow:  state.EscrowLedger.NodeNetFlow.String(),
-		}
-	}
-
-	return rpcState
 }

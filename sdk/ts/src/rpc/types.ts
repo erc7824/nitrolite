@@ -23,7 +23,7 @@ export interface ChannelV1 {
   /** Type of the channel (home, escrow) */
   type: string;
   /** Unique identifier for the blockchain */
-  blockchain_id: number; // uint64
+  blockchain_id: string; // uint64 as string
   /** Address of the token used in the channel */
   token_address: Address;
   /** Challenge period for the channel in seconds */
@@ -31,7 +31,7 @@ export interface ChannelV1 {
   /** Timestamp when challenge expires */
   challenge_expires_at?: string;
   /** Nonce for the channel */
-  nonce: number; // uint64
+  nonce: string; // uint64 as string
   /** Current status of the channel (void, open, challenged, closed) */
   status: string;
   /** On-chain state version of the channel */
@@ -73,7 +73,7 @@ export interface LedgerV1 {
   /** Address of the token used in this channel */
   token_address: Address;
   /** Unique identifier for the blockchain */
-  blockchain_id: number; // uint64
+  blockchain_id: string; // uint64 as string
   /** User balance in the channel */
   user_balance: string;
   /** User net flow in the channel */
@@ -148,7 +148,7 @@ export interface TokenV1 {
   /** Token contract address */
   address: Address;
   /** Blockchain network ID */
-  blockchain_id: number; // uint64
+  blockchain_id: string; // uint64 as string
   /** Number of decimal places */
   decimals: number; // uint8
 }
@@ -160,7 +160,7 @@ export interface BlockchainInfoV1 {
   /** Blockchain name */
   name: string;
   /** Blockchain network ID */
-  blockchain_id: number; // uint64
+  blockchain_id: string; // uint64 as string
   /** Contract address on this network */
   contract_address: Address;
 }

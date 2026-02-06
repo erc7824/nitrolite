@@ -1,6 +1,7 @@
 package channel_v1
 
 import (
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -78,7 +79,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		}
 
 		// Validate the home channel ID in the state
-		if incomingState.HomeChannelID == nil || *incomingState.HomeChannelID != homeChannelID {
+		if incomingState.HomeChannelID == nil || !strings.EqualFold(*incomingState.HomeChannelID, homeChannelID) {
 			return rpc.Errorf("incoming state home_channel_id is invalid")
 		}
 
@@ -87,7 +88,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 			if !isFinal {
 				return rpc.Errorf("channel is already initialized")
 			}
-			if isFinal && *incomingState.HomeChannelID == *currentState.HomeChannelID {
+			if isFinal && strings.EqualFold(*incomingState.HomeChannelID, *currentState.HomeChannelID) {
 				return rpc.Errorf("cannot use same home channel id")
 			}
 		}

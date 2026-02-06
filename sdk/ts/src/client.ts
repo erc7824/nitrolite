@@ -1161,7 +1161,7 @@ export class Client {
       escrow_channel_id: state.escrowChannelId,
       home_ledger: {
         token_address: state.homeLedger.tokenAddress,
-        blockchain_id: Number(state.homeLedger.blockchainId),
+        blockchain_id: state.homeLedger.blockchainId.toString(),
         user_balance: state.homeLedger.userBalance.toString(),
         user_net_flow: state.homeLedger.userNetFlow.toString(),
         node_balance: state.homeLedger.nodeBalance.toString(),
@@ -1170,7 +1170,7 @@ export class Client {
       escrow_ledger: state.escrowLedger
         ? {
             token_address: state.escrowLedger.tokenAddress,
-            blockchain_id: Number(state.escrowLedger.blockchainId),
+            blockchain_id: state.escrowLedger.blockchainId.toString(),
             user_balance: state.escrowLedger.userBalance.toString(),
             user_net_flow: state.escrowLedger.userNetFlow.toString(),
             node_balance: state.escrowLedger.nodeBalance.toString(),

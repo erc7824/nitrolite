@@ -16,12 +16,17 @@ import (
 // ============================================================================
 
 // transformNodeConfig converts an RPC NodeV1GetConfigResponse to SDK NodeConfig type.
-func transformNodeConfig(resp rpc.NodeV1GetConfigResponse) *core.NodeConfig {
+func transformNodeConfig(resp rpc.NodeV1GetConfigResponse) (*core.NodeConfig, error) {
 	blockchains := make([]core.Blockchain, 0, len(resp.Blockchains))
 	for _, info := range resp.Blockchains {
+		blockchainID, err := strconv.ParseUint(info.BlockchainID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse blockchain ID: %w", err)
+		}
+
 		blockchains = append(blockchains, core.Blockchain{
 			Name:            info.Name,
-			ID:              info.BlockchainID,
+			ID:              blockchainID,
 			ContractAddress: info.ContractAddress,
 			BlockStep:       0, // Not provided in RPC response
 		})
@@ -31,7 +36,7 @@ func transformNodeConfig(resp rpc.NodeV1GetConfigResponse) *core.NodeConfig {
 		NodeAddress: resp.NodeAddress,
 		NodeVersion: resp.NodeVersion,
 		Blockchains: blockchains,
-	}
+	}, nil
 }
 
 // ============================================================================
@@ -39,16 +44,21 @@ func transformNodeConfig(resp rpc.NodeV1GetConfigResponse) *core.NodeConfig {
 // ============================================================================
 
 // transformAssets converts RPC AssetV1 slice to core.Asset slice.
-func transformAssets(assets []rpc.AssetV1) []core.Asset {
+func transformAssets(assets []rpc.AssetV1) ([]core.Asset, error) {
 	result := make([]core.Asset, 0, len(assets))
 	for _, asset := range assets {
 		tokens := make([]core.Token, 0, len(asset.Tokens))
 		for _, token := range asset.Tokens {
+			blockchainID, err := strconv.ParseUint(token.BlockchainID, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse blockchain ID: %w", err)
+			}
+
 			tokens = append(tokens, core.Token{
 				Name:         token.Name,
 				Symbol:       token.Symbol,
 				Address:      token.Address,
-				BlockchainID: token.BlockchainID,
+				BlockchainID: blockchainID,
 				Decimals:     token.Decimals,
 			})
 		}
@@ -59,7 +69,7 @@ func transformAssets(assets []rpc.AssetV1) []core.Asset {
 			Tokens:   tokens,
 		})
 	}
-	return result
+	return result, nil
 }
 
 // ============================================================================
@@ -87,7 +97,7 @@ func transformBalances(balances []rpc.BalanceEntryV1) ([]core.BalanceEntry, erro
 // ============================================================================
 
 // transformChannel converts a single RPC ChannelV1 to core.Channel.
-func transformChannel(channel rpc.ChannelV1) core.Channel {
+func transformChannel(channel rpc.ChannelV1) (core.Channel, error) {
 	// Parse channel type
 	var channelType core.ChannelType
 	switch channel.Type {
@@ -119,17 +129,27 @@ func transformChannel(channel rpc.ChannelV1) core.Channel {
 		}
 	}
 
+	blockchainID, err := strconv.ParseUint(channel.BlockchainID, 10, 64)
+	if err != nil {
+		return core.Channel{}, fmt.Errorf("failed to parse blockchain ID: %w", err)
+	}
+
+	nonce, err := strconv.ParseUint(channel.Nonce, 10, 64)
+	if err != nil {
+		return core.Channel{}, fmt.Errorf("failed to parse nonce: %w", err)
+	}
+
 	return core.Channel{
 		ChannelID:         channel.ChannelID,
 		UserWallet:        channel.UserWallet,
 		Type:              channelType,
-		BlockchainID:      channel.BlockchainID,
+		BlockchainID:      blockchainID,
 		TokenAddress:      channel.TokenAddress,
 		ChallengeDuration: channel.ChallengeDuration,
-		Nonce:             channel.Nonce,
+		Nonce:             nonce,
 		Status:            channelStatus,
 		StateVersion:      stateVersion,
-	}
+	}, nil
 }
 
 // ============================================================================
@@ -297,6 +317,11 @@ func transformStateToRPC(state core.State) rpc.StateV1 {
 
 // transformLedger converts RPC LedgerV1 to core.Ledger.
 func transformLedger(ledger rpc.LedgerV1) (core.Ledger, error) {
+	blockchainID, err := strconv.ParseUint(ledger.BlockchainID, 10, 64)
+	if err != nil {
+		return core.Ledger{}, fmt.Errorf("failed to parse blockchain ID: %w", err)
+	}
+
 	userBalance, err := decimal.NewFromString(ledger.UserBalance)
 	if err != nil {
 		return core.Ledger{}, fmt.Errorf("failed to parse user balance: %w", err)
@@ -319,7 +344,7 @@ func transformLedger(ledger rpc.LedgerV1) (core.Ledger, error) {
 
 	return core.Ledger{
 		TokenAddress: ledger.TokenAddress,
-		BlockchainID: ledger.BlockchainID,
+		BlockchainID: blockchainID,
 		UserBalance:  userBalance,
 		UserNetFlow:  userNetFlow,
 		NodeBalance:  nodeBalance,
@@ -331,7 +356,7 @@ func transformLedger(ledger rpc.LedgerV1) (core.Ledger, error) {
 func transformLedgerToRPC(ledger core.Ledger) rpc.LedgerV1 {
 	return rpc.LedgerV1{
 		TokenAddress: ledger.TokenAddress,
-		BlockchainID: ledger.BlockchainID,
+		BlockchainID: strconv.FormatUint(ledger.BlockchainID, 10),
 		UserBalance:  ledger.UserBalance.String(),
 		UserNetFlow:  ledger.UserNetFlow.String(),
 		NodeBalance:  ledger.NodeBalance.String(),
@@ -342,7 +367,7 @@ func transformLedgerToRPC(ledger core.Ledger) rpc.LedgerV1 {
 // transformChannelDefinitionToRPC converts core.ChannelDefinition to RPC ChannelDefinitionV1.
 func transformChannelDefinitionToRPC(def core.ChannelDefinition) rpc.ChannelDefinitionV1 {
 	return rpc.ChannelDefinitionV1{
-		Nonce:     def.Nonce,
+		Nonce:     strconv.FormatUint(def.Nonce, 10),
 		Challenge: def.Challenge,
 	}
 }
@@ -388,14 +413,24 @@ func transformAppSessions(sessions []rpc.AppSessionInfoV1) ([]app.AppSessionInfo
 			sessionData = *s.SessionData
 		}
 
+		nonce, err := strconv.ParseUint(s.Nonce, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse nonce: %w", err)
+		}
+
+		version, err := strconv.ParseUint(s.Version, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse version: %w", err)
+		}
+
 		result = append(result, app.AppSessionInfoV1{
 			AppSessionID: s.AppSessionID,
 			IsClosed:     isClosed,
 			Participants: participants,
 			SessionData:  sessionData,
 			Quorum:       s.Quorum,
-			Version:      s.Version,
-			Nonce:        s.Nonce,
+			Version:      version,
+			Nonce:        nonce,
 			Allocations:  allocations,
 		})
 	}
@@ -403,7 +438,7 @@ func transformAppSessions(sessions []rpc.AppSessionInfoV1) ([]app.AppSessionInfo
 }
 
 // transformAppDefinition converts RPC AppDefinitionV1 to app.AppDefinitionV1.
-func transformAppDefinition(def rpc.AppDefinitionV1) app.AppDefinitionV1 {
+func transformAppDefinition(def rpc.AppDefinitionV1) (app.AppDefinitionV1, error) {
 	participants := make([]app.AppParticipantV1, 0, len(def.Participants))
 	for _, p := range def.Participants {
 		participants = append(participants, app.AppParticipantV1{
@@ -412,12 +447,17 @@ func transformAppDefinition(def rpc.AppDefinitionV1) app.AppDefinitionV1 {
 		})
 	}
 
+	nonce, err := strconv.ParseUint(def.Nonce, 10, 64)
+	if err != nil {
+		return app.AppDefinitionV1{}, fmt.Errorf("failed to parse nonce: %w", err)
+	}
+
 	return app.AppDefinitionV1{
 		Application:  def.Application,
 		Participants: participants,
 		Quorum:       def.Quorum,
-		Nonce:        def.Nonce,
-	}
+		Nonce:        nonce,
+	}, nil
 }
 
 // transformAppDefinitionToRPC converts app.AppDefinitionV1 to RPC AppDefinitionV1.
@@ -434,7 +474,7 @@ func transformAppDefinitionToRPC(def app.AppDefinitionV1) rpc.AppDefinitionV1 {
 		Application:  def.Application,
 		Participants: participants,
 		Quorum:       def.Quorum,
-		Nonce:        def.Nonce,
+		Nonce:        strconv.FormatUint(def.Nonce, 10),
 	}
 }
 
@@ -452,7 +492,7 @@ func transformAppStateUpdateToRPC(update app.AppStateUpdateV1) rpc.AppStateUpdat
 	return rpc.AppStateUpdateV1{
 		AppSessionID: update.AppSessionID,
 		Intent:       update.Intent,
-		Version:      update.Version,
+		Version:      strconv.FormatUint(update.Version, 10),
 		Allocations:  allocations,
 		SessionData:  update.SessionData,
 	}

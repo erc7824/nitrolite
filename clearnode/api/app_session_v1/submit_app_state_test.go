@@ -73,7 +73,7 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentOperate,
-			Version:      2,
+			Version:      "2",
 			Allocations: []rpc.AppAllocationV1{
 				{Participant: participant1, Asset: "USDC", Amount: "100"},
 				{Participant: participant2, Asset: "USDC", Amount: "50"},
@@ -177,7 +177,7 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentOperate,
-			Version:      2,
+			Version:      "2",
 			Allocations: []rpc.AppAllocationV1{
 				{Participant: participant1, Asset: "USDC", Amount: "75"}, // -25
 				{Participant: participant2, Asset: "USDC", Amount: "75"}, // +25
@@ -273,7 +273,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentWithdraw,
-			Version:      2,
+			Version:      "2",
 			Allocations: []rpc.AppAllocationV1{
 				{Participant: participant1, Asset: "USDC", Amount: "60"}, // Withdraw 40
 			},
@@ -378,7 +378,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentClose,
-			Version:      2,
+			Version:      "2",
 			Allocations: []rpc.AppAllocationV1{
 				{Participant: participant1, Asset: "USDC", Amount: "100"},
 				{Participant: participant2, Asset: "USDC", Amount: "50"},
@@ -486,7 +486,7 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentClose,
-			Version:      2,
+			Version:      "2",
 			Allocations: []rpc.AppAllocationV1{
 				{Participant: participant1, Asset: "USDC", Amount: "50"}, // Mismatch: trying to close with different amount
 			},
@@ -582,7 +582,7 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentOperate,
-			Version:      2,
+			Version:      "2",
 			Allocations: []rpc.AppAllocationV1{
 				{Participant: participant1, Asset: "USDC", Amount: "150"}, // Only one participant - missing participant2
 			},
@@ -674,7 +674,7 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentWithdraw,
-			Version:      2,
+			Version:      "2",
 			Allocations: []rpc.AppAllocationV1{
 				{Participant: participant1, Asset: "USDC", Amount: "60"}, // Missing DAI allocation
 			},
@@ -748,7 +748,7 @@ func TestSubmitAppState_DepositIntent_Rejected(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentDeposit,
-			Version:      2,
+			Version:      "2",
 			Allocations:  []rpc.AppAllocationV1{},
 			SessionData:  "",
 		},
@@ -811,7 +811,7 @@ func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentOperate,
-			Version:      2,
+			Version:      "2",
 			Allocations:  []rpc.AppAllocationV1{},
 			SessionData:  "",
 		},
@@ -876,7 +876,7 @@ func TestSubmitAppState_InvalidVersion_Rejected(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentOperate,
-			Version:      10, // Wrong version
+			Version:      "10", // Wrong version
 			Allocations:  []rpc.AppAllocationV1{},
 			SessionData:  "",
 		},
@@ -935,7 +935,7 @@ func TestSubmitAppState_SessionNotFound_Rejected(t *testing.T) {
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentOperate,
-			Version:      2,
+			Version:      "2",
 			Allocations:  []rpc.AppAllocationV1{},
 			SessionData:  "",
 		},
@@ -1021,7 +1021,7 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentOperate,
-			Version:      2,
+			Version:      "2",
 			Allocations: []rpc.AppAllocationV1{
 				{Participant: participant1, Asset: "USDC", Amount: "100.1234567"}, // 7 decimal places
 			},
@@ -1111,7 +1111,7 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentWithdraw,
-			Version:      2,
+			Version:      "2",
 			Allocations: []rpc.AppAllocationV1{
 				{Participant: participant1, Asset: "USDC", Amount: "60.1234567"}, // 7 decimal places, withdrawing 40
 			},
@@ -1208,7 +1208,7 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
 			Intent:       app.AppStateUpdateIntentOperate,
-			Version:      2,
+			Version:      "2",
 			Allocations: []rpc.AppAllocationV1{
 				{Participant: participant1, Asset: "WETH", Amount: "0.01"},
 				{Participant: participant2, Asset: "WETH", Amount: "0.005"},

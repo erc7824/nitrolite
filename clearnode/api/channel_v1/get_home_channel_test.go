@@ -91,7 +91,7 @@ func TestGetHomeChannel_Success(t *testing.T) {
 	assert.Equal(t, homeChannelID, response.Channel.ChannelID)
 	assert.Equal(t, userWallet, response.Channel.UserWallet)
 	assert.Equal(t, "home", response.Channel.Type)
-	assert.Equal(t, uint64(1), response.Channel.BlockchainID)
+	assert.Equal(t, "1", response.Channel.BlockchainID)
 	assert.Equal(t, "open", response.Channel.Status)
 
 	// Verify all mock expectations

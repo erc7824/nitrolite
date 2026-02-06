@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -69,7 +70,7 @@ func (s *DBStore) GetLastUserState(wallet, asset string, signed bool) (*core.Sta
 		Select("s.*, hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address, ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address").
 		Joins("LEFT JOIN channels AS hc ON s.home_channel_id = hc.channel_id").
 		Joins("LEFT JOIN channels AS ec ON s.escrow_channel_id = ec.channel_id").
-		Where("s.user_wallet = ? AND s.asset = ?", wallet, asset)
+		Where("s.user_wallet = ? AND s.asset = ?", strings.ToLower(wallet), asset)
 
 	if signed {
 		query = query.Where("s.user_sig IS NOT NULL AND s.node_sig IS NOT NULL")
@@ -102,6 +103,8 @@ func (s *DBStore) StoreUserState(state core.State) error {
 
 // GetLastStateByChannelID retrieves the most recent state for a given channel.
 func (s *DBStore) GetLastStateByChannelID(channelID string, signed bool) (*core.State, error) {
+	channelID = strings.ToLower(channelID)
+
 	var dbState State
 	query := s.db.Table("channel_states AS s").
 		Select("s.*, hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address, ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address").
@@ -126,6 +129,8 @@ func (s *DBStore) GetLastStateByChannelID(channelID string, signed bool) (*core.
 
 // GetStateByChannelIDAndVersion retrieves a specific state version for a channel.
 func (s *DBStore) GetStateByChannelIDAndVersion(channelID string, version uint64) (*core.State, error) {
+	channelID = strings.ToLower(channelID)
+
 	var dbState State
 	err := s.db.Table("channel_states AS s").
 		Select("s.*, hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address, ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address").

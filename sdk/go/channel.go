@@ -462,7 +462,11 @@ func (c *Client) GetHomeChannel(ctx context.Context, wallet, asset string) (*cor
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home channel: %w", err)
 	}
-	channel := transformChannel(resp.Channel)
+
+	channel, err := transformChannel(resp.Channel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform channel: %w", err)
+	}
 	return &channel, nil
 }
 
@@ -487,7 +491,11 @@ func (c *Client) GetEscrowChannel(ctx context.Context, escrowChannelID string) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to get escrow channel: %w", err)
 	}
-	channel := transformChannel(resp.Channel)
+
+	channel, err := transformChannel(resp.Channel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform channel: %w", err)
+	}
 	return &channel, nil
 }
 

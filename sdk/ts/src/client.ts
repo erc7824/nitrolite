@@ -987,14 +987,15 @@ export class Client {
     asset: string,
     depositAmount: Decimal
   ): Promise<string> {
-    const appUpdate = transformAppStateUpdateToRPC(appStateUpdate);
-
     // Get current state
     const currentState = await this.getLatestState(this.getUserAddress(), asset, false);
 
-    // Create next state with commit transition
+    // Create next state with commit transition (use app session ID as account ID)
     const newState = nextState(currentState);
-    applyCommitTransition(newState, appUpdate.appSessionId, depositAmount);
+    applyCommitTransition(newState, appStateUpdate.appSessionId, depositAmount);
+
+    // Transform to RPC format after applying the commit transition
+    const appUpdate = transformAppStateUpdateToRPC(appStateUpdate);
 
     // Sign the state
     const stateSig = await this.signState(newState);

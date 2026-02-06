@@ -1,0 +1,19 @@
+{
+  "name": "@nitrolite/example-app-sessions",
+  "version": "1.0.0",
+  "description": "Nitrolite SDK App Sessions Lifecycle Example",
+  "type": "module",
+  "scripts": {
+    "lifecycle": "tsx lifecycle.ts"
+  },
+  "dependencies": {
+    "@nitrolite/sdk": "file:../..",
+    "decimal.js": "^10.4.3",
+    "viem": "^2.21.54"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

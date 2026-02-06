@@ -2,6 +2,7 @@ package app_session_v1
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/app"
@@ -56,7 +57,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 			return
 		}
 		totalWeights += participant.SignatureWeight
-		participantWeights[participant.WalletAddress] = participant.SignatureWeight
+		participantWeights[strings.ToLower(participant.WalletAddress)] = participant.SignatureWeight
 	}
 
 	if reqPayload.Definition.Quorum > totalWeights {

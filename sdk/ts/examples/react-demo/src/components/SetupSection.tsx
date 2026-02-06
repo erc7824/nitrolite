@@ -31,7 +31,7 @@ export default function SetupSection({
 }: SetupSectionProps) {
   const [chainId, setChainId] = useState('11155111');
   const [rpcUrl, setRpcUrl] = useState('');
-  const [homeAsset, setHomeAsset] = useState('');
+  const [homeAsset, setHomeAsset] = useState('usdc');
   const [homeChainId, setHomeChainId] = useState('11155111');
 
   const handleAddRpc = () => {

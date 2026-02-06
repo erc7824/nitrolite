@@ -333,14 +333,25 @@ export class Client {
 
     // Try to get latest state to determine if channel exists
     let state: core.State | null = null;
+    let channelIsOpen = false;
     try {
       state = await this.getLatestState(userWallet, asset, false);
+
+      // If state has a home channel ID, check if it's usable
+      if (state && state.homeChannelId) {
+        // Check if state has a finalize transition (channel is being closed)
+        const hasFinalize = state.transitions.some(
+          (t) => t.type === core.TransitionType.Finalize
+        );
+        // If no finalize transition, channel is still open and usable
+        channelIsOpen = !hasFinalize;
+      }
     } catch (err) {
       // Channel doesn't exist, will create it
     }
 
-    // Scenario A: Channel doesn't exist - create it
-    if (!state || !state.homeChannelId) {
+    // Scenario A: Channel doesn't exist or is closed - create it
+    if (!state || !state.homeChannelId || !channelIsOpen) {
       // Create channel definition
       const channelDef: core.ChannelDefinition = {
         nonce: generateNonce(),
@@ -369,7 +380,7 @@ export class Client {
       return txHash;
     }
 
-    // Scenario B: Channel exists - checkpoint deposit
+    // Scenario B: Channel exists and is open - checkpoint deposit
     const newState = nextState(state);
     applyHomeDepositTransition(newState, amount);
 
@@ -420,14 +431,25 @@ export class Client {
 
     // Try to get latest state to determine if channel exists
     let state: core.State | null = null;
+    let channelIsOpen = false;
     try {
       state = await this.getLatestState(userWallet, asset, false);
+
+      // If state has a home channel ID, check if it's usable
+      if (state && state.homeChannelId) {
+        // Check if state has a finalize transition (channel is being closed)
+        const hasFinalize = state.transitions.some(
+          (t) => t.type === core.TransitionType.Finalize
+        );
+        // If no finalize transition, channel is still open and usable
+        channelIsOpen = !hasFinalize;
+      }
     } catch (err) {
       // Channel doesn't exist, will create it
     }
 
-    // Channel doesn't exist - create it and withdraw
-    if (!state || !state.homeChannelId) {
+    // Channel doesn't exist or is closed - create it and withdraw
+    if (!state || !state.homeChannelId || !channelIsOpen) {
       // Create channel definition
       const channelDef: core.ChannelDefinition = {
         nonce: generateNonce(),
@@ -489,13 +511,25 @@ export class Client {
 
     // Get sender's latest state
     let state: core.State | null = null;
+    let channelIsOpen = false;
     try {
       state = await this.getLatestState(senderWallet, asset, false);
+
+      // If state has a home channel ID, check if the channel is actually open
+      if (state && state.homeChannelId) {
+        try {
+          const channelInfo = await this.getHomeChannel(senderWallet, asset);
+          channelIsOpen = channelInfo.status === core.ChannelStatus.Open;
+        } catch (err) {
+          // Channel doesn't exist or error fetching - will create new one
+          channelIsOpen = false;
+        }
+      }
     } catch (err) {
       // Channel doesn't exist
     }
 
-    if (!state || !state.homeChannelId) {
+    if (!state || !state.homeChannelId || !channelIsOpen) {
       // Create channel definition
       const channelDef: core.ChannelDefinition = {
         nonce: generateNonce(),
@@ -1136,12 +1170,6 @@ export class Client {
       },
     };
 
-    console.log(`🔗 Creating blockchain client for chain ${chainId}:`, {
-      chainId: chainId.toString(),
-      rpcUrl,
-      contractAddress,
-      chainName: chain.name,
-    });
 
     // Detect if we're in a browser with MetaMask/wallet provider
     // In browser: use wallet provider for transactions (supports signing)
@@ -1151,7 +1179,6 @@ export class Client {
     let walletClient: blockchain.evm.WalletSigner;
 
     if (isBrowser) {
-      console.log('🦊 Browser detected - using MetaMask/wallet provider for transactions');
       // Use MetaMask/wallet provider which supports transaction signing
       walletClient = createWalletClient({
         chain,
@@ -1159,8 +1186,6 @@ export class Client {
         account: this.txSigner.getAddress(),
       }) as blockchain.evm.WalletSigner;
     } else {
-      console.warn('⚠️  Node.js environment - HTTP transport will NOT support transaction signing');
-      console.warn('    Transactions will fail unless using a service that manages private keys');
       // Fallback to HTTP (will fail for transactions in most cases)
       walletClient = createWalletClient({
         chain,

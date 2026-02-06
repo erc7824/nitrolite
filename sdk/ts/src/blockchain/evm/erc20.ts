@@ -52,14 +52,7 @@ export class ERC20 {
       throw new Error('Wallet signer is required for approve operation');
     }
 
-    console.log('🔓 ERC20 Approve:', {
-      token: this.tokenAddress,
-      spender,
-      amount: amount.toString(),
-    });
 
-    // Simulate first
-    console.log('🔍 Simulating approve...');
     try {
       const { request } = (await this.client.simulateContract({
         address: this.tokenAddress,
@@ -69,19 +62,10 @@ export class ERC20 {
         account: this.walletSigner.account!.address,
       } as any)) as any;
 
-      console.log('✅ Simulation successful - executing approve...');
-
       const hash = await this.walletSigner.writeContract(request as any);
 
-      console.log('📤 Approve transaction submitted - hash:', hash);
-      console.log('⏳ Waiting for confirmation...');
+      await this.client.waitForTransactionReceipt({ hash });
 
-      const receipt = await this.client.waitForTransactionReceipt({ hash });
-
-      console.log('✅ Approve transaction confirmed!', {
-        blockNumber: receipt.blockNumber,
-        gasUsed: receipt.gasUsed.toString(),
-      });
 
       return hash;
     } catch (error: any) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -136,7 +137,7 @@ func unmapAppStateUpdateV1(upd *rpc.AppStateUpdateV1) (app.AppStateUpdateV1, err
 		}
 
 		allocations[i] = app.AppAllocationV1{
-			Participant: alloc.Participant,
+			Participant: strings.ToLower(alloc.Participant),
 			Asset:       alloc.Asset,
 			Amount:      decAmount,
 		}

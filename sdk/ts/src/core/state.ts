@@ -169,9 +169,15 @@ export function applyReceiverTransitions(state: State, ...transitions: Transitio
   for (const transition of transitions) {
     switch (transition.type) {
       case TransitionType.TransferReceive:
+        if (!transition.accountId) {
+          throw new Error('missing account ID for transfer receive transition');
+        }
         applyTransferReceiveTransition(state, transition.accountId, transition.amount, transition.txId);
         break;
       case TransitionType.Release:
+        if (!transition.accountId) {
+          throw new Error('missing account ID for release transition');
+        }
         applyReleaseTransition(state, transition.accountId, transition.amount);
         break;
       default:

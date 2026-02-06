@@ -43,42 +43,17 @@ export class RPCClient {
     const payload = newPayload(req);
     const message = newRequest(requestId, method, payload);
 
-    // Log request body
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`🔵 RPC Request: ${method}`);
-    console.log(`📋 Request ID: ${requestId}`);
-    console.log('📦 Request Body:', JSON.stringify(req, (key, value) =>
-      typeof value === 'bigint' ? value.toString() : value
-    , 2));
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-
     // Send request and await response
     const response = await this.dialer.call(message, signal);
 
     // Check if response contains an error
     const err = messageError(response);
     if (err) {
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`🔴 RPC Error Response: ${method}`);
-      console.log(`📋 Request ID: ${requestId}`);
-      console.log('❌ Error:', err.message);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
       throw new Error(`rpc returned error: ${err.message}`);
     }
 
     // Translate response payload to typed object
-    const result = translatePayload<TResp>(response.payload);
-
-    // Log successful response
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`🟢 RPC Success Response: ${method}`);
-    console.log(`📋 Request ID: ${requestId}`);
-    console.log('📦 Response Body:', JSON.stringify(result, (key, value) =>
-      typeof value === 'bigint' ? value.toString() : value
-    , 2));
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-
-    return result;
+    return translatePayload<TResp>(response.payload);
   }
 
   // ============================================================================

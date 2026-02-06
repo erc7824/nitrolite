@@ -10,6 +10,7 @@ interface AllowanceSectionProps {
 }
 
 export default function AllowanceSection({ client, defaultAddress, showStatus }: AllowanceSectionProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [chainId, setChainId] = useState('11155111');
   const [tokenAddress, setTokenAddress] = useState('');
   const [amount, setAmount] = useState('');
@@ -25,8 +26,6 @@ export default function AllowanceSection({ client, defaultAddress, showStatus }:
 
     try {
       setLoading('check');
-      console.log('🔍 Checking current allowance...');
-
       const allowance = await client.checkTokenAllowance(
         BigInt(chainId),
         tokenAddress,
@@ -34,10 +33,10 @@ export default function AllowanceSection({ client, defaultAddress, showStatus }:
       );
 
       setCurrentAllowance(allowance.toString());
-      console.log('✅ Current allowance:', allowance.toString());
+      console.log('Allowance checked:', allowance.toString());
       showStatus('success', 'Allowance checked', `Current allowance: ${allowance.toString()}`);
     } catch (error) {
-      console.error('❌ Failed to check allowance:', error);
+      console.error('Failed to check allowance:', error);
       showStatus('error', 'Check failed', error instanceof Error ? error.message : String(error));
       setCurrentAllowance('Error');
     } finally {
@@ -51,21 +50,9 @@ export default function AllowanceSection({ client, defaultAddress, showStatus }:
       return;
     }
 
-    console.group('🔓 APPROVE TOKEN ALLOWANCE');
     try {
-      console.log('📋 Parameters:', {
-        chainId,
-        tokenAddress,
-        amount,
-        timestamp: new Date().toISOString()
-      });
-
       setLoading('approve');
-
-      // Convert amount to bigint
       const amountBig = BigInt(amount);
-
-      console.log('⏳ Submitting approval transaction...');
 
       const hash = await client.approveToken(
         BigInt(chainId),
@@ -73,34 +60,38 @@ export default function AllowanceSection({ client, defaultAddress, showStatus }:
         amountBig
       );
 
-      console.log('✅ Approval successful!');
+      console.log('Approval successful. Transaction hash:', hash);
       showStatus('success', 'Allowance approved', `Transaction: ${hash}`);
 
-      // Refresh allowance
       await checkAllowance();
       setAmount('');
     } catch (error) {
-      console.error('❌ Approval failed!');
-      console.error('Error details:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
+      console.error('Approval failed:', error);
       showStatus('error', 'Approval failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
-      console.groupEnd();
     }
   };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">💳 Token Allowance</h2>
-      <p className="text-sm text-gray-600 mb-6">
-        Approve the contract to spend your tokens. <strong>Required before deposits!</strong>
-      </p>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Token Allowance</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Approve the contract to spend your tokens. <strong>Required before deposits!</strong>
+          </p>
+        </div>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="ml-4 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium transition"
+        >
+          {isExpanded ? '▲ Hide' : '▼ Show'}
+        </button>
+      </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      {isExpanded && (
+        <div className="grid grid-cols-1 gap-6">
         {/* Approve Section */}
         <div className="border border-blue-200 rounded p-4 bg-blue-50">
           <h3 className="font-semibold mb-3 text-blue-700">Approve Token Spending</h3>
@@ -190,6 +181,7 @@ export default function AllowanceSection({ client, defaultAddress, showStatus }:
           </ul>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -378,6 +378,9 @@ async function main() {
   // Close clients
   await wallet1Client.close();
   await wallet2Client.close();
+
+  // Exit successfully
+  process.exit(0);
 }
 
 // Run the example

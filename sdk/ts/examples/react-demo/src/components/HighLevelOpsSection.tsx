@@ -25,139 +25,68 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
   const [closeAsset, setCloseAsset] = useState('usdc');
 
   const handleDeposit = async () => {
-    console.group('🔵 DEPOSIT TRANSACTION');
     try {
-      console.log('📋 Parameters:', {
-        chainId: depositChainId,
-        asset: depositAsset,
-        amount: depositAmount,
-        timestamp: new Date().toISOString()
-      });
-
       setLoading('deposit');
       const amount = new Decimal(depositAmount);
-      console.log('💰 Parsed amount:', amount.toString());
-      console.log('🔗 Chain ID (BigInt):', BigInt(depositChainId).toString());
-
-      console.log('⏳ Submitting deposit transaction to blockchain...');
       const txHash = await client.deposit(BigInt(depositChainId), depositAsset, amount);
 
-      console.log('✅ Deposit transaction successful!');
-      console.log('📝 Transaction hash:', txHash);
+      console.log('Deposit successful. Transaction:', txHash);
       showStatus('success', 'Deposit completed', `Transaction: ${txHash}`);
       setDepositAmount('');
     } catch (error) {
-      console.error('❌ Deposit transaction failed!');
-      console.error('Error details:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
+      console.error('Deposit failed:', error);
       showStatus('error', 'Deposit failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
-      console.groupEnd();
     }
   };
 
   const handleWithdraw = async () => {
-    console.group('🔴 WITHDRAW TRANSACTION');
     try {
-      console.log('📋 Parameters:', {
-        chainId: withdrawChainId,
-        asset: withdrawAsset,
-        amount: withdrawAmount,
-        timestamp: new Date().toISOString()
-      });
-
       setLoading('withdraw');
       const amount = new Decimal(withdrawAmount);
-      console.log('💰 Parsed amount:', amount.toString());
-      console.log('🔗 Chain ID (BigInt):', BigInt(withdrawChainId).toString());
-
-      console.log('⏳ Submitting withdraw transaction to blockchain...');
       const txHash = await client.withdraw(BigInt(withdrawChainId), withdrawAsset, amount);
 
-      console.log('✅ Withdraw transaction successful!');
-      console.log('📝 Transaction hash:', txHash);
+      console.log('Withdrawal successful. Transaction:', txHash);
       showStatus('success', 'Withdrawal completed', `Transaction: ${txHash}`);
       setWithdrawAmount('');
     } catch (error) {
-      console.error('❌ Withdraw transaction failed!');
-      console.error('Error details:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
+      console.error('Withdrawal failed:', error);
       showStatus('error', 'Withdrawal failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
-      console.groupEnd();
     }
   };
 
   const handleTransfer = async () => {
-    console.group('🟣 TRANSFER TRANSACTION');
     try {
-      console.log('📋 Parameters:', {
-        recipient: transferRecipient,
-        asset: transferAsset,
-        amount: transferAmount,
-        timestamp: new Date().toISOString()
-      });
-
       setLoading('transfer');
       const amount = new Decimal(transferAmount);
-      console.log('💰 Parsed amount:', amount.toString());
-      console.log('👤 Recipient address:', transferRecipient);
-
-      console.log('⏳ Submitting transfer transaction...');
       const txId = await client.transfer(transferRecipient as `0x${string}`, transferAsset, amount);
 
-      console.log('✅ Transfer transaction successful!');
-      console.log('🆔 Transaction ID:', txId);
+      console.log('Transfer successful. Transaction ID:', txId);
       showStatus('success', 'Transfer completed', `Transaction ID: ${txId}`);
       setTransferAmount('');
     } catch (error) {
-      console.error('❌ Transfer transaction failed!');
-      console.error('Error details:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
+      console.error('Transfer failed:', error);
       showStatus('error', 'Transfer failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
-      console.groupEnd();
     }
   };
 
   const handleCloseChannel = async () => {
-    console.group('🟠 CLOSE CHANNEL TRANSACTION');
     try {
-      console.log('📋 Parameters:', {
-        asset: closeAsset,
-        timestamp: new Date().toISOString()
-      });
-
       setLoading('close');
-      console.log('⏳ Submitting close channel transaction to blockchain...');
       const txHash = await client.closeHomeChannel(closeAsset);
 
-      console.log('✅ Close channel transaction successful!');
-      console.log('📝 Transaction hash:', txHash);
+      console.log('Channel closed successfully. Transaction:', txHash);
       showStatus('success', 'Channel closed', `Transaction: ${txHash}`);
     } catch (error) {
-      console.error('❌ Close channel transaction failed!');
-      console.error('Error details:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
+      console.error('Channel close failed:', error);
       showStatus('error', 'Close channel failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
-      console.groupEnd();
     }
   };
 

@@ -72,49 +72,24 @@ function App() {
 
           // Auto-connect to node if wallet is reconnected
           try {
-            console.group('🔄 AUTO-RECONNECTING TO NODE');
-            console.log('📋 Auto-reconnect details:', {
-              nodeUrl: DEFAULT_NODE_URL,
-              walletAddress: address,
-              rpcConfigs: DEFAULT_RPC_CONFIGS,
-              timestamp: new Date().toISOString()
-            });
-
-            // Create signers
-            console.log('🔑 Creating wallet signers...');
             const stateSigner = new WalletStateSigner(client);
             const txSigner = new WalletTransactionSigner(client);
-            console.log('✅ Signers created');
 
-            // Build options with RPC configs
-            console.log('⚙️ Building RPC configurations...');
-            const options = Object.entries(DEFAULT_RPC_CONFIGS).map(([chainId, rpcUrl]) => {
-              console.log(`  - Chain ${chainId}: ${rpcUrl}`);
-              return withBlockchainRPC(BigInt(chainId), rpcUrl);
-            });
-            console.log(`✅ ${options.length} RPC configurations built`);
+            const options = Object.entries(DEFAULT_RPC_CONFIGS).map(([chainId, rpcUrl]) =>
+              withBlockchainRPC(BigInt(chainId), rpcUrl)
+            );
 
-            // Create SDK client
-            console.log('🔌 Creating SDK client...');
             const sdkClient = await Client.create(
               DEFAULT_NODE_URL,
               stateSigner,
               txSigner,
               ...options
             );
-            console.log('✅ SDK client created successfully');
 
             setAppState(prev => ({ ...prev, client: sdkClient, connected: true }));
-            console.log('✅ Auto-reconnection complete!');
-            console.groupEnd();
             showStatus('success', 'Connected to Clearnode', 'Fully reconnected and ready!');
           } catch (nodeError) {
-            console.error('❌ Auto node connection failed:', nodeError);
-            if (nodeError instanceof Error) {
-              console.error('Error message:', nodeError.message);
-              console.error('Error stack:', nodeError.stack);
-            }
-            console.groupEnd();
+            console.error('Auto node connection failed:', nodeError);
             showStatus('info', 'Wallet reconnected', 'Click "Connect to Node" to continue');
           }
         }
@@ -175,24 +150,10 @@ function App() {
 
       const address = accounts[0];
 
-      console.log('🔧 Creating wallet client:', {
-        address,
-        chain: 'mainnet (id: 1)',
-        note: 'Wallet client is configured for mainnet - SDK will handle multi-chain via RPC configs'
-      });
-
-      // Create wallet client
       const client = createWalletClient({
         account: address as `0x${string}`,
         chain: mainnet,
         transport: custom(window.ethereum),
-      });
-
-      console.log('✅ Wallet client created:', {
-        hasAccount: !!client.account,
-        accountAddress: client.account?.address,
-        chainId: client.chain?.id,
-        chainName: client.chain?.name
       });
 
       // Save connection state
@@ -212,58 +173,37 @@ function App() {
       return;
     }
 
-    console.group('🌐 CONNECTING TO NODE');
     try {
-      console.log('📋 Connection details:', {
-        nodeUrl: appState.nodeUrl,
-        walletAddress: appState.address,
-        rpcConfigs: appState.rpcConfigs,
-        homeBlockchains: appState.homeBlockchains,
-        timestamp: new Date().toISOString()
-      });
-
-      // Create signers
-      console.log('🔑 Creating wallet signers...');
       const stateSigner = new WalletStateSigner(walletClient);
       const txSigner = new WalletTransactionSigner(walletClient);
-      console.log('✅ Signers created');
 
-      // Build options with RPC configs
-      console.log('⚙️ Building RPC configurations...');
-      const options = Object.entries(appState.rpcConfigs).map(([chainId, rpcUrl]) => {
-        console.log(`  - Chain ${chainId}: ${rpcUrl}`);
-        return withBlockchainRPC(BigInt(chainId), rpcUrl);
-      });
-      console.log(`✅ ${options.length} RPC configurations built`);
+      const options = Object.entries(appState.rpcConfigs).map(([chainId, rpcUrl]) =>
+        withBlockchainRPC(BigInt(chainId), rpcUrl)
+      );
 
-      // Create SDK client
-      console.log('🔌 Creating SDK client...');
       const client = await Client.create(
         appState.nodeUrl,
         stateSigner,
         txSigner,
         ...options
       );
-      console.log('✅ SDK client created successfully');
 
-      // Set home blockchains if configured
       const homeBlockchainErrors: string[] = [];
       if (Object.keys(appState.homeBlockchains).length > 0) {
-        console.log('🏠 Setting home blockchains...');
         for (const [asset, chainId] of Object.entries(appState.homeBlockchains)) {
           try {
             await client.setHomeBlockchain(asset, BigInt(chainId));
-            console.log(`✅ Home blockchain set for ${asset} on chain ${chainId}`);
+            console.log(`Home blockchain set: ${asset} on chain ${chainId}`);
           } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
-            console.error(`❌ Failed to set home blockchain for ${asset}:`, errorMsg);
+            console.error(`Failed to set home blockchain for ${asset}:`, errorMsg);
             homeBlockchainErrors.push(`${asset}: ${errorMsg}`);
           }
         }
       }
 
       setAppState(prev => ({ ...prev, client, connected: true }));
-      console.log('✅ Connection complete!');
+      console.log('Connected to Clearnode');
 
       if (homeBlockchainErrors.length > 0) {
         showStatus('info', 'Connected to Clearnode (with warnings)',
@@ -272,15 +212,8 @@ function App() {
         showStatus('success', 'Connected to Clearnode', appState.nodeUrl);
       }
     } catch (error) {
-      console.error('❌ Failed to connect to node');
-      console.error('Error details:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
+      console.error('Failed to connect to node:', error);
       showStatus('error', 'Failed to connect to node', error instanceof Error ? error.message : String(error));
-    } finally {
-      console.groupEnd();
     }
   }, [walletClient, appState.address, appState.nodeUrl, appState.rpcConfigs, appState.homeBlockchains, showStatus]);
 

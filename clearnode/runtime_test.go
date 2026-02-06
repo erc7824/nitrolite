@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/erc7824/nitrolite/pkg/core"
 )
 
 func TestCheckChannelHubVersion_Manual(t *testing.T) {
@@ -25,14 +27,14 @@ func TestCheckChannelHubVersion_Manual(t *testing.T) {
 			name:              "valid ChannelHub with correct version",
 			blockchainRPC:     blockchainRPC,
 			channelHubAddress: correctChannelHubAddress,
-			expectedVersion:   CHANNEL_HUB_VERSION,
+			expectedVersion:   core.ChannelHubVersion,
 			expectError:       false,
 		},
 		{
 			name:              "invalid contract address (no code)",
 			blockchainRPC:     blockchainRPC,
 			channelHubAddress: common.HexToAddress("0x0000000000000000000000000000000000004242"), // Address with no contract
-			expectedVersion:   CHANNEL_HUB_VERSION,
+			expectedVersion:   core.ChannelHubVersion,
 			expectError:       true,
 			errorContains:     "failed to get ChannelHub version",
 		},

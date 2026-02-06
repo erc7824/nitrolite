@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -388,7 +389,7 @@ func TestDecimalToBigInt_RoundTrip(t *testing.T) {
 
 func TestGetHomeChannelID(t *testing.T) {
 	t.Run("match_solidity_implementation", func(t *testing.T) {
-		// Test values from contracts-new/test/Utils.t.sol:test_log_calculateChannelId
+		// Test values from contracts/test/Utils.t.sol:test_log_calculateChannelId
 		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
 		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
 		asset := "ether"
@@ -398,9 +399,56 @@ func TestGetHomeChannelID(t *testing.T) {
 		channelID, err := GetHomeChannelID(node, user, asset, nonce, challengeDuration)
 		assert.NoError(t, err)
 
-		// Expected value from Solidity test
-		expected := "0x7c827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee"
+		// Expected value from Solidity test (with version byte 0x01)
+		expected := "0x01827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee"
 		assert.Equal(t, expected, channelID, "Channel ID should match Solidity implementation")
+	})
+
+	t.Run("different_versions_produce_different_ids", func(t *testing.T) {
+		// This test matches contracts/test/Utils.t.sol:test_channelId_forDifferentVersions_differ
+		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
+		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+		asset := "ether"
+		nonce := uint64(42)
+		challengeDuration := uint32(86400)
+
+		channelIDV1, err := getHomeChannelID(node, user, asset, nonce, challengeDuration, 1)
+		assert.NoError(t, err)
+
+		channelIDV2, err := getHomeChannelID(node, user, asset, nonce, challengeDuration, 2)
+		assert.NoError(t, err)
+
+		channelIDV255, err := getHomeChannelID(node, user, asset, nonce, challengeDuration, 255)
+		assert.NoError(t, err)
+
+		// Channel IDs must differ for different versions
+		assert.NotEqual(t, channelIDV1, channelIDV2, "channelIdV1 should differ from channelIdV2")
+		assert.NotEqual(t, channelIDV1, channelIDV255, "channelIdV1 should differ from channelIdV255")
+		assert.NotEqual(t, channelIDV2, channelIDV255, "channelIdV2 should differ from channelIdV255")
+
+		// Expected values from Solidity test
+		expectedV1 := "0x01827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee"
+		expectedV2 := "0x02827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee"
+		expectedV255 := "0xff827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee"
+
+		assert.Equal(t, expectedV1, channelIDV1, "Version 1 channel ID should match Solidity")
+		assert.Equal(t, expectedV2, channelIDV2, "Version 2 channel ID should match Solidity")
+		assert.Equal(t, expectedV255, channelIDV255, "Version 255 channel ID should match Solidity")
+
+		// First byte should match the version
+		assert.Equal(t, byte(1), common.HexToHash(channelIDV1)[0], "First byte of V1 should be 0x01")
+		assert.Equal(t, byte(2), common.HexToHash(channelIDV2)[0], "First byte of V2 should be 0x02")
+		assert.Equal(t, byte(255), common.HexToHash(channelIDV255)[0], "First byte of V255 should be 0xFF")
+
+		// All other bytes should be the same (derived from the same base hash)
+		v1Hash := common.HexToHash(channelIDV1)
+		v2Hash := common.HexToHash(channelIDV2)
+		v255Hash := common.HexToHash(channelIDV255)
+
+		for i := 1; i < 32; i++ {
+			assert.Equal(t, v1Hash[i], v2Hash[i], "Byte %d should be the same for V1 and V2", i)
+			assert.Equal(t, v1Hash[i], v255Hash[i], "Byte %d should be the same for V1 and V255", i)
+		}
 	})
 
 	t.Run("different_assets_produce_different_ids", func(t *testing.T) {

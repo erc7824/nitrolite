@@ -17,6 +17,7 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/erc7824/nitrolite/clearnode/store/memory"
 	"github.com/erc7824/nitrolite/pkg/blockchain/evm"
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/erc7824/nitrolite/pkg/sign"
@@ -26,8 +27,6 @@ import (
 var embedMigrations embed.FS
 
 var Version = "v1.0.0" // set at build time with -ldflags "-X main.Version=x.y.z"
-
-const CHANNEL_HUB_VERSION = 1
 
 type Backbone struct {
 	NodeVersion                 string
@@ -148,7 +147,7 @@ func InitBackbone() *Backbone {
 
 		// Verify ChannelHub version
 		channelHubAddress := common.HexToAddress(bc.ContractAddress)
-		if err := checkChannelHubVersion(rpcURL, channelHubAddress, CHANNEL_HUB_VERSION); err != nil {
+		if err := checkChannelHubVersion(rpcURL, channelHubAddress, core.ChannelHubVersion); err != nil {
 			logger.Fatal("failed to verify ChannelHub version", "blockchainID", bc.ID, "address", bc.ContractAddress, "error", err)
 		}
 

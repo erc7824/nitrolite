@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/shopspring/decimal"
@@ -33,6 +34,8 @@ func (s *DBStore) ExecuteInTransaction(txFunc StoreTxHandler) error {
 
 // GetUserBalances retrieves the balances for a user's wallet.
 func (s *DBStore) GetUserBalances(wallet string) ([]core.BalanceEntry, error) {
+	wallet = strings.ToLower(wallet)
+
 	type balanceEntry struct {
 		Asset           string          `gorm:"column:asset"`
 		HomeUserBalance decimal.Decimal `gorm:"column:home_user_balance"`
@@ -87,6 +90,8 @@ func (s *DBStore) GetUserBalances(wallet string) ([]core.BalanceEntry, error) {
 //   - escrow_withdraw: Verify last_state.version == escrow_channel.state_version
 //   - migrate: Verify last_state.version == home_channel.state_version
 func (s *DBStore) EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error {
+	wallet = strings.ToLower(wallet)
+
 	type versionCheck struct {
 		StateVersion         uint64
 		HomeChannelVersion   *uint64

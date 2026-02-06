@@ -102,5 +102,4 @@ func TestPackState(t *testing.T) {
 		packedHex := hexutil.Encode(packed)
 		assert.Equal(t, expectedPackedState, packedHex, "Packed state should match expected value")
 	})
-
 }

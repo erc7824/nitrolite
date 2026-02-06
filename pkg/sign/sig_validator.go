@@ -2,6 +2,7 @@ package sign
 
 import (
 	"fmt"
+	"strings"
 )
 
 type SigValidator struct {
@@ -33,7 +34,7 @@ func (s *SigValidator) Verify(wallet string, data, sig []byte) error {
 		return err
 	}
 
-	if address != wallet {
+	if strings.EqualFold(address, wallet) {
 		return fmt.Errorf("invalid signature")
 	}
 	return nil

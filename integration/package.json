@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "@erc7824/nitrolite": "file:../sdk",
-    "pg": "^8.17.0",
+    "pg": "^8.17.1",
     "viem": "^2.43.5",
     "ws": "^8.19.0"
   },

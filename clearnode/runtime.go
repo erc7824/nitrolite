@@ -9,12 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
 
 	"github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/erc7824/nitrolite/clearnode/store/memory"
+	"github.com/erc7824/nitrolite/pkg/blockchain/evm"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/erc7824/nitrolite/pkg/sign"
@@ -24,6 +26,8 @@ import (
 var embedMigrations embed.FS
 
 var Version = "v1.0.0" // set at build time with -ldflags "-X main.Version=x.y.z"
+
+const CHANNEL_HUB_VERSION = 1
 
 type Backbone struct {
 	NodeVersion                 string
@@ -141,6 +145,13 @@ func InitBackbone() *Backbone {
 		if err := checkChainId(rpcURL, bc.ID); err != nil {
 			logger.Fatal("failed to verify blockchain RPC", "blockchainID", bc.ID, "error", err)
 		}
+
+		// Verify ChannelHub version
+		channelHubAddress := common.HexToAddress(bc.ContractAddress)
+		if err := checkChannelHubVersion(rpcURL, channelHubAddress, CHANNEL_HUB_VERSION); err != nil {
+			logger.Fatal("failed to verify ChannelHub version", "blockchainID", bc.ID, "address", bc.ContractAddress, "error", err)
+		}
+
 		blockchainRPCs[bc.ID] = rpcURL
 	}
 
@@ -178,6 +189,36 @@ func checkChainId(blockchainRPC string, expectedChainID uint64) error {
 
 	if chainID.Uint64() != expectedChainID {
 		return fmt.Errorf("unexpected chain ID from blockchain RPC: got %d, want %d", chainID.Uint64(), expectedChainID)
+	}
+
+	return nil
+}
+
+// checkChannelHubVersion verifies that the ChannelHub contract at the given address
+// has the expected VERSION constant value.
+// The function uses a 5-second timeout for the connection and contract calls.
+func checkChannelHubVersion(blockchainRPC string, channelHubAddress common.Address, expectedVersion uint8) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	client, err := ethclient.DialContext(ctx, blockchainRPC)
+	if err != nil {
+		return fmt.Errorf("failed to connect to blockchain RPC: %w", err)
+	}
+	defer client.Close()
+
+	channelHub, err := evm.NewChannelHubCaller(channelHubAddress, client)
+	if err != nil {
+		return fmt.Errorf("failed to create ChannelHub caller: %w", err)
+	}
+
+	fetchedVersion, err := channelHub.VERSION(nil)
+	if err != nil {
+		return fmt.Errorf("failed to get ChannelHub version: %w", err)
+	}
+
+	if fetchedVersion != expectedVersion {
+		return fmt.Errorf("configured and fetched ChannelHub version mismatch: got %d, want %d", fetchedVersion, expectedVersion)
 	}
 
 	return nil

@@ -1,6 +1,12 @@
 import { useState } from 'react';
+import { Wallet, Link2, Server, Globe, X } from 'lucide-react';
 import type { AppState, StatusMessage } from '../types';
 import { formatAddress } from '../utils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { Separator } from './ui/separator';
 
 interface SetupSectionProps {
   appState: AppState;
@@ -55,180 +61,194 @@ export default function SetupSection({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">Setup & Configuration</h2>
-
-      {/* Wallet Connection */}
-      <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
-        <h3 className="font-semibold mb-3 text-gray-700">1. Connect Wallet</h3>
-        <div className="flex items-center gap-4">
-          {!appState.address ? (
-            <button
-              onClick={onConnectWallet}
-              className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded font-medium transition"
-            >
-              Connect MetaMask
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Connected:</span>
-              <code className="bg-gray-200 px-3 py-1 rounded text-sm font-mono">
-                {formatAddress(appState.address)}
-              </code>
-              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-              <button
-                onClick={onDisconnectWallet}
-                className="text-red-500 hover:text-red-700 text-sm px-2 py-1 border border-red-300 rounded"
-              >
-                Disconnect
-              </button>
-            </div>
-          )}
+    <Card>
+      <CardHeader>
+        <CardTitle>Setup & Configuration</CardTitle>
+        <CardDescription>Connect your wallet and configure network settings</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Wallet Connection */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider">
+            <Wallet className="h-4 w-4" />
+            <span>1. Wallet Connection</span>
+          </div>
+          <Separator />
+          <div className="flex items-center gap-3">
+            {!appState.address ? (
+              <Button onClick={onConnectWallet} className="gap-2">
+                <Wallet className="h-4 w-4" />
+                Connect MetaMask
+              </Button>
+            ) : (
+              <>
+                <Badge variant="outline" className="px-3 py-1.5 gap-2">
+                  <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+                  <code className="text-xs font-mono">{formatAddress(appState.address)}</code>
+                </Badge>
+                <Button
+                  onClick={onDisconnectWallet}
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <X className="h-3 w-3" />
+                  Disconnect
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Node URL Configuration */}
-      <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
-        <h3 className="font-semibold mb-3 text-gray-700">2. Configure Clearnode URL</h3>
-        <div className="flex gap-2">
-          <input
+        {/* Node URL Configuration */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider">
+            <Link2 className="h-4 w-4" />
+            <span>2. Clearnode URL</span>
+          </div>
+          <Separator />
+          <Input
             type="text"
             value={appState.nodeUrl}
             onChange={(e) => onNodeUrlChange(e.target.value)}
             disabled={appState.connected}
             placeholder="wss://clearnode.example.com/ws"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
           />
         </div>
-      </div>
 
-      {/* RPC Configuration */}
-      <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
-        <h3 className="font-semibold mb-3 text-gray-700">3. Blockchain RPCs (Pre-configured)</h3>
-        <p className="text-xs text-gray-500 mb-3">
-          ✓ Public RPCs already configured for Polygon Amoy, Ethereum Sepolia, Base Sepolia, and Arbitrum Sepolia
-        </p>
+        {/* RPC Configuration */}
         <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider">
+            <Server className="h-4 w-4" />
+            <span>3. Blockchain RPCs</span>
+          </div>
+          <Separator />
+          <p className="text-xs text-muted-foreground">
+            Pre-configured for Polygon Amoy, Ethereum Sepolia, Base Sepolia, and Arbitrum Sepolia
+          </p>
           <div className="flex gap-2">
-            <input
+            <Input
               type="text"
               value={chainId}
               onChange={(e) => setChainId(e.target.value)}
-              placeholder="Chain ID (e.g., 80002)"
-              className="w-32 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Chain ID"
+              className="w-32"
             />
-            <input
+            <Input
               type="text"
               value={rpcUrl}
               onChange={(e) => setRpcUrl(e.target.value)}
-              placeholder="RPC URL (e.g., https://polygon-amoy.g.alchemy.com/v2/KEY)"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="RPC URL"
+              className="flex-1"
             />
-            <button
-              onClick={handleAddRpc}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded font-medium transition"
-            >
-              Add RPC
-            </button>
+            <Button onClick={handleAddRpc} variant="secondary" size="sm">
+              Add
+            </Button>
           </div>
 
           {Object.entries(appState.rpcConfigs).length > 0 && (
-            <div className="mt-2 space-y-1">
-              <p className="text-sm text-gray-600 mb-2">Configured RPCs:</p>
+            <div className="space-y-2">
               {Object.entries(appState.rpcConfigs).map(([id, url]) => (
-                <div key={id} className="flex items-center gap-2 text-sm bg-white p-2 rounded">
-                  <span className="font-semibold text-gray-700">Chain {id}:</span>
-                  <code className="flex-1 text-gray-600 truncate">{url}</code>
-                  <button
+                <div key={id} className="flex items-center gap-2 bg-muted p-2 text-xs">
+                  <span className="font-semibold uppercase">Chain {id}</span>
+                  <code className="flex-1 text-muted-foreground truncate">{url}</code>
+                  <Button
                     onClick={() => onRemoveRpc(id)}
-                    className="text-red-500 hover:text-red-700 px-2"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2"
                   >
-                    Remove
-                  </button>
+                    <X className="h-3 w-3" />
+                  </Button>
                 </div>
               ))}
             </div>
           )}
         </div>
-      </div>
 
-      {/* Home Blockchain Configuration (Optional) */}
-      <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
-        <h3 className="font-semibold mb-3 text-gray-700">Home Blockchain Selection (Optional)</h3>
-        <p className="text-xs text-gray-500 mb-3">
-          Configure which blockchain to use as the "home" blockchain for each asset. This determines where deposits/withdrawals settle. If not set, you'll be prompted when needed.
-        </p>
+        {/* Home Blockchain Configuration */}
         <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider">
+            <Globe className="h-4 w-4" />
+            <span>Home Blockchain (Optional)</span>
+          </div>
+          <Separator />
+          <p className="text-xs text-muted-foreground">
+            Configure which blockchain to use as the "home" blockchain for each asset
+          </p>
           <div className="flex gap-2">
-            <input
+            <Input
               type="text"
               value={homeAsset}
               onChange={(e) => setHomeAsset(e.target.value)}
-              placeholder="Asset (e.g., usdc)"
-              className="w-32 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Asset"
+              className="w-32"
             />
-            <input
+            <Input
               type="text"
               value={homeChainId}
               onChange={(e) => setHomeChainId(e.target.value)}
-              placeholder="Chain ID (e.g., 11155111)"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Chain ID"
+              className="flex-1"
             />
-            <button
+            <Button
               onClick={handleAddHomeBlockchain}
               disabled={appState.connected}
-              className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded font-medium transition disabled:bg-gray-400"
+              variant="secondary"
+              size="sm"
             >
-              Set Home
-            </button>
+              Set
+            </Button>
           </div>
 
           {Object.entries(appState.homeBlockchains).length > 0 && (
-            <div className="mt-2 space-y-1">
-              <p className="text-sm text-gray-600 mb-2">Configured Home Blockchains:</p>
+            <div className="space-y-2">
               {Object.entries(appState.homeBlockchains).map(([asset, chainId]) => (
-                <div key={asset} className="flex items-center gap-2 text-sm bg-white p-2 rounded">
-                  <span className="font-semibold text-gray-700">{asset}:</span>
-                  <code className="flex-1 text-gray-600">Chain {chainId}</code>
-                  <button
+                <div key={asset} className="flex items-center gap-2 bg-muted p-2 text-xs">
+                  <span className="font-semibold uppercase">{asset}</span>
+                  <code className="flex-1 text-muted-foreground">Chain {chainId}</code>
+                  <Button
                     onClick={() => onRemoveHomeBlockchain(asset)}
                     disabled={appState.connected}
-                    className="text-red-500 hover:text-red-700 px-2 disabled:text-gray-400"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2"
                   >
-                    Remove
-                  </button>
+                    <X className="h-3 w-3" />
+                  </Button>
                 </div>
               ))}
             </div>
           )}
         </div>
-      </div>
 
-      {/* Connect/Disconnect */}
-      <div className="flex gap-3">
-        {!appState.connected ? (
-          <button
-            onClick={onConnectNode}
-            disabled={!appState.address}
-            className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded font-medium transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            4. Connect to Node
-          </button>
-        ) : (
-          <>
-            <div className="flex items-center gap-2 bg-green-100 px-4 py-2 rounded">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="text-green-800 font-medium">Connected to Node</span>
-            </div>
-            <button
-              onClick={onDisconnect}
-              className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded font-medium transition"
+        <Separator />
+
+        {/* Connect/Disconnect */}
+        <div className="flex items-center gap-3">
+          {!appState.connected ? (
+            <Button
+              onClick={onConnectNode}
+              disabled={!appState.address}
+              className="gap-2"
+              size="lg"
             >
-              Disconnect
-            </button>
-          </>
-        )}
-      </div>
-    </div>
+              <Server className="h-4 w-4" />
+              4. Connect to Node
+            </Button>
+          ) : (
+            <>
+              <Badge className="px-4 py-2 gap-2">
+                <div className="h-2 w-2 rounded-full bg-secondary-foreground animate-pulse" />
+                <span>Connected to Node</span>
+              </Badge>
+              <Button onClick={onDisconnect} variant="destructive" size="sm">
+                Disconnect
+              </Button>
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -80,48 +80,47 @@ describe('PackState', () => {
     expect(packed).toBe(expectedPackedState);
   });
 
-  //  test('pack_state_without_escrow', async () => {
-  //   // Setup mock asset store
-  //   const assetStore = new MockAssetStore();
-  //   assetStore.addToken(42n, '0x90b7E285ab6cf4e3A2487669dba3E339dB8a3320' as Address, 8);
-  //   assetStore.addToken(4242n, '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address, 14);
+   test('pack_state_without_escrow', async () => {
+    // Setup mock asset store
+    const assetStore = new MockAssetStore();
+    assetStore.addToken(42n, '0x90b7E285ab6cf4e3A2487669dba3E339dB8a3320' as Address, 8);
+    assetStore.addToken(4242n, '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address, 14);
 
-  //   const channelId = '0x3e9dd25a843e3a234c278c6f3fab3983949e2404b276cacb3c47ada06e00f74b';
+    const channelId = '0x3e9dd25a843e3a234c278c6f3fab3983949e2404b276cacb3c47ada06e00f74b';
 
-  //   const decimalFromString = (s: string): Decimal => {
-  //     return new Decimal(s);
-  //   };
+    const decimalFromString = (s: string): Decimal => {
+      return new Decimal(s);
+    };
 
-  //   // Create a state with transitions (metadata will be derived from transitions)
-  //   const state: State = {
-  //     id: '',
-  //     version: 24n,
-  //     asset: 'test',
-  //     userWallet: '0x0' as Address,
-  //     epoch: 0n,
-  //     transitions: [
-  //       newTransition(TransitionType.HomeDeposit, 'tx123', 'account456', new Decimal(1000)),
-  //     ],
-  //     homeChannelId: channelId,
-  //     homeLedger: {
-  //       blockchainId: 42n,
-  //       tokenAddress: '0x90b7E285ab6cf4e3A2487669dba3E339dB8a3320' as Address,
-  //       userBalance: decimalFromString('3'),
-  //       userNetFlow: decimalFromString('2.00000001'),
-  //       nodeBalance: decimalFromString('0'),
-  //       nodeNetFlow: decimalFromString('-0.99999999'),
-  //     },
-  //     escrowLedger: undefined,
-  //   };
+    // Create a state with transitions (metadata will be derived from transitions)
+    const state: State = {
+      id: '',
+      version: 24n,
+      asset: 'test',
+      userWallet: '0x0' as Address,
+      epoch: 0n,
+      transitions: [
+        newTransition(TransitionType.HomeDeposit, 'tx123', 'account456', new Decimal(1000)),
+      ],
+      homeChannelId: channelId,
+      homeLedger: {
+        blockchainId: 42n,
+        tokenAddress: '0x90b7E285ab6cf4e3A2487669dba3E339dB8a3320' as Address,
+        userBalance: decimalFromString('3'),
+        userNetFlow: decimalFromString('2.00000001'),
+        nodeBalance: decimalFromString('0'),
+        nodeNetFlow: decimalFromString('-0.99999999'),
+      },
+      escrowLedger: undefined,
+    };
 
-  //   const packer = newStatePackerV1(assetStore);
-  //   const packed = await packer.packState(state);
-  //   expect(packed).toBeDefined();
+    const packer = newStatePackerV1(assetStore);
+    const packed = await packer.packState(state);
+    expect(packed).toBeDefined();
 
-  //   const expectedPackedState =
-  //     '0x3e9dd25a843e3a234c278c6f3fab3983949e2404b276cacb3c47ada06e00f74b000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000026d621872dd3d14fe6f6ddb415d586e62fb584ffda861ac379bf0d0a0e6410bd6000000000000000000000000000000000000000000000000000000000000002a00000000000000000000000090b7e285ab6cf4e3a2487669dba3e339db8a332000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000011e1a300000000000000000000000000000000000000000000000000000000000bebc2010000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffa0a1f010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
+    const expectedPackedState =
+      '0x3e9dd25a843e3a234c278c6f3fab3983949e2404b276cacb3c47ada06e00f74b0000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000000234cf7c712e3949d1cd9bdf9403149be906146248f9401df1f393f12e6f209355000000000000000000000000000000000000000000000000000000000000002a00000000000000000000000090b7e285ab6cf4e3a2487669dba3e339db8a332000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000011e1a300000000000000000000000000000000000000000000000000000000000bebc2010000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffa0a1f010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
 
-  //   const packedHex = '0x' + Buffer.from(packed).toString('hex');
-  //   expect(packedHex).toBe(expectedPackedState);
-  // });
+    expect(packed).toBe(expectedPackedState);
+  });
 });

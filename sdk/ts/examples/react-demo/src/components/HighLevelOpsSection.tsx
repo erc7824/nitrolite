@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import Decimal from 'decimal.js';
+import { ArrowDownToLine, ArrowUpFromLine, Send, XCircle } from 'lucide-react';
 import type { Client } from '@erc7824/nitrolite';
 import type { StatusMessage } from '../types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 interface HighLevelOpsSectionProps {
   client: Client;
@@ -29,12 +33,9 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
       setLoading('deposit');
       const amount = new Decimal(depositAmount);
       const txHash = await client.deposit(BigInt(depositChainId), depositAsset, amount);
-
-      console.log('Deposit successful. Transaction:', txHash);
       showStatus('success', 'Deposit completed', `Transaction: ${txHash}`);
       setDepositAmount('');
     } catch (error) {
-      console.error('Deposit failed:', error);
       showStatus('error', 'Deposit failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
@@ -46,12 +47,9 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
       setLoading('withdraw');
       const amount = new Decimal(withdrawAmount);
       const txHash = await client.withdraw(BigInt(withdrawChainId), withdrawAsset, amount);
-
-      console.log('Withdrawal successful. Transaction:', txHash);
       showStatus('success', 'Withdrawal completed', `Transaction: ${txHash}`);
       setWithdrawAmount('');
     } catch (error) {
-      console.error('Withdrawal failed:', error);
       showStatus('error', 'Withdrawal failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
@@ -63,12 +61,9 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
       setLoading('transfer');
       const amount = new Decimal(transferAmount);
       const txId = await client.transfer(transferRecipient as `0x${string}`, transferAsset, amount);
-
-      console.log('Transfer successful. Transaction ID:', txId);
       showStatus('success', 'Transfer completed', `Transaction ID: ${txId}`);
       setTransferAmount('');
     } catch (error) {
-      console.error('Transfer failed:', error);
       showStatus('error', 'Transfer failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
@@ -79,11 +74,8 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
     try {
       setLoading('close');
       const txHash = await client.closeHomeChannel(closeAsset);
-
-      console.log('Channel closed successfully. Transaction:', txHash);
       showStatus('success', 'Channel closed', `Transaction: ${txHash}`);
     } catch (error) {
-      console.error('Channel close failed:', error);
       showStatus('error', 'Close channel failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
@@ -91,138 +83,137 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">High-Level Operations</h2>
-      <p className="text-sm text-gray-600 mb-6">Smart client operations with automatic state management</p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Deposit */}
-        <div className="border border-gray-200 rounded p-4">
-          <h3 className="font-semibold mb-3 text-green-700">Deposit</h3>
-          <div className="space-y-3">
-            <input
+    <Card>
+      <CardHeader>
+        <CardTitle>High-Level Operations</CardTitle>
+        <CardDescription>Smart client operations with automatic state management</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Deposit */}
+          <div className="border border-border p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ArrowDownToLine className="h-4 w-4" />
+              <h3 className="text-sm font-semibold uppercase tracking-wider">Deposit</h3>
+            </div>
+            <Input
               type="text"
               value={depositChainId}
               onChange={(e) => setDepositChainId(e.target.value)}
-              placeholder="Chain ID (e.g., 80002)"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Chain ID"
             />
-            <input
+            <Input
               type="text"
               value={depositAsset}
               onChange={(e) => setDepositAsset(e.target.value)}
-              placeholder="Asset (e.g., usdc)"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Asset"
             />
-            <input
+            <Input
               type="text"
               value={depositAmount}
               onChange={(e) => setDepositAmount(e.target.value)}
               placeholder="Amount"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
             />
-            <button
+            <Button
               onClick={handleDeposit}
               disabled={loading === 'deposit' || !depositChainId || !depositAsset || !depositAmount}
-              className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded font-medium transition disabled:bg-gray-400"
+              className="w-full"
             >
               {loading === 'deposit' ? 'Processing...' : 'Deposit'}
-            </button>
+            </Button>
           </div>
-        </div>
 
-        {/* Withdraw */}
-        <div className="border border-gray-200 rounded p-4">
-          <h3 className="font-semibold mb-3 text-blue-700">Withdraw</h3>
-          <div className="space-y-3">
-            <input
+          {/* Withdraw */}
+          <div className="border border-border p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ArrowUpFromLine className="h-4 w-4" />
+              <h3 className="text-sm font-semibold uppercase tracking-wider">Withdraw</h3>
+            </div>
+            <Input
               type="text"
               value={withdrawChainId}
               onChange={(e) => setWithdrawChainId(e.target.value)}
-              placeholder="Chain ID (e.g., 80002)"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Chain ID"
             />
-            <input
+            <Input
               type="text"
               value={withdrawAsset}
               onChange={(e) => setWithdrawAsset(e.target.value)}
-              placeholder="Asset (e.g., usdc)"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Asset"
             />
-            <input
+            <Input
               type="text"
               value={withdrawAmount}
               onChange={(e) => setWithdrawAmount(e.target.value)}
               placeholder="Amount"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <button
+            <Button
               onClick={handleWithdraw}
               disabled={loading === 'withdraw' || !withdrawChainId || !withdrawAsset || !withdrawAmount}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded font-medium transition disabled:bg-gray-400"
+              className="w-full"
             >
               {loading === 'withdraw' ? 'Processing...' : 'Withdraw'}
-            </button>
+            </Button>
           </div>
-        </div>
 
-        {/* Transfer */}
-        <div className="border border-gray-200 rounded p-4">
-          <h3 className="font-semibold mb-3 text-purple-700">Transfer</h3>
-          <div className="space-y-3">
-            <input
+          {/* Transfer */}
+          <div className="border border-border p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Send className="h-4 w-4" />
+              <h3 className="text-sm font-semibold uppercase tracking-wider">Transfer</h3>
+            </div>
+            <Input
               type="text"
               value={transferRecipient}
               onChange={(e) => setTransferRecipient(e.target.value)}
-              placeholder="Recipient address (0x...)"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Recipient (0x...)"
+              className="font-mono text-xs"
             />
-            <input
+            <Input
               type="text"
               value={transferAsset}
               onChange={(e) => setTransferAsset(e.target.value)}
-              placeholder="Asset (e.g., usdc)"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Asset"
             />
-            <input
+            <Input
               type="text"
               value={transferAmount}
               onChange={(e) => setTransferAmount(e.target.value)}
               placeholder="Amount"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
-            <button
+            <Button
               onClick={handleTransfer}
               disabled={loading === 'transfer' || !transferRecipient || !transferAsset || !transferAmount}
-              className="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 rounded font-medium transition disabled:bg-gray-400"
+              className="w-full"
             >
               {loading === 'transfer' ? 'Processing...' : 'Transfer'}
-            </button>
+            </Button>
           </div>
-        </div>
 
-        {/* Close Channel */}
-        <div className="border border-gray-200 rounded p-4">
-          <h3 className="font-semibold mb-3 text-red-700">Close Channel</h3>
-          <div className="space-y-3">
-            <input
+          {/* Close Channel */}
+          <div className="border border-border p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <XCircle className="h-4 w-4" />
+              <h3 className="text-sm font-semibold uppercase tracking-wider">Close Channel</h3>
+            </div>
+            <Input
               type="text"
               value={closeAsset}
               onChange={(e) => setCloseAsset(e.target.value)}
-              placeholder="Asset (e.g., usdc)"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Asset"
             />
-            <button
+            <Button
               onClick={handleCloseChannel}
               disabled={loading === 'close' || !closeAsset}
-              className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded font-medium transition disabled:bg-gray-400"
+              variant="destructive"
+              className="w-full"
             >
               {loading === 'close' ? 'Processing...' : 'Close Channel'}
-            </button>
-            <p className="text-xs text-gray-500">Warning: This will finalize and close the channel</p>
+            </Button>
+            <p className="text-xs text-muted-foreground">Warning: This will finalize and close the channel</p>
           </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

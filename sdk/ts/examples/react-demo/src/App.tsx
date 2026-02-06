@@ -271,21 +271,28 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Yellow TS  SDK Demo
-          </h1>
-          {autoConnecting && (
-            <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              <span className="text-sm text-blue-700 font-medium">Reconnecting wallet and node...</span>
+    <div className="min-h-screen bg-background">
+      {/* Header Bar */}
+      <header className="border-b border-border bg-card">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight uppercase">
+                Yellow Network
+              </h1>
+              <p className="text-sm text-muted-foreground mt-0.5">Nitrolite SDK Demo</p>
             </div>
-          )}
+            {autoConnecting && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-muted border border-border">
+                <div className="animate-spin rounded-full h-3 w-3 border-2 border-accent border-t-transparent"></div>
+                <span className="text-xs uppercase tracking-wider font-medium">Reconnecting...</span>
+              </div>
+            )}
+          </div>
         </div>
+      </header>
 
+      <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Status Bar */}
         {status && <StatusBar status={status} onClose={() => setStatus(null)} />}
 
@@ -306,7 +313,7 @@ function App() {
 
         {/* Operations Sections - Only show when connected */}
         {appState.connected && appState.client && (
-          <div className="space-y-6">
+          <div className="space-y-6 mt-6">
             {/* Token Allowance Management */}
             <AllowanceSection
               client={appState.client}
@@ -342,22 +349,24 @@ function App() {
             />
           </div>
         )}
+      </main>
 
-        {/* Footer */}
-        <div className="mt-12 text-center text-sm text-gray-500">
-          <p>Nitrolite SDK v0.5.2 - Built with React & Tailwind</p>
+      {/* Footer */}
+      <footer className="border-t border-border mt-16 py-6">
+        <div className="max-w-7xl mx-auto px-6 text-center text-xs text-muted-foreground">
+          <p className="uppercase tracking-wider">Nitrolite SDK v0.5.2</p>
           <p className="mt-1">
             <a
               href="https://github.com/erc7824/nitrolite"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800"
+              className="hover:text-accent transition-colors"
             >
               GitHub Repository
             </a>
           </p>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

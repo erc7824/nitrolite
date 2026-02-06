@@ -24,13 +24,14 @@ import {
 import { packCreateAppSessionRequestV1, packAppStateUpdateV1 } from '../../src/app/packing';
 
 async function main() {
-  const wsURL = 'wss://clearnode-v1-rc.yellow.org/ws';
+  // Replace with a real deployment url
+  const wsURL = 'wss://deployment.yellow.org/ws';
 
   // --- 0. Setup Wallets ---
   // Replace these strings with your actual hex private keys
-  const wallet1PrivateKey = '0x7d6071201765d2630ca9eb83cbe3e2e2e76f9b56ea3ed13a49a00208ebcdf843';
-  const wallet2PrivateKey = '0x9b6521133af49807e72b8ecc68ef79706fe374685214130079c375810ec47fe3';
-  const wallet3PrivateKey = '0xf636952f9d68984a78ef45ea82480723b8a2c40127111cf83d384f8dcd3b77f8';
+  const wallet1PrivateKey = '0x7d607...';
+  const wallet2PrivateKey = '0x9b652...';
+  const wallet3PrivateKey = '0xf6369...';
 
   // Create signers from private keys
   const wallet1Signers = createSigners(wallet1PrivateKey);

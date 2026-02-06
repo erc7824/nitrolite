@@ -1,3 +1,5 @@
+import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { StatusMessage } from '../types';
 
 interface StatusBarProps {
@@ -6,20 +8,47 @@ interface StatusBarProps {
 }
 
 export default function StatusBar({ status, onClose }: StatusBarProps) {
-  const bgColors = {
-    success: 'bg-green-100 border-green-400 text-green-800',
-    error: 'bg-red-100 border-red-400 text-red-800',
-    info: 'bg-blue-100 border-blue-400 text-blue-800',
+  const variants = {
+    success: {
+      bg: 'bg-accent/10 border-accent',
+      text: 'text-foreground',
+      icon: CheckCircle,
+    },
+    error: {
+      bg: 'bg-destructive/10 border-destructive',
+      text: 'text-destructive',
+      icon: AlertCircle,
+    },
+    info: {
+      bg: 'bg-muted border-border',
+      text: 'text-foreground',
+      icon: Info,
+    },
   };
 
+  const { bg, text, icon: Icon } = variants[status.type];
+
   return (
-    <div className={`fixed top-4 right-4 max-w-md border-l-4 p-4 rounded shadow-lg z-50 ${bgColors[status.type]}`}>
-      <div className="flex justify-between items-start">
-        <div className="flex-1">
-          <p className="font-semibold">{status.message}</p>
-          {status.details && <p className="text-sm mt-1">{status.details}</p>}
+    <div
+      className={cn(
+        'fixed top-6 right-6 max-w-md border-l-4 border p-4 z-50 animate-in slide-in-from-right-5',
+        bg
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <Icon className={cn('h-5 w-5 flex-shrink-0 mt-0.5', text)} />
+        <div className="flex-1 space-y-1">
+          <p className="text-sm font-semibold uppercase tracking-wide">{status.message}</p>
+          {status.details && (
+            <p className="text-xs text-muted-foreground font-mono break-all">{status.details}</p>
+          )}
         </div>
-        <button onClick={onClose} className="ml-4 text-xl leading-none">&times;</button>
+        <button
+          onClick={onClose}
+          className="flex-shrink-0 hover:bg-muted p-1 transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );

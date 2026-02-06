@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import Decimal from 'decimal.js';
+import { ChevronDown, ChevronUp, CheckCircle2, Search, Info } from 'lucide-react';
 import type { Client } from '@erc7824/nitrolite';
 import type { StatusMessage } from '../types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Separator } from './ui/separator';
 
 interface AllowanceSectionProps {
   client: Client;
@@ -17,7 +21,6 @@ export default function AllowanceSection({ client, defaultAddress, showStatus }:
   const [currentAllowance, setCurrentAllowance] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
 
-  // Check current allowance
   const checkAllowance = async () => {
     if (!tokenAddress || !chainId) {
       showStatus('error', 'Missing fields', 'Please enter token address and chain ID');
@@ -33,10 +36,8 @@ export default function AllowanceSection({ client, defaultAddress, showStatus }:
       );
 
       setCurrentAllowance(allowance.toString());
-      console.log('Allowance checked:', allowance.toString());
       showStatus('success', 'Allowance checked', `Current allowance: ${allowance.toString()}`);
     } catch (error) {
-      console.error('Failed to check allowance:', error);
       showStatus('error', 'Check failed', error instanceof Error ? error.message : String(error));
       setCurrentAllowance('Error');
     } finally {
@@ -53,20 +54,12 @@ export default function AllowanceSection({ client, defaultAddress, showStatus }:
     try {
       setLoading('approve');
       const amountBig = BigInt(amount);
+      const hash = await client.approveToken(BigInt(chainId), tokenAddress, amountBig);
 
-      const hash = await client.approveToken(
-        BigInt(chainId),
-        tokenAddress,
-        amountBig
-      );
-
-      console.log('Approval successful. Transaction hash:', hash);
       showStatus('success', 'Allowance approved', `Transaction: ${hash}`);
-
       await checkAllowance();
       setAmount('');
     } catch (error) {
-      console.error('Approval failed:', error);
       showStatus('error', 'Approval failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
@@ -74,114 +67,122 @@ export default function AllowanceSection({ client, defaultAddress, showStatus }:
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Token Allowance</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Approve the contract to spend your tokens. <strong>Required before deposits!</strong>
-          </p>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <CardTitle>Token Allowance</CardTitle>
+            <CardDescription>
+              Approve the contract to spend your tokens. <span className="text-accent font-semibold">Required before deposits</span>
+            </CardDescription>
+          </div>
+          <Button
+            onClick={() => setIsExpanded(!isExpanded)}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="h-4 w-4" />
+                Hide
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-4 w-4" />
+                Show
+              </>
+            )}
+          </Button>
         </div>
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="ml-4 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium transition"
-        >
-          {isExpanded ? '▲ Hide' : '▼ Show'}
-        </button>
-      </div>
+      </CardHeader>
 
       {isExpanded && (
-        <div className="grid grid-cols-1 gap-6">
-        {/* Approve Section */}
-        <div className="border border-blue-200 rounded p-4 bg-blue-50">
-          <h3 className="font-semibold mb-3 text-blue-700">Approve Token Spending</h3>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Chain ID
-              </label>
-              <input
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wider font-semibold">Chain ID</label>
+              <Input
                 type="text"
                 value={chainId}
                 onChange={(e) => setChainId(e.target.value)}
                 placeholder="11155111 (Sepolia)"
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Token Address
-              </label>
-              <input
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wider font-semibold">Token Address</label>
+              <Input
                 type="text"
                 value={tokenAddress}
                 onChange={(e) => setTokenAddress(e.target.value)}
-                placeholder="0x... (ERC20 token contract address)"
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="0x..."
+                className="font-mono text-xs"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground">
                 Example USDC on Sepolia: 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
               </p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Amount (in smallest unit - e.g., 1000000 = 1 USDC with 6 decimals)
-              </label>
-              <input
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wider font-semibold">Amount</label>
+              <Input
                 type="text"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="1000000 (for 6 decimal tokens) or very large number"
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="1000000"
+                className="font-mono"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                💡 Tip: Use 115792089237316195423570985008687907853269984665640564039457584007913129639935 for unlimited
+              <p className="text-xs text-muted-foreground">
+                Amount in smallest unit (e.g., 1000000 = 1 USDC with 6 decimals)
               </p>
             </div>
 
             {currentAllowance !== null && (
-              <div className="bg-white border border-blue-300 rounded p-3">
-                <p className="text-sm">
-                  <span className="font-medium text-blue-900">Current Allowance:</span>{' '}
-                  <span className="font-mono text-blue-700">{currentAllowance}</span>
-                </p>
+              <div className="bg-muted p-3 space-y-1">
+                <p className="text-xs uppercase tracking-wider font-semibold">Current Allowance</p>
+                <code className="text-xs font-mono break-all">{currentAllowance}</code>
               </div>
             )}
 
-            <div className="flex gap-2">
-              <button
+            <div className="grid grid-cols-2 gap-2">
+              <Button
                 onClick={handleApprove}
                 disabled={loading === 'approve' || !tokenAddress || !amount || !chainId}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded font-medium transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="gap-2"
               >
-                {loading === 'approve' ? '⏳ Approving...' : '✅ Approve'}
-              </button>
-              <button
+                <CheckCircle2 className="h-4 w-4" />
+                {loading === 'approve' ? 'Approving...' : 'Approve'}
+              </Button>
+              <Button
                 onClick={checkAllowance}
                 disabled={loading === 'check' || !tokenAddress || !chainId}
-                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded font-medium transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                variant="secondary"
+                className="gap-2"
               >
-                {loading === 'check' ? '⏳ Checking...' : '🔍 Check Allowance'}
-              </button>
+                <Search className="h-4 w-4" />
+                {loading === 'check' ? 'Checking...' : 'Check'}
+              </Button>
             </div>
           </div>
-        </div>
 
-        {/* Info Section */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
-          <h4 className="font-semibold text-yellow-900 mb-2">ℹ️ About Token Allowances</h4>
-          <ul className="text-sm text-yellow-800 space-y-1">
-            <li>✓ Allowance lets the contract spend your tokens on your behalf</li>
-            <li>✓ <strong>Required before making deposits</strong> to the channel</li>
-            <li>✓ You can approve unlimited tokens or a specific amount</li>
-            <li>✓ Check your current allowance before approving more</li>
-            <li>✓ Amount must be in smallest unit (e.g., 1 USDC = 1000000 if 6 decimals)</li>
-          </ul>
-        </div>
-      </div>
+          <Separator />
+
+          <div className="bg-accent/10 border border-accent/20 p-4 space-y-2">
+            <div className="flex items-start gap-2">
+              <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div className="space-y-1 text-xs">
+                <p className="font-semibold uppercase tracking-wider">About Allowances</p>
+                <ul className="space-y-0.5 text-muted-foreground">
+                  <li>• Lets the contract spend tokens on your behalf</li>
+                  <li>• Required before making deposits</li>
+                  <li>• You can approve unlimited or specific amount</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
 }

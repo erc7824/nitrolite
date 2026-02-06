@@ -1,6 +1,10 @@
 import { useState } from 'react';
+import { Database, Home, Lock } from 'lucide-react';
 import type { Client } from '@erc7824/nitrolite';
 import type { StatusMessage } from '../types';
+import { CollapsibleCard } from './ui/collapsible-card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 interface LowLevelSectionProps {
   client: Client;
@@ -64,137 +68,204 @@ export default function LowLevelSection({ client, defaultAddress, showStatus }: 
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">Low-Level State Management</h2>
-      <p className="text-sm text-gray-600 mb-6">Direct access to channel states and information</p>
-
+    <CollapsibleCard
+      title="Low-Level State Management"
+      description="Direct access to channel states and information"
+      defaultOpen={false}
+    >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* Get Latest State */}
-        <div className="border border-gray-200 rounded p-4">
-          <h3 className="font-semibold mb-3 text-gray-700">Get Latest State</h3>
-          <div className="space-y-3">
-            <input
-              type="text"
-              value={stateWallet}
-              onChange={(e) => setStateWallet(e.target.value)}
-              placeholder="Wallet address"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-            <input
-              type="text"
-              value={stateAsset}
-              onChange={(e) => setStateAsset(e.target.value)}
-              placeholder="Asset"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-            <button
-              onClick={handleGetState}
-              disabled={loading || !stateWallet || !stateAsset}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded font-medium transition disabled:bg-gray-400 text-sm"
-            >
-              {loading ? 'Loading...' : 'Get State'}
-            </button>
+        <div className="border border-border p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            <h3 className="text-sm font-semibold uppercase tracking-wider">Get Latest State</h3>
           </div>
+          <Input
+            type="text"
+            value={stateWallet}
+            onChange={(e) => setStateWallet(e.target.value)}
+            placeholder="Wallet address"
+            className="font-mono text-xs"
+          />
+          <Input
+            type="text"
+            value={stateAsset}
+            onChange={(e) => setStateAsset(e.target.value)}
+            placeholder="Asset"
+          />
+          <Button
+            onClick={handleGetState}
+            disabled={loading || !stateWallet || !stateAsset}
+            className="w-full"
+          >
+            {loading ? 'Loading...' : 'Get State'}
+          </Button>
         </div>
 
         {/* Get Home Channel */}
-        <div className="border border-gray-200 rounded p-4">
-          <h3 className="font-semibold mb-3 text-gray-700">Get Home Channel</h3>
-          <div className="space-y-3">
-            <input
-              type="text"
-              value={homeChannelWallet}
-              onChange={(e) => setHomeChannelWallet(e.target.value)}
-              placeholder="Wallet address"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-            <input
-              type="text"
-              value={homeChannelAsset}
-              onChange={(e) => setHomeChannelAsset(e.target.value)}
-              placeholder="Asset"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-            <button
-              onClick={handleGetHomeChannel}
-              disabled={loading || !homeChannelWallet || !homeChannelAsset}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded font-medium transition disabled:bg-gray-400 text-sm"
-            >
-              {loading ? 'Loading...' : 'Get Channel'}
-            </button>
+        <div className="border border-border p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Home className="h-4 w-4" />
+            <h3 className="text-sm font-semibold uppercase tracking-wider">Get Home Channel</h3>
           </div>
+          <Input
+            type="text"
+            value={homeChannelWallet}
+            onChange={(e) => setHomeChannelWallet(e.target.value)}
+            placeholder="Wallet address"
+            className="font-mono text-xs"
+          />
+          <Input
+            type="text"
+            value={homeChannelAsset}
+            onChange={(e) => setHomeChannelAsset(e.target.value)}
+            placeholder="Asset"
+          />
+          <Button
+            onClick={handleGetHomeChannel}
+            disabled={loading || !homeChannelWallet || !homeChannelAsset}
+            className="w-full"
+          >
+            {loading ? 'Loading...' : 'Get Channel'}
+          </Button>
         </div>
 
         {/* Get Escrow Channel */}
-        <div className="border border-gray-200 rounded p-4">
-          <h3 className="font-semibold mb-3 text-gray-700">Get Escrow Channel</h3>
-          <div className="space-y-3">
-            <input
-              type="text"
-              value={escrowChannelId}
-              onChange={(e) => setEscrowChannelId(e.target.value)}
-              placeholder="Escrow Channel ID"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-            <button
-              onClick={handleGetEscrowChannel}
-              disabled={loading || !escrowChannelId}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded font-medium transition disabled:bg-gray-400 text-sm"
-            >
-              {loading ? 'Loading...' : 'Get Channel'}
-            </button>
+        <div className="border border-border p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Lock className="h-4 w-4" />
+            <h3 className="text-sm font-semibold uppercase tracking-wider">Get Escrow Channel</h3>
           </div>
+          <Input
+            type="text"
+            value={escrowChannelId}
+            onChange={(e) => setEscrowChannelId(e.target.value)}
+            placeholder="Escrow Channel ID"
+            className="font-mono text-xs"
+          />
+          <Button
+            onClick={handleGetEscrowChannel}
+            disabled={loading || !escrowChannelId}
+            className="w-full"
+          >
+            {loading ? 'Loading...' : 'Get Channel'}
+          </Button>
         </div>
       </div>
 
       {/* Results Display */}
       {result && (
-        <div className="mt-4 bg-gray-50 rounded p-4 border border-gray-200 max-h-96 overflow-y-auto">
-          <h3 className="font-semibold mb-3 text-gray-700">Results:</h3>
+        <div className="mt-4 bg-muted p-4 border border-border max-h-96 overflow-y-auto">
+          <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Results:</h3>
 
           {activeView === 'state' && (
             <div className="space-y-2 text-sm">
-              <div><span className="font-medium">Version:</span> {result.version?.toString()}</div>
-              <div><span className="font-medium">Epoch:</span> {result.epoch?.toString()}</div>
-              <div><span className="font-medium">State ID:</span> {result.id}</div>
-              {result.homeChannelId && <div><span className="font-medium">Channel:</span> {result.homeChannelId}</div>}
-              <div className="mt-3 font-medium">Home Ledger:</div>
-              <div className="ml-4 space-y-1">
-                <div>Chain: {(result.homeLedger?.blockchainId || result.homeLedger?.blockchain_id)?.toString()}</div>
-                <div>Token: {result.homeLedger?.tokenAddress || result.homeLedger?.token_address}</div>
-                <div>User Balance: {result.homeLedger?.userBalance?.toString() || result.homeLedger?.user_balance?.toString()}</div>
-                <div>Node Balance: {result.homeLedger?.nodeBalance?.toString() || result.homeLedger?.node_balance?.toString()}</div>
-                <div>User NetFlow: {result.homeLedger?.userNetFlow?.toString() || result.homeLedger?.user_net_flow?.toString()}</div>
-                <div>Node NetFlow: {result.homeLedger?.nodeNetFlow?.toString() || result.homeLedger?.node_net_flow?.toString()}</div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[120px]">Version:</span>
+                <span className="font-mono text-xs">{result.version?.toString()}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[120px]">Epoch:</span>
+                <span className="font-mono text-xs">{result.epoch?.toString()}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[120px]">State ID:</span>
+                <span className="font-mono text-xs break-all">{result.id}</span>
+              </div>
+              {result.homeChannelId && (
+                <div className="flex gap-2">
+                  <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[120px]">Channel:</span>
+                  <span className="font-mono text-xs break-all">{result.homeChannelId}</span>
+                </div>
+              )}
+              <div className="mt-4 pt-3 border-t border-border">
+                <div className="font-semibold uppercase tracking-wider text-xs mb-2">Home Ledger:</div>
+                <div className="ml-4 space-y-1.5 text-xs">
+                  <div className="flex gap-2">
+                    <span className="font-semibold uppercase tracking-wider text-muted-foreground min-w-[140px]">Chain:</span>
+                    <span className="font-mono">{(result.homeLedger?.blockchainId || result.homeLedger?.blockchain_id)?.toString()}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold uppercase tracking-wider text-muted-foreground min-w-[140px]">Token:</span>
+                    <span className="font-mono break-all">{result.homeLedger?.tokenAddress || result.homeLedger?.token_address}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold uppercase tracking-wider text-muted-foreground min-w-[140px]">User Balance:</span>
+                    <span className="font-mono">{result.homeLedger?.userBalance?.toString() || result.homeLedger?.user_balance?.toString()}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold uppercase tracking-wider text-muted-foreground min-w-[140px]">Node Balance:</span>
+                    <span className="font-mono">{result.homeLedger?.nodeBalance?.toString() || result.homeLedger?.node_balance?.toString()}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold uppercase tracking-wider text-muted-foreground min-w-[140px]">User NetFlow:</span>
+                    <span className="font-mono">{result.homeLedger?.userNetFlow?.toString() || result.homeLedger?.user_net_flow?.toString()}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold uppercase tracking-wider text-muted-foreground min-w-[140px]">Node NetFlow:</span>
+                    <span className="font-mono">{result.homeLedger?.nodeNetFlow?.toString() || result.homeLedger?.node_net_flow?.toString()}</span>
+                  </div>
+                </div>
               </div>
               {result.transitions && result.transitions.length > 0 && (
-                <>
-                  <div className="mt-3 font-medium">Transitions: {result.transitions.length}</div>
-                  {result.transitions.map((t: any, idx: number) => (
-                    <div key={idx} className="ml-4 text-xs">
-                      {idx + 1}. {t.type} (Amount: {t.amount?.toString()})
-                    </div>
-                  ))}
-                </>
+                <div className="mt-4 pt-3 border-t border-border">
+                  <div className="font-semibold uppercase tracking-wider text-xs mb-2">
+                    Transitions: {result.transitions.length}
+                  </div>
+                  <div className="ml-4 space-y-1">
+                    {result.transitions.map((t: any, idx: number) => (
+                      <div key={idx} className="text-xs font-mono">
+                        {idx + 1}. {t.type} (Amount: {t.amount?.toString()})
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
 
           {(activeView === 'homeChannel' || activeView === 'escrowChannel') && (
             <div className="space-y-2 text-sm">
-              <div><span className="font-medium">Channel ID:</span> {result.channelId || result.channel_id}</div>
-              <div><span className="font-medium">User Wallet:</span> {result.userWallet || result.user_wallet}</div>
-              <div><span className="font-medium">Type:</span> {result.type}</div>
-              <div><span className="font-medium">Status:</span> {result.status}</div>
-              <div><span className="font-medium">Version:</span> {(result.stateVersion || result.state_version)?.toString()}</div>
-              <div><span className="font-medium">Nonce:</span> {result.nonce?.toString()}</div>
-              <div><span className="font-medium">Chain ID:</span> {(result.blockchainId || result.blockchain_id)?.toString()}</div>
-              <div><span className="font-medium">Token:</span> {result.tokenAddress || result.token_address}</div>
-              <div><span className="font-medium">Challenge Duration:</span> {(result.challengeDuration || result.challenge_duration)?.toString()}s</div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[160px]">Channel ID:</span>
+                <span className="font-mono text-xs break-all">{result.channelId || result.channel_id}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[160px]">User Wallet:</span>
+                <span className="font-mono text-xs break-all">{result.userWallet || result.user_wallet}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[160px]">Type:</span>
+                <span className="font-mono text-xs">{result.type}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[160px]">Status:</span>
+                <span className="font-mono text-xs">{result.status}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[160px]">Version:</span>
+                <span className="font-mono text-xs">{(result.stateVersion || result.state_version)?.toString()}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[160px]">Nonce:</span>
+                <span className="font-mono text-xs">{result.nonce?.toString()}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[160px]">Chain ID:</span>
+                <span className="font-mono text-xs">{(result.blockchainId || result.blockchain_id)?.toString()}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[160px]">Token:</span>
+                <span className="font-mono text-xs break-all">{result.tokenAddress || result.token_address}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="font-semibold uppercase tracking-wider text-xs text-muted-foreground min-w-[160px]">Challenge Duration:</span>
+                <span className="font-mono text-xs">{(result.challengeDuration || result.challenge_duration)?.toString()}s</span>
+              </div>
             </div>
           )}
         </div>
       )}
-    </div>
+    </CollapsibleCard>
   );
 }

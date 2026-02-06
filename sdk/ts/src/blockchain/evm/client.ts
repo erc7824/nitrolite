@@ -112,6 +112,43 @@ export class Client {
     return new Decimal(balance.toString()).div(Decimal.pow(10, decimals));
   }
 
+  // ========= Public Token Operations =========
+
+  /**
+   * Check the current allowance for an asset
+   */
+  async checkAllowance(asset: string, owner: Address): Promise<Decimal> {
+    return await this.getAllowance(asset, owner);
+  }
+
+  /**
+   * Approve the contract to spend tokens for an asset
+   */
+  async approveToken(asset: string, amount: Decimal): Promise<string> {
+    const tokenAddress = await this.assetStore.getTokenAddress(asset, this.blockchainId);
+    const decimals = await this.assetStore.getTokenDecimals(this.blockchainId, tokenAddress);
+    const amountBig = decimalToBigInt(amount, decimals);
+
+    const erc20 = newERC20(tokenAddress, this.evmClient, this.walletSigner);
+    return await erc20.approve(this.contractAddress, amountBig);
+  }
+
+  /**
+   * Approve the contract to spend tokens by token address
+   */
+  async approveTokenByAddress(tokenAddress: Address, amount: bigint): Promise<string> {
+    const erc20 = newERC20(tokenAddress, this.evmClient, this.walletSigner);
+    return await erc20.approve(this.contractAddress, amount);
+  }
+
+  /**
+   * Check allowance by token address
+   */
+  async checkAllowanceByAddress(tokenAddress: Address, owner: Address): Promise<bigint> {
+    const erc20 = newERC20(tokenAddress, this.evmClient);
+    return await erc20.allowance(owner, this.contractAddress);
+  }
+
   // ========= Getters - ChannelHub =========
 
   async getNodeBalance(token: Address): Promise<Decimal> {
@@ -177,28 +214,107 @@ export class Client {
     const decimals = await this.assetStore.getTokenDecimals(this.blockchainId, token);
     const amountBig = decimalToBigInt(amount, decimals);
 
-    const hash = await this.walletSigner.writeContract({
-      address: this.contractAddress,
-      abi: ChannelHubAbi,
-      functionName: 'depositToVault',
-      args: [node, token, amountBig],
-      chain: undefined,
-    } as any);
-    return hash;
+    console.log('💳 EVM Client - Deposit transaction:', {
+      contractAddress: this.contractAddress,
+      blockchainId: this.blockchainId.toString(),
+      node,
+      token,
+      amount: amount.toString(),
+      amountBig: amountBig.toString(),
+      walletChain: this.walletSigner.chain?.id,
+      walletChainName: this.walletSigner.chain?.name
+    });
+
+    try {
+      // Simulate transaction first to catch errors before submitting
+      console.log('🔍 Simulating deposit...');
+      const { request } = await this.evmClient.simulateContract({
+        address: this.contractAddress,
+        abi: ChannelHubAbi,
+        functionName: 'depositToVault',
+        args: [node, token, amountBig],
+        account: this.walletSigner.account!.address,
+      });
+
+      console.log('✅ Simulation successful - executing deposit...');
+
+      // Execute the validated transaction
+      const hash = await this.walletSigner.writeContract(request);
+
+      console.log('📤 Deposit transaction submitted - hash:', hash);
+      console.log('⏳ Waiting for confirmation...');
+
+      // Wait for transaction receipt
+      const receipt = await this.evmClient.waitForTransactionReceipt({ hash });
+
+      console.log('✅ Deposit transaction confirmed!', {
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed.toString(),
+      });
+
+      return hash;
+    } catch (error: any) {
+      console.error('❌ Deposit transaction failed at blockchain level');
+      if (error.message?.includes('not supported') || error.message?.includes('not available')) {
+        console.error('⚠️  RPC ENDPOINT ISSUE: The RPC endpoint does not support sending transactions.');
+        console.error('    This usually means the RPC only supports read operations (eth_call, eth_getBalance, etc.)');
+        console.error('    but not write operations (eth_sendTransaction).');
+        console.error('    Solutions:');
+        console.error('      1. Use an RPC provider that supports transactions (Infura, Alchemy, etc.)');
+        console.error('      2. Make sure your RPC endpoint includes transaction capabilities');
+      }
+      throw error;
+    }
   }
 
   async withdraw(node: Address, token: Address, amount: Decimal): Promise<string> {
     const decimals = await this.assetStore.getTokenDecimals(this.blockchainId, token);
     const amountBig = decimalToBigInt(amount, decimals);
 
-    const hash = await this.walletSigner.writeContract({
-      address: this.contractAddress,
-      abi: ChannelHubAbi,
-      functionName: 'withdrawFromVault',
-      args: [node, token, amountBig],
-      chain: undefined,
-    } as any);
-    return hash;
+    console.log('💳 EVM Client - Withdraw transaction:', {
+      contractAddress: this.contractAddress,
+      blockchainId: this.blockchainId.toString(),
+      node,
+      token,
+      amount: amount.toString(),
+      amountBig: amountBig.toString(),
+      walletChain: this.walletSigner.chain?.id,
+      walletChainName: this.walletSigner.chain?.name
+    });
+
+    try {
+      // Simulate transaction first
+      console.log('🔍 Simulating withdrawal...');
+      const { request } = await this.evmClient.simulateContract({
+        address: this.contractAddress,
+        abi: ChannelHubAbi,
+        functionName: 'withdrawFromVault',
+        args: [node, token, amountBig],
+        account: this.walletSigner.account!.address,
+      });
+
+      console.log('✅ Simulation successful - executing withdrawal...');
+
+      const hash = await this.walletSigner.writeContract(request);
+
+      console.log('📤 Withdraw transaction submitted - hash:', hash);
+      console.log('⏳ Waiting for confirmation...');
+
+      const receipt = await this.evmClient.waitForTransactionReceipt({ hash });
+
+      console.log('✅ Withdraw transaction confirmed!', {
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed.toString(),
+      });
+
+      return hash;
+    } catch (error: any) {
+      console.error('❌ Withdraw simulation/execution failed!');
+      if (error.message) {
+        console.error('   Reason:', error.message);
+      }
+      throw error;
+    }
   }
 
   // ========= Channel Lifecycle =========
@@ -237,14 +353,49 @@ export class Client {
       }
     }
 
-    const hash = await this.walletSigner.writeContract({
-      address: this.contractAddress,
-      abi: ChannelHubAbi,
-      functionName: 'createChannel',
-      args: [contractDef, contractState],
-      chain: undefined,
-    } as any);
-    return hash;
+    console.log('💳 EVM Client - Create channel transaction:', {
+      contractAddress: this.contractAddress,
+      blockchainId: this.blockchainId.toString(),
+      walletChain: this.walletSigner.chain?.id,
+      walletChainName: this.walletSigner.chain?.name
+    });
+
+    // Step 1: Simulate the transaction to validate it will succeed
+    console.log('🔍 Simulating transaction...');
+    try {
+      const { request } = (await this.evmClient.simulateContract({
+        address: this.contractAddress,
+        abi: ChannelHubAbi,
+        functionName: 'createChannel',
+        args: [contractDef, contractState],
+        account: this.walletSigner.account!.address,
+      } as any)) as any;
+
+      console.log('✅ Simulation successful - executing transaction...');
+
+      // Step 2: Execute the validated transaction
+      const hash = await this.walletSigner.writeContract(request as any);
+
+      console.log('📤 Transaction submitted - hash:', hash);
+      console.log('⏳ Waiting for confirmation...');
+
+      // Wait for transaction receipt
+      const receipt = await this.evmClient.waitForTransactionReceipt({ hash });
+
+      console.log('✅ Create channel transaction confirmed!', {
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed.toString(),
+      });
+
+      return hash;
+    } catch (error: any) {
+      console.error('❌ Transaction simulation failed!');
+      console.error('   This means the transaction would revert on-chain.');
+      if (error.message) {
+        console.error('   Revert reason:', error.message);
+      }
+      throw error;
+    }
   }
 
   async checkpoint(candidate: core.State): Promise<string> {
@@ -276,36 +427,63 @@ export class Client {
         }
       }
 
+      console.log('💳 EVM Client - Deposit to channel transaction:', {
+        contractAddress: this.contractAddress,
+        blockchainId: this.blockchainId.toString(),
+        channelId: channelIdBytes,
+        walletChain: this.walletSigner.chain?.id
+      });
+
       const hash = await this.walletSigner.writeContract({
         address: this.contractAddress,
         abi: ChannelHubAbi,
         functionName: 'depositToChannel',
         args: [channelIdBytes, contractCandidate],
-        chain: undefined,
+        gas: 5000000n, // 5M gas limit
       } as any);
+
+      console.log('✅ Deposit to channel transaction hash:', hash);
       return hash;
     }
 
     // Check for withdrawal intent
     if (lastTransition?.type === core.TransitionType.HomeWithdrawal) {
+      console.log('💳 EVM Client - Withdraw from channel transaction:', {
+        contractAddress: this.contractAddress,
+        blockchainId: this.blockchainId.toString(),
+        channelId: channelIdBytes,
+        walletChain: this.walletSigner.chain?.id
+      });
+
       const hash = await this.walletSigner.writeContract({
         address: this.contractAddress,
         abi: ChannelHubAbi,
         functionName: 'withdrawFromChannel',
         args: [channelIdBytes, contractCandidate],
-        chain: undefined,
+        gas: 5000000n, // 5M gas limit
       } as any);
+
+      console.log('✅ Withdraw from channel transaction hash:', hash);
       return hash;
     }
 
     // Default checkpoint
+    console.log('💳 EVM Client - Checkpoint channel transaction:', {
+      contractAddress: this.contractAddress,
+      blockchainId: this.blockchainId.toString(),
+      channelId: channelIdBytes,
+      walletChain: this.walletSigner.chain?.id
+    });
+
     const hash = await this.walletSigner.writeContract({
       address: this.contractAddress,
       abi: ChannelHubAbi,
       functionName: 'checkpointChannel',
       args: [channelIdBytes, contractCandidate, []],
-      chain: undefined,
+      gas: 5000000n, // 5M gas limit
     } as any);
+
+    console.log('✅ Checkpoint channel transaction hash:', hash);
     return hash;
   }
 
@@ -321,13 +499,22 @@ export class Client {
       (blockchainId, tokenAddress) => this.assetStore.getTokenDecimals(blockchainId, tokenAddress)
     );
 
+    console.log('💳 EVM Client - Challenge channel transaction:', {
+      contractAddress: this.contractAddress,
+      blockchainId: this.blockchainId.toString(),
+      channelId: channelIdBytes,
+      walletChain: this.walletSigner.chain?.id
+    });
+
     const hash = await this.walletSigner.writeContract({
       address: this.contractAddress,
       abi: ChannelHubAbi,
       functionName: 'challengeChannel',
       args: [channelIdBytes, contractCandidate, [], challengerSig],
-      chain: undefined,
+      gas: 5000000n, // 5M gas limit
     } as any);
+
+    console.log('✅ Challenge channel transaction hash:', hash);
     return hash;
   }
 
@@ -349,13 +536,23 @@ export class Client {
       throw new Error('Unsupported intent for close');
     }
 
+    console.log('💳 EVM Client - Close channel transaction:', {
+      contractAddress: this.contractAddress,
+      blockchainId: this.blockchainId.toString(),
+      channelId: channelIdBytes,
+      walletChain: this.walletSigner.chain?.id,
+      walletChainName: this.walletSigner.chain?.name
+    });
+
     const hash = await this.walletSigner.writeContract({
       address: this.contractAddress,
       abi: ChannelHubAbi,
       functionName: 'closeChannel',
       args: [channelIdBytes, contractCandidate, []],
-      chain: undefined,
+      gas: 5000000n, // 5M gas limit
     } as any);
+
+    console.log('✅ Close channel transaction hash:', hash);
     return hash;
   }
 

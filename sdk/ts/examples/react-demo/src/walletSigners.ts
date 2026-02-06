@@ -18,9 +18,12 @@ export class WalletStateSigner {
   }
 
   getAddress(): Address {
+    console.log('📍 WalletStateSigner.getAddress called');
     if (!this.walletClient.account?.address) {
+      console.error('❌ No account address in wallet client');
       throw new Error('Wallet client does not have an account address');
     }
+    console.log('  Address:', this.walletClient.account.address);
     return this.walletClient.account.address;
   }
 
@@ -28,14 +31,25 @@ export class WalletStateSigner {
    * Sign a message hash using EIP-191 (with Ethereum message prefix)
    */
   async signMessage(hash: Hex): Promise<Hex> {
+    console.log('🔐 WalletStateSigner.signMessage called');
+    console.log('  Hash to sign:', hash);
+
     if (!this.walletClient.account) {
+      console.error('❌ No account in wallet client');
       throw new Error('Wallet client does not have an account');
     }
 
-    return await this.walletClient.signMessage({
+    console.log('  Account:', this.walletClient.account.address);
+    console.log('⏳ Requesting signature from wallet...');
+
+    const signature = await this.walletClient.signMessage({
       account: this.walletClient.account,
       message: { raw: hash },
     });
+
+    console.log('✅ Message signed successfully');
+    console.log('  Signature:', signature);
+    return signature;
   }
 }
 
@@ -51,9 +65,12 @@ export class WalletTransactionSigner {
   }
 
   getAddress(): Address {
+    console.log('📍 WalletTransactionSigner.getAddress called');
     if (!this.walletClient.account?.address) {
+      console.error('❌ No account address in wallet client');
       throw new Error('Wallet client does not have an account address');
     }
+    console.log('  Address:', this.walletClient.account.address);
     return this.walletClient.account.address;
   }
 
@@ -61,20 +78,39 @@ export class WalletTransactionSigner {
    * Send a transaction to the blockchain
    */
   async sendTransaction(tx: any): Promise<Hex> {
+    console.log('⚠️ WalletTransactionSigner.sendTransaction called (this should not be used)');
+    console.log('  Transaction data:', tx);
     throw new Error('sendTransaction requires a wallet client - use the blockchain client instead');
+  }
+
+  /**
+   * Sign a message (required by TransactionSigner interface)
+   * This wraps the signRaw functionality
+   */
+  async signMessage(message: { raw: Hex }): Promise<Hex> {
+    console.log('🔐 WalletTransactionSigner.signMessage called');
+    console.log('  Message hash:', message.raw);
+    return await this.signRaw(message.raw);
   }
 
   /**
    * Sign a message (raw bytes without prefix)
    */
   async signRaw(hash: Hex): Promise<Hex> {
+    console.log('🔐 WalletTransactionSigner.signRaw called');
+    console.log('  Hash to sign:', hash);
+
     if (!this.walletClient.account) {
+      console.error('❌ No account in wallet client');
       throw new Error('Wallet client does not have an account');
     }
 
+    console.log('  Account:', this.walletClient.account.address);
+    console.log('⏳ Requesting typed data signature from wallet...');
+
     // Sign the hash directly without EIP-191 prefix
     // MetaMask doesn't have a direct "sign raw" method, so we use signTypedData with a minimal schema
-    return await this.walletClient.signTypedData({
+    const signature = await this.walletClient.signTypedData({
       account: this.walletClient.account,
       domain: {
         name: 'Nitrolite',
@@ -89,5 +125,9 @@ export class WalletTransactionSigner {
         data: hash,
       },
     });
+
+    console.log('✅ Typed data signed successfully');
+    console.log('  Signature:', signature);
+    return signature;
   }
 }

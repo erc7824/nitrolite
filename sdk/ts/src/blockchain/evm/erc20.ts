@@ -4,7 +4,7 @@
 
 import { Address } from 'viem';
 import { Erc20Abi } from './erc20_abi';
-import { EVMClient } from './interface';
+import { EVMClient, WalletSigner } from './interface';
 
 /**
  * ERC20 contract wrapper for token interactions
@@ -12,10 +12,12 @@ import { EVMClient } from './interface';
 export class ERC20 {
   private tokenAddress: Address;
   private client: EVMClient;
+  private walletSigner?: WalletSigner;
 
-  constructor(tokenAddress: Address, client: EVMClient) {
+  constructor(tokenAddress: Address, client: EVMClient, walletSigner?: WalletSigner) {
     this.tokenAddress = tokenAddress;
     this.client = client;
+    this.walletSigner = walletSigner;
   }
 
   /**
@@ -43,6 +45,55 @@ export class ERC20 {
   }
 
   /**
+   * Approve spender to spend amount of tokens
+   */
+  async approve(spender: Address, amount: bigint): Promise<string> {
+    if (!this.walletSigner) {
+      throw new Error('Wallet signer is required for approve operation');
+    }
+
+    console.log('🔓 ERC20 Approve:', {
+      token: this.tokenAddress,
+      spender,
+      amount: amount.toString(),
+    });
+
+    // Simulate first
+    console.log('🔍 Simulating approve...');
+    try {
+      const { request } = (await this.client.simulateContract({
+        address: this.tokenAddress,
+        abi: Erc20Abi,
+        functionName: 'approve',
+        args: [spender, amount],
+        account: this.walletSigner.account!.address,
+      } as any)) as any;
+
+      console.log('✅ Simulation successful - executing approve...');
+
+      const hash = await this.walletSigner.writeContract(request as any);
+
+      console.log('📤 Approve transaction submitted - hash:', hash);
+      console.log('⏳ Waiting for confirmation...');
+
+      const receipt = await this.client.waitForTransactionReceipt({ hash });
+
+      console.log('✅ Approve transaction confirmed!', {
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed.toString(),
+      });
+
+      return hash;
+    } catch (error: any) {
+      console.error('❌ Approve simulation/execution failed!');
+      if (error.message) {
+        console.error('   Reason:', error.message);
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Get the decimals of the token
    */
   async decimals(): Promise<number> {
@@ -55,6 +106,6 @@ export class ERC20 {
 /**
  * Create a new ERC20 contract instance
  */
-export function newERC20(tokenAddress: Address, client: EVMClient): ERC20 {
-  return new ERC20(tokenAddress, client);
+export function newERC20(tokenAddress: Address, client: EVMClient, walletSigner?: WalletSigner): ERC20 {
+  return new ERC20(tokenAddress, client, walletSigner);
 }

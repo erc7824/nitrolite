@@ -5,7 +5,7 @@
  * low-level RPC access for advanced use cases.
  */
 
-import { Address, Hex, createPublicClient, createWalletClient, http } from 'viem';
+import { Address, Hex, createPublicClient, createWalletClient, http, custom } from 'viem';
 import Decimal from 'decimal.js';
 import * as core from './core/types';
 import * as app from './app/types';
@@ -595,6 +595,44 @@ export class Client {
     return txHash;
   }
 
+  /**
+   * Approve token spending for a specific chain and token
+   * @param chainId - The blockchain ID
+   * @param tokenAddress - The ERC20 token contract address
+   * @param amount - Amount to approve (in smallest unit, e.g., wei)
+   * @returns Transaction hash
+   */
+  async approveToken(chainId: bigint, tokenAddress: string, amount: bigint): Promise<string> {
+    await this.initializeBlockchainClient(chainId);
+    const blockchainClient = this.blockchainClients.get(chainId)!;
+
+    return await blockchainClient.approveTokenByAddress(
+      tokenAddress as `0x${string}`,
+      amount
+    );
+  }
+
+  /**
+   * Check token allowance for a specific chain and token
+   * @param chainId - The blockchain ID
+   * @param tokenAddress - The ERC20 token contract address
+   * @param owner - The owner address
+   * @returns Current allowance amount (in smallest unit)
+   */
+  async checkTokenAllowance(
+    chainId: bigint,
+    tokenAddress: string,
+    owner: string
+  ): Promise<bigint> {
+    await this.initializeBlockchainClient(chainId);
+    const blockchainClient = this.blockchainClients.get(chainId)!;
+
+    return await blockchainClient.checkAllowanceByAddress(
+      tokenAddress as `0x${string}`,
+      owner as `0x${string}`
+    );
+  }
+
   // ============================================================================
   // Node Information Methods
   // ============================================================================
@@ -1085,11 +1123,50 @@ export class Client {
       transport: http(rpcUrl),
     }) as blockchain.evm.EVMClient;
 
-    // Use txSigner's address for blockchain transactions
-    const walletClient = createWalletClient({
-      transport: http(rpcUrl),
-      account: this.txSigner.getAddress(),
-    }) as blockchain.evm.WalletSigner;
+    // Create a minimal chain object for the wallet client
+    // This is required for viem to know which chain to submit transactions to
+    const chain = {
+      id: Number(chainId),
+      name: `Chain ${chainId}`,
+      nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+      rpcUrls: {
+        default: { http: [rpcUrl] },
+        public: { http: [rpcUrl] },
+      },
+    };
+
+    console.log(`🔗 Creating blockchain client for chain ${chainId}:`, {
+      chainId: chainId.toString(),
+      rpcUrl,
+      contractAddress,
+      chainName: chain.name,
+    });
+
+    // Detect if we're in a browser with MetaMask/wallet provider
+    // In browser: use wallet provider for transactions (supports signing)
+    // In Node.js: use HTTP (requires private key, won't work for transactions)
+    const isBrowser = typeof window !== 'undefined' && typeof (window as any).ethereum !== 'undefined';
+
+    let walletClient: blockchain.evm.WalletSigner;
+
+    if (isBrowser) {
+      console.log('🦊 Browser detected - using MetaMask/wallet provider for transactions');
+      // Use MetaMask/wallet provider which supports transaction signing
+      walletClient = createWalletClient({
+        chain,
+        transport: custom((window as any).ethereum),
+        account: this.txSigner.getAddress(),
+      }) as blockchain.evm.WalletSigner;
+    } else {
+      console.warn('⚠️  Node.js environment - HTTP transport will NOT support transaction signing');
+      console.warn('    Transactions will fail unless using a service that manages private keys');
+      // Fallback to HTTP (will fail for transactions in most cases)
+      walletClient = createWalletClient({
+        chain,
+        transport: http(rpcUrl),
+        account: this.txSigner.getAddress(),
+      }) as blockchain.evm.WalletSigner;
+    }
 
     const blockchainClient = new blockchain.evm.Client(
       contractAddress,

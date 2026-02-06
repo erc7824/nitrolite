@@ -12,7 +12,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
         });
 
-        bytes32 channelId = Utils.getChannelId(def);
+        bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
 
         // Check VOID status before channel creation
         (ChannelStatus status,,,,) = cHub.getChannelData(channelId);
@@ -191,7 +191,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
         });
 
-        bytes32 channelId = Utils.getChannelId(def);
+        bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
 
         // Check VOID status before channel creation
         (ChannelStatus statusBefore,,,,) = cHub.getChannelData(channelId);
@@ -251,7 +251,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
         });
 
-        bytes32 channelId = Utils.getChannelId(def);
+        bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
 
         // Check VOID status before channel creation
         (ChannelStatus statusBefore,,,,) = cHub.getChannelData(channelId);
@@ -311,7 +311,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
         });
 
-        bytes32 channelId = Utils.getChannelId(def);
+        bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
 
         // Check VOID status before channel creation
         (ChannelStatus statusBefore,,,,) = cHub.getChannelData(channelId);

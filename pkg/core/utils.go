@@ -11,6 +11,13 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const (
+	// ChannelHubVersion is the version of the ChannelHub contract that this code is compatible with.
+	// This version is encoded as the first byte of the channelId to prevent replay attacks
+	// across different ChannelHub deployments on the same chain.
+	ChannelHubVersion uint8 = 1
+)
+
 var (
 	uint8Type, _   = abi.NewType("uint8", "", nil)
 	uint32Type, _  = abi.NewType("uint32", "", nil)
@@ -78,10 +85,11 @@ func DecimalToBigInt(amount decimal.Decimal, decimals uint8) (*big.Int, error) {
 	return scaled.BigInt(), nil
 }
 
-// GetHomeChannelID generates a unique identifier for a primary channel based on its definition.
-// This matches the Solidity getChannelId function which computes keccak256(abi.encode(ChannelDefinition)).
+// getHomeChannelID is the internal implementation that generates a unique identifier for a primary channel
+// based on its definition and version. This matches the Solidity getChannelId function which computes
+// keccak256(abi.encode(ChannelDefinition)) and then sets the first byte to the version.
 // The metadata is derived from the asset: first 8 bytes of keccak256(asset) padded to 32 bytes.
-func GetHomeChannelID(node, user, asset string, nonce uint64, challengeDuration uint32) (string, error) {
+func getHomeChannelID(node, user, asset string, nonce uint64, challengeDuration uint32, channelHubVersion uint8) (string, error) {
 	// Generate metadata from asset
 	userAddr := common.HexToAddress(user)
 	nodeAddr := common.HexToAddress(node)
@@ -125,7 +133,21 @@ func GetHomeChannelID(node, user, asset string, nonce uint64, challengeDuration 
 		return "", err
 	}
 
-	return crypto.Keccak256Hash(packed).Hex(), nil
+	// Calculate base channelId
+	baseId := crypto.Keccak256Hash(packed)
+
+	// Set the first byte (most significant byte) to the version
+	versionedId := baseId
+	versionedId[0] = channelHubVersion
+
+	return versionedId.Hex(), nil
+}
+
+// GetHomeChannelID generates a unique identifier for a primary channel based on its definition.
+// It uses the configured ChannelHubVersion to ensure compatibility with the deployed ChannelHub contract.
+// The channelId includes version information to prevent replay attacks across different ChannelHub deployments.
+func GetHomeChannelID(node, user, asset string, nonce uint64, challengeDuration uint32) (string, error) {
+	return getHomeChannelID(node, user, asset, nonce, challengeDuration, ChannelHubVersion)
 }
 
 // GetEscrowChannelID derives an escrow-specific channel ID based on a home channel and state version.

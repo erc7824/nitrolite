@@ -88,6 +88,8 @@ library ChannelEngine {
         ) {
             require(!candidate.nonHomeState.isEmpty(), "non-home state required for cross-chain operations");
             require(candidate.nonHomeState.chainId != block.chainid, "invalid non-home chain id");
+        } else {
+            require(candidate.nonHomeState.isEmpty(), "non-home state must be empty for home-only operations");
         }
 
         uint256 allocsSum = candidate.homeState.userAllocation + candidate.homeState.nodeAllocation;

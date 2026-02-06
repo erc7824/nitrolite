@@ -6,6 +6,37 @@ import {Utils} from "../src/Utils.sol";
 import {ChannelDefinition, State, Ledger, StateIntent} from "../src/interfaces/Types.sol";
 
 contract UtilsTest is Test {
+    function test_channelId_forDifferentVersions_differ() public pure {
+        ChannelDefinition memory def = ChannelDefinition({
+            challengeDuration: 86400,
+            user: 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045,
+            node: 0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a,
+            nonce: 42,
+            metadata: 0x13730b0d8e1bdbdc000000000000000000000000000000000000000000000000
+        });
+
+        bytes32 channelIdV1 = Utils.getChannelId(def, 1);
+        bytes32 channelIdV2 = Utils.getChannelId(def, 2);
+        bytes32 channelIdV255 = Utils.getChannelId(def, 255);
+
+        // Channel IDs must differ for different versions
+        assert(channelIdV1 != channelIdV2);
+        assert(channelIdV1 != channelIdV255);
+        assert(channelIdV2 != channelIdV255);
+
+        // First byte should match the version
+        assert(uint8(uint256(channelIdV1) >> 248) == 1);
+        assert(uint8(uint256(channelIdV2) >> 248) == 2);
+        assert(uint8(uint256(channelIdV255) >> 248) == 255);
+
+        // All other bytes should be the same (derived from the same base hash)
+        bytes32 mask = 0x00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+        assert(channelIdV1 & mask == channelIdV2 & mask);
+        assert(channelIdV1 & mask == channelIdV255 & mask);
+    }
+
+    // ========== Packing Tests ==========
+
     function test_log_packingState() public pure {
         Ledger memory homeLedger = Ledger({
             chainId: 42,
@@ -106,9 +137,9 @@ contract UtilsTest is Test {
             metadata: metadata
         });
 
-        bytes32 channelId = Utils.getChannelId(def);
+        bytes32 channelId = Utils.getChannelId(def, 1);
 
-        // 0x7c827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee
+        // 0x01827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee
         console.logBytes32(channelId);
     }
 

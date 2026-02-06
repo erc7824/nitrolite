@@ -31,9 +31,9 @@ export class StatePackerV1 implements StatePacker {
    * PackState encodes a channel ID and state into ABI-packed bytes for on-chain submission.
    * This matches the Solidity pack function which encodes: channelId, version, intent, metadata, homeState, nonHomeState.
    * @param state - State to pack
-   * @returns Packed bytes as Uint8Array
+   * @returns Packed bytes as hex string
    */
-  async packState(state: State): Promise<Uint8Array> {
+  async packState(state: State): Promise<`0x${string}`> {
     // Ensure HomeChannelID is present
     if (!state.homeChannelId) {
       throw new Error('state.homeChannelId is required for packing');
@@ -156,8 +156,7 @@ export class StatePackerV1 implements StatePacker {
       ]
     );
 
-    // Convert hex string to Uint8Array
-    return hexToUint8Array(packed);
+    return packed;
   }
 }
 
@@ -175,24 +174,9 @@ export function newStatePackerV1(assetStore: AssetStore): StatePackerV1 {
  * For production use, create a StatePackerV1 instance and reuse it.
  * @param state - State to pack
  * @param assetStore - Asset store for retrieving token metadata
- * @returns Packed bytes as Uint8Array
+ * @returns Packed bytes as hex string
  */
-export async function packState(state: State, assetStore: AssetStore): Promise<Uint8Array> {
+export async function packState(state: State, assetStore: AssetStore): Promise<`0x${string}`> {
   const packer = newStatePackerV1(assetStore);
   return packer.packState(state);
-}
-
-/**
- * Helper function to convert hex string to Uint8Array
- */
-function hexToUint8Array(hex: string): Uint8Array {
-  // Remove '0x' prefix if present
-  const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
-
-  // Convert to Uint8Array
-  const bytes = new Uint8Array(cleanHex.length / 2);
-  for (let i = 0; i < cleanHex.length; i += 2) {
-    bytes[i / 2] = parseInt(cleanHex.slice(i, i + 2), 16);
-  }
-  return bytes;
 }

@@ -104,8 +104,6 @@ type StateV1 struct {
 	HomeLedger LedgerV1 `json:"home_ledger"`
 	// EscrowLedger contains user and node balances for the escrow channel
 	EscrowLedger *LedgerV1 `json:"escrow_ledger,omitempty"`
-	// IsFinal indicates if the state is final
-	IsFinal bool `json:"is_final"`
 	// UserSig is the user signature for the state
 	UserSig *string `json:"user_sig,omitempty"`
 	// NodeSig is the node signature for the state

@@ -3,6 +3,7 @@ package memory
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/erc7824/nitrolite/pkg/core"
 )
@@ -58,10 +59,11 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 				continue
 			}
 
+			tokenAddress := strings.ToLower(token.Address)
 			tokens = append(tokens, core.Token{
 				Name:         token.Name,
 				Symbol:       token.Symbol,
-				Address:      token.Address,
+				Address:      tokenAddress,
 				BlockchainID: token.BlockchainID,
 				Decimals:     token.Decimals,
 			})
@@ -69,12 +71,12 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 			if _, ok := supportedAssets[asset.Symbol]; !ok {
 				supportedAssets[asset.Symbol] = make(map[uint64]string)
 			}
-			supportedAssets[asset.Symbol][token.BlockchainID] = token.Address
+			supportedAssets[asset.Symbol][token.BlockchainID] = tokenAddress
 
 			if _, ok := tokenDecimals[token.BlockchainID]; !ok {
 				tokenDecimals[token.BlockchainID] = make(map[string]uint8)
 			}
-			tokenDecimals[token.BlockchainID][token.Address] = token.Decimals
+			tokenDecimals[token.BlockchainID][tokenAddress] = token.Decimals
 		}
 		if len(tokens) == 0 {
 			continue
@@ -182,7 +184,7 @@ func (ms *MemoryStoreV1) IsAssetSupported(asset, tokenAddress string, blockchain
 	if !ok {
 		return false, nil
 	}
-	return tokenAddress == _tokenAddress, nil
+	return strings.EqualFold(tokenAddress, _tokenAddress), nil
 }
 
 // GetAssetDecimals checks if an asset exists and returns its decimals in YN
@@ -196,6 +198,8 @@ func (ms *MemoryStoreV1) GetAssetDecimals(asset string) (uint8, error) {
 
 // GetTokenDecimals returns the decimals for a token on a specific blockchain
 func (ms *MemoryStoreV1) GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error) {
+	tokenAddress = strings.ToLower(tokenAddress)
+
 	decimalsOnChain, ok := ms.tokenDecimals[blockchainID]
 	if !ok {
 		return 0, fmt.Errorf("blockchain with ID '%d' is not supported", blockchainID)

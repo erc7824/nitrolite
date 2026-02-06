@@ -241,7 +241,7 @@ export interface StatePacker {
    * @param state - State to pack
    * @returns Packed bytes
    */
-  packState(state: State): Promise<Uint8Array>;
+  packState(state: State): Promise<`0x${string}`>;
 }
 
 // ============================================================================

@@ -168,6 +168,7 @@ func GetStateID(userWallet, asset string, epoch, version uint64) string {
 }
 
 func GetStateTransitionsHash(transitions []Transition) ([32]byte, error) {
+
 	hash := [32]byte{}
 	type contractTransition struct {
 		Type      uint8

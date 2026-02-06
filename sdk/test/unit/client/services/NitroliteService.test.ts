@@ -25,6 +25,7 @@ describe('NitroliteService', () => {
 
     let mockPublicClient: any;
     let mockWalletClient: any;
+    let mockContractWriter: any;
     let service: NitroliteService;
 
     beforeEach(() => {
@@ -36,7 +37,10 @@ describe('NitroliteService', () => {
             writeContract: jest.fn(),
             account,
         };
-        service = new NitroliteService(mockPublicClient, addresses, mockWalletClient, account);
+        mockContractWriter = {
+            write: jest.fn(),
+        };
+        service = new NitroliteService(mockPublicClient, addresses, mockWalletClient, account, mockContractWriter);
     });
 
     describe('constructor', () => {
@@ -156,21 +160,21 @@ describe('NitroliteService', () => {
             test('success', async () => {
                 const req = fakeRequest();
                 (mockPublicClient.simulateContract as any).mockResolvedValue({ request: req, result: {} });
-                (mockWalletClient.writeContract as any).mockResolvedValue('0xhash');
+                (mockContractWriter.write as any).mockResolvedValue({ txHashes: ['0xhash'] });
                 const hash = await def.exec();
-                expect(mockWalletClient.writeContract).toHaveBeenCalledWith({ ...req, account });
+                expect(mockContractWriter.write).toHaveBeenCalledWith({ calls: [{ ...req, account }] });
                 expect(hash).toBe('0xhash');
             });
             test('TransactionError', async () => {
                 const req = fakeRequest();
                 (mockPublicClient.simulateContract as any).mockResolvedValue({ request: req, result: {} });
-                (mockWalletClient.writeContract as any).mockRejectedValue(new Error('oops'));
+                (mockContractWriter.write as any).mockRejectedValue(new Error('oops'));
                 await expect(def.exec()).rejects.toThrow(Errors.TransactionError);
             });
             test('rethrow NitroliteError', async () => {
                 (mockPublicClient.simulateContract as any).mockResolvedValue({ request: {} as any, result: {} });
-                const ne = new Errors.WalletClientRequiredError();
-                (mockWalletClient.writeContract as any).mockRejectedValue(ne);
+                const ne = new Errors.ContractWriterRequiredError();
+                (mockContractWriter.write as any).mockRejectedValue(ne);
                 await expect(def.exec()).rejects.toThrow(ne);
             });
         });

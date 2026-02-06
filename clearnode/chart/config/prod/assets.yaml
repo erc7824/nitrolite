@@ -73,6 +73,9 @@ assets:
       - blockchain_id: 56
         address: "0x55d398326f99059fF775485246999027B3197955" # pegged
         decimals: 18
+      - blockchain_id: 8217
+        address: "0xd077a400968890eacc75cdc901f0356c943e4fdb"
+        decimals: 6
       - blockchain_id: 8453
         address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2"
         decimals: 6

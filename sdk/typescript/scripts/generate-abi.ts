@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const contractPath = '../contract/out/Custody.sol/Custody.json';
+const contractPath = '../../contracts/out/ChannelHub.sol/ChannelHub.json';
 const outputPath = 'src/abis/generated.ts';
 
 // Read the contract JSON

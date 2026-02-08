@@ -2,41 +2,44 @@ import { AbiParameter } from 'abitype';
 
 /**
  * Common ABI fragments that can be reused across different ABIs
+ * These match the new contract structures from V1
  */
 
-// Channel tuple structure
-export const ChannelParamFragment: AbiParameter[] = [
-    { name: 'participants', type: 'address[2]' },
-    { name: 'adjudicator', type: 'address' },
-    { name: 'challenge', type: 'uint64' },
-    { name: 'nonce', type: 'uint64' },
-];
-
-// Allocation tuple structure
-export const AllocationParamFragment: AbiParameter[] = [
-    { name: 'destination', type: 'address' },
+// Ledger tuple structure - represents token allocations and flows on a chain
+export const LedgerParamFragment: AbiParameter[] = [
+    { name: 'chainId', type: 'uint64' },
     { name: 'token', type: 'address' },
-    { name: 'amount', type: 'uint256' },
+    { name: 'decimals', type: 'uint8' },
+    { name: 'userAllocation', type: 'uint256' },
+    { name: 'userNetFlow', type: 'int256' },
+    { name: 'nodeAllocation', type: 'uint256' },
+    { name: 'nodeNetFlow', type: 'int256' },
 ];
 
-// Signature tuple structure
-export const SignatureParamFragment: AbiParameter[] = [
-    { name: 'v', type: 'uint8' },
-    { name: 'r', type: 'bytes32' },
-    { name: 's', type: 'bytes32' },
-];
-
-// State tuple structure
+// State tuple structure - represents the channel state
 export const StateParamFragment: AbiParameter[] = [
-    { name: 'data', type: 'bytes' },
+    { name: 'version', type: 'uint64' },
+    { name: 'intent', type: 'uint8' }, // enum StateIntent
+    { name: 'metadata', type: 'bytes32' },
     {
-        name: 'allocations',
-        type: 'tuple[2]',
-        components: AllocationParamFragment,
+        name: 'homeState',
+        type: 'tuple',
+        components: LedgerParamFragment,
     },
     {
-        name: 'sigs',
-        type: 'tuple[]',
-        components: SignatureParamFragment,
+        name: 'nonHomeState',
+        type: 'tuple',
+        components: LedgerParamFragment,
     },
+    { name: 'userSig', type: 'bytes' },
+    { name: 'nodeSig', type: 'bytes' },
+];
+
+// ChannelDefinition tuple structure - defines channel parameters
+export const ChannelDefinitionParamFragment: AbiParameter[] = [
+    { name: 'challengeDuration', type: 'uint32' },
+    { name: 'user', type: 'address' },
+    { name: 'node', type: 'address' },
+    { name: 'nonce', type: 'uint64' },
+    { name: 'metadata', type: 'bytes32' },
 ];

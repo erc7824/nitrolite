@@ -6,7 +6,6 @@
 
 // Export main ABIs
 export * from './custody';
-export { AdjudicatorAbi } from './adjudicator';
 export { Erc20Abi } from './token';
 
 // Export ABI fragments

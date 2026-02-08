@@ -1,39 +1,47 @@
 // Auto-generated file. Do not edit manually.
 export const custodyAbi = [
   {
-    "type": "constructor",
-    "inputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "function",
-    "name": "CHALLENGE_STATE_TYPEHASH",
+    "name": "ESCROW_DEPOSIT_UNLOCK_DELAY",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "MIN_CHALLENGE_PERIOD",
+    "name": "MAX_DEPOSIT_ESCROW_PURGE",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "challenge",
+    "name": "MIN_CHALLENGE_DURATION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "challengeChannel",
     "inputs": [
       {
         "name": "channelId",
@@ -46,29 +54,29 @@ export const custodyAbi = [
         "internalType": "struct State",
         "components": [
           {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -76,48 +84,115 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       },
       {
-        "name": "proofs",
+        "name": "proof",
         "type": "tuple[]",
         "internalType": "struct State[]",
         "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
           {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -125,18 +200,103 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
+      },
+      {
+        "name": "challengerSig",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "challengeEscrowDeposit",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
         "name": "challengerSig",
@@ -149,7 +309,25 @@ export const custodyAbi = [
   },
   {
     "type": "function",
-    "name": "checkpoint",
+    "name": "challengeEscrowWithdrawal",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "challengerSig",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "checkpointChannel",
     "inputs": [
       {
         "name": "channelId",
@@ -162,29 +340,29 @@ export const custodyAbi = [
         "internalType": "struct State",
         "components": [
           {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -192,48 +370,115 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       },
       {
-        "name": "proofs",
+        "name": "proof",
         "type": "tuple[]",
         "internalType": "struct State[]",
         "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
           {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -241,26 +486,93 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "payable"
   },
   {
     "type": "function",
-    "name": "close",
+    "name": "closeChannel",
     "inputs": [
       {
         "name": "channelId",
@@ -273,29 +585,29 @@ export const custodyAbi = [
         "internalType": "struct State",
         "components": [
           {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -303,48 +615,115 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       },
       {
-        "name": "",
+        "name": "proof",
         "type": "tuple[]",
         "internalType": "struct State[]",
         "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
           {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -352,83 +731,155 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "payable"
   },
   {
     "type": "function",
-    "name": "create",
+    "name": "createChannel",
     "inputs": [
       {
-        "name": "ch",
+        "name": "def",
         "type": "tuple",
-        "internalType": "struct Channel",
+        "internalType": "struct ChannelDefinition",
         "components": [
           {
-            "name": "participants",
-            "type": "address[]",
-            "internalType": "address[]"
+            "name": "challengeDuration",
+            "type": "uint32",
+            "internalType": "uint32"
           },
           {
-            "name": "adjudicator",
+            "name": "user",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "challenge",
-            "type": "uint64",
-            "internalType": "uint64"
+            "name": "node",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "nonce",
             "type": "uint64",
             "internalType": "uint64"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
       },
       {
-        "name": "initial",
+        "name": "initState",
         "type": "tuple",
         "internalType": "struct State",
         "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
           {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -436,35 +887,225 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       }
     ],
-    "outputs": [
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "depositToChannel",
+    "inputs": [
       {
         "name": "channelId",
         "type": "bytes32",
         "internalType": "bytes32"
+      },
+      {
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
       }
     ],
-    "stateMutability": "nonpayable"
+    "outputs": [],
+    "stateMutability": "payable"
   },
   {
     "type": "function",
-    "name": "deposit",
+    "name": "depositToVault",
     "inputs": [
       {
-        "name": "account",
+        "name": "node",
         "type": "address",
         "internalType": "address"
       },
@@ -484,174 +1125,278 @@ export const custodyAbi = [
   },
   {
     "type": "function",
-    "name": "depositAndCreate",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "ch",
-        "type": "tuple",
-        "internalType": "struct Channel",
-        "components": [
-          {
-            "name": "participants",
-            "type": "address[]",
-            "internalType": "address[]"
-          },
-          {
-            "name": "adjudicator",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "challenge",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "nonce",
-            "type": "uint64",
-            "internalType": "uint64"
-          }
-        ]
-      },
-      {
-        "name": "initial",
-        "type": "tuple",
-        "internalType": "struct State",
-        "components": [
-          {
-            "name": "intent",
-            "type": "uint8",
-            "internalType": "enum StateIntent"
-          },
-          {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
-            "components": [
-              {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "token",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "amount",
-                "type": "uint256",
-                "internalType": "uint256"
-              }
-            ]
-          },
-          {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "eip712Domain",
+    "name": "escrowHead",
     "inputs": [],
     "outputs": [
       {
-        "name": "fields",
-        "type": "bytes1",
-        "internalType": "bytes1"
-      },
-      {
-        "name": "name",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "version",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "chainId",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
-      },
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "finalizeEscrowDeposit",
+    "inputs": [
       {
-        "name": "verifyingContract",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "salt",
+        "name": "escrowId",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "extensions",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
       }
     ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "getAccountsBalances",
+    "name": "finalizeEscrowWithdrawal",
     "inputs": [
       {
-        "name": "accounts",
-        "type": "address[]",
-        "internalType": "address[]"
+        "name": "escrowId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
-        "name": "tokens",
-        "type": "address[]",
-        "internalType": "address[]"
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
       }
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256[][]",
-        "internalType": "uint256[][]"
-      }
-    ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "getChannelBalances",
+    "name": "finalizeMigration",
     "inputs": [
       {
         "name": "channelId",
@@ -659,16 +1404,145 @@ export const custodyAbi = [
         "internalType": "bytes32"
       },
       {
-        "name": "tokens",
-        "type": "address[]",
-        "internalType": "address[]"
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getAccountBalance",
+    "inputs": [
+      {
+        "name": "node",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
       {
-        "name": "balances",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -685,76 +1559,71 @@ export const custodyAbi = [
     ],
     "outputs": [
       {
-        "name": "channel",
-        "type": "tuple",
-        "internalType": "struct Channel",
-        "components": [
-          {
-            "name": "participants",
-            "type": "address[]",
-            "internalType": "address[]"
-          },
-          {
-            "name": "adjudicator",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "challenge",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "nonce",
-            "type": "uint64",
-            "internalType": "uint64"
-          }
-        ]
-      },
-      {
         "name": "status",
         "type": "uint8",
         "internalType": "enum ChannelStatus"
       },
       {
-        "name": "wallets",
-        "type": "address[]",
-        "internalType": "address[]"
+        "name": "definition",
+        "type": "tuple",
+        "internalType": "struct ChannelDefinition",
+        "components": [
+          {
+            "name": "challengeDuration",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "node",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "nonce",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
       },
       {
-        "name": "challengeExpiry",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "lastValidState",
+        "name": "lastState",
         "type": "tuple",
         "internalType": "struct State",
         "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
           {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -762,16 +1631,441 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "challengeExpiry",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "lockedFunds",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getChannelIds",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getEscrowDepositData",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "status",
+        "type": "uint8",
+        "internalType": "enum EscrowStatus"
+      },
+      {
+        "name": "unlockAt",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "challengeExpiry",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "lockedAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "initState",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getEscrowDepositIds",
+    "inputs": [
+      {
+        "name": "page",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "pageSize",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "ids",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getEscrowWithdrawalData",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "status",
+        "type": "uint8",
+        "internalType": "enum EscrowStatus"
+      },
+      {
+        "name": "challengeExpiry",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "lockedAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "initState",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       }
@@ -783,52 +2077,530 @@ export const custodyAbi = [
     "name": "getOpenChannels",
     "inputs": [
       {
-        "name": "accounts",
-        "type": "address[]",
-        "internalType": "address[]"
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "bytes32[][]",
-        "internalType": "bytes32[][]"
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "join",
-    "inputs": [
-      {
-        "name": "channelId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "index",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "sig",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
+    "name": "getUnlockableEscrowDepositAmount",
+    "inputs": [],
     "outputs": [
       {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "totalUnlockable",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getUnlockableEscrowDepositCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "count",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initiateEscrowDeposit",
+    "inputs": [
+      {
+        "name": "def",
+        "type": "tuple",
+        "internalType": "struct ChannelDefinition",
+        "components": [
+          {
+            "name": "challengeDuration",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "node",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "nonce",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
+      },
+      {
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "initiateEscrowWithdrawal",
+    "inputs": [
+      {
+        "name": "def",
+        "type": "tuple",
+        "internalType": "struct ChannelDefinition",
+        "components": [
+          {
+            "name": "challengeDuration",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "node",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "nonce",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
+      },
+      {
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "resize",
+    "name": "initiateMigration",
+    "inputs": [
+      {
+        "name": "def",
+        "type": "tuple",
+        "internalType": "struct ChannelDefinition",
+        "components": [
+          {
+            "name": "challengeDuration",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "node",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "nonce",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
+      },
+      {
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "purgeEscrowDeposits",
+    "inputs": [
+      {
+        "name": "maxToPurge",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "withdrawFromChannel",
     "inputs": [
       {
         "name": "channelId",
@@ -841,29 +2613,29 @@ export const custodyAbi = [
         "internalType": "struct State",
         "components": [
           {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -871,48 +2643,41 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
-          }
-        ]
-      },
-      {
-        "name": "proofs",
-        "type": "tuple[]",
-        "internalType": "struct State[]",
-        "components": [
-          {
-            "name": "intent",
-            "type": "uint8",
-            "internalType": "enum StateIntent"
-          },
-          {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -920,27 +2685,57 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "payable"
   },
   {
     "type": "function",
-    "name": "withdraw",
+    "name": "withdrawFromVault",
     "inputs": [
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "token",
         "type": "address",
@@ -957,7 +2752,7 @@ export const custodyAbi = [
   },
   {
     "type": "event",
-    "name": "Challenged",
+    "name": "ChannelChallenged",
     "inputs": [
       {
         "name": "channelId",
@@ -966,35 +2761,35 @@ export const custodyAbi = [
         "internalType": "bytes32"
       },
       {
-        "name": "state",
+        "name": "candidate",
         "type": "tuple",
         "indexed": false,
         "internalType": "struct State",
         "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
           {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -1002,31 +2797,98 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       },
       {
-        "name": "expiration",
-        "type": "uint256",
+        "name": "challengeExpireAt",
+        "type": "uint64",
         "indexed": false,
-        "internalType": "uint256"
+        "internalType": "uint64"
       }
     ],
     "anonymous": false
   },
   {
     "type": "event",
-    "name": "Checkpointed",
+    "name": "ChannelCheckpointed",
     "inputs": [
       {
         "name": "channelId",
@@ -1035,35 +2897,35 @@ export const custodyAbi = [
         "internalType": "bytes32"
       },
       {
-        "name": "state",
+        "name": "candidate",
         "type": "tuple",
         "indexed": false,
         "internalType": "struct State",
         "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
           {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -1071,16 +2933,83 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       }
@@ -1089,7 +3018,7 @@ export const custodyAbi = [
   },
   {
     "type": "event",
-    "name": "Closed",
+    "name": "ChannelClosed",
     "inputs": [
       {
         "name": "channelId",
@@ -1104,29 +3033,29 @@ export const custodyAbi = [
         "internalType": "struct State",
         "components": [
           {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -1134,16 +3063,83 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       }
@@ -1152,7 +3148,7 @@ export const custodyAbi = [
   },
   {
     "type": "event",
-    "name": "Created",
+    "name": "ChannelCreated",
     "inputs": [
       {
         "name": "channelId",
@@ -1161,69 +3157,80 @@ export const custodyAbi = [
         "internalType": "bytes32"
       },
       {
-        "name": "wallet",
+        "name": "user",
         "type": "address",
         "indexed": true,
         "internalType": "address"
       },
       {
-        "name": "channel",
+        "name": "node",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "definition",
         "type": "tuple",
         "indexed": false,
-        "internalType": "struct Channel",
+        "internalType": "struct ChannelDefinition",
         "components": [
           {
-            "name": "participants",
-            "type": "address[]",
-            "internalType": "address[]"
+            "name": "challengeDuration",
+            "type": "uint32",
+            "internalType": "uint32"
           },
           {
-            "name": "adjudicator",
+            "name": "user",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "challenge",
-            "type": "uint64",
-            "internalType": "uint64"
+            "name": "node",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "nonce",
             "type": "uint64",
             "internalType": "uint64"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
       },
       {
-        "name": "initial",
+        "name": "initialState",
         "type": "tuple",
         "indexed": false,
         "internalType": "struct State",
         "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
           {
             "name": "intent",
             "type": "uint8",
             "internalType": "enum StateIntent"
           },
           {
-            "name": "version",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "allocations",
-            "type": "tuple[]",
-            "internalType": "struct Allocation[]",
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
             "components": [
               {
-                "name": "destination",
-                "type": "address",
-                "internalType": "address"
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "token",
@@ -1231,16 +3238,343 @@ export const custodyAbi = [
                 "internalType": "address"
               },
               {
-                "name": "amount",
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
               }
             ]
           },
           {
-            "name": "sigs",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ChannelDeposited",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "candidate",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ChannelWithdrawn",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "candidate",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       }
@@ -1274,14 +3608,150 @@ export const custodyAbi = [
   },
   {
     "type": "event",
-    "name": "EIP712DomainChanged",
-    "inputs": [],
+    "name": "EscrowDepositChallenged",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "challengeExpireAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
     "anonymous": false
   },
   {
     "type": "event",
-    "name": "Joined",
+    "name": "EscrowDepositFinalized",
     "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
       {
         "name": "channelId",
         "type": "bytes32",
@@ -1289,7 +3759,539 @@ export const custodyAbi = [
         "internalType": "bytes32"
       },
       {
-        "name": "index",
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EscrowDepositFinalizedOnHome",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EscrowDepositInitiated",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EscrowDepositInitiatedOnHome",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EscrowDepositsPurged",
+    "inputs": [
+      {
+        "name": "purgedCount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1299,20 +4301,687 @@ export const custodyAbi = [
   },
   {
     "type": "event",
-    "name": "Opened",
+    "name": "EscrowWithdrawalChallenged",
     "inputs": [
       {
-        "name": "channelId",
+        "name": "escrowId",
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "challengeExpireAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
       }
     ],
     "anonymous": false
   },
   {
     "type": "event",
-    "name": "Resized",
+    "name": "EscrowWithdrawalFinalized",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EscrowWithdrawalFinalizedOnHome",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EscrowWithdrawalInitiated",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EscrowWithdrawalInitiatedOnHome",
+    "inputs": [
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MigrationInFinalized",
     "inputs": [
       {
         "name": "channelId",
@@ -1321,10 +4990,511 @@ export const custodyAbi = [
         "internalType": "bytes32"
       },
       {
-        "name": "deltaAllocations",
-        "type": "int256[]",
+        "name": "state",
+        "type": "tuple",
         "indexed": false,
-        "internalType": "int256[]"
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MigrationInInitiated",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MigrationOutFinalized",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MigrationOutInitiated",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "state",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "version",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "metadata",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "homeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "nonHomeState",
+            "type": "tuple",
+            "internalType": "struct Ledger",
+            "components": [
+              {
+                "name": "chainId",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "decimals",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "userAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "userNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              },
+              {
+                "name": "nodeAllocation",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "nodeNetFlow",
+                "type": "int256",
+                "internalType": "int256"
+              }
+            ]
+          },
+          {
+            "name": "userSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "nodeSig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
       }
     ],
     "anonymous": false
@@ -1356,43 +5526,23 @@ export const custodyAbi = [
   },
   {
     "type": "error",
-    "name": "ChallengeNotExpired",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ChannelNotFinal",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ChannelNotFound",
+    "name": "AddressCollision",
     "inputs": [
       {
-        "name": "channelId",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "collision",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
   {
     "type": "error",
-    "name": "DepositAlreadyFulfilled",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "DepositsNotFulfilled",
+    "name": "ChannelDoesNotExist",
     "inputs": [
       {
-        "name": "expectedFulfilled",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "actualFulfilled",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "channelId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   },
@@ -1425,55 +5575,12 @@ export const custodyAbi = [
   },
   {
     "type": "error",
-    "name": "ERC6492DeploymentFailed",
-    "inputs": [
-      {
-        "name": "factory",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "calldata_",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ERC6492NoCode",
-    "inputs": [
-      {
-        "name": "expectedSigner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InsufficientBalance",
-    "inputs": [
-      {
-        "name": "available",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "required",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidAdjudicator",
+    "name": "IncorrectChallengeDuration",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "InvalidAllocations",
+    "name": "InvalidAddress",
     "inputs": []
   },
   {
@@ -1483,43 +5590,24 @@ export const custodyAbi = [
   },
   {
     "type": "error",
-    "name": "InvalidChallengePeriod",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidChallengerSignature",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidParticipant",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidShortString",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidState",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidStateSignatures",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidStatus",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidValue",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SafeCastOverflowedIntToUint",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "int256",
+        "internalType": "int256"
+      }
+    ]
   },
   {
     "type": "error",
@@ -1529,38 +5617,6 @@ export const custodyAbi = [
         "name": "token",
         "type": "address",
         "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "StringTooLong",
-    "inputs": [
-      {
-        "name": "str",
-        "type": "string",
-        "internalType": "string"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "TransferFailed",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ]
   }

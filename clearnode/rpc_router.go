@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"gorm.io/gorm"
 )
 
@@ -25,6 +26,7 @@ type RPCRouter struct {
 	RPCStore          *RPCStore
 	wsNotifier        *WSNotifier
 	MessageCache      *MessageCache
+	EthClients        map[uint32]*ethclient.Client
 
 	lg Logger
 }

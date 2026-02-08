@@ -2,32 +2,17 @@ import { Address, Hex } from 'viem';
 import {
     RPCMethod,
     GenericRPCMessage,
-    RPCAppDefinition,
     RPCChannelStatus,
-    RPCChannelUpdate,
     RPCNetworkInfo,
-    RPCBalance,
-    RPCLedgerEntry,
     RPCAppSession,
-    RPCHistoryEntry,
     RPCAsset,
     RPCTransaction,
-    RPCChannelUpdateWithWallet,
-    RPCChannelOperation,
     RPCChannel,
     RPCSessionKey,
+    RPCState,
+    PaginationMetadata,
+    RPCBalanceEntry,
 } from '.';
-
-/**
- * Represents the response structure for the 'auth_challenge' RPC method.
- */
-export interface AuthChallengeResponse extends GenericRPCMessage {
-    method: RPCMethod.AuthChallenge;
-    params: {
-        /** The challenge message to be signed by the client for authentication. */
-        challengeMessage: string;
-    };
-}
 
 /**
  * Represents the response structure for an error response.
@@ -41,7 +26,15 @@ export interface ErrorResponse extends GenericRPCMessage {
 }
 
 /**
- * Represents the response structure for the 'get_config' RPC method.
+ * Represents the response structure for the 'node.v1.ping' RPC method.
+ */
+export interface PingResponse extends GenericRPCMessage {
+    method: RPCMethod.Ping;
+    params: {};
+}
+
+/**
+ * Represents the response structure for the 'node.v1.get_config' RPC method.
  */
 export interface GetConfigResponse extends GenericRPCMessage {
     method: RPCMethod.GetConfig;
@@ -54,118 +47,123 @@ export interface GetConfigResponse extends GenericRPCMessage {
 }
 
 /**
- * Represents the response structure for the 'get_ledger_balances' RPC method.
+ * Represents the response structure for the 'node.v1.get_assets' RPC method.
  */
-export interface GetLedgerBalancesResponse extends GenericRPCMessage {
-    method: RPCMethod.GetLedgerBalances;
+export interface GetAssetsResponse extends GenericRPCMessage {
+    method: RPCMethod.GetAssets;
     params: {
-        /** List of balances for each asset in the ledger. */
-        ledgerBalances: RPCBalance[];
+        /** List of assets available in the clearnode. */
+        assets: RPCAsset[];
     };
 }
 
 /**
- * Represents the response structure for the 'get_ledger_entries' RPC method.
+ * Represents the response structure for the 'user.v1.get_balances' RPC method.
  */
-export interface GetLedgerEntriesResponse extends GenericRPCMessage {
-    method: RPCMethod.GetLedgerEntries;
+export interface GetBalancesResponse extends GenericRPCMessage {
+    method: RPCMethod.GetBalances;
     params: {
-        /** List of ledger entries containing transaction details. */
-        ledgerEntries: RPCLedgerEntry[];
+        /** List of user balances */
+        balances: RPCBalanceEntry[];
     };
 }
 
 /**
- * Represents the response structure for the 'get_transactions' RPC method.
+ * Represents the response structure for the 'user.v1.get_transactions' RPC method.
  */
-export interface GetLedgerTransactionsResponse extends GenericRPCMessage {
-    method: RPCMethod.GetLedgerTransactions;
+export interface GetTransactionsResponse extends GenericRPCMessage {
+    method: RPCMethod.GetTransactions;
     params: {
-        /** List of transactions in the ledger. */
-        ledgerTransactions: RPCTransaction[];
+        /** List of transactions */
+        transactions: RPCTransaction[];
+        /** Pagination metadata */
+        metadata?: PaginationMetadata;
     };
 }
 
 /**
- * Represents the response structure for the 'get_user_tag' RPC method.
+ * Represents the response structure for the 'channels.v1.get_home_channel' RPC method.
  */
-export interface GetUserTagResponse extends GenericRPCMessage {
-    method: RPCMethod.GetUserTag;
+export interface GetHomeChannelResponse extends GenericRPCMessage {
+    method: RPCMethod.GetHomeChannel;
     params: {
-        /** The user's unique tag identifier. */
-        tag: string;
+        /** Home channel information */
+        channel: RPCChannel;
     };
 }
 
 /**
- * Represents the response structure for the 'get_session_keys' RPC method.
+ * Represents the response structure for the 'channels.v1.get_escrow_channel' RPC method.
  */
-export interface GetSessionKeysResponse extends GenericRPCMessage {
-    method: RPCMethod.GetSessionKeys;
+export interface GetEscrowChannelResponse extends GenericRPCMessage {
+    method: RPCMethod.GetEscrowChannel;
     params: {
-        /** Array of active session keys for the authenticated user. */
-        sessionKeys: RPCSessionKey[];
+        /** Escrow channel information */
+        channel: RPCChannel;
     };
 }
 
 /**
- * Represents the response structure for the 'revoke_session_key' RPC method.
+ * Represents the response structure for the 'channels.v1.get_channels' RPC method.
  */
-export interface RevokeSessionKeyResponse extends GenericRPCMessage {
-    method: RPCMethod.RevokeSessionKey;
+export interface GetChannelsResponse extends GenericRPCMessage {
+    method: RPCMethod.GetChannels;
     params: {
-        /** The session key address that was revoked. */
-        sessionKey: Address;
+        /** List of channels. */
+        channels: RPCChannel[];
+        /** Pagination metadata */
+        metadata?: PaginationMetadata;
     };
 }
 
 /**
- * Represents the response structure for the 'create_app_session' RPC method.
+ * Represents the response structure for the 'channels.v1.get_latest_state' RPC method.
  */
-export interface CreateAppSessionResponse extends GenericRPCMessage {
-    method: RPCMethod.CreateAppSession;
+export interface GetLatestStateResponse extends GenericRPCMessage {
+    method: RPCMethod.GetLatestState;
     params: {
-        /** The unique identifier for the application session. */
-        appSessionId: Hex;
-        /** The version number of the session. */
-        version: number;
-        /** The current status of the channel (e.g., "open", "closed"). */
-        status: RPCChannelStatus;
+        /** Latest state for the user's asset */
+        state: RPCState;
     };
 }
 
 /**
- * Represents the response structure for the 'submit_app_state' RPC method.
+ * Represents the response structure for the 'channels.v1.get_states' RPC method.
  */
-export interface SubmitAppStateResponse extends GenericRPCMessage {
-    method: RPCMethod.SubmitAppState;
+export interface GetStatesResponse extends GenericRPCMessage {
+    method: RPCMethod.GetStates;
     params: {
-        /** The unique identifier for the application session. */
-        appSessionId: Hex;
-        /** The version number of the session. */
-        version: number;
-        /** The current status of the channel (e.g., "open", "closed"). */
-        status: RPCChannelStatus;
+        /** List of states */
+        states: RPCState[];
+        /** Pagination metadata */
+        metadata?: PaginationMetadata;
     };
 }
 
 /**
- * Represents the response structure for the 'close_app_session' RPC method.
+ * Represents the response structure for the 'channels.v1.request_creation' RPC method.
  */
-export interface CloseAppSessionResponse extends GenericRPCMessage {
-    method: RPCMethod.CloseAppSession;
+export interface CreateChannelResponse extends GenericRPCMessage {
+    method: RPCMethod.CreateChannel;
     params: {
-        /** The unique identifier for the application session. */
-        appSessionId: Hex;
-        /** The version number of the session. */
-        version: number;
-        /** The current status of the channel (e.g., "open", "closed"). */
-        status: RPCChannelStatus;
+        /** Node's signature for the state */
+        signature: Hex;
     };
 }
 
 /**
- * Represents the response structure for the 'get_app_definition' RPC method.
+ * Represents the response structure for the 'channels.v1.submit_state' RPC method.
+ */
+export interface SubmitStateResponse extends GenericRPCMessage {
+    method: RPCMethod.SubmitState;
+    params: {
+        /** Server's signature for the state */
+        signature: Hex;
+    };
+}
+
+/**
+ * Represents the response structure for the 'app_sessions.v1.get_app_definition' RPC method.
  */
 export interface GetAppDefinitionResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppDefinition;
@@ -186,7 +184,7 @@ export interface GetAppDefinitionResponse extends GenericRPCMessage {
 }
 
 /**
- * Represents the response structure for the 'get_app_sessions' RPC method.
+ * Represents the response structure for the 'app_sessions.v1.get_app_sessions' RPC method.
  */
 export interface GetAppSessionsResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppSessions;
@@ -196,66 +194,100 @@ export interface GetAppSessionsResponse extends GenericRPCMessage {
 }
 
 /**
- * Represents the response structure for the 'create_channel' RPC method.
+ * Represents the response structure for the 'app_sessions.v1.create_app_session' RPC method.
  */
-export interface CreateChannelResponse extends GenericRPCMessage {
-    method: RPCMethod.CreateChannel;
-    params: RPCChannelOperation & {
-        channel: RPCChannel;
-    };
-}
-
-/**
- * Represents the response structure for the 'resize_channel' RPC method.
- */
-export interface ResizeChannelResponse extends GenericRPCMessage {
-    method: RPCMethod.ResizeChannel;
-    params: RPCChannelOperation;
-}
-
-/**
- * Represents the response structure for the 'close_channel' RPC method.
- */
-export interface CloseChannelResponse extends GenericRPCMessage {
-    method: RPCMethod.CloseChannel;
-    params: RPCChannelOperation;
-}
-
-/**
- * Represents the response structure for the 'get_channels' RPC method.
- */
-export interface GetChannelsResponse extends GenericRPCMessage {
-    method: RPCMethod.GetChannels;
+export interface CreateAppSessionResponse extends GenericRPCMessage {
+    method: RPCMethod.CreateAppSession;
     params: {
-        /** List of channel updates containing information about each channel. */
-        channels: RPCChannelUpdateWithWallet[];
+        /** The unique identifier for the application session. */
+        appSessionId: Hex;
+        /** The version number of the session. */
+        version: number;
+        /** The current status of the channel (e.g., "open", "closed"). */
+        status: RPCChannelStatus;
     };
 }
 
 /**
- * Represents the response structure for the 'get_rpc_history' RPC method.
+ * Represents the response structure for the 'app_sessions.v1.submit_app_state' RPC method.
  */
-export interface GetRPCHistoryResponse extends GenericRPCMessage {
-    method: RPCMethod.GetRPCHistory;
+export interface SubmitAppStateResponse extends GenericRPCMessage {
+    method: RPCMethod.SubmitAppState;
     params: {
-        /** List of RPC entries containing historical RPC calls and their responses. */
-        rpcEntries: RPCHistoryEntry[];
+        /** The unique identifier for the application session. */
+        appSessionId: Hex;
+        /** The version number of the session. */
+        version: number;
+        /** The current status of the channel (e.g., "open", "closed"). */
+        status: RPCChannelStatus;
     };
 }
 
 /**
- * Represents the response structure for the 'get_assets' RPC method.
+ * Represents the response structure for the 'app_sessions.v1.submit_deposit_state' RPC method.
  */
-export interface GetAssetsResponse extends GenericRPCMessage {
-    method: RPCMethod.GetAssets;
+export interface SubmitDepositStateResponse extends GenericRPCMessage {
+    method: RPCMethod.SubmitDepositState;
     params: {
-        /** List of assets available in the clearnode. */
-        assets: RPCAsset[];
+        /** Server's signature for the deposit */
+        signature: Hex;
     };
 }
 
 /**
- * Represents the response structure for the 'assets' RPC method.
+ * Represents the response structure for the 'app_sessions.v1.rebalance_app_sessions' RPC method.
+ */
+export interface RebalanceAppSessionsResponse extends GenericRPCMessage {
+    method: RPCMethod.RebalanceAppSessions;
+    params: {
+        /** Unique batch ID for the rebalance operation */
+        batchId: string;
+    };
+}
+
+/**
+ * Represents the response structure for the 'session_keys.v1.register' RPC method.
+ */
+export interface RegisterResponse extends GenericRPCMessage {
+    method: RPCMethod.Register;
+    params: {
+        /** Challenge message to sign for authorization */
+        challengeMessage: string;
+    };
+}
+
+/**
+ * Represents the response structure for the 'session_keys.v1.get_session_keys' RPC method.
+ */
+export interface GetSessionKeysResponse extends GenericRPCMessage {
+    method: RPCMethod.GetSessionKeys;
+    params: {
+        /** Array of active session keys for the authenticated user. */
+        sessionKeys: RPCSessionKey[];
+    };
+}
+
+/**
+ * Represents the response structure for the 'session_keys.v1.revoke_session_key' RPC method.
+ */
+export interface RevokeSessionKeyResponse extends GenericRPCMessage {
+    method: RPCMethod.RevokeSessionKey;
+    params: {
+        /** The session key address that was revoked. */
+        sessionKey: Address;
+    };
+}
+
+/**
+ * Represents the response structure for the 'message' server push event.
+ */
+export interface MessageResponse extends GenericRPCMessage {
+    method: RPCMethod.Message;
+    params: {};
+}
+
+/**
+ * Represents the response structure for the 'assets' server push event.
  */
 export interface AssetsResponse extends GenericRPCMessage {
     method: RPCMethod.Assets;
@@ -266,105 +298,37 @@ export interface AssetsResponse extends GenericRPCMessage {
 }
 
 /**
- * Represents the response structure for the 'auth_verify' RPC method.
- */
-export interface AuthVerifyResponse extends GenericRPCMessage {
-    method: RPCMethod.AuthVerify;
-    params: {
-        address: Address;
-        sessionKey: Address;
-        success: boolean;
-        /** Available only if challenge auth method was used in {@link AuthVerifyRequest} during the call to {@link RPCMethod.AuthRequest} */
-        jwtToken?: string;
-    };
-}
-
-/**
- * Represents the response structure for the 'auth_request' RPC method.
- */
-export interface AuthRequestResponse extends GenericRPCMessage {
-    method: RPCMethod.AuthRequest;
-    params: {
-        /** The challenge message to be signed by the client for authentication. */
-        challengeMessage: string;
-    };
-}
-
-/**
- * Represents the response structure for the 'message' RPC method.
- */
-export interface MessageResponse extends GenericRPCMessage {
-    method: RPCMethod.Message;
-    params: {};
-}
-
-/**
- * Represents the response structure for the 'bu' RPC method.
+ * Represents the response structure for the 'bu' server push event.
  */
 export interface BalanceUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.BalanceUpdate;
     params: {
         /** List of balance updates. */
-        balanceUpdates: RPCBalance[];
+        balanceUpdates: RPCBalanceEntry[];
     };
 }
 
 /**
- * Represents the response structure for the 'channels' RPC method.
+ * Represents the response structure for the 'channels' server push event.
  */
 export interface ChannelsUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelsUpdate;
     params: {
-        /** List of channel updates. */
-        channels: RPCChannelUpdate[];
+        /** List of channels. */
+        channels: RPCChannel[];
     };
 }
 
 /**
- * Represents the response structure for the 'cu' RPC method.
+ * Represents the response structure for the 'cu' server push event.
  */
 export interface ChannelUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelUpdate;
-    params: RPCChannelUpdate;
+    params: RPCChannel;
 }
 
 /**
- * Represents the response structure for the 'ping' RPC method.
- */
-export interface PingResponse extends GenericRPCMessage {
-    method: RPCMethod.Ping;
-    params: {};
-}
-
-/**
- * Represents the response structure for the 'pong' RPC method.
- */
-export interface PongResponse extends GenericRPCMessage {
-    method: RPCMethod.Pong;
-    params: {};
-}
-
-/**
- * Represents the response structure for the 'transfer' RPC method.
- */
-export interface TransferResponse extends GenericRPCMessage {
-    method: RPCMethod.Transfer;
-    params: {
-        /** List of transactions representing transfers. */
-        transactions: RPCTransaction[];
-    };
-}
-
-/**
- * Represents the response structure for the 'cleanup_session_key_cache' RPC method.
- */
-export interface CleanupSessionKeyCacheResponse extends GenericRPCMessage {
-    method: RPCMethod.CleanupSessionKeyCache;
-    params: {};
-}
-
-/**
- * Represents the response structure for the 'transfer_notification' RPC method.
+ * Represents the response structure for the 'tr' server push event.
  */
 export interface TransferNotificationResponse extends GenericRPCMessage {
     method: RPCMethod.TransferNotification;
@@ -375,211 +339,157 @@ export interface TransferNotificationResponse extends GenericRPCMessage {
 }
 
 /**
- * Represents the parameters for the 'auth_challenge' RPC method.
+ * Server push notification for app session updates.
  */
-export type AuthChallengeResponseParams = AuthChallengeResponse['params'];
-
-/**
- * Represents the parameters for the 'auth_verify' RPC method.
- */
-export type AuthVerifyResponseParams = AuthVerifyResponse['params'];
-
-/**
- * Represents the parameters for the 'error' RPC method.
- */
-export type ErrorResponseParams = ErrorResponse['params'];
-
-/**
- * Represents the parameters for the 'get_config' RPC method.
- */
-export type GetConfigResponseParams = GetConfigResponse['params'];
-
-/**
- * Represents the parameters for the 'get_ledger_balances' RPC method.
- */
-export type GetLedgerBalancesResponseParams = GetLedgerBalancesResponse['params'];
-
-/**
- * Represents the parameters for the 'get_ledger_entries' RPC method.
- */
-export type GetLedgerEntriesResponseParams = GetLedgerEntriesResponse['params'];
-
-/**
- * Represents the parameters for the 'get_ledger_transactions' RPC method.
- */
-export type GetLedgerTransactionsResponseParams = GetLedgerTransactionsResponse['params'];
-
-/**
- * Represents the parameters for the 'get_user_tag' RPC method.
- */
-export type GetUserTagResponseParams = GetUserTagResponse['params'];
-
-/**
- * Represents the parameters for the 'get_session_keys' RPC method.
- */
-export type GetSessionKeysResponseParams = GetSessionKeysResponse['params'];
-
-/**
- * Represents the parameters for the 'revoke_session_key' RPC method.
- */
-export type RevokeSessionKeyResponseParams = RevokeSessionKeyResponse['params'];
-
-/**
- * Represents the parameters for the 'create_app_session' RPC method.
- */
-export type CreateAppSessionResponseParams = CreateAppSessionResponse['params'];
-
-/**
- * Represents the parameters for the 'submit_app_state' RPC method.
- */
-export type SubmitAppStateResponseParams = SubmitAppStateResponse['params'];
-
-/**
- * Represents the parameters for the 'close_app_session' RPC method.
- */
-export type CloseAppSessionResponseParams = CloseAppSessionResponse['params'];
-
-/**
- * Represents the parameters for the 'get_app_definition' RPC method.
- */
-export type GetAppDefinitionResponseParams = GetAppDefinitionResponse['params'];
-
-/**
- * Represents the parameters for the 'get_app_sessions' RPC method.
- */
-export type GetAppSessionsResponseParams = GetAppSessionsResponse['params'];
-
-/**
- * Represents the parameters for the 'create_channel' RPC method.
- */
-export type CreateChannelResponseParams = CreateChannelResponse['params'];
-
-/**
- * Represents the parameters for the 'resize_channel' RPC method.
- */
-export type ResizeChannelResponseParams = ResizeChannelResponse['params'];
-
-/**
- * Represents the parameters for the 'close_channel' RPC method.
- */
-export type CloseChannelResponseParams = CloseChannelResponse['params'];
-
-/**
- * Represents the parameters for the 'get_channels' RPC method.
- */
-export type GetChannelsResponseParams = GetChannelsResponse['params'];
-
-/**
- * Represents the parameters for the 'get_rpc_history' RPC method.
- */
-export type GetRPCHistoryResponseParams = GetRPCHistoryResponse['params'];
-
-/**
- * Represents the parameters for the 'get_assets' RPC method.
- */
-export type GetAssetsResponseParams = GetAssetsResponse['params'];
-
-/**
- * Represents the parameters for the 'assets' RPC method.
- */
-export type AssetsResponseParams = AssetsResponse['params'];
-
-/**
- * Represents the parameters for the 'auth_request' RPC method.
- */
-export type AuthRequestResponseParams = AuthRequestResponse['params'];
-
-/**
- * Represents the parameters for the 'message' RPC method.
- */
-export type MessageResponseParams = MessageResponse['params'];
-
-/**
- * Represents the parameters for the 'bu' RPC method.
- */
-export type BalanceUpdateResponseParams = BalanceUpdateResponse['params'];
-
-/**
- * Represents the parameters for the 'channels' RPC method.
- */
-export type ChannelsUpdateResponseParams = ChannelsUpdateResponse['params'];
-
-/**
- * Represents the parameters for the 'cu' RPC method.
- */
-export type ChannelUpdateResponseParams = ChannelUpdateResponse['params'];
-
-/**
- * Represents the parameters for the 'ping' RPC method.
- */
-export type PingResponseParams = PingResponse['params'];
-
-/**
- * Represents the parameters for the 'pong' RPC method.
- */
-export type PongResponseParams = PongResponse['params'];
-
-/**
- * Represents the parameters for the 'transfer' RPC method.
- */
-export type TransferResponseParams = TransferResponse['params'];
-
-/**
- * Represents the parameters for the 'cleanup_session_key_cache' RPC method.
- */
-export type CleanupSessionKeyCacheResponseParams = CleanupSessionKeyCacheResponse['params'];
-
-/**
- * Represents the parameters for the 'tr' RPC method.
- */
-export type TransferNotificationResponseParams = TransferNotificationResponse['params'];
+export interface AppSessionUpdateResponse extends GenericRPCMessage {
+    method: RPCMethod.AppSessionUpdate;
+    params: {
+        /** Updated app session information */
+        appSession: RPCAppSession;
+    };
+}
 
 /**
  * Union type for all possible RPC response types.
  * This allows for type-safe handling of different response structures.
  */
 export type RPCResponse =
-    | AuthChallengeResponse
-    | AuthVerifyResponse
-    | AuthRequestResponse
+    // Node
     | ErrorResponse
     | GetConfigResponse
-    | GetLedgerBalancesResponse
-    | GetLedgerEntriesResponse
-    | GetLedgerTransactionsResponse
-    | GetUserTagResponse
-    | GetSessionKeysResponse
-    | RevokeSessionKeyResponse
-    | CreateAppSessionResponse
-    | SubmitAppStateResponse
-    | CloseAppSessionResponse
+    | GetAssetsResponse
+    | PingResponse
+    // User
+    | GetBalancesResponse
+    | GetTransactionsResponse
+    // Channels
+    | GetChannelsResponse
+    | GetHomeChannelResponse
+    | GetEscrowChannelResponse
+    | GetLatestStateResponse
+    | GetStatesResponse
+    | CreateChannelResponse
+    | SubmitStateResponse
+    // App Sessions
     | GetAppDefinitionResponse
     | GetAppSessionsResponse
-    | CreateChannelResponse
-    | ResizeChannelResponse
-    | CloseChannelResponse
-    | GetChannelsResponse
-    | GetRPCHistoryResponse
-    | GetAssetsResponse
+    | CreateAppSessionResponse
+    | SubmitAppStateResponse
+    | SubmitDepositStateResponse
+    | RebalanceAppSessionsResponse
+    // Session Keys
+    | RegisterResponse
+    | GetSessionKeysResponse
+    | RevokeSessionKeyResponse
+    // Server Push
     | AssetsResponse
-    | PingResponse
-    | PongResponse
-    | TransferResponse
-    | CleanupSessionKeyCacheResponse
     | MessageResponse
     | BalanceUpdateResponse
     | ChannelsUpdateResponse
     | ChannelUpdateResponse
-    | TransferNotificationResponse;
+    | TransferNotificationResponse
+    | AppSessionUpdateResponse;
+
+/** Represents the parameters for the 'error' RPC method. */
+export type ErrorResponseParams = ErrorResponse['params'];
+
+/** Represents the parameters for the 'node.v1.ping' RPC method. */
+export type PingResponseParams = PingResponse['params'];
+
+/** Represents the parameters for the 'node.v1.get_config' RPC method. */
+export type GetConfigResponseParams = GetConfigResponse['params'];
+
+/** Represents the parameters for the 'node.v1.get_assets' RPC method. */
+export type GetAssetsResponseParams = GetAssetsResponse['params'];
+
+/** Represents the parameters for the 'user.v1.get_balances' RPC method. */
+export type GetBalancesResponseParams = GetBalancesResponse['params'];
+
+/** Represents the parameters for the 'user.v1.get_transactions' RPC method. */
+export type GetTransactionsResponseParams = GetTransactionsResponse['params'];
+
+/** Represents the parameters for the 'channels.v1.get_home_channel' RPC method. */
+export type GetHomeChannelResponseParams = GetHomeChannelResponse['params'];
+
+/** Represents the parameters for the 'channels.v1.get_escrow_channel' RPC method. */
+export type GetEscrowChannelResponseParams = GetEscrowChannelResponse['params'];
+
+/** Represents the parameters for the 'channels.v1.get_channels' RPC method. */
+export type GetChannelsResponseParams = GetChannelsResponse['params'];
+
+/** Represents the parameters for the 'channels.v1.get_latest_state' RPC method. */
+export type GetLatestStateResponseParams = GetLatestStateResponse['params'];
+
+/** Represents the parameters for the 'channels.v1.get_states' RPC method. */
+export type GetStatesResponseParams = GetStatesResponse['params'];
+
+/** Represents the parameters for the 'channels.v1.request_creation' RPC method. */
+export type CreateChannelResponseParams = CreateChannelResponse['params'];
+
+/** Represents the parameters for the 'channels.v1.submit_state' RPC method. */
+export type SubmitStateResponseParams = SubmitStateResponse['params'];
+
+/** Represents the parameters for the 'app_sessions.v1.get_app_definition' RPC method. */
+export type GetAppDefinitionResponseParams = GetAppDefinitionResponse['params'];
+
+/** Represents the parameters for the 'app_sessions.v1.get_app_sessions' RPC method. */
+export type GetAppSessionsResponseParams = GetAppSessionsResponse['params'];
+
+/** Represents the parameters for the 'app_sessions.v1.create_app_session' RPC method. */
+export type CreateAppSessionResponseParams = CreateAppSessionResponse['params'];
+
+/** Represents the parameters for the 'app_sessions.v1.submit_app_state' RPC method. */
+export type SubmitAppStateResponseParams = SubmitAppStateResponse['params'];
+
+/** Represents the parameters for the 'app_sessions.v1.submit_deposit_state' RPC method. */
+export type SubmitDepositStateResponseParams = SubmitDepositStateResponse['params'];
+
+/** Represents the parameters for the 'app_sessions.v1.rebalance_app_sessions' RPC method. */
+export type RebalanceAppSessionsResponseParams = RebalanceAppSessionsResponse['params'];
+
+/** Represents the parameters for the 'session_keys.v1.register' RPC method. */
+export type RegisterResponseParams = RegisterResponse['params'];
+
+/** Represents the parameters for the 'session_keys.v1.get_session_keys' RPC method. */
+export type GetSessionKeysResponseParams = GetSessionKeysResponse['params'];
+
+/** Represents the parameters for the 'session_keys.v1.revoke_session_key' RPC method. */
+export type RevokeSessionKeyResponseParams = RevokeSessionKeyResponse['params'];
+
+/** Represents the parameters for the 'assets' server push event. */
+export type AssetsResponseParams = AssetsResponse['params'];
+
+/** Represents the parameters for the 'message' server push event. */
+export type MessageResponseParams = MessageResponse['params'];
+
+/** Represents the parameters for the 'bu' server push event. */
+export type BalanceUpdateResponseParams = BalanceUpdateResponse['params'];
+
+/** Represents the parameters for the 'channels' server push event. */
+export type ChannelsUpdateResponseParams = ChannelsUpdateResponse['params'];
+
+/** Represents the parameters for the 'cu' server push event. */
+export type ChannelUpdateResponseParams = ChannelUpdateResponse['params'];
+
+/** Represents the parameters for the 'tr' server push event. */
+export type TransferNotificationResponseParams = TransferNotificationResponse['params'];
+
+/** Represents the parameters for the 'asu' server push event. */
+export type AppSessionUpdateResponseParams = AppSessionUpdateResponse['params'];
 
 /**
- * Maps RPC methods to their corresponding parameter types.
+ * Helper type to extract the response type for a given method.
  */
-// Helper type to extract the response type for a given method
 export type ExtractResponseByMethod<M extends RPCMethod> = Extract<RPCResponse, { method: M }>;
 
+/**
+ * Type representing all response params as a union.
+ */
 export type RPCResponseParams = ExtractResponseByMethod<RPCMethod>['params'];
 
+/**
+ * Maps RPC methods to their corresponding response parameter types.
+ */
 export type RPCResponseParamsByMethod = {
     [M in RPCMethod]: ExtractResponseByMethod<M>['params'];
 };

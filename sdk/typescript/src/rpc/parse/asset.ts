@@ -1,21 +1,45 @@
 import { z } from 'zod';
-import { RPCMethod, GetAssetsResponseParams, RPCAsset, AssetsResponseParams } from '../types';
+import { RPCMethod, GetAssetsResponseParams, AssetsResponseParams, RPCAsset, RPCToken } from '../types';
 import { addressSchema, ParamsParser } from './common';
 
-const AssetObjectSchema = z
-    .object({ token: addressSchema, chain_id: z.number(), symbol: z.string(), decimals: z.number() })
+// Token schema (token on a specific blockchain)
+const TokenSchema = z
+    .object({
+        name: z.string(),
+        symbol: z.string(),
+        address: addressSchema,
+        blockchain_id: z.number(),
+        decimals: z.number(),
+    })
     .transform(
-        (raw): RPCAsset => ({
-            token: raw.token,
-            chainId: raw.chain_id,
+        (raw): RPCToken => ({
+            name: raw.name,
             symbol: raw.symbol,
+            address: raw.address,
+            blockchainId: raw.blockchain_id,
             decimals: raw.decimals,
         }),
     );
 
+// Asset schema (asset with tokens across multiple blockchains)
+const AssetSchema = z
+    .object({
+        name: z.string(),
+        symbol: z.string(),
+        tokens: z.array(TokenSchema),
+    })
+    .transform(
+        (raw): RPCAsset => ({
+            name: raw.name,
+            symbol: raw.symbol,
+            tokens: raw.tokens,
+        }),
+    );
+
+// get_assets response parser
 const GetAssetsParamsSchema = z
     .object({
-        assets: z.array(AssetObjectSchema),
+        assets: z.array(AssetSchema),
     })
     .transform(
         (raw): GetAssetsResponseParams => ({
@@ -23,9 +47,10 @@ const GetAssetsParamsSchema = z
         }),
     );
 
+// assets event parser (server push)
 const AssetsParamsSchema = z
     .object({
-        assets: z.array(AssetObjectSchema),
+        assets: z.array(AssetSchema),
     })
     .transform(
         (raw): AssetsResponseParams => ({

@@ -1,87 +1,126 @@
 import { z } from 'zod';
-import { Address } from 'viem';
+import { Address, Hex } from 'viem';
 import {
     RPCMethod,
     CreateAppSessionResponseParams,
     SubmitAppStateResponseParams,
-    CloseAppSessionResponseParams,
+    SubmitDepositStateResponseParams,
+    RebalanceAppSessionsResponseParams,
     GetAppDefinitionResponseParams,
     GetAppSessionsResponseParams,
+    AppSessionUpdateResponseParams,
     RPCAppSession,
+    RPCAppParticipant,
+    RPCAppSessionAllocation,
 } from '../types';
-import { hexSchema, addressSchema, statusEnum, ParamsParser, dateSchema, protocolVersionEnum } from './common';
+import { hexSchema, addressSchema, ParamsParser } from './common';
 
-const AppAllocationObject = z.object({
-    participant: addressSchema,
-    asset: z.string(),
-    amount: z.string(),
-});
-
-const AppSessionObject = z.object({
-    app_session_id: hexSchema,
-    application: z.string(),
-    status: statusEnum,
-    participants: z.array(addressSchema),
-    protocol: protocolVersionEnum,
-    challenge: z.number(),
-    weights: z.array(z.number()),
-    quorum: z.number(),
-    version: z.number(),
-    nonce: z.number(),
-    created_at: dateSchema,
-    updated_at: dateSchema,
-    session_data: z.string().optional(),
-});
-
-const AppSessionObjectSchema = AppSessionObject
+// App participant schema
+const AppParticipantSchema = z
+    .object({
+        wallet_address: addressSchema,
+        signature_weight: z.number(),
+    })
     .transform(
-        (raw): RPCAppSession => ({
-            appSessionId: raw.app_session_id,
-            application: raw.application,
-            status: raw.status,
-            participants: raw.participants,
-            protocol: raw.protocol,
-            challenge: raw.challenge,
-            weights: raw.weights,
-            quorum: raw.quorum,
-            version: raw.version,
-            nonce: raw.nonce,
-            createdAt: raw.created_at,
-            updatedAt: raw.updated_at,
-            sessionData: raw.session_data,
+        (raw): RPCAppParticipant => ({
+            walletAddress: raw.wallet_address,
+            signatureWeight: raw.signature_weight,
         }),
     );
 
+// App session allocation schema
+const AppSessionAllocationSchema = z
+    .object({
+        asset: z.string(),
+        amount: z.string(),
+        participant: addressSchema,
+    })
+    .transform(
+        (raw): RPCAppSessionAllocation => ({
+            asset: raw.asset,
+            amount: raw.amount,
+            participant: raw.participant,
+        }),
+    );
+
+// App session schema
+const AppSessionSchema = z
+    .object({
+        app_session_id: z.string(),
+        status: z.string(),
+        participants: z.array(AppParticipantSchema),
+        session_data: z.string().optional(),
+        quorum: z.number(),
+        version: z.number(),
+        nonce: z.number(),
+        allocations: z.array(AppSessionAllocationSchema),
+    })
+    .transform(
+        (raw): RPCAppSession => ({
+            appSessionId: raw.app_session_id,
+            status: raw.status,
+            participants: raw.participants,
+            sessionData: raw.session_data,
+            quorum: raw.quorum,
+            version: raw.version,
+            nonce: raw.nonce,
+            allocations: raw.allocations,
+        }),
+    );
+
+// create_app_session response parser
 const CreateAppSessionParamsSchema = z
-    .object({ app_session_id: hexSchema, version: z.number(), status: statusEnum })
+    .object({
+        app_session_id: hexSchema,
+        version: z.number(),
+        status: z.string(),
+    })
     .transform(
         (raw): CreateAppSessionResponseParams => ({
             appSessionId: raw.app_session_id,
             version: raw.version,
-            status: raw.status,
+            status: raw.status as any, // RPCChannelStatus enum
         }),
     );
 
+// submit_app_state response parser
 const SubmitAppStateParamsSchema = z
-    .object({ app_session_id: hexSchema, version: z.number(), status: statusEnum })
+    .object({
+        app_session_id: hexSchema,
+        version: z.number(),
+        status: z.string(),
+    })
     .transform(
         (raw): SubmitAppStateResponseParams => ({
             appSessionId: raw.app_session_id,
             version: raw.version,
-            status: raw.status,
+            status: raw.status as any, // RPCChannelStatus enum
         }),
     );
 
-const CloseAppSessionParamsSchema = z
-    .object({ app_session_id: hexSchema, version: z.number(), status: statusEnum })
+// submit_deposit_state response parser
+const SubmitDepositStateParamsSchema = z
+    .object({
+        signature: hexSchema,
+    })
     .transform(
-        (raw): CloseAppSessionResponseParams => ({
-            appSessionId: raw.app_session_id,
-            version: raw.version,
-            status: raw.status,
+        (raw): SubmitDepositStateResponseParams => ({
+            signature: raw.signature,
         }),
     );
 
+// rebalance_app_sessions response parser
+const RebalanceAppSessionsParamsSchema = z
+    .object({
+        batch_id: z.string(),
+    })
+    .transform(
+        (raw): RebalanceAppSessionsResponseParams => ({
+            batchId: raw.batch_id,
+        }),
+    );
+
+// get_app_definition response parser
 const GetAppDefinitionParamsSchema = z
     .object({
         protocol: z.string(),
@@ -102,9 +141,10 @@ const GetAppDefinitionParamsSchema = z
         }),
     );
 
+// get_app_sessions response parser
 const GetAppSessionsParamsSchema = z
     .object({
-        app_sessions: z.array(AppSessionObjectSchema),
+        app_sessions: z.array(AppSessionSchema),
     })
     .transform(
         (raw): GetAppSessionsResponseParams => ({
@@ -112,38 +152,22 @@ const GetAppSessionsParamsSchema = z
         }),
     );
 
-const AppSessionUpdateObjectSchema = z
+// app_session_update event parser (server push)
+const AppSessionUpdateParamsSchema = z
     .object({
-        app_session: AppSessionObject,
-        participant_allocations: z.array(AppAllocationObject),
+        app_session: AppSessionSchema,
     })
-    .transform((raw) => ({
-        appSessionId: raw.app_session.app_session_id,
-        application: raw.app_session.application,
-        status: raw.app_session.status,
-        participants: raw.app_session.participants,
-        sessionData: raw.app_session.session_data,
-        protocol: raw.app_session.protocol,
-        challenge: raw.app_session.challenge,
-        weights: raw.app_session.weights,
-        quorum: raw.app_session.quorum,
-        version: raw.app_session.version,
-        nonce: raw.app_session.nonce,
-        createdAt: raw.app_session.created_at,
-        updatedAt: raw.app_session.updated_at,
-        participantAllocations: raw.participant_allocations.map((a) => ({
-                participant: a.participant,
-                asset: a.asset,
-                amount: a.amount,
-            })),
-    }));
-
-const AppSessionUpdateParamsSchema = AppSessionUpdateObjectSchema;
+    .transform(
+        (raw): AppSessionUpdateResponseParams => ({
+            appSession: raw.app_session,
+        }),
+    );
 
 export const appParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.CreateAppSession]: (params) => CreateAppSessionParamsSchema.parse(params),
     [RPCMethod.SubmitAppState]: (params) => SubmitAppStateParamsSchema.parse(params),
-    [RPCMethod.CloseAppSession]: (params) => CloseAppSessionParamsSchema.parse(params),
+    [RPCMethod.SubmitDepositState]: (params) => SubmitDepositStateParamsSchema.parse(params),
+    [RPCMethod.RebalanceAppSessions]: (params) => RebalanceAppSessionsParamsSchema.parse(params),
     [RPCMethod.GetAppDefinition]: (params) => GetAppDefinitionParamsSchema.parse(params),
     [RPCMethod.GetAppSessions]: (params) => GetAppSessionsParamsSchema.parse(params),
     [RPCMethod.AppSessionUpdate]: (params) => AppSessionUpdateParamsSchema.parse(params),

@@ -1,6 +1,6 @@
 import { RPCMethod } from '../types';
 import { ParamsParser, noop } from './common';
-import { authParamsParsers } from './auth';
+import { authParamsParsers } from './session_keys';
 import { ledgerParamsParsers } from './ledger';
 import { appParamsParsers } from './app';
 import { channelParamsParsers } from './channel';
@@ -17,6 +17,4 @@ export const paramsParsers = {
 
     // Methods with no params
     [RPCMethod.Ping]: noop,
-    [RPCMethod.Pong]: noop,
-    [RPCMethod.CleanupSessionKeyCache]: noop,
 } as Record<RPCMethod, ParamsParser<unknown>>;

@@ -2,102 +2,46 @@ import { Hex, Address, Hash } from 'viem';
 
 /** Represents the status of a channel. */
 export enum RPCChannelStatus {
+    Void = 'void',
     Open = 'open',
-    Closed = 'closed',
-    Resizing = 'resizing',
     Challenged = 'challenged',
+    Closed = 'closed',
 }
 
 /**
- * Represents the request parameters for the 'get_transactions' RPC method.
+ * Participant in an application session.
  */
-export enum RPCTxType {
-    Transfer = 'transfer',
-    Deposit = 'deposit',
-    Withdrawal = 'withdrawal',
-    AppDeposit = 'app_deposit',
-    AppWithdrawal = 'app_withdrawal',
-    EscrowLock = 'escrow_lock',
-    EscrowUnlock = 'escrow_unlock',
-}
-
-/**
- * Represents the protocol version and is used to provide backward compatibility as the API evolves.
- */
-export enum RPCProtocolVersion {
-    // NitroRPC_0_2 is the initial supported version of the NitroRPC protocol
-    NitroRPC_0_2 = 'NitroRPC/0.2',
-    // NitroRPC_0_4 adds support for App Session deposits and withdrawals
-    NitroRPC_0_4 = 'NitroRPC/0.4',
+export interface RPCAppParticipant {
+    /** Participant's wallet address */
+    walletAddress: Address;
+    /** Signature weight for the participant */
+    signatureWeight: number;
 }
 
 /**
  * Defines the structure of an application definition used when creating an application.
  */
 export interface RPCAppDefinition {
-    /** Application identifier */
+    /** Application identifier from an app registry */
     application: string;
-    /** Protocol identifies the version of the application protocol */
-    protocol: RPCProtocolVersion;
-    /** An array of participant addresses (Ethereum addresses) involved in the application. Must have at least 2 participants. */
-    participants: Hex[];
-    /** An array representing the relative weights or stakes of participants, often used for dispute resolution or allocation calculations. Order corresponds to the participants array. */
-    weights: number[];
-    /** The number of participants required to reach consensus or approve state updates. */
+    /** List of participants in the app session */
+    participants: RPCAppParticipant[];
+    /** Quorum required for the app session */
     quorum: number;
-    /** A parameter related to the challenge period or mechanism within the application's protocol, in seconds. */
-    challenge: number;
-    /** A unique number used once, often for preventing replay attacks or ensuring uniqueness of the application instance. Must be non-zero. */
-    nonce?: number;
-}
-
-/**
- * Represents a channel update message sent over the RPC protocol.
- */
-export interface RPCChannelUpdate {
-    /** The unique identifier for the channel. */
-    channelId: Hex;
-    /** The Ethereum address of the participant. */
-    participant: Address;
-    /** The current status of the channel (e.g., "open", "closed"). */
-    status: RPCChannelStatus;
-    /** The token contract address. */
-    token: Address;
-    /** The total amount in the channel. */
-    amount: BigInt;
-    /** The chain ID where the channel exists. */
-    chainId: number;
-    /** The adjudicator contract address. */
-    adjudicator: Address;
-    /** The challenge period in seconds. */
-    challenge: number;
-    /** The nonce value for the channel. */
+    /** A unique number to prevent replay attacks */
     nonce: number;
-    /** The version number of the channel. */
-    version: number;
-    /** The timestamp when the channel was created. */
-    createdAt: Date;
-    /** The timestamp when the channel was last updated. */
-    updatedAt: Date;
-}
-
-export interface RPCChannelUpdateWithWallet extends RPCChannelUpdate {
-    /** The Ethereum address of the wallet associated with the channel. */
-    wallet: Address;
 }
 
 /**
  * Represents the network information for the 'get_config' RPC method.
  */
 export interface RPCNetworkInfo {
-    /** The chain ID of the network. */
-    chainId: number;
-    /** The name of the blockchain (e.g., "polygon_amoy", "base_sepolia"). */
+    /** Blockchain name */
     name: string;
-    /** The custody contract address for the network. */
-    custodyAddress: Address;
-    /** The adjudicator contract address for the network. */
-    adjudicatorAddress: Address;
+    /** Blockchain network ID */
+    blockchainId: number;
+    /** Address of the main contract on this blockchain */
+    contractAddress: Address;
 }
 
 export enum RPCAppStateIntent {
@@ -107,145 +51,68 @@ export enum RPCAppStateIntent {
     Deposit = 'deposit',
     /** Intent for withdrawing funds from the app session */
     Withdraw = 'withdraw',
+    /** Intent for rebalancing multiple app sessions atomically */
+    Rebalance = 'rebalance',
 }
 
 /**
  * Represents the app session information.
  */
 export interface RPCAppSession {
-    /** The unique identifier for the application session. */
-    appSessionId: Hex;
-    /** Application identifier */
-    application: string;
-    /** The current status of the channel (e.g., "open", "closed"). */
-    status: RPCChannelStatus;
-    /** List of participant Ethereum addresses. */
-    participants: Address[];
-    /** Protocol identifies the version of the application protocol */
-    protocol: RPCProtocolVersion;
-    /** The challenge period in seconds. */
-    challenge: number;
-    /** The signature weights for each participant. */
-    weights: number[];
-    /** The minimum number of signatures required for state updates. */
-    quorum: number;
-    /** The version number of the session. */
-    version: number;
-    /** The nonce value for the session. */
-    nonce: number;
-    /** The timestamp when the session was created. */
-    createdAt: Date;
-    /** The timestamp when the session was last updated. */
-    updatedAt: Date;
-    /** Optional session data as a JSON string that stores application-specific state or metadata. */
+    /** A unique application session identifier */
+    appSessionId: string;
+    /** Session status (open/closed) */
+    status: string;
+    /** List of participant wallet addresses with weights */
+    participants: RPCAppParticipant[];
+    /** JSON stringified session data */
     sessionData?: string;
+    /** Quorum required for operations */
+    quorum: number;
+    /** Current version of the session state */
+    version: number;
+    /** Nonce for the session */
+    nonce: number;
+    /** List of allocations in the app state */
+    allocations: RPCAppSessionAllocation[];
 }
 
 /**
- * Represents RPC entry in the history.
+ * Token information for a specific blockchain.
  */
-export interface RPCHistoryEntry {
-    /** Unique identifier for the RPC entry. */
-    id: number;
-    /** The Ethereum address of the sender. */
-    sender: Address;
-    /** The request ID for the RPC call. */
-    reqId: number;
-    /** The RPC method name. */
-    method: string;
-    /** The JSON string of the request parameters. */
-    params: string;
-    /** The timestamp of the RPC call. */
-    timestamp: number;
-    /** Array of request signatures. */
-    reqSig: Hex[];
-    /** Array of response signatures. */
-    resSig: Hex[];
-    /** The JSON string of the response. */
-    response: string;
-}
-
-/**
- * Represents Asset information received from the clearnode.
- */
-export interface RPCAsset {
-    /** The token contract address. */
-    token: Address;
-    /** The chain ID where the asset exists. */
-    chainId: number;
-    /** The asset symbol (e.g., "eth", "usdc"). */
+export interface RPCToken {
+    /** Token name */
+    name: string;
+    /** Token symbol */
     symbol: string;
-    /** The number of decimal places for the asset. */
+    /** Token contract address */
+    address: Address;
+    /** Blockchain network ID */
+    blockchainId: number;
+    /** Number of decimal places */
     decimals: number;
 }
 
 /**
- * Represents the balance information from clearnode.
+ * Asset information received from the clearnode.
  */
-export interface RPCBalance {
-    /** The asset symbol (e.g., "eth", "usdc"). */
-    asset: string;
-    /** The balance amount. */
-    amount: string;
-}
-
-export type LedgerAccountType = Address | Hash;
-
-/**
- * Represents a single entry in the ledger.
- */
-export interface RPCLedgerEntry {
-    /** Unique identifier for the ledger entry. */
-    id: number;
-    /** The account identifier associated with the entry. */
-    accountId: LedgerAccountType;
-    /** The type of account (e.g., "wallet", "channel"). */
-    accountType: number;
-    /** The asset symbol for the entry. */
-    asset: string;
-    /** The Ethereum address of the participant. */
-    participant: Address;
-    /** The credit amount. */
-    credit: string;
-    /** The debit amount. */
-    debit: string;
-    /** The timestamp when the entry was created. */
-    createdAt: Date;
+export interface RPCAsset {
+    /** Asset name */
+    name: string;
+    /** Asset symbol (e.g., "eth", "usdc") */
+    symbol: string;
+    /** Supported tokens for this asset across different blockchains */
+    tokens: RPCToken[];
 }
 
 /**
- * Represents the parameters for the transfer transaction.
- */
-export interface RPCTransaction {
-    /** Unique identifier for the transfer. */
-    id: number;
-    /** The type of transaction. */
-    txType: RPCTxType;
-    /** The source address from which assets were transferred. */
-    fromAccount: LedgerAccountType;
-    /** The user tag for the source account (optional). */
-    fromAccountTag?: string;
-    /** The destination address to which assets were transferred. */
-    toAccount: LedgerAccountType;
-    /** The user tag for the destination account (optional). */
-    toAccountTag?: string;
-    /** The asset symbol that was transferred. */
-    asset: string;
-    /** The amount that was transferred. */
-    amount: string;
-    /** The timestamp when the transfer was created. */
-    createdAt: Date;
-}
-
-/**
- * Represents a generic RPC message structure that includes common fields.
- * This interface is extended by specific RPC request and response types.
+ * Represents an allowance for session key registration.
  */
 export interface RPCAllowance {
     /** The symbol of the asset (e.g., "eth", "usdc"). */
     asset: string;
-    /** The amount of the asset that is allowed to be spent. */
-    amount: string;
+    /** The maximum amount of the asset that is allowed to be spent. */
+    allowance: string;
 }
 
 /**
@@ -280,8 +147,6 @@ export interface RPCSessionKey {
     createdAt: Date;
 }
 
-// TODO: create single domain allocation type
-
 /**
  * Represents the allocation of assets within an application session.
  * This structure is used to define the initial allocation of assets among participants.
@@ -297,59 +162,222 @@ export interface RPCAppSessionAllocation {
 }
 
 /**
- * Represents the allocation of assets for an RPC transfer.
- * This structure is used to define the asset and amount being transferred to a specific destination address.
+ * Represents an application session state update.
  */
-export interface RPCChannelAllocation {
-    /** The destination address for the allocation. */
-    destination: Address;
-    /** The token contract address for the asset being allocated. */
-    token: Address;
-    /** The amount of the asset being allocated. */
-    amount: bigint;
+export interface RPCAppStateUpdate {
+    /** A unique application session identifier */
+    app_session_id: string;
+    /** The intent of the app session update */
+    intent: RPCAppStateIntent;
+    /** Version of the app state */
+    version: number;
+    /** List of allocations in the app state */
+    allocations: RPCAppSessionAllocation[];
+    /** JSON stringified session data */
+    session_data?: string;
 }
 
 /**
- * Represents the allocation of assets for an RPC transfer.
- * This structure is used to define the asset and amount being transferred.
+ * Represents a signed application session state update.
  */
-export interface RPCTransferAllocation {
-    /** The symbol of the asset (e.g., "eth", "usdc"). */
-    asset: string;
-    /** The amount of the asset being transferred. */
+export interface RPCSignedAppStateUpdate {
+    /** The application session state update */
+    app_state_update: RPCAppStateUpdate;
+    /** The signature quorum for the application session */
+    quorum_sigs: Hex[];
+}
+
+/**
+ * Transition types for state management.
+ * Represents different types of state transitions that can occur in channels.
+ */
+export enum RPCTransitionType {
+    TransferReceive = 'transfer_receive',
+    TransferSend = 'transfer_send',
+    Release = 'release',
+    Commit = 'commit',
+    HomeDeposit = 'home_deposit',
+    HomeWithdrawal = 'home_withdrawal',
+    MutualLock = 'mutual_lock',
+    EscrowDeposit = 'escrow_deposit',
+    EscrowLock = 'escrow_lock',
+    EscrowWithdraw = 'escrow_withdraw',
+    Migrate = 'migrate',
+}
+
+/**
+ * Represents a single state transition.
+ */
+export interface RPCTransition {
+    /** Type of the state transition */
+    type: RPCTransitionType;
+    /** Associated blockchain transaction hash (optional) */
+    txHash?: string;
+    /** Account identifier for the transition */
+    accountId: string;
+    /** Amount involved in the transition (decimal string) */
     amount: string;
 }
 
 /**
- * Represents the state of a channel operation.
- * This structure is used to define the intent, version, state data, and allocations for a channel operation.
+ * Represents ledger balances for a channel.
+ * Tracks user and node balances with their net flows.
  */
-export interface RPCChannelOperationState {
-    /** The intent type for the state update. */
-    intent: number;
-    /** The version number of the channel. */
-    version: number;
-    /** The encoded state data for the channel. */
-    stateData: Hex;
-    /** The list of allocations for the channel. */
-    allocations: RPCChannelAllocation[];
-}
-
-export interface RPCChannelOperation {
-    /** The unique identifier for the channel. */
-    channelId: Hex;
-    /** The channel state object. */
-    state: RPCChannelOperationState;
-    /** The server's signature for the state update. */
-    serverSignature: Hex;
+export interface RPCLedger {
+    /** Token contract address */
+    tokenAddress: Address;
+    /** Blockchain network ID */
+    blockchainId: number;
+    /** User's current balance (decimal string) */
+    userBalance: string;
+    /** User's net flow (decimal string) */
+    userNetFlow: string;
+    /** Node's current balance (decimal string) */
+    nodeBalance: string;
+    /** Node's net flow (decimal string) */
+    nodeNetFlow: string;
 }
 
 /**
- * Represents the fixed part of a channel, containing essential metadata.
+ * Represents a complete state.
+ * States track all transitions and current balances for a user's asset.
+ */
+export interface RPCState {
+    /** Deterministic hash identifier for the state */
+    id: string;
+    /** List of state transitions */
+    transitions: RPCTransition[];
+    /** Asset symbol (e.g., "usdc", "eth") */
+    asset: string;
+    /** User's wallet address */
+    userWallet: Address;
+    /** User epoch index */
+    epoch: number;
+    /** State version number */
+    version: number;
+    /** Home channel ID (optional) */
+    homeChannelId?: string;
+    /** Escrow channel ID (optional) */
+    escrowChannelId?: string;
+    /** Home channel ledger */
+    homeLedger: RPCLedger;
+    /** Escrow channel ledger (optional) */
+    escrowLedger?: RPCLedger;
+    /** User's signature (optional) */
+    userSig?: Hex;
+    /** Node's signature (optional) */
+    nodeSig?: Hex;
+}
+
+/**
+ * Represents channel information.
+ * Channels can be either home (user-node) or escrow (multi-party).
  */
 export interface RPCChannel {
-    participants: Address[];
-    adjudicator: Address;
+    /** Unique channel identifier */
+    channelId: string;
+    /** User's wallet address */
+    userWallet: Address;
+    /** Node's wallet address */
+    nodeWallet: Address;
+    /** Channel type: home or escrow */
+    type: 'home' | 'escrow';
+    /** Blockchain network ID */
+    blockchainId: number;
+    /** Token contract address */
+    tokenAddress: Address;
+    /** Challenge period in seconds */
     challenge: number;
+    /** Channel nonce for uniqueness */
     nonce: number;
+    /** Channel status */
+    status: 'void' | 'open' | 'challenged' | 'closed';
+    /** On-chain state version */
+    stateVersion: number;
+}
+
+/**
+ * Channel definition for creating new channels.
+ */
+export interface RPCChannelDefinition {
+    /** Unique number for replay protection */
+    nonce: number;
+    /** Challenge period in seconds */
+    challenge: number;
+}
+
+/**
+ * Transaction types supported by the API.
+ */
+export enum RPCTransactionType {
+    Transfer = 'transfer',
+    Release = 'release',
+    Commit = 'commit',
+    HomeDeposit = 'home_deposit',
+    HomeWithdrawal = 'home_withdrawal',
+    MutualLock = 'mutual_lock',
+    EscrowDeposit = 'escrow_deposit',
+    EscrowLock = 'escrow_lock',
+    EscrowWithdraw = 'escrow_withdraw',
+    Migrate = 'migrate',
+}
+
+/**
+ * Represents a transaction.
+ */
+export interface RPCTransaction {
+    /** Transaction reference ID */
+    id: string;
+    /** Asset symbol */
+    asset: string;
+    /** Transaction type */
+    txType: RPCTransactionType;
+    /** Sender account identifier */
+    fromAccount: string;
+    /** Recipient account identifier */
+    toAccount: string;
+    /** Sender's new state ID after transaction (optional) */
+    senderNewStateId?: string;
+    /** Receiver's new state ID after transaction (optional) */
+    receiverNewStateId?: string;
+    /** Transaction amount (decimal string) */
+    amount: string;
+    /** Transaction creation timestamp */
+    createdAt: Date;
+}
+
+/**
+ * Balance entry for user balances.
+ */
+export interface RPCBalanceEntry {
+    /** Asset symbol */
+    asset: string;
+    /** Balance amount (decimal string) */
+    amount: string;
+}
+
+/**
+ * Pagination parameters for list queries.
+ */
+export interface PaginationParams {
+    /** Number of items to skip */
+    offset?: number;
+    /** Maximum number of items to return */
+    limit?: number;
+    /** Sort order: ascending or descending */
+    sort?: 'asc' | 'desc';
+}
+
+/**
+ * Pagination metadata returned with paginated responses.
+ */
+export interface PaginationMetadata {
+    /** Current page number */
+    page: number;
+    /** Items per page */
+    perPage: number;
+    /** Total number of items */
+    totalCount: number;
+    /** Total number of pages */
+    pageCount: number;
 }

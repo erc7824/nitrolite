@@ -1,149 +1,121 @@
 import { z } from 'zod';
 import {
     RPCMethod,
-    ResizeChannelResponseParams,
-    CloseChannelResponseParams,
+    GetHomeChannelResponseParams,
+    GetEscrowChannelResponseParams,
     GetChannelsResponseParams,
-    ChannelUpdateResponseParams,
-    RPCChannelUpdate,
-    ChannelsUpdateResponseParams,
-    RPCChannelUpdateWithWallet,
+    GetLatestStateResponseParams,
+    GetStatesResponseParams,
     CreateChannelResponseParams,
-    RPCChannelOperation,
+    SubmitStateResponseParams,
+    ChannelUpdateResponseParams,
+    ChannelsUpdateResponseParams,
 } from '../types';
-import { hexSchema, addressSchema, statusEnum, ParamsParser, bigIntSchema, dateSchema } from './common';
+import { hexSchema, channelSchema, stateSchema, paginationMetadataSchema, ParamsParser } from './common';
 
-const RPCAllocationSchema = z.object({
-    destination: addressSchema,
-    token: addressSchema,
-    amount: bigIntSchema,
-});
+// get_home_channel response parser
+const GetHomeChannelParamsSchema = z
+    .object({
+        channel: channelSchema,
+    })
+    .transform(
+        (raw): GetHomeChannelResponseParams => ({
+            channel: raw.channel,
+        }),
+    );
 
-const ChannelOperationObject = z.object({
-    channel_id: hexSchema,
-    state: z.object({
-        intent: z.number(),
-        version: z.number(),
-        state_data: hexSchema,
-        allocations: z.array(RPCAllocationSchema),
-    }),
-    server_signature: hexSchema,
-});
+// get_escrow_channel response parser
+const GetEscrowChannelParamsSchema = z
+    .object({
+        channel: channelSchema,
+    })
+    .transform(
+        (raw): GetEscrowChannelResponseParams => ({
+            channel: raw.channel,
+        }),
+    );
 
-const ChannelOperationObjectSchema = ChannelOperationObject.transform(
-    (raw): RPCChannelOperation => ({
-        channelId: raw.channel_id,
-        state: {
-            intent: raw.state.intent,
-            version: raw.state.version,
-            stateData: raw.state.state_data,
-            allocations: raw.state.allocations.map((a) => ({
-                destination: a.destination,
-                token: a.token,
-                amount: BigInt(a.amount),
-            })),
-        },
-        serverSignature: raw.server_signature,
-    }),
-);
+// get_channels response parser
+const GetChannelsParamsSchema = z
+    .object({
+        channels: z.array(channelSchema),
+        metadata: paginationMetadataSchema.optional(),
+    })
+    .transform(
+        (raw): GetChannelsResponseParams => ({
+            channels: raw.channels,
+            metadata: raw.metadata,
+        }),
+    );
 
+// get_latest_state response parser
+const GetLatestStateParamsSchema = z
+    .object({
+        state: stateSchema,
+    })
+    .transform(
+        (raw): GetLatestStateResponseParams => ({
+            state: raw.state,
+        }),
+    );
+
+// get_states response parser
+const GetStatesParamsSchema = z
+    .object({
+        states: z.array(stateSchema),
+        metadata: paginationMetadataSchema.optional(),
+    })
+    .transform(
+        (raw): GetStatesResponseParams => ({
+            states: raw.states,
+            metadata: raw.metadata,
+        }),
+    );
+
+// request_creation response parser (CreateChannel method)
 const CreateChannelParamsSchema = z
     .object({
-        ...ChannelOperationObject.shape,
-        channel: z.object({
-            participants: z.array(addressSchema),
-            adjudicator: addressSchema,
-            challenge: z.number(),
-            nonce: z.number(),
-        }),
+        signature: hexSchema,
     })
     .transform(
         (raw): CreateChannelResponseParams => ({
-            ...ChannelOperationObjectSchema.parse(raw),
-            channel: {
-                participants: raw.channel.participants,
-                adjudicator: raw.channel.adjudicator,
-                challenge: raw.channel.challenge,
-                nonce: raw.channel.nonce,
-            },
+            signature: raw.signature,
         }),
     );
 
-const ResizeChannelParamsSchema = ChannelOperationObjectSchema
-    // Validate received type with linter
-    .transform((raw): ResizeChannelResponseParams => raw);
-
-const CloseChannelParamsSchema = ChannelOperationObjectSchema
-    // Validate received type with linter
-    .transform((raw): CloseChannelResponseParams => raw);
-
-const ChannelUpdateObject = z.object({
-    channel_id: hexSchema,
-    participant: addressSchema,
-    status: statusEnum,
-    token: addressSchema,
-    amount: bigIntSchema,
-    chain_id: z.number(),
-    adjudicator: addressSchema,
-    challenge: z.number(),
-    nonce: z.number(),
-    version: z.number(),
-    created_at: dateSchema,
-    updated_at: dateSchema,
-});
-
-const ChannelUpdateObjectSchema = ChannelUpdateObject.transform(
-    (raw): RPCChannelUpdate => ({
-        channelId: raw.channel_id,
-        participant: raw.participant,
-        status: raw.status,
-        token: raw.token,
-        amount: BigInt(raw.amount),
-        chainId: raw.chain_id,
-        adjudicator: raw.adjudicator,
-        challenge: raw.challenge,
-        nonce: raw.nonce,
-        version: raw.version,
-        createdAt: raw.created_at,
-        updatedAt: raw.updated_at,
-    }),
-);
-
-const ChannelUpdateWithWalletObjectSchema = z
+// submit_state response parser
+const SubmitStateParamsSchema = z
     .object({
-        ...ChannelUpdateObject.shape,
-        wallet: addressSchema,
+        signature: hexSchema,
     })
     .transform(
-        (raw): RPCChannelUpdateWithWallet => ({
-            ...ChannelUpdateObjectSchema.parse(raw),
-            wallet: raw.wallet,
+        (raw): SubmitStateResponseParams => ({
+            signature: raw.signature,
         }),
     );
 
-const GetChannelsParamsSchema = z
-    .object({
-        channels: z.array(ChannelUpdateWithWalletObjectSchema),
-    })
-    // Validate received type with linter
-    .transform((raw): GetChannelsResponseParams => raw);
+// channel_update event parser (server push) - note: params is RPCChannel directly, not wrapped
+const ChannelUpdateParamsSchema = channelSchema.transform((raw): ChannelUpdateResponseParams => raw);
 
-const ChannelUpdateParamsSchema = ChannelUpdateObjectSchema
-    // Validate received type with linter
-    .transform((raw): ChannelUpdateResponseParams => raw);
-
+// channels_update event parser (server push)
 const ChannelsUpdateParamsSchema = z
     .object({
-        channels: z.array(ChannelUpdateObjectSchema),
+        channels: z.array(channelSchema),
     })
-    // Validate received type with linter
-    .transform((raw): ChannelsUpdateResponseParams => raw);
+    .transform(
+        (raw): ChannelsUpdateResponseParams => ({
+            channels: raw.channels,
+        }),
+    );
 
 export const channelParamsParsers: Record<string, ParamsParser<unknown>> = {
-    [RPCMethod.CreateChannel]: (params) => CreateChannelParamsSchema.parse(params),
-    [RPCMethod.ResizeChannel]: (params) => ResizeChannelParamsSchema.parse(params),
-    [RPCMethod.CloseChannel]: (params) => CloseChannelParamsSchema.parse(params),
+    [RPCMethod.GetHomeChannel]: (params) => GetHomeChannelParamsSchema.parse(params),
+    [RPCMethod.GetEscrowChannel]: (params) => GetEscrowChannelParamsSchema.parse(params),
     [RPCMethod.GetChannels]: (params) => GetChannelsParamsSchema.parse(params),
+    [RPCMethod.GetLatestState]: (params) => GetLatestStateParamsSchema.parse(params),
+    [RPCMethod.GetStates]: (params) => GetStatesParamsSchema.parse(params),
+    [RPCMethod.CreateChannel]: (params) => CreateChannelParamsSchema.parse(params),
+    [RPCMethod.SubmitState]: (params) => SubmitStateParamsSchema.parse(params),
     [RPCMethod.ChannelUpdate]: (params) => ChannelUpdateParamsSchema.parse(params),
     [RPCMethod.ChannelsUpdate]: (params) => ChannelsUpdateParamsSchema.parse(params),
 };

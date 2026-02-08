@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RPCProtocolVersion, RPCChannelStatus, RPCMethod } from '../types';
+import { RPCMethod, RPCTransitionType } from '../types';
 import { Address, Hex } from 'viem';
 
 // --- Shared Interfaces & Classes ---
@@ -43,9 +43,107 @@ export const decimalSchema = z
         message: 'Must be a valid decimal string',
     });
 
-export const statusEnum = z.nativeEnum(RPCChannelStatus);
+export const paginationMetadataSchema = z
+    .object({
+        page: z.number(),
+        per_page: z.number(),
+        total_count: z.number(),
+        page_count: z.number(),
+    })
+    .transform((raw) => ({
+        page: raw.page,
+        perPage: raw.per_page,
+        totalCount: raw.total_count,
+        pageCount: raw.page_count,
+    }));
 
-export const protocolVersionEnum = z.nativeEnum(RPCProtocolVersion);
+export const transitionSchema = z
+    .object({
+        type: z.nativeEnum(RPCTransitionType),
+        tx_hash: z.string().optional(),
+        account_id: z.string(),
+        amount: decimalSchema,
+    })
+    .transform((raw) => ({
+        type: raw.type,
+        txHash: raw.tx_hash,
+        accountId: raw.account_id,
+        amount: raw.amount,
+    }));
+
+export const ledgerSchema = z
+    .object({
+        token_address: addressSchema,
+        blockchain_id: z.number(),
+        user_balance: decimalSchema,
+        user_net_flow: decimalSchema,
+        node_balance: decimalSchema,
+        node_net_flow: decimalSchema,
+    })
+    .transform((raw) => ({
+        tokenAddress: raw.token_address,
+        blockchainId: raw.blockchain_id,
+        userBalance: raw.user_balance,
+        userNetFlow: raw.user_net_flow,
+        nodeBalance: raw.node_balance,
+        nodeNetFlow: raw.node_net_flow,
+    }));
+
+export const stateSchema = z
+    .object({
+        id: z.string(),
+        transitions: z.array(transitionSchema),
+        asset: z.string(),
+        user_wallet: addressSchema,
+        epoch: z.number(),
+        version: z.number(),
+        home_channel_id: z.string().optional(),
+        escrow_channel_id: z.string().optional(),
+        home_ledger: ledgerSchema,
+        escrow_ledger: ledgerSchema.optional(),
+        user_sig: hexSchema.optional(),
+        node_sig: hexSchema.optional(),
+    })
+    .transform((raw) => ({
+        id: raw.id,
+        transitions: raw.transitions,
+        asset: raw.asset,
+        userWallet: raw.user_wallet,
+        epoch: raw.epoch,
+        version: raw.version,
+        homeChannelId: raw.home_channel_id,
+        escrowChannelId: raw.escrow_channel_id,
+        homeLedger: raw.home_ledger,
+        escrowLedger: raw.escrow_ledger,
+        userSig: raw.user_sig,
+        nodeSig: raw.node_sig,
+    }));
+
+export const channelSchema = z
+    .object({
+        channel_id: z.string(),
+        user_wallet: addressSchema,
+        node_wallet: addressSchema,
+        type: z.enum(['home', 'escrow']),
+        blockchain_id: z.number(),
+        token_address: addressSchema,
+        challenge: z.number(),
+        nonce: z.number(),
+        status: z.enum(['void', 'open', 'challenged', 'closed']),
+        state_version: z.number(),
+    })
+    .transform((raw) => ({
+        channelId: raw.channel_id,
+        userWallet: raw.user_wallet,
+        nodeWallet: raw.node_wallet,
+        type: raw.type,
+        blockchainId: raw.blockchain_id,
+        tokenAddress: raw.token_address,
+        challenge: raw.challenge,
+        nonce: raw.nonce,
+        status: raw.status,
+        stateVersion: raw.state_version,
+    }));
 
 // --- Shared Parser Functions ---
 

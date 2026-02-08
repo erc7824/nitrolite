@@ -1,10 +1,8 @@
 import { Hex, stringToHex } from 'viem';
-import { NitroliteRPCMessage } from './types';
+import { RPCMessage, RPCMessageType } from './types';
 
 /**
  * Get the current time in milliseconds
- *
- * @returns The current timestamp in milliseconds
  */
 export function getCurrentTimestamp(): number {
     return Date.now();
@@ -12,107 +10,90 @@ export function getCurrentTimestamp(): number {
 
 /**
  * Generate a unique request ID
- *
- * @returns A unique request ID
  */
 export function generateRequestId(): number {
     return Math.floor(Date.now() + Math.random() * 10000);
 }
 
 /**
- * Extract the request ID from a message
- *
- * @param message The message to extract from
- * @returns The request ID, or undefined if not found
+ * Extract the message type from a wire format message.
+ * Wire format: [type, requestId, method, params, timestamp]
  */
-export function getRequestId(message: any): number | undefined {
-    if (message.req) return message.req[0];
-    if (message.res) return message.res[0];
-    if (message.err) return message.err[0];
-    return undefined;
+export function getMessageType(message: RPCMessage): RPCMessageType {
+    return message[0];
 }
 
 /**
- * Extract the method name from a request or response
- *
- * @param message The message to extract from
- * @returns The method name, or undefined if not found
+ * Extract the request ID from a wire format message.
+ * Wire format: [type, requestId, method, params, timestamp]
  */
-export function getMethod(message: any): string | undefined {
-    if (message.req) return message.req[1];
-    if (message.res) return message.res[1];
-    return undefined;
+export function getRequestId(message: RPCMessage): number {
+    return message[1];
 }
 
 /**
- * Extract parameters from a request
- *
- * @param message The request message
- * @returns The parameters, or an empty array if not found
+ * Extract the method name from a wire format message.
+ * Wire format: [type, requestId, method, params, timestamp]
  */
-export function getParams(message: any): any[] {
-    if (message.req) return message.req[2] || [];
-    return [];
+export function getMethod(message: RPCMessage): string {
+    return message[2];
 }
 
 /**
- * Extract result from a response
- *
- * @param message The response message
- * @returns The result, or an empty array if not found
+ * Extract parameters from a wire format message.
+ * Wire format: [type, requestId, method, params, timestamp]
  */
-export function getResult(message: any): any[] {
-    if (message.res) return message.res[2] || [];
-    return [];
+export function getParams(message: RPCMessage): Record<string, unknown> {
+    return message[3];
 }
 
 /**
- * Extract timestamp from a message
- *
- * @param message The message to extract from
- * @returns The timestamp, or undefined if not found
+ * Extract timestamp from a wire format message.
+ * Wire format: [type, requestId, method, params, timestamp]
  */
-export function getTimestamp(message: any): number | undefined {
-    if (message.req) return message.req[3];
-    if (message.res) return message.res[3];
-    if (message.err) return message.err[3];
-    return undefined;
+export function getTimestamp(message: RPCMessage): number {
+    return message[4];
 }
 
 /**
- * Extract error details from an error message
- *
- * @param message The error message
- * @returns The error details, or undefined if not found
+ * Check if a message is a request.
  */
-export function getError(message: any): { code: number; message: string } | undefined {
-    if (message.err) {
-        return {
-            code: message.err[1],
-            message: message.err[2],
-        };
-    }
-    return undefined;
+export function isRequest(message: RPCMessage): boolean {
+    return message[0] === RPCMessageType.Request;
 }
 
 /**
- * Convert parameters or results to bytes format for smart contract interaction
- *
- * @param values Array of values to convert
- * @returns Array of hex strings
+ * Check if a message is a response.
+ */
+export function isResponse(message: RPCMessage): boolean {
+    return message[0] === RPCMessageType.Response;
+}
+
+/**
+ * Check if a message is an event.
+ */
+export function isEvent(message: RPCMessage): boolean {
+    return message[0] === RPCMessageType.Event;
+}
+
+/**
+ * Check if a message is an error response.
+ */
+export function isErrorResponse(message: RPCMessage): boolean {
+    return message[0] === RPCMessageType.ErrorResponse;
+}
+
+/**
+ * Convert parameters or results to bytes format for smart contract interaction.
  */
 export function toBytes(values: any[]): Hex[] {
     return values.map((v) => (typeof v === 'string' ? stringToHex(v) : stringToHex(JSON.stringify(v))));
 }
 
 /**
- * Validates that a response timestamp is greater than the request timestamp
- *
- * @param request The request message
- * @param response The response message
- * @returns True if the response timestamp is valid
+ * Validates that a response timestamp is greater than the request timestamp.
  */
-export function isValidResponseTimestamp(request: NitroliteRPCMessage, response: NitroliteRPCMessage): boolean {
+export function isValidResponseTimestamp(request: RPCMessage, response: RPCMessage): boolean {
     const requestTimestamp = getTimestamp(request);
     const responseTimestamp = getTimestamp(response);
 
@@ -124,13 +105,9 @@ export function isValidResponseTimestamp(request: NitroliteRPCMessage, response:
 }
 
 /**
- * Validates that a response request ID matches the request
- *
- * @param request The request message
- * @param response The response message
- * @returns True if the response request ID is valid
+ * Validates that a response request ID matches the request.
  */
-export function isValidResponseRequestId(request: NitroliteRPCMessage, response: NitroliteRPCMessage): boolean {
+export function isValidResponseRequestId(request: RPCMessage, response: RPCMessage): boolean {
     const requestId = getRequestId(request);
     const responseId = getRequestId(response);
 

@@ -1,22 +1,41 @@
 import { Address, Hex } from 'viem';
-import { RPCAllowance } from './common';
 
 export * from './request';
 export * from './response';
-export * from './filters';
 export * from './common';
+
+/**
+ * Message type identifier for RPC protocol.
+ * Indicates whether the message is a request, response, event, or error.
+ */
+export enum RPCMessageType {
+    /** Request message (client to server) */
+    Request = 1,
+    /** Response message (server to client, success) */
+    Response = 2,
+    /** Event message (server-initiated notification) */
+    Event = 3,
+    /** Error response message (server to client, error) */
+    ErrorResponse = 4,
+}
 
 /** Type alias for Request ID (uint64) */
 export type RequestID = number;
 
-/** Type alias for Timestamp (uint64) */
+/** Type alias for Timestamp (uint64 in milliseconds) */
 export type Timestamp = number;
 
 /** Type alias for Account ID (channelId or appId) */
 export type AccountID = Hex;
 
-/** Represents the data payload within a request or response message: [requestId, method, params, timestamp?]. */
-export type RPCData = [RequestID, RPCMethod, object, Timestamp?];
+/**
+ * Represents the wire format for RPC messages as transmitted over WebSocket.
+ * Format: [type, requestId, method, params, timestamp]
+ *
+ * Example request: [1, 100, "node.v1.ping", {}, 1770559919268]
+ * Example response: [2, 100, "node.v1.ping", {}, 1770559919300]
+ */
+export type RPCMessage = [RPCMessageType, RequestID, string, Record<string, unknown>, Timestamp];
 
 /**
  * Represents a generic RPC message structure that includes common fields.
@@ -25,33 +44,6 @@ export type RPCData = [RequestID, RPCMethod, object, Timestamp?];
 export interface GenericRPCMessage {
     requestId?: RequestID;
     timestamp?: Timestamp;
-    signatures?: Hex[];
-}
-
-/**
- * Defines the wire format for Nitrolite RPC messages, based on NitroRPC principles
- * as adapted for the Clearnet protocol.
- * This is the structure used for WebSocket communication.
- */
-export interface NitroliteRPCMessage {
-    /** Contains the request payload if this is a request message. */
-    req?: RPCData;
-    /** Contains the response or error payload if this is a response message. */
-    res?: RPCData;
-    /** Optional cryptographic signature(s) for message authentication. */
-    sig?: Hex[];
-}
-
-/**
- * Defines the wire format for Nitrolite RPC messages sent within the context
- * of a specific application.
- */
-export interface ApplicationRPCMessage extends NitroliteRPCMessage {
-    /**
-     * Application Session ID. Mandatory.
-     * This field also serves as the destination pubsub topic for the message.
-     */
-    sid: Hex;
 }
 
 /**
@@ -78,19 +70,17 @@ export enum NitroliteErrorCode {
 }
 
 /**
- * Defines the function signature for signing message payloads (req or res objects).
- * Implementations can use either signMessage or signStateData depending on the use case.
- * For general RPC messages, signMessage is typically used.
- * For state channel operations, signStateData may be more appropriate.
+ * Defines the function signature for signing state data.
+ * Used for signing states that get embedded in request params (e.g., user_sig field).
  *
- * Example implementations:
- * - Using signMessage: (payload) => walletClient.signMessage({ message: JSON.stringify(payload) })
- * - Using signStateData: (payload) => walletClient.signStateData({ data: encodeAbiParameters([...], payload) })
+ * Example implementation:
+ * - Using signMessage: (data) => walletClient.signMessage({ message: JSON.stringify(data) })
+ * - Using signTypedData: (data) => walletClient.signTypedData({ domain, types, message: data })
  *
- * @param payload - The RequestData or ResponsePayload object (array) to sign.
+ * @param data - The data object to sign (e.g., RPCState)
  * @returns A Promise that resolves to the cryptographic signature as a Hex string.
  */
-export type MessageSigner = (payload: RPCData) => Promise<Hex>;
+export type StateSigner = (data: unknown) => Promise<Hex>;
 
 /**
  * Defines the function signature for signing challenge state data.
@@ -102,110 +92,96 @@ export type MessageSigner = (payload: RPCData) => Promise<Hex>;
 export type ChallengeStateSigner = (stateHash: Hex) => Promise<Hex>;
 
 /**
- * Defines the function signature for verifying a single message signature against its payload.
- * @param payload - The RequestData or ResponsePayload object (array) that was signed.
- * @param signature - The single signature (Hex string) to verify.
- * @param address - The Ethereum address of the expected signer.
- * @returns A Promise that resolves to true if the signature is valid for the given payload and address, false otherwise.
+ * Defines the function signature for verifying a signature against state data.
+ * @param data - The state data that was signed
+ * @param signature - The signature (Hex string) to verify
+ * @param address - The Ethereum address of the expected signer
+ * @returns A Promise that resolves to true if the signature is valid, false otherwise.
  */
-export type SingleMessageVerifier = (payload: RPCData, signature: Hex, address: Address) => Promise<boolean>;
+export type StateVerifier = (data: unknown, signature: Hex, address: Address) => Promise<boolean>;
 
 /**
- * Defines the function signature for verifying multiple message signatures against a payload.
- * This is used for operations requiring consensus from multiple parties (e.g., closing an application).
- * @param payload - The RequestData or ResponsePayload object (array) that was signed.
- * @param signatures - An array of signature strings (Hex) to verify.
- * @param expectedSigners - An array of Ethereum addresses of the required signers. The implementation determines if order matters.
- * @returns A Promise that resolves to true if all required signatures from the expected signers are present and valid, false otherwise.
+ * Defines the function signature for verifying multiple signatures against state data.
+ * This is used for operations requiring consensus from multiple parties.
+ * @param data - The state data that was signed
+ * @param signatures - An array of signature strings (Hex) to verify
+ * @param expectedSigners - An array of Ethereum addresses of the required signers
+ * @returns A Promise that resolves to true if all required signatures are present and valid, false otherwise.
  */
-export type MultiMessageVerifier = (
-    payload: RPCData,
-    signatures: Hex[],
-    expectedSigners: Address[],
-) => Promise<boolean>;
+export type MultiStateVerifier = (data: unknown, signatures: Hex[], expectedSigners: Address[]) => Promise<boolean>;
 
 /**
- * Represents a partial EIP-712 message for authorization.
- * This is used to define the structure of the authorization message
- * that will be signed by the user.
- */
-export interface PartialEIP712AuthMessage {
-    scope: string;
-    session_key: Address;
-    expires_at: bigint;
-    allowances: RPCAllowance[];
-}
-
-/**
- * Represents a complete EIP-712 message for authorization.
- */
-export interface EIP712AuthMessage extends PartialEIP712AuthMessage {
-    wallet: Address;
-    challenge: string;
-}
-
-/**
- * Represents the EIP-712 domain for authorization messages.
- * This is used to define the domain separator for EIP-712 signatures.
- */
-export interface EIP712AuthDomain {
-    name: string;
-}
-
-/**
- * Represents the EIP-712 types for authorization messages.
- */
-export const EIP712AuthTypes = {
-    Policy: [
-        { name: 'challenge', type: 'string' },
-        { name: 'scope', type: 'string' },
-        { name: 'wallet', type: 'address' },
-        { name: 'session_key', type: 'address' },
-        { name: 'expires_at', type: 'uint64' },
-        { name: 'allowances', type: 'Allowance[]' },
-    ],
-    Allowance: [
-        { name: 'asset', type: 'string' },
-        { name: 'amount', type: 'string' },
-    ],
-};
-
-/**
- * Represents the RPC methods used in the Nitrolite protocol.
+ * RPC methods supported by the Clearnode API.
+ *
+ * @see {@link https://github.com/erc7824/nitrolite/blob/main/docs/api.yaml API Specification}
  */
 export enum RPCMethod {
-    AuthRequest = 'auth_request',
-    AuthChallenge = 'auth_challenge',
-    AuthVerify = 'auth_verify',
+    /** Error response from the server */
     Error = 'error',
-    GetConfig = 'get_config',
-    GetLedgerBalances = 'get_ledger_balances',
-    GetLedgerEntries = 'get_ledger_entries',
-    GetLedgerTransactions = 'get_ledger_transactions',
-    GetUserTag = 'get_user_tag',
-    GetSessionKeys = 'get_session_keys',
-    RevokeSessionKey = 'revoke_session_key',
-    CreateAppSession = 'create_app_session',
-    SubmitAppState = 'submit_app_state',
-    CloseAppSession = 'close_app_session',
-    GetAppDefinition = 'get_app_definition',
-    GetAppSessions = 'get_app_sessions',
-    CreateChannel = 'create_channel',
-    ResizeChannel = 'resize_channel',
-    CloseChannel = 'close_channel',
-    GetChannels = 'get_channels',
-    GetRPCHistory = 'get_rpc_history',
-    GetAssets = 'get_assets',
-    CleanupSessionKeyCache = 'cleanup_session_key_cache',
+    /** Health check to verify connection is alive */
+    Ping = 'node.v1.ping',
+    /** Get node configuration and supported blockchains */
+    GetConfig = 'node.v1.get_config',
+    /** Get list of supported assets, optionally filtered by blockchain */
+    GetAssets = 'node.v1.get_assets',
 
+    // User Group (user.v1)
+    /** Get user's asset balances */
+    GetBalances = 'user.v1.get_balances',
+    /** Get user's transaction history with optional filtering and pagination */
+    GetTransactions = 'user.v1.get_transactions',
+
+    // Channels Group (channels.v1)
+    /** Get list of channels with optional filtering and pagination */
+    GetChannels = 'channels.v1.get_channels',
+    /** Get home channel information for a specific wallet and asset */
+    GetHomeChannel = 'channels.v1.get_home_channel',
+    /** Get escrow channel information by channel ID */
+    GetEscrowChannel = 'channels.v1.get_escrow_channel',
+    /** Get the latest state for a user's asset */
+    GetLatestState = 'channels.v1.get_latest_state',
+    /** Get state history with optional filtering and pagination */
+    GetStates = 'channels.v1.get_states',
+    /** Create a new channel */
+    CreateChannel = 'channels.v1.request_creation',
+    /** Submit a cross-chain state transition */
+    SubmitState = 'channels.v1.submit_state',
+
+    // App Sessions Group (app_sessions.v1)
+    /** Get application definition for a session */
+    GetAppDefinition = 'app_sessions.v1.get_app_definition',
+    /** Get list of application sessions with optional filtering and pagination */
+    GetAppSessions = 'app_sessions.v1.get_app_sessions',
+    /** Create a new application session */
+    CreateAppSession = 'app_sessions.v1.create_app_session',
+    /** Submit an application session state update */
+    SubmitAppState = 'app_sessions.v1.submit_app_state',
+    /** Submit an application session deposit state update */
+    SubmitDepositState = 'app_sessions.v1.submit_deposit_state',
+    /** Atomically rebalance multiple application sessions */
+    RebalanceAppSessions = 'app_sessions.v1.rebalance_app_sessions',
+
+    // Session Keys Group (session_keys.v1)
+    /** Register a new session key with allowances and expiration */
+    Register = 'session_keys.v1.register',
+    /** Get all active session keys for a user */
+    GetSessionKeys = 'session_keys.v1.get_session_keys',
+    /** Revoke an existing session key */
+    RevokeSessionKey = 'session_keys.v1.revoke_session_key',
+
+    // Server Push Events (no group prefix for events)
+    /** Server-initiated asset list update */
     Assets = 'assets',
+    /** Application-scoped message */
     Message = 'message',
+    /** Balance change notification */
     BalanceUpdate = 'bu',
+    /** Channel list update notification */
     ChannelsUpdate = 'channels',
+    /** Single channel update notification */
     ChannelUpdate = 'cu',
-    Ping = 'ping',
-    Pong = 'pong',
-    Transfer = 'transfer',
+    /** Transfer notification */
     TransferNotification = 'tr',
+    /** Application session update notification */
     AppSessionUpdate = 'asu',
 }

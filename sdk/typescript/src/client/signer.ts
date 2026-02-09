@@ -1,10 +1,8 @@
-import { Account, Address, Chain, Hex, ParseAccount, toHex, Transport, WalletClient } from 'viem';
-import { State, UnsignedState } from './types';
-import { getPackedState, getStateHash } from '../utils';
+import { Account, Address, Chain, Hex, ParseAccount, Transport, WalletClient } from 'viem';
+import { UnsignedStateV1 } from './types';
+import { getPackedState } from '../utils';
 import { signRawECDSAMessage } from '../utils/sign';
 import { privateKeyToAccount } from 'viem/accounts';
-
-// TODO: perhaps extend this interface with rpc signing methods and use it as universal signer interface
 
 /**
  * Interface for signing protocol states.
@@ -21,10 +19,10 @@ export interface StateSigner {
     /**
      * Sign a state for a given channel ID.
      * @param channelId The ID of the channel.
-     * @param state The state to sign.
+     * @param state The unsigned state to sign (without signatures).
      * @returns A Promise that resolves to the signature as a Hex string.
      */
-    signState(channelId: Hex, state: UnsignedState): Promise<Hex>;
+    signState(channelId: Hex, state: UnsignedStateV1): Promise<Hex>;
     /**
      * Sign a raw message.
      * @param message The message to sign as a Hex string.
@@ -51,8 +49,8 @@ export class WalletStateSigner implements StateSigner {
         return this.walletClient.account.address;
     }
 
-    async signState(channelId: Hex, state: State): Promise<Hex> {
-        const packedState = getPackedState(channelId, state)
+    async signState(channelId: Hex, state: UnsignedStateV1): Promise<Hex> {
+        const packedState = getPackedState(channelId, state);
 
         return this.walletClient.signMessage({ message: { raw: packedState } });
     }
@@ -80,7 +78,7 @@ export class SessionKeyStateSigner implements StateSigner {
         return this.account.address;
     }
 
-    async signState(channelId: Hex, state: State): Promise<Hex> {
+    async signState(channelId: Hex, state: UnsignedStateV1): Promise<Hex> {
         const packedState = getPackedState(channelId, state);
 
         return signRawECDSAMessage(packedState, this.sessionKey);

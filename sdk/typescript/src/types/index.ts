@@ -1,13 +1,13 @@
 import { Address, Hex } from 'viem';
-import { Channel, State } from '../client/types';
+import { ChannelDefinition, State } from '../client/types';
 
 /**
- * Participant roles in a channel
+ * Participant roles in a channel (V1: User and Node)
  */
 export enum Role {
     UNDEFINED = -1,
-    HOST = 0, // Participant at index 0
-    GUEST = 1, // Participant at index 1
+    USER = 0, // User participant
+    NODE = 1, // Node participant
 }
 
 /**
@@ -32,11 +32,11 @@ export namespace AppDataTypes {
 }
 
 /**
- * Channel metadata (Consider if this is still the best structure)
+ * Channel metadata (V1)
  * Represents off-chain context or cached information about a channel.
  */
 export interface Metadata {
-    channel: Channel; // The channel configuration
+    definition: ChannelDefinition; // The channel definition
     challengeExpire?: bigint; // Optional: Calculated expiry timestamp based on last challenge
     lastValidState?: State; // Optional: The last known valid state off-chain
 }
@@ -48,34 +48,34 @@ export interface AppLogic<T = unknown> {
     /**
      * Encode application data to bytes (Hex string)
      * @param data Application-specific data structure
-     * @returns Hex-encoded data for the State.appData field
+     * @returns Hex-encoded data for the State.metadata field
      */
     encode: (data: T) => Hex;
 
     /**
      * Decode application data from bytes (Hex string)
-     * @param encoded Hex-encoded data from the State.appData field
+     * @param encoded Hex-encoded data from the State.metadata field
      * @returns Application-specific data structure
      */
     decode: (encoded: Hex) => T;
 
     /**
      * Validate a state transition based on application logic.
-     * @param channel The channel configuration.
+     * @param definition The channel definition.
      * @param prevState The application-specific data of the previous state.
      * @param nextState The application-specific data of the next state to validate.
      * @returns Whether the transition is valid according to app rules.
      */
-    validateTransition?: (channel: Channel, prevState: T, nextState: T) => boolean;
+    validateTransition?: (definition: ChannelDefinition, prevState: T, nextState: T) => boolean;
 
     /**
      * Define what historical states (proofs) are needed for an on-chain operation (e.g., challenge, close).
-     * @param channel The channel configuration.
+     * @param definition The channel definition.
      * @param state The application-specific data of the state requiring proofs.
      * @param previousStates Array of historical full State objects.
      * @returns Array of full State objects required as proofs.
      */
-    provideProofs?: (channel: Channel, state: T, previousStates: State[]) => State[];
+    provideProofs?: (definition: ChannelDefinition, state: T, previousStates: State[]) => State[];
 
     /**
      * Check if the application state represents a final or terminal condition.

@@ -19,23 +19,31 @@ export type StateHash = Hex;
 export type Signature = Hex;
 
 /**
- * Allocation structure representing fund distribution
+ * Ledger structure - represents token allocations and flows on a specific chain
+ * Used in V1 state structure for tracking balances across home and non-home chains
  */
-export interface Allocation {
-    destination: Address; // Where funds are sent on channel closure
-    token: Address; // ERC-20 token address (zero address for ETH)
-    amount: bigint; // Token amount allocated
+export interface Ledger {
+    chainId: bigint; // Chain ID where this ledger exists (uint64 in contract)
+    token: Address; // Token contract address (zero address for ETH)
+    decimals: number; // Token decimals (uint8 in contract)
+    userAllocation: bigint; // User's allocated amount
+    userNetFlow: bigint; // User's net flow (can be negative, int256 in contract)
+    nodeAllocation: bigint; // Node's allocated amount
+    nodeNetFlow: bigint; // Node's net flow (can be negative, int256 in contract)
 }
 
 /**
- * Channel configuration structure
+ * Channel definition structure for V1 contracts
+ * Defines the parameters of a payment channel
  */
-export interface Channel {
-    participants: Address[]; // List of participants in the channel
-    adjudicator: Address; // Address of the contract that validates final states
-    challenge: bigint; // Duration in seconds for challenge period (uint64 in contract)
-    nonce: bigint; // Unique per channel with same participants and adjudicator (uint64 in contract)
+export interface ChannelDefinition {
+    challengeDuration: number; // Duration in seconds for challenge period (uint32 in contract)
+    user: Address; // User's wallet address
+    node: Address; // Node's wallet address
+    nonce: bigint; // Unique nonce for channel creation (uint64 in contract)
+    metadata: Hex; // Additional metadata (bytes32 in contract)
 }
+
 
 /**
  * Channel status enum - represents the various states a channel can be in
@@ -59,37 +67,35 @@ export enum StateIntent {
 }
 
 /**
- * Channel data structure - contains all information about a channel
+ * Channel data structure - contains all information about a channel (V1)
  */
 export interface ChannelData {
-    channel: Channel; // Channel configuration
+    definition: ChannelDefinition; // Channel definition
     status: ChannelStatus; // Current status of the channel
-    wallets: [Address, Address]; // List of participant wallet addresses
-    challengeExpiry: bigint; // Timestamp when the challenge period ends
-    lastValidState: State; // Last valid state of the channel recorded on-chain
+    lastState: State; // Last state of the channel recorded on-chain
+    challengeExpiry: bigint; // Timestamp when the challenge period ends (0 if not challenged)
 }
 
-export interface UnsignedState {
+/**
+ * V1 State structure - represents the channel state with home and non-home ledgers
+ * This is the primary state structure used in V1 contracts
+ */
+export interface State {
+    version: bigint; // State version number (uint64 in contract)
     intent: StateIntent; // Intent of the state (uint8 enum in contract)
-    version: bigint; // Version of the state (uint256 in contract)
-    data: Hex; // Application data encoded (bytes in contract)
-    allocations: Allocation[]; // Asset allocation array
+    metadata: Hex; // Additional metadata (bytes32 in contract)
+    homeState: Ledger; // Home chain ledger state
+    nonHomeState: Ledger; // Non-home chain ledger state (can be zero for single-chain)
+    userSig: Hex; // User's signature
+    nodeSig: Hex; // Node's signature
 }
 
 /**
- * Channel state structure - matches the contract State struct
+ * Unsigned portion of V1 State - used for signing
+ * Omits the signature fields from State
  */
-export interface State extends UnsignedState {
-    sigs: Signature[]; // State signatures array
-}
+export type UnsignedStateV1 = Omit<State, 'userSig' | 'nodeSig'>;
 
-/**
- * Extended state structure with channel ID and server signature to close the channel
- */
-export interface FinalState extends UnsignedState {
-    channelId: ChannelId;
-    serverSignature: Signature;
-}
 
 /**
  * Configuration for initializing the NitroliteClient.
@@ -120,53 +126,57 @@ export interface NitroliteClientConfig {
     chainId: number;
 
     /** Default challenge duration (in seconds) for new channels. */
-    challengeDuration: bigint;
+    challengeDuration: number;
 }
 
 /**
- * Parameters required for creating a new state channel.
- * @remarks
- * The initial allocation (`allocations[0]`) must have amount set to zero as
- * channels are created with zero deposit and must be funded separately via resize_channel.
- * It is impossible to request the backend for channel creation user deposit to be non-zero.
- * This constraint ensures proper funding sequencing and will be refined in the next major release.
+ * Parameters required for creating a new state channel (V1).
  */
 export interface CreateChannelParams {
-    channel: Channel;
-    unsignedInitialState: UnsignedState;
-    serverSignature: Signature;
+    definition: ChannelDefinition;
+    initialState: State;
 }
 
 /**
- * Parameters required for collaboratively closing a state channel.
+ * Parameters required for collaboratively closing a state channel (V1).
  */
 export interface CloseChannelParams {
-    stateData?: Hex;
-    finalState: FinalState;
+    channelId: ChannelId;
+    finalState: State;
+    proofs?: State[];
 }
 
 /**
- * Parameters required for challenging a state channel.
+ * Parameters required for challenging a state channel (V1).
  */
 export interface ChallengeChannelParams {
     channelId: ChannelId;
     candidateState: State;
-    proofStates?: State[];
+    proofs?: State[];
+    challengerSig: Hex;
 }
 
 /**
- * Parameters required for resizing a state channel.
- */
-export interface ResizeChannelParams {
-    resizeState: FinalState;
-    proofStates: State[];
-}
-
-/**
- * Parameters required for checkpointing a state on-chain.
+ * Parameters required for checkpointing a state on-chain (V1).
  */
 export interface CheckpointChannelParams {
     channelId: ChannelId;
     candidateState: State;
-    proofStates?: State[];
+    proofs?: State[];
+}
+
+/**
+ * Parameters required for depositing to a channel (V1).
+ */
+export interface DepositToChannelParams {
+    channelId: ChannelId;
+    candidate: State;
+}
+
+/**
+ * Parameters required for withdrawing from a channel (V1).
+ */
+export interface WithdrawFromChannelParams {
+    channelId: ChannelId;
+    candidate: State;
 }

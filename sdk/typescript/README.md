@@ -1,14 +1,49 @@
-# Nitrolite SDK
+# Nitrolite SDK (V1)
 
 [![npm version](https://img.shields.io/npm/v/@erc7824/nitrolite.svg)](https://www.npmjs.com/package/@erc7824/nitrolite)
 [![License](https://img.shields.io/npm/l/@erc7824/nitrolite.svg)](https://github.com/erc7824/nitrolite/blob/main/LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-website-blue)](https://erc7824.org/quick_start)
 
-A TypeScript SDK for building scalable blockchain applications using ERC-7824. The SDK provides a simple client interface that allows developers to create and manage channels with custom application logic.
+A TypeScript SDK for building scalable blockchain applications using ERC-7824. The SDK provides both on-chain contract interactions and off-chain RPC communication with Clearnode.
 
-## 📚 Documentation
+> **⚠️ V1 Breaking Changes**: This is a major version update with significant API changes from v0.x. See the [migration guide](#migration-from-v0x) below.
+
+## Documentation
 
 - [Complete Documentation](https://erc7824.org/quick_start) - Full Documentation
+- [Client Module](./src/client/README.md) - On-chain contract interactions
+- [RPC Module](./src/rpc/README.md) - Off-chain Clearnode communication
+- [Utilities](./UTILITIES.md) - Low-level utility functions
+
+## SDK Modules
+
+The Nitrolite SDK is organized into specialized modules:
+
+### Client Module
+On-chain contract interactions for channel lifecycle management.
+- **NitroliteClient**: High-level API with automatic signing
+- **NitroliteService**: Direct contract interactions
+- **NitroliteTransactionPreparer**: Low-level transaction preparation
+
+[Client Documentation](./src/client/README.md)
+
+### RPC Module
+Off-chain WebSocket communication with Clearnode.
+- Session key management
+- Channel operations
+- Application sessions
+- Real-time events
+
+[RPC Documentation](./src/rpc/README.md)
+
+### Utilities
+Toolkit of pure functions for common operations:
+- Amount formatting/parsing
+- State packing/hashing/verification
+- Channel ID calculation
+- Contract data parsing
+
+[Utilities Documentation](./UTILITIES.md)
 
 ## Features
 
@@ -70,9 +105,153 @@ We recommend working through these guides in sequence to understand the complete
 
 Start with the [Channel Creation](https://erc7824.org/quick_start/initializing_channel) guide to begin your journey with Nitrolite applications.
 
+## Migration from V0.x
+
+V1 introduces significant improvements but includes breaking changes. Key differences:
+
+### Client API Changes
+
+**Channel Creation:**
+```typescript
+// V0
+await client.depositAndCreate(user, node, asset, userDeposit, nodeDeposit);
+
+// V1
+await client.depositAndCreateChannel(node, token, amount, {
+    definition: { challengeDuration, user, node, nonce, metadata },
+    state: initialState,
+    counterpartySig: nodeSig,
+});
+```
+
+**Balance Queries:**
+```typescript
+// V0
+await client.getChannelBalance(channelId);
+
+// V1
+await client.getAccountBalance(nodeAddress, tokenAddress);
+```
+
+### Removed Methods
+
+- `joinChannel()` - Channels are created directly
+- `depositAndCreate()` - Replaced with `depositAndCreateChannel()`
+- `resizeChannel()` - Use state transitions
+- `getChannelBalance()` - Use `getAccountBalance()`
+
+### New Concepts
+
+- **Channel Definitions with Nonces**: Unique channel identification
+- **Ledger-Based States**: Separate home/non-home state tracking
+- **Vault Management**: Per-node, per-token balance tracking
+- **State Intent**: Challenge/Final state specification
+
+[Full Migration Guide](./src/client/README.md#migration-guide)
+
+### RPC Changes
+
+The RPC protocol now uses a flat array format:
+
+```typescript
+// V0
+{ req: [requestId, method, params, timestamp], sig: ["0x..."] }
+
+// V1
+[RPCMessageType, requestId, method, params, timestamp]
+```
+
+[RPC Breaking Changes](./src/rpc/README.md#breaking-changes-from-v05x)
+
 ## Documentation
 
 For complete documentation, visit [https://erc7824.org](https://erc7824.org)
+
+## Examples
+
+### On-Chain: Create Channel
+
+```typescript
+import { NitroliteClient, generateChannelNonce } from '@erc7824/nitrolite';
+import { parseEther, zeroAddress } from 'viem';
+
+// Initialize client (see Client documentation for full setup)
+const client = new NitroliteClient(config);
+
+// Generate unique nonce
+const nonce = generateChannelNonce(userAddress);
+
+// Deposit and create channel
+const tx = await client.depositAndCreateChannel(
+    nodeAddress,
+    zeroAddress, // ETH
+    parseEther('1.0'),
+    {
+        definition: {
+            challengeDuration: 3600,
+            user: userAddress,
+            node: nodeAddress,
+            nonce,
+            metadata: '0x0000000000000000000000000000000000000000000000000000000000000000',
+        },
+        state: {
+            version: 0n,
+            intent: 0,
+            metadata: '0x0000000000000000000000000000000000000000000000000000000000000000',
+            homeState: {
+                chainId: 1n,
+                token: zeroAddress,
+                decimals: 18,
+                userAllocation: parseEther('1.0'),
+                userNetFlow: 0n,
+                nodeAllocation: 0n,
+                nodeNetFlow: 0n,
+            },
+            nonHomeState: { /* ... */ },
+        },
+        counterpartySig: nodeSig,
+    }
+);
+
+console.log('Channel created:', tx);
+```
+
+### Off-Chain: Submit State via RPC
+
+```typescript
+import { createSubmitStateMessage } from '@erc7824/nitrolite/rpc';
+
+// Create WebSocket connection
+const ws = new WebSocket('wss://clearnet.yellow.com/ws');
+
+// Submit state update
+const message = await createSubmitStateMessage(signer, {
+    id: stateId,
+    transitions: [...],
+    asset: 'usdc',
+    userWallet: account.address,
+    epoch: 1,
+    version: 2,
+    homeLedger: { /* ... */ },
+    // ... other state fields
+});
+
+ws.send(message);
+```
+
+### Utilities: Amount Conversion
+
+```typescript
+import { formatTokenAmount, parseTokenAmount } from '@erc7824/nitrolite';
+
+// Convert bigint to human-readable
+const readable = formatTokenAmount(1500000000000000000n, 18);
+console.log(readable); // "1.5"
+
+// Convert string to bigint
+const amount = parseTokenAmount("1.5", 18);
+console.log(amount); // 1500000000000000000n
+```
 
 ## Contributing
 

@@ -1,6 +1,6 @@
 import { describe, test, expect, jest } from '@jest/globals';
 import { getStateHash, verifySignature } from '../../../src/utils/state';
-import { type State, type Signature, type Allocation, StateIntent } from '../../../src/client/types';
+import { type UnsignedStateV1, type Signature, StateIntent } from '../../../src/client/types';
 import { Hex, Address, recoverMessageAddress, encodeAbiParameters, keccak256 } from 'viem';
 
 jest.mock('viem', () => ({
@@ -19,34 +19,82 @@ afterAll(() => {
 describe('getStateHash', () => {
     test('encodes state and hashes', () => {
         const channelId = '0xChannelId' as Hex;
-        const state: State = {
-            data: '0xdata' as Hex,
+        const state: UnsignedStateV1 = {
             version: 1n,
             intent: StateIntent.INITIALIZE,
-            allocations: [
-                { destination: '0xA' as Address, token: '0xT' as Address, amount: 10n },
-                { destination: '0xB' as Address, token: '0xT' as Address, amount: 10n },
-            ] as [Allocation, Allocation],
-            sigs: [], // sigs not used by getStateHash
+            metadata: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
+            homeState: {
+                chainId: 1n,
+                token: '0xT' as Address,
+                decimals: 18,
+                userAllocation: 100n,
+                userNetFlow: 0n,
+                nodeAllocation: 100n,
+                nodeNetFlow: 0n,
+            },
+            nonHomeState: {
+                chainId: 0n,
+                token: '0x0000000000000000000000000000000000000000' as Address,
+                decimals: 0,
+                userAllocation: 0n,
+                userNetFlow: 0n,
+                nodeAllocation: 0n,
+                nodeNetFlow: 0n,
+            },
         };
         const hash = getStateHash(channelId, state);
+
+        const ledgerComponents = [
+            { name: 'chainId', type: 'uint64' },
+            { name: 'token', type: 'address' },
+            { name: 'decimals', type: 'uint8' },
+            { name: 'userAllocation', type: 'uint256' },
+            { name: 'userNetFlow', type: 'int256' },
+            { name: 'nodeAllocation', type: 'uint256' },
+            { name: 'nodeNetFlow', type: 'int256' },
+        ];
+
         expect(encodeAbiParameters).toHaveBeenCalledWith(
             [
                 { name: 'channelId', type: 'bytes32' },
+                { name: 'version', type: 'uint64' },
                 { name: 'intent', type: 'uint8' },
-                { name: 'version', type: 'uint256' },
-                { name: 'data', type: 'bytes' },
+                { name: 'metadata', type: 'bytes32' },
                 {
-                    name: 'allocations',
-                    type: 'tuple[]',
-                    components: [
-                        { name: 'destination', type: 'address' },
-                        { name: 'token', type: 'address' },
-                        { name: 'amount', type: 'uint256' },
-                    ],
+                    name: 'homeState',
+                    type: 'tuple',
+                    components: ledgerComponents,
+                },
+                {
+                    name: 'nonHomeState',
+                    type: 'tuple',
+                    components: ledgerComponents,
                 },
             ],
-            [channelId, state.intent, state.version, state.data, state.allocations],
+            [
+                channelId,
+                state.version,
+                state.intent,
+                state.metadata,
+                {
+                    chainId: state.homeState.chainId,
+                    token: state.homeState.token,
+                    decimals: state.homeState.decimals,
+                    userAllocation: state.homeState.userAllocation,
+                    userNetFlow: state.homeState.userNetFlow,
+                    nodeAllocation: state.homeState.nodeAllocation,
+                    nodeNetFlow: state.homeState.nodeNetFlow,
+                },
+                {
+                    chainId: state.nonHomeState.chainId,
+                    token: state.nonHomeState.token,
+                    decimals: state.nonHomeState.decimals,
+                    userAllocation: state.nonHomeState.userAllocation,
+                    userNetFlow: state.nonHomeState.userNetFlow,
+                    nodeAllocation: state.nonHomeState.nodeAllocation,
+                    nodeNetFlow: state.nonHomeState.nodeNetFlow,
+                },
+            ],
         );
         expect(keccak256).toHaveBeenCalledWith('0xencoded');
         expect(hash).toBe('0xhash');
@@ -55,15 +103,28 @@ describe('getStateHash', () => {
 
 describe('verifySignature', () => {
     const channelId = '0xChannelId' as Hex;
-    const state: State = {
-        data: '0xdata' as Hex,
+    const state: UnsignedStateV1 = {
+        version: 1n,
         intent: StateIntent.INITIALIZE,
-        allocations: [
-            { destination: '0xA' as Address, token: '0xT' as Address, amount: 10n },
-            { destination: '0xB' as Address, token: '0xT' as Address, amount: 20n },
-        ] as [Allocation, Allocation],
-        version: 0n,
-        sigs: [],
+        metadata: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
+        homeState: {
+            chainId: 1n,
+            token: '0xT' as Address,
+            decimals: 18,
+            userAllocation: 100n,
+            userNetFlow: 0n,
+            nodeAllocation: 100n,
+            nodeNetFlow: 0n,
+        },
+        nonHomeState: {
+            chainId: 0n,
+            token: '0x0000000000000000000000000000000000000000' as Address,
+            decimals: 0,
+            userAllocation: 0n,
+            userNetFlow: 0n,
+            nodeAllocation: 0n,
+            nodeNetFlow: 0n,
+        },
     };
     const stateHash = getStateHash(channelId, state);
     const signature: Signature = "0xr0xs1b" as Signature;

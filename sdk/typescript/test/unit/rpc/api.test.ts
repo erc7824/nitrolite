@@ -1,435 +1,509 @@
-import { describe, test, expect, jest, afterEach } from '@jest/globals';
+import { describe, test, expect } from '@jest/globals';
 import { Address, Hex } from 'viem';
 import {
-    createAuthRequestMessage,
-    createAuthVerifyMessageFromChallenge,
-    createAuthVerifyMessage,
-    createAuthVerifyMessageWithJWT,
     createPingMessage,
     createGetConfigMessage,
-    createGetLedgerBalancesMessage,
-    createGetLedgerTransactionsMessage,
-    createGetUserTagMessage,
-    createGetAppDefinitionMessage,
-    createAppSessionMessage,
-    createCloseAppSessionMessage,
-    createApplicationMessage,
-    createCloseChannelMessage,
-    createResizeChannelMessage,
+    createGetAssetsMessage,
+    createGetBalancesMessage,
+    createGetTransactionsMessage,
+    createGetHomeChannelMessage,
+    createGetEscrowChannelMessage,
     createGetChannelsMessage,
-    createTransferMessage,
-    createECDSAMessageSigner,
+    createGetLatestStateMessage,
+    createGetStatesMessage,
+    createCreateChannelMessage,
+    createSubmitStateMessage,
+    createGetAppDefinitionMessage,
+    createGetAppSessionsMessage,
+    createCreateAppSessionMessage,
+    createSubmitAppStateMessage,
+    createSubmitDepositStateMessage,
+    createRebalanceAppSessionsMessage,
+    createRegisterMessage,
+    createGetSessionKeysMessage,
+    createRevokeSessionKeyMessage,
+    createApplicationMessage,
 } from '../../../src/rpc/api';
 import {
-    MessageSigner,
-    AuthChallengeResponse,
     RPCMethod,
-    ResizeChannelRequestParams,
-    AuthRequestParams,
-    CloseAppSessionRequestParams,
-    RPCChannelStatus,
-    RPCTransferAllocation,
-    RPCTxType,
-    RPCData,
-    RPCProtocolVersion,
+    RPCAppStateIntent,
+    RPCAppParticipant,
+    RPCAppDefinition,
+    RPCState,
+    RPCAppSessionAllocation,
+    RPCAppStateUpdate,
+    RPCSignedAppStateUpdate,
+    RPCTransition,
+    RPCTransitionType,
+    RPCLedger,
 } from '../../../src/rpc/types';
+import { RPCMessageType } from '../../../src/rpc/types';
 
-describe('API message creators', () => {
-    const signer: MessageSigner = jest.fn(async () => '0xsig' as Hex);
+describe('API v1 message creators', () => {
     const requestId = 42;
     const timestamp = 1000;
-    const clientAddress = '0x000000000000000000000000000000000000abcd' as Hex;
-    const channelId = '0x000000000000000000000000000000000000cdef' as Hex;
-    const appId = '0x000000000000000000000000000000000000ffff' as Hex;
-    const fundDestination = '0x0000000000000000000000000000000000000000' as Address;
+    const walletAddress = '0x000000000000000000000000000000000000abcd' as Address;
+    const tokenAddress = '0x000000000000000000000000000000000000cdef' as Address;
+    const appSessionId = '0x000000000000000000000000000000000000ffff' as Hex;
 
-    afterEach(() => {
-        jest.clearAllMocks();
-    });
-
-    test('createAuthRequestMessage', async () => {
-        const authRequest: AuthRequestParams = {
-            address: clientAddress,
-            session_key: clientAddress,
-            application: 'test-app',
-            allowances: [],
-            expires_at: 0n,
-            scope: '',
-        };
-        const msgStr = await createAuthRequestMessage(authRequest, requestId, timestamp);
-        expect(signer).not.toHaveBeenCalled();
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [
-                requestId,
-                RPCMethod.AuthRequest,
-                {
-                    address: clientAddress,
-                    session_key: clientAddress,
-                    application: 'test-app',
-                    allowances: [],
-                    expires_at: 0,
-                    scope: '',
-                },
-                timestamp,
-            ],
-            sig: [],
-        });
-    });
-
-    test('createAuthVerifyMessageFromChallenge', async () => {
-        const challenge = 'challenge123';
-        const msgStr = await createAuthVerifyMessageFromChallenge(signer, challenge, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.AuthVerify, { challenge }, timestamp]);
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.AuthVerify, { challenge }, timestamp],
-            sig: ['0xsig'],
-        });
-    });
-
-    describe('createAuthVerifyMessage', () => {
-        const rawResponse: AuthChallengeResponse = {
-            method: RPCMethod.AuthChallenge,
-            requestId: 1750865059076,
-            timestamp: 1750865059117,
-            params: {
-                challengeMessage: 'c8261773-2619-4fbe-9514-96392f87e7b2',
-            },
-            signatures: [
-                '0xddf03239f12089da25362dd3799edb3c6e7c1bc558f3475298b9dbe94d43137204ad9f37bad1e620d68c6a73b8ef908788f8538b41e49c857c41e6568a8fa76a00',
-            ],
-        };
-
-        test('successful challenge flow', async () => {
-            const msgStr = await createAuthVerifyMessage(signer, rawResponse, requestId, timestamp);
-            const challenge = 'c8261773-2619-4fbe-9514-96392f87e7b2';
-            expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.AuthVerify, { challenge }, timestamp]);
+    describe('Node methods', () => {
+        test('createPingMessage', () => {
+            const msgStr = createPingMessage(requestId, timestamp);
             const parsed = JSON.parse(msgStr);
-            expect(parsed).toEqual({
-                req: [requestId, RPCMethod.AuthVerify, { challenge }, timestamp],
-                sig: ['0xsig'],
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.Ping,
+                {},
+                timestamp,
+            ]);
+        });
+
+        test('createGetConfigMessage', () => {
+            const msgStr = createGetConfigMessage(requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetConfig,
+                {},
+                timestamp,
+            ]);
+        });
+
+        test('createGetAssetsMessage without chainId', () => {
+            const msgStr = createGetAssetsMessage(undefined, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetAssets,
+                {},
+                timestamp,
+            ]);
+        });
+
+        test('createGetAssetsMessage with chainId', () => {
+            const msgStr = createGetAssetsMessage(1, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetAssets,
+                { chain_id: 1 },
+                timestamp,
+            ]);
+        });
+    });
+
+    describe('User methods', () => {
+        test('createGetBalancesMessage', () => {
+            const msgStr = createGetBalancesMessage(walletAddress, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetBalances,
+                { wallet: walletAddress },
+                timestamp,
+            ]);
+        });
+
+        test('createGetTransactionsMessage with no filters', () => {
+            const msgStr = createGetTransactionsMessage(walletAddress, undefined, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetTransactions,
+                { wallet: walletAddress },
+                timestamp,
+            ]);
+        });
+
+        test('createGetTransactionsMessage with all filters', () => {
+            const options = {
+                asset: 'usdc',
+                tx_type: 'transfer',
+                from_time: 1000,
+                to_time: 2000,
+                pagination: { offset: 0, limit: 10, sort: 'desc' as const },
+            };
+            const msgStr = createGetTransactionsMessage(walletAddress, options, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed[3]).toMatchObject({
+                wallet: walletAddress,
+                asset: 'usdc',
+                tx_type: 'transfer',
+                from_time: 1000,
+                to_time: 2000,
+                pagination: { offset: 0, limit: 10, sort: 'desc' },
             });
         });
     });
 
-    test('createPingMessage', async () => {
-        const msgStr = await createPingMessage(signer, requestId, timestamp);
-        expect(signer).not.toHaveBeenCalled();
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.Ping, {}, timestamp],
-            sig: [],
-        });
-    });
-
-    test('createGetConfigMessage', async () => {
-        const msgStr = await createGetConfigMessage(signer, requestId, timestamp);
-        expect(signer).not.toHaveBeenCalled();
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetConfig, {}, timestamp],
-            sig: [],
-        });
-    });
-
-    test('createGetUserTagMessage', async () => {
-        const msgStr = await createGetUserTagMessage(signer, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetUserTag, {}, timestamp]);
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetUserTag, {}, timestamp],
-            sig: ['0xsig'],
-        });
-    });
-
-    test('createGetLedgerBalancesMessage', async () => {
-        const accountId = '0x0123124124124100000000000000000000000000' as Address;
-        const ledgerParams = { account_id: accountId };
-        const msgStr = await createGetLedgerBalancesMessage(signer, accountId, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerBalances, ledgerParams, timestamp]);
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetLedgerBalances, ledgerParams, timestamp],
-            sig: ['0xsig'],
-        });
-    });
-
-    test('createGetAppDefinitionMessage', async () => {
-        const appParams = { app_session_id: appId };
-        const msgStr = await createGetAppDefinitionMessage(signer, appId, requestId, timestamp);
-        expect(signer).not.toHaveBeenCalled();
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetAppDefinition, appParams, timestamp],
-            sig: [],
-        });
-    });
-
-    test('createAppSessionMessage', async () => {
-        const params = {
-            definition: {
-                application: 'test-app',
-                protocol: RPCProtocolVersion.NitroRPC_0_2,
-                participants: [],
-                weights: [],
-                quorum: 0,
-                challenge: 0,
-                nonce: 0,
-            },
-            allocations: [
-                {
-                    participant: '0xAaBbCcDdEeFf0011223344556677889900aAbBcC' as Address,
-                    asset: 'usdc',
-                    amount: '0.0',
-                },
-                {
-                    participant: '0x00112233445566778899AaBbCcDdEeFf00112233' as Address,
-                    asset: 'usdc',
-                    amount: '200.0',
-                },
-            ],
-        };
-        const msgStr = await createAppSessionMessage(signer, params, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.CreateAppSession, params, timestamp]);
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.CreateAppSession, params, timestamp],
-            sig: ['0xsig'],
-        });
-    });
-
-    test('createCloseAppSessionMessage', async () => {
-        const closeParams: CloseAppSessionRequestParams = { app_session_id: appId, allocations: [] };
-        const msgStr = await createCloseAppSessionMessage(signer, closeParams, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.CloseAppSession, closeParams, timestamp]);
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.CloseAppSession, closeParams, timestamp],
-            sig: ['0xsig'],
-        });
-    });
-
-    test('createApplicationMessage', async () => {
-        const messageParams = 'hello';
-        const msgStr = await createApplicationMessage(signer, appId, messageParams, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Message, messageParams, timestamp]);
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.Message, messageParams, timestamp],
-            sid: appId,
-            sig: ['0xsig'],
-        });
-    });
-
-    test('createCloseChannelMessage', async () => {
-        const msgStr = await createCloseChannelMessage(signer, channelId, fundDestination, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([
-            requestId,
-            RPCMethod.CloseChannel,
-            { channel_id: channelId, funds_destination: fundDestination },
-            timestamp,
-        ]);
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [
+    describe('Channel methods', () => {
+        test('createGetHomeChannelMessage', () => {
+            const msgStr = createGetHomeChannelMessage(walletAddress, 'usdc', requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
                 requestId,
-                RPCMethod.CloseChannel,
-                { channel_id: channelId, funds_destination: fundDestination },
+                RPCMethod.GetHomeChannel,
+                { wallet: walletAddress, asset: 'usdc' },
                 timestamp,
-            ],
-            sig: ['0xsig'],
+            ]);
         });
-    });
 
-    test('createAuthVerifyMessageWithJWT', async () => {
-        const jwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
-        const msgStr = await createAuthVerifyMessageWithJWT(jwtToken, requestId, timestamp);
-        expect(signer).not.toHaveBeenCalled();
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.AuthVerify, { jwt: jwtToken }, timestamp],
-            sig: [],
+        test('createGetEscrowChannelMessage', () => {
+            const channelId = 'channel123';
+            const msgStr = createGetEscrowChannelMessage(channelId, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetEscrowChannel,
+                { escrow_channel_id: channelId },
+                timestamp,
+            ]);
         });
-    });
 
-    test('createResizeChannelMessage', async () => {
-        const resizeParams: ResizeChannelRequestParams = {
-            channel_id: channelId,
-            funds_destination: fundDestination,
-            resize_amount: 1000n,
-        };
-        const msgStr = await createResizeChannelMessage(signer, resizeParams, requestId, timestamp);
-        // The signer should be called with the original bigint value
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.ResizeChannel, resizeParams, timestamp]);
-        const parsed = JSON.parse(msgStr);
-        // The parsed message should have the stringified bigint
-        const resizeParamsExpected = {
-            ...resizeParams,
-            resize_amount: resizeParams.resize_amount?.toString(),
-        };
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.ResizeChannel, resizeParamsExpected, timestamp],
-            sig: ['0xsig'],
+        test('createGetChannelsMessage with no filters', () => {
+            const msgStr = createGetChannelsMessage(walletAddress, undefined, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetChannels,
+                { wallet: walletAddress },
+                timestamp,
+            ]);
         });
-    });
 
-    test('createGetChannelsMessage', async () => {
-        const participant = '0x0123124124124131000000000000000000000000' as Address;
-        const msgStr = await createGetChannelsMessage(signer, participant, RPCChannelStatus.Open, requestId, timestamp);
-        expect(signer).not.toHaveBeenCalled();
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetChannels, { participant, status: RPCChannelStatus.Open }, timestamp],
-            sig: [],
-        });
-    });
-
-    test('createTransferMessage with destination address', async () => {
-        const destination = '0x1234567890123456789012345678901234567890' as Address;
-        const allocations: RPCTransferAllocation[] = [
-            {
+        test('createGetChannelsMessage with filters', () => {
+            const options = {
                 asset: 'usdc',
-                amount: '100.5',
-            },
-            {
-                asset: 'eth',
-                amount: '0.25',
-            },
-        ];
-        const transferParams = { destination, allocations };
-        const msgStr = await createTransferMessage(signer, transferParams, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Transfer, transferParams, timestamp]);
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.Transfer, transferParams, timestamp],
-            sig: ['0xsig'],
-        });
-    });
-
-    test('createTransferMessage with destination_user_tag', async () => {
-        const destination_user_tag = 'UX123D8C';
-        const allocations: RPCTransferAllocation[] = [
-            {
+                status: 'open',
+                pagination: { offset: 0, limit: 10, sort: 'asc' as const },
+            };
+            const msgStr = createGetChannelsMessage(walletAddress, options, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed[3]).toMatchObject({
+                wallet: walletAddress,
                 asset: 'usdc',
-                amount: '100.5',
-            },
-        ];
-        const transferParams = { destination_user_tag, allocations };
-        const msgStr = await createTransferMessage(signer, transferParams, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Transfer, transferParams, timestamp]);
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.Transfer, transferParams, timestamp],
-            sig: ['0xsig'],
+                status: 'open',
+                pagination: { offset: 0, limit: 10, sort: 'asc' },
+            });
+        });
+
+        test('createGetLatestStateMessage', () => {
+            const msgStr = createGetLatestStateMessage(walletAddress, 'usdc', true, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetLatestState,
+                { wallet: walletAddress, asset: 'usdc', only_signed: true },
+                timestamp,
+            ]);
+        });
+
+        test('createGetStatesMessage', () => {
+            const options = {
+                epoch: 1,
+                channel_id: 'channel123',
+                pagination: { offset: 0, limit: 10, sort: 'desc' as const },
+            };
+            const msgStr = createGetStatesMessage(walletAddress, 'usdc', false, options, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed[3]).toMatchObject({
+                wallet: walletAddress,
+                asset: 'usdc',
+                only_signed: false,
+                epoch: 1,
+                channel_id: 'channel123',
+                pagination: { offset: 0, limit: 10, sort: 'desc' },
+            });
+        });
+
+        test('createCreateChannelMessage', () => {
+            const homeLedger: RPCLedger = {
+                tokenAddress,
+                blockchainId: 1,
+                userBalance: '100',
+                userNetFlow: '0',
+                nodeBalance: '100',
+                nodeNetFlow: '0',
+            };
+
+            const state: RPCState = {
+                id: 'state123',
+                transitions: [],
+                asset: 'usdc',
+                userWallet: walletAddress,
+                epoch: 0,
+                version: 0,
+                homeLedger,
+            };
+
+            const channelDef = { nonce: 1, challenge: 3600 };
+            const msgStr = createCreateChannelMessage(state, channelDef, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed[2]).toBe(RPCMethod.CreateChannel);
+            expect(parsed[3]).toMatchObject({
+                state,
+                channel_definition: channelDef,
+            });
+        });
+
+        test('createSubmitStateMessage', () => {
+            const homeLedger: RPCLedger = {
+                tokenAddress,
+                blockchainId: 1,
+                userBalance: '100',
+                userNetFlow: '0',
+                nodeBalance: '100',
+                nodeNetFlow: '0',
+            };
+
+            const state: RPCState = {
+                id: 'state123',
+                transitions: [],
+                asset: 'usdc',
+                userWallet: walletAddress,
+                epoch: 0,
+                version: 1,
+                homeLedger,
+            };
+
+            const msgStr = createSubmitStateMessage(state, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.SubmitState,
+                { state },
+                timestamp,
+            ]);
         });
     });
 
-    test('createTransferMessage validates destination parameters', async () => {
-        const allocations: RPCTransferAllocation[] = [{ asset: 'usdc', amount: '100.5' }];
+    describe('App Session methods', () => {
+        test('createGetAppDefinitionMessage', () => {
+            const msgStr = createGetAppDefinitionMessage(appSessionId, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetAppDefinition,
+                { app_session_id: appSessionId },
+                timestamp,
+            ]);
+        });
 
-        // Test missing both parameters
-        await expect(createTransferMessage(signer, { allocations }, requestId, timestamp)).rejects.toThrow(
-            'Either destination or destination_user_tag must be provided',
-        );
+        test('createGetAppSessionsMessage with no filters', () => {
+            const msgStr = createGetAppSessionsMessage(undefined, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetAppSessions,
+                {},
+                timestamp,
+            ]);
+        });
 
-        // Test both parameters provided
-        const destination = '0x1234567890123456789012345678901234567890' as Address;
-        const destination_user_tag = 'UX123D8C';
-        await expect(
-            createTransferMessage(signer, { destination, destination_user_tag, allocations }, requestId, timestamp),
-        ).rejects.toThrow('Cannot provide both destination and destination_user_tag');
-    });
+        test('createGetAppSessionsMessage with filters', () => {
+            const options = {
+                app_session_id: 'session123',
+                participant: walletAddress,
+                status: 'open',
+                pagination: { offset: 0, limit: 10, sort: 'asc' as const },
+            };
+            const msgStr = createGetAppSessionsMessage(options, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed[3]).toMatchObject(options);
+        });
 
-    test('createGetLedgerTransactionsMessage with no filters', async () => {
-        const accountId = 'test-account';
-        const expectedParams = { account_id: accountId };
-        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, undefined, requestId, timestamp);
-        expect(signer).not.toHaveBeenCalled();
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
-            sig: [],
+        test('createCreateAppSessionMessage', () => {
+            const participants: RPCAppParticipant[] = [
+                { walletAddress, signatureWeight: 1 },
+            ];
+            const definition: RPCAppDefinition = {
+                application: 'test-app',
+                participants,
+                quorum: 1,
+                nonce: 1,
+            };
+            const quorumSigs: Hex[] = ['0xsig1' as Hex];
+            const sessionData = '{"data":"test"}';
+
+            const msgStr = createCreateAppSessionMessage(definition, quorumSigs, sessionData, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed[2]).toBe(RPCMethod.CreateAppSession);
+            expect(parsed[3]).toMatchObject({
+                definition,
+                quorum_sigs: quorumSigs,
+                session_data: sessionData,
+            });
+        });
+
+        test('createSubmitAppStateMessage', () => {
+            const allocations: RPCAppSessionAllocation[] = [
+                { participant: walletAddress, asset: 'usdc', amount: '100' },
+            ];
+            const appStateUpdate = {
+                app_session_id: appSessionId,
+                intent: RPCAppStateIntent.Operate,
+                version: 1,
+                allocations,
+            };
+            const quorumSigs: Hex[] = ['0xsig1' as Hex];
+
+            const msgStr = createSubmitAppStateMessage(appStateUpdate, quorumSigs, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed[2]).toBe(RPCMethod.SubmitAppState);
+            expect(parsed[3]).toMatchObject({
+                app_state_update: appStateUpdate,
+                quorum_sigs: quorumSigs,
+            });
+        });
+
+        test('createSubmitDepositStateMessage', () => {
+            const allocations: RPCAppSessionAllocation[] = [
+                { participant: walletAddress, asset: 'usdc', amount: '100' },
+            ];
+            const appStateUpdate: RPCAppStateUpdate = {
+                app_session_id: appSessionId,
+                intent: RPCAppStateIntent.Deposit,
+                version: 1,
+                allocations,
+            };
+            const quorumSigs: Hex[] = ['0xsig1' as Hex];
+            const homeLedger: RPCLedger = {
+                tokenAddress,
+                blockchainId: 1,
+                userBalance: '100',
+                userNetFlow: '0',
+                nodeBalance: '100',
+                nodeNetFlow: '0',
+            };
+            const userState: RPCState = {
+                id: 'state123',
+                transitions: [],
+                asset: 'usdc',
+                userWallet: walletAddress,
+                epoch: 0,
+                version: 1,
+                homeLedger,
+            };
+
+            const msgStr = createSubmitDepositStateMessage(appStateUpdate, quorumSigs, userState, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed[2]).toBe(RPCMethod.SubmitDepositState);
+            expect(parsed[3]).toMatchObject({
+                app_state_update: appStateUpdate,
+                quorum_sigs: quorumSigs,
+                user_state: userState,
+            });
+        });
+
+        test('createRebalanceAppSessionsMessage', () => {
+            const allocations: RPCAppSessionAllocation[] = [
+                { participant: walletAddress, asset: 'usdc', amount: '100' },
+            ];
+            const signedUpdates: RPCSignedAppStateUpdate[] = [
+                {
+                    app_state_update: {
+                        app_session_id: appSessionId,
+                        intent: RPCAppStateIntent.Rebalance,
+                        version: 1,
+                        allocations,
+                    },
+                    quorum_sigs: ['0xsig1' as Hex],
+                },
+            ];
+
+            const msgStr = createRebalanceAppSessionsMessage(signedUpdates, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.RebalanceAppSessions,
+                { signed_updates: signedUpdates },
+                timestamp,
+            ]);
         });
     });
 
-    test('createGetLedgerTransactionsMessage with all filters', async () => {
-        const accountId = 'test-account';
-        const filters = {
-            asset: 'usdc',
-            tx_type: RPCTxType.Transfer,
-            offset: 10,
-            limit: 20,
-            sort: 'desc' as const,
-        };
-        const expectedParams = {
-            account_id: accountId,
-            asset: 'usdc',
-            tx_type: RPCTxType.Transfer,
-            offset: 10,
-            limit: 20,
-            sort: 'desc',
-        };
-        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
-        expect(signer).not.toHaveBeenCalled();
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
-            sig: [],
+    describe('Session Key methods', () => {
+        test('createRegisterMessage with minimal params', () => {
+            const msgStr = createRegisterMessage(walletAddress, undefined, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.Register,
+                { address: walletAddress },
+                timestamp,
+            ]);
+        });
+
+        test('createRegisterMessage with all options', () => {
+            const sessionKey = '0x0000000000000000000000000000000000001234' as Address;
+            const options = {
+                session_key: sessionKey,
+                application: 'test-app',
+                allowances: [{ asset: 'usdc', allowance: '1000' }],
+                scope: 'full',
+                expires_at: 9999999999,
+            };
+            const msgStr = createRegisterMessage(walletAddress, options, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed[3]).toMatchObject({
+                address: walletAddress,
+                ...options,
+            });
+        });
+
+        test('createGetSessionKeysMessage', () => {
+            const msgStr = createGetSessionKeysMessage(walletAddress, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.GetSessionKeys,
+                { wallet: walletAddress },
+                timestamp,
+            ]);
+        });
+
+        test('createRevokeSessionKeyMessage', () => {
+            const sessionKey = '0x0000000000000000000000000000000000001234' as Address;
+            const msgStr = createRevokeSessionKeyMessage(sessionKey, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.RevokeSessionKey,
+                { session_key: sessionKey },
+                timestamp,
+            ]);
         });
     });
 
-    test('createGetLedgerTransactionsMessage with partial filters', async () => {
-        const accountId = 'test-account';
-        const filters = {
-            asset: 'eth',
-            limit: 5,
-        };
-        const expectedParams = {
-            account_id: accountId,
-            asset: 'eth',
-            limit: 5,
-        };
-        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
-        expect(signer).not.toHaveBeenCalled();
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
-            sig: [],
+    describe('Application Message', () => {
+        test('createApplicationMessage', () => {
+            const params = { type: 'custom', data: 'hello' };
+            const msgStr = createApplicationMessage(params, requestId, timestamp);
+            const parsed = JSON.parse(msgStr);
+            expect(parsed).toEqual([
+                RPCMessageType.Request,
+                requestId,
+                RPCMethod.Message,
+                params,
+                timestamp,
+            ]);
         });
-    });
-
-    test('createGetLedgerTransactionsMessage filters out null/undefined/empty values', async () => {
-        const accountId = 'test-account';
-        const filters = {
-            asset: '',
-            tx_type: RPCTxType.Transfer,
-            offset: 0,
-            limit: undefined,
-            sort: null as any,
-        };
-        const expectedParams = {
-            account_id: accountId,
-            tx_type: RPCTxType.Transfer,
-            offset: 0,
-        };
-        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
-        expect(signer).not.toHaveBeenCalled();
-        const parsed = JSON.parse(msgStr);
-        expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
-            sig: [],
-        });
-    });
-
-    test('createECDSAMessageSigner', async () => {
-        const privateKey = '0xb482c8fa261c29eaaa646703948e2cc2a2ff54411cc42d8fce9a161035dfb3dc';
-        const payload: RPCData = [42, RPCMethod.Ping, { p1: 4337, p2: 7702 }, 20];
-        const signer = createECDSAMessageSigner(privateKey);
-        const signature = await signer(payload);
-        expect(signature).toBeDefined();
-        expect(signature).toEqual(
-            '0x7263178cbb9b9820491b3add77f83ebbab7df700fc30734a659b69bf0268073a2494ccbcf0ee3e98a9321f88385013a88aabe6a640d6411cda19fbbc197d38ac1c',
-        );
     });
 });

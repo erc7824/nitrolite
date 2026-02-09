@@ -2,231 +2,152 @@
  * @file Tests for src/client/state.ts
  */
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { Hex } from 'viem';
+import { Address, Hex, zeroAddress, zeroHash } from 'viem';
 import { _prepareAndSignInitialState, _prepareAndSignFinalState } from '../../../src/client/state';
 import { Errors } from '../../../src/errors';
-import { State, Channel, CreateChannelParams, StateIntent } from '../../../src/client/types';
-
-// Mock utils
-jest.mock('../../../src/utils', () => ({
-    generateChannelNonce: jest.fn(() => 999n),
-    getChannelId: jest.fn(() => 'cid' as any),
-    getStateHash: jest.fn(() => 'hsh'),
-    getPackedState: jest.fn(() => '0xpacked' as Hex),
-    signState: jest.fn(async () => 'accSig'),
-    encoders: { numeric: jest.fn(() => 'encData') },
-    removeQuotesFromRS: jest.fn((s: string) => s.replace(/"/g, '')),
-}));
+import { State, CreateChannelParams, StateIntent, CloseChannelParams, ChannelDefinition } from '../../../src/client/types';
 
 describe('_prepareAndSignInitialState', () => {
     let deps: any;
-    let defaultChannel: Channel;
-    let defaultState: State;
-    const guestAddress = '0xGUEST' as Hex;
-    const tokenAddress = '0xTOKEN' as Hex;
-    const adjudicatorAddress = '0xADJ' as Hex;
-    const challengeDuration = BigInt(123);
-    const stateSigner = {
-        getAddress: jest.fn(() => '0xOWNER' as Hex),
-        signState: jest.fn(async (_1: Hex, _2: State) => 'accSig'),
-        signRawMessage: jest.fn(async (_: Hex) => 'accSig'),
+    const nodeAddress = '0x5555555555555555555555555555555555555555' as Address;
+    const userAddress = '0x1234567890123456789012345678901234567890' as Address;
+    const tokenAddress = '0x4444444444444444444444444444444444444444' as Address;
+
+    const definition: ChannelDefinition = {
+        user: userAddress,
+        node: nodeAddress,
+        nonce: 1n,
+        challengeDuration: 3600,
+        metadata: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
+    };
+
+    const initialState: State = {
+        version: 0n,
+        intent: StateIntent.INITIALIZE,
+        metadata: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
+        homeState: {
+            chainId: 1n,
+            token: tokenAddress,
+            decimals: 18,
+            userAllocation: 100n,
+            userNetFlow: 0n,
+            nodeAllocation: 100n,
+            nodeNetFlow: 0n,
+        },
+        nonHomeState: {
+            chainId: 0n,
+            token: zeroAddress,
+            decimals: 0,
+            userAllocation: 0n,
+            userNetFlow: 0n,
+            nodeAllocation: 0n,
+            nodeNetFlow: 0n,
+        },
+        userSig: '0x' as Hex,
+        nodeSig: '0x' as Hex,
     };
 
     beforeEach(() => {
         deps = {
-            account: { address: '0xOWNER' as Hex },
-            stateSigner,
-            walletClient: {
-                account: { address: '0xWALLET' as Hex },
-                signMessage: stateSigner.signRawMessage,
-            },
+            account: { address: userAddress },
             addresses: {
-                guestAddress,
-                adjudicator: adjudicatorAddress,
+                custody: '0x1111111111111111111111111111111111111111' as Address,
             },
-            challengeDuration,
+            challengeDuration: 3600,
             chainId: 1,
         };
-
-        defaultChannel = {
-            participants: [deps.account.address, guestAddress],
-            adjudicator: adjudicatorAddress,
-            challenge: challengeDuration,
-            nonce: 999n,
-        };
-
-        defaultState = {
-            data: '0xcustomData',
-            intent: StateIntent.INITIALIZE,
-            allocations: [
-                // NOTE: first allocation amount is zero
-                { destination: deps.account.address, token: tokenAddress, amount: 0n },
-                { destination: guestAddress, token: tokenAddress, amount: 20n },
-            ],
-            version: 0n,
-            sigs: [],
-        };
     });
 
-    test('success with explicit stateData', async () => {
+    test('success with valid params', async () => {
         const params: CreateChannelParams = {
-            channel: defaultChannel,
-            unsignedInitialState: defaultState,
-            serverSignature: '0xSRVSIG',
+            definition,
+            initialState,
         };
-        const { initialState, channelId } = await _prepareAndSignInitialState(deps, params);
+        const result = await _prepareAndSignInitialState(deps, params);
 
-        // channelId is stubbed
-        expect(channelId).toBe('cid');
-        // State fields
-        expect(initialState).toEqual({
-            data: '0xcustomData',
-            intent: StateIntent.INITIALIZE,
-            allocations: [
-                { destination: deps.account.address, token: tokenAddress, amount: 0n },
-                { destination: guestAddress, token: tokenAddress, amount: 20n },
-            ],
-            version: 0n,
-            sigs: ['accSig', '0xSRVSIG'],
-        });
-        // Signs the state
-        expect(stateSigner.signState).toHaveBeenCalledWith(
-            'cid',
-            {
-                data: '0xcustomData',
-                intent: StateIntent.INITIALIZE,
-                allocations: expect.any(Array),
-                version: 0n,
-                sigs: [],
-            }
-        );
+        expect(result.channelId).toBe(zeroHash);
+        expect(result.initialState).toEqual(initialState);
     });
 
-    test('throws if no adjudicator', async () => {
-        const localChannel = { ...defaultChannel, adjudicator: undefined } as any;
+    test('throws if no definition', async () => {
+        const params = {
+            initialState,
+        } as any;
 
-        await expect(
-            _prepareAndSignInitialState(deps, {
-                channel: localChannel,
-                unsignedInitialState: defaultState,
-                serverSignature: '0xSRVSIG',
-            }),
-        ).rejects.toThrow(Errors.MissingParameterError);
+        await expect(_prepareAndSignInitialState(deps, params)).rejects.toThrow(Errors.MissingParameterError);
     });
 
-    test('throws if bad allocations length', async () => {
-        const localState = { ...defaultState, allocations: [] } as any;
+    test('throws if no initialState', async () => {
+        const params = {
+            definition,
+        } as any;
 
-        await expect(
-            _prepareAndSignInitialState(deps, {
-                channel: defaultChannel,
-                unsignedInitialState: localState,
-                serverSignature: '0xSRVSIG',
-            }),
-        ).rejects.toThrow(Errors.InvalidParameterError);
-    });
-
-    test('throws if first allocation amount is NOT zero', async () => {
-        const localState = { ...defaultState, allocations: [{ ...defaultState.allocations[0], amount: 1n }] } as any;
-
-        await expect(
-            _prepareAndSignInitialState(deps, {
-                channel: defaultChannel,
-                unsignedInitialState: localState,
-                serverSignature: '0xSRVSIG',
-            }),
-        ).rejects.toThrow(Errors.InvalidParameterError);
+        await expect(_prepareAndSignInitialState(deps, params)).rejects.toThrow(Errors.MissingParameterError);
     });
 });
 
 describe('_prepareAndSignFinalState', () => {
     let deps: any;
-    const serverSig = 'srvSig';
-    const channelIdArg = 'cid' as Hex;
-    const allocations = [{ destination: '0xA' as Hex, token: '0xT' as Hex, amount: 5n }];
-    const version = 7n;
-    const stateSigner = {
-        getAddress: jest.fn(async () => '0xOWNER' as Hex),
-        signState: jest.fn(async (_1: Hex, _2: State) => 'accSig'),
-        signRawMessage: jest.fn(async (_: Hex) => 'accSig'),
+    const nodeAddress = '0x5555555555555555555555555555555555555555' as Address;
+    const userAddress = '0x1234567890123456789012345678901234567890' as Address;
+    const tokenAddress = '0x4444444444444444444444444444444444444444' as Address;
+    const channelId = '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex;
+
+    const finalState: State = {
+        version: 1n,
+        intent: StateIntent.FINALIZE,
+        metadata: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
+        homeState: {
+            chainId: 1n,
+            token: tokenAddress,
+            decimals: 18,
+            userAllocation: 50n,
+            userNetFlow: 0n,
+            nodeAllocation: 50n,
+            nodeNetFlow: 0n,
+        },
+        nonHomeState: {
+            chainId: 0n,
+            token: zeroAddress,
+            decimals: 0,
+            userAllocation: 0n,
+            userNetFlow: 0n,
+            nodeAllocation: 0n,
+            nodeNetFlow: 0n,
+        },
+        userSig: '0x' as Hex,
+        nodeSig: '0x' as Hex,
     };
 
     beforeEach(() => {
         deps = {
-            stateSigner,
-            walletClient: {
-                account: { address: '0xWALLET' as Hex },
-                signMessage: stateSigner.signRawMessage,
-            },
-            nitroliteService: {
-                getChannelData: jest.fn(async () => ({
-                    channel: {
-                        participants: ['0xOWNER' as Hex, '0xGUEST' as Hex],
-                        adjudicator: '0xADJ' as Hex,
-                        challenge: 123n,
-                        nonce: 999n,
-                    },
-                    status: 0,
-                    wallets: ['0xW1' as Hex, '0xW2' as Hex],
-                    challengeExpiry: 0n,
-                    lastValidState: {} as any,
-                })),
-            },
+            account: { address: userAddress },
             addresses: {
-                /* not used */
+                custody: '0x1111111111111111111111111111111111111111' as Address,
             },
-            account: {
-                /* not used */
-            },
-            challengeDuration: 0,
+            challengeDuration: 3600,
             chainId: 1,
         };
     });
 
-    test('success with explicit stateData', async () => {
-        const params = {
-            stateData: 'finalData',
-            finalState: {
-                intent: StateIntent.FINALIZE,
-                channelId: channelIdArg,
-                allocations,
-                version,
-                serverSignature: serverSig,
-            },
+    test('success with valid params', async () => {
+        const params: CloseChannelParams = {
+            channelId,
+            finalState,
+            proofs: [],
         };
-        const { finalStateWithSigs, channelId } = await _prepareAndSignFinalState(deps, params as any);
+        const result = await _prepareAndSignFinalState(deps, params);
 
-        expect(channelId).toBe(channelIdArg);
-        // Data and allocations
-        expect(finalStateWithSigs).toEqual({
-            data: 'finalData',
-            intent: StateIntent.FINALIZE,
-            allocations,
-            version,
-            sigs: ['accSig', 'srvSig'],
-        });
-        expect(stateSigner.signState).toHaveBeenCalledWith(
-            'cid',
-            {
-                data: 'finalData',
-                intent: StateIntent.FINALIZE,
-                allocations,
-                version,
-                sigs: [],
-            }
-        );
+        expect(result.channelId).toBe(channelId);
+        expect(result.finalState).toEqual(finalState);
+        expect(result.proofs).toEqual([]);
     });
 
-    test('throws if no stateData', async () => {
+    test('throws if no finalState', async () => {
         const params = {
-            stateData: undefined,
-            finalState: {
-                channelId: channelIdArg,
-                allocations,
-                version,
-                serverSignature: serverSig,
-            },
-        };
-        await expect(_prepareAndSignFinalState(deps, params as any)).rejects.toThrow(Errors.MissingParameterError);
+            channelId,
+        } as any;
+
+        await expect(_prepareAndSignFinalState(deps, params)).rejects.toThrow(Errors.MissingParameterError);
     });
 });

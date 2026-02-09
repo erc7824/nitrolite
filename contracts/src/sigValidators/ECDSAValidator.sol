@@ -32,7 +32,7 @@ contract ECDSAValidator is BaseValidator, ISignatureValidator {
         address participant
     ) external pure returns (ValidationResult) {
         bytes memory message = Utils.pack(channelId, signingData);
-        if(validateECDSASigner(message, signature, participant)) {
+        if(validateEcdsaSigner(message, signature, participant)) {
             return VALIDATION_SUCCESS;
         } else {
             return VALIDATION_FAILURE;
@@ -59,7 +59,7 @@ contract ECDSAValidator is BaseValidator, ISignatureValidator {
         address node
     ) external pure returns (ValidationResult) {
         bytes memory message = abi.encodePacked(Utils.pack(channelId, signingData), "challenge");
-        if (validateECDSASignerIsEither(message, signature, user, node)) {
+        if (validateEcdsaSignerIsEither(message, signature, user, node)) {
             return VALIDATION_SUCCESS;
         } else {
             return VALIDATION_FAILURE;

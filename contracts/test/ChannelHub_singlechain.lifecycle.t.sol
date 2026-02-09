@@ -64,7 +64,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
         // invoke a checkpoint
         // Expected: user allocation = 958, user net flow = 1000, node allocation = 0, node net flow = -42
         vm.prank(alice);
-        cHub.checkpointChannel(channelId, state, new State[](0));
+        cHub.checkpointChannel(channelId, state);
         verifyChannelState(channelId, 958, 1000, 0, -42, "after checkpoint");
 
         // receive 24 (allocation increases by 24, node net flow increases by 24)
@@ -176,7 +176,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
         state = signStateWithBothParties(state, channelId, ALICE_PK);
 
         vm.prank(alice);
-        cHub.closeChannel(channelId, state, new State[](0));
+        cHub.closeChannel(channelId, state);
 
         // Check CLOSED status after channel closure
         (ChannelStatus finalStatus,,,,) = cHub.getChannelData(channelId);

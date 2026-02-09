@@ -22,7 +22,7 @@ abstract contract BaseValidator {
      * @param expectedSigner The address that should have signed the message
      * @return result VALIDATION_SUCCESS if signature is from expectedSigner, VALIDATION_FAILURE otherwise
      */
-    function validateECDSASigner(
+    function validateEcdsaSigner(
         bytes memory message,
         bytes memory signature,
         address expectedSigner
@@ -54,7 +54,7 @@ abstract contract BaseValidator {
      * @param addr2 Second possible signer address
      * @return result VALIDATION_SUCCESS if signature is from addr1 or addr2, VALIDATION_FAILURE otherwise
      */
-    function validateECDSASignerIsEither(
+    function validateEcdsaSignerIsEither(
         bytes memory message,
         bytes memory signature,
         address addr1,

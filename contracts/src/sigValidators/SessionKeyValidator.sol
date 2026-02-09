@@ -64,7 +64,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
 
         // Step 1: Verify participant authorized this session key
         bytes memory authMessage = _toSigningData(skAuth);
-        bool authResult = validateECDSASigner(authMessage, skAuth.authSignature, participant);
+        bool authResult = validateEcdsaSigner(authMessage, skAuth.authSignature, participant);
 
         if (!authResult) {
             return VALIDATION_FAILURE;
@@ -72,7 +72,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
 
         // Step 2: Verify session key signed the full state message
         bytes memory stateMessage = Utils.pack(channelId, signingData);
-        if (validateECDSASigner(stateMessage, skSignature, skAuth.sessionKey)) {
+        if (validateEcdsaSigner(stateMessage, skSignature, skAuth.sessionKey)) {
             return VALIDATION_SUCCESS;
         } else {
             return VALIDATION_FAILURE;
@@ -102,7 +102,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
 
         // Step 1: Verify participant authorized this session key
         bytes memory authMessage = _toSigningData(skAuth);
-        bool authResult = validateECDSASignerIsEither(authMessage, skAuth.authSignature, user, node);
+        bool authResult = validateEcdsaSignerIsEither(authMessage, skAuth.authSignature, user, node);
 
         if (!authResult) {
             return VALIDATION_FAILURE;
@@ -110,7 +110,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
 
         // Step 2: Verify session key signed the full challenge message
         bytes memory challengeMessage = abi.encodePacked(Utils.pack(channelId, signingData), "challenge");
-        if (validateECDSASigner(challengeMessage, skSignature, skAuth.sessionKey)) {
+        if (validateEcdsaSigner(challengeMessage, skSignature, skAuth.sessionKey)) {
             return VALIDATION_SUCCESS;
         } else {
             return VALIDATION_FAILURE;

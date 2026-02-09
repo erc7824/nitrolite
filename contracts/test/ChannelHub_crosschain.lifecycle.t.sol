@@ -188,7 +188,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         // checkpoint on home chain
         vm.prank(alice);
-        cHub.checkpointChannel(channelId, state, new State[](0));
+        cHub.checkpointChannel(channelId, state);
         verifyChannelState(channelId, 477, 750, 0, -273, "after checkpoint");
 
         // Verify user balance hasn't changed
@@ -702,7 +702,6 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         vm.prank(bob);
         cHub.initiateMigration(bobDef, state);
-        // TODO: in ChannelEngine it should be checked that no channel exists with such channelId, and that nonHomeState only includes the same `userAllocation` as in the homeState
 
         // Verify node's balance after migration (should have locked 469)
         uint256 nodeBalanceAfter = cHub.getAccountBalance(node, address(token));

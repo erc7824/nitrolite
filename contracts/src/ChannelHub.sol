@@ -34,7 +34,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
     uint8 public constant VERSION = 1;
 
-    ISignatureValidator public immutable defaultSigValidator;
+    ISignatureValidator public immutable DEFAULT_SIG_VALIDATOR;
 
     event EscrowDepositsPurged(uint256 purgedCount);
 
@@ -134,7 +134,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
     constructor(ISignatureValidator _defaultSigValidator) {
         require(address(_defaultSigValidator) != address(0), InvalidAddress());
-        defaultSigValidator = _defaultSigValidator;
+        DEFAULT_SIG_VALIDATOR = _defaultSigValidator;
     }
 
     // ========== Getters ==========
@@ -426,7 +426,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         emit ChannelWithdrawn(channelId, candidate);
     }
 
-    function checkpointChannel(bytes32 channelId, State calldata candidate, State[] calldata proof) external payable {
+    function checkpointChannel(bytes32 channelId, State calldata candidate) external payable {
         require(candidate.intent == StateIntent.OPERATE, "can only checkpoint operate states");
 
         ChannelMeta storage meta = _channels[channelId];
@@ -445,7 +445,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
     function challengeChannel(
         bytes32 channelId,
         State calldata candidate,
-        State[] calldata proof,
         bytes calldata challengerSig
     ) external payable {
         ChannelMeta storage meta = _channels[channelId];
@@ -481,7 +480,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         emit ChannelChallenged(channelId, candidate, challengeExpiry);
     }
 
-    function closeChannel(bytes32 channelId, State calldata candidate, State[] calldata proof) external payable {
+    function closeChannel(bytes32 channelId, State calldata candidate) external payable {
         require(candidate.intent == StateIntent.CLOSE, "invalid state intent");
 
         ChannelMeta storage meta = _channels[channelId];
@@ -832,7 +831,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         SigValidatorType userValidatorType = SigValidatorType(uint8(state.userSig[0]));
         bytes memory userSigData = state.userSig[1:];
         ISignatureValidator userValidator = userValidatorType == SigValidatorType.DEFAULT
-            ? defaultSigValidator
+            ? DEFAULT_SIG_VALIDATOR
             : ISignatureValidator(def.signatureValidator);
 
         ValidationResult userResult = userValidator.validateSignature(channelId, signingData, userSigData, def.user);
@@ -842,7 +841,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         SigValidatorType nodeValidatorType = SigValidatorType(uint8(state.nodeSig[0]));
         bytes memory nodeSigData = state.nodeSig[1:];
         ISignatureValidator nodeValidator = nodeValidatorType == SigValidatorType.DEFAULT
-            ? defaultSigValidator
+            ? DEFAULT_SIG_VALIDATOR
             : ISignatureValidator(def.signatureValidator);
 
         ValidationResult nodeResult = nodeValidator.validateSignature(channelId, signingData, nodeSigData, def.node);
@@ -865,7 +864,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         SigValidatorType validatorType = SigValidatorType(uint8(challengerSig[0]));
         bytes memory sigData = challengerSig[1:];
         ISignatureValidator validator = validatorType == SigValidatorType.DEFAULT
-            ? defaultSigValidator
+            ? DEFAULT_SIG_VALIDATOR
             : ISignatureValidator(def.signatureValidator);
 
         ValidationResult result = validator.validateChallengerSignature(channelId, signingData, sigData, user, node);

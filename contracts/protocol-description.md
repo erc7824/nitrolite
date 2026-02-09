@@ -530,6 +530,42 @@ This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
 
 ---
 
+## Signature validation
+
+The protocol supports flexible signature validation through a **signature validator module** system. This enables channels to use custom signature schemes beyond the default EIP-191 standard.
+
+### Signature validator architecture
+
+* **Default validator**: The ChannelHub is initialized with a `defaultSigValidator` address that implements the `ISignatureValidator` interface. This validator is used for standard signature verification.
+
+* **Channel-specific validator**: Each channel can optionally specify a custom `sigValidator` address in its Channel Definition. This allows per-channel signature validation logic.
+
+* **Validator selection**: The first byte of a signature determines which validator is used:
+
+  * `0x00` (DEFAULT) → use the ChannelHub's `defaultSigValidator`
+  * `0x01` (CHANNEL) → use the channel's custom `sigValidator` from the Channel Definition
+
+* **ISignatureValidator interface**: All validators must implement this interface, which provides two methods:
+
+  * `validateSignature()` — validates a single participant's signature
+  * `validateChallengerSignature()` — validates a challenger's signature in dispute scenarios
+
+### Signature format
+
+Signatures follow this structure:
+
+```
+[validator_type: 1 byte][signature_data: variable length]
+```
+
+Where:
+* `validator_type` is `0x00` for DEFAULT or `0x01` for CHANNEL
+* `signature_data` is passed to the selected validator for verification
+
+This design allows channels to support advanced signature schemes (multi-sig, threshold signatures, account abstraction) while maintaining backwards compatibility with standard ECDSA signatures.
+
+---
+
 ## Mental model
 
 * Off-chain protocol **decides what should happen**.

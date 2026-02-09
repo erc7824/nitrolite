@@ -9,6 +9,7 @@ import {TestUtils} from "./TestUtils.sol";
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {ECDSAValidator} from "../src/sigValidators/ECDSAValidator.sol";
 import {State, StateIntent, Ledger} from "../src/interfaces/Types.sol";
+import {ISignatureValidator} from "../src/interfaces/ISignatureValidator.sol";
 
 // forge-lint: disable-next-item(unsafe-typecast)
 contract ChannelHubTest_Base is Test {
@@ -22,6 +23,8 @@ contract ChannelHubTest_Base is Test {
     address node;
     address alice;
     address bob;
+
+    ISignatureValidator immutable DEFAULT_SIG_VALIDATOR = ISignatureValidator(address(1));
 
     uint8 constant CHANNEL_HUB_VERSION = 1;
     uint32 constant CHALLENGE_DURATION = 86400; // 1 day
@@ -162,13 +165,13 @@ contract ChannelHubTest_Base is Test {
         });
     }
 
-    function signStateWithBothParties(State memory state, bytes32 channelId, uint256 userPk)
+    function mutualSignStateWithDefaultValidator(State memory state, bytes32 channelId, uint256 userPk)
         internal
         pure
         returns (State memory)
     {
-        state.userSig = TestUtils.signStateEip191(vm, channelId, state, userPk);
-        state.nodeSig = TestUtils.signStateEip191(vm, channelId, state, NODE_PK);
+        state.userSig = TestUtils.signStateEip191WithDefaultValidator(vm, channelId, state, userPk);
+        state.nodeSig = TestUtils.signStateEip191WithDefaultValidator(vm, channelId, state, NODE_PK);
         return state;
     }
 

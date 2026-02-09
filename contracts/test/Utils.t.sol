@@ -13,7 +13,7 @@ contract UtilsTest is Test {
             user: 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045,
             node: 0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a,
             nonce: 42,
-            signatureValidator: ISignatureValidator(address(0)),
+            signatureValidator: ISignatureValidator(address(123)),
             metadata: 0x13730b0d8e1bdbdc000000000000000000000000000000000000000000000000
         });
 
@@ -136,7 +136,7 @@ contract UtilsTest is Test {
             user: 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045,
             node: 0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a,
             nonce: 42,
-            signatureValidator: ISignatureValidator(address(0)),
+            signatureValidator: ISignatureValidator(address(123)),
             metadata: metadata
         });
 

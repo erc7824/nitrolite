@@ -36,9 +36,6 @@ assets:
       - blockchain_id: 8453   # Base Mainnet
         address: "0xf7C1CEfCf7E1dd8161e00099facD3E1Db9e528ee"
         decimals: 18
-      - blockchain_id: 1      # Ethereum Mainnet
-        address: "0x1C9922314ED1415c95b9FD453c3818fd41867d0B"
-        decimals: 18
   - symbol: "usdc"
     name: "USD Coin"
     tokens:

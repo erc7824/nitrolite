@@ -244,6 +244,8 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 					break
 				}
 			}
+		} else {
+			logger.Warn("failed to compute typed data hash for ERC-1271 fallback", "error", hashErr)
 		}
 
 		if !erc1271Verified {

@@ -159,6 +159,12 @@ func main() {
 		logger.Error("failed to shut down RPC server", "error", err)
 	}
 
+	// Close ethClients used for ERC-1271 verification
+	for chainID, client := range ethClients {
+		client.Close()
+		logger.Info("ethClient closed", "chainID", chainID)
+	}
+
 	logger.Info("shutdown complete")
 }
 

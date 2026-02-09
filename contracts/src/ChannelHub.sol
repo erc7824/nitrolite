@@ -88,7 +88,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         EscrowStatus status;
         address user;
         address node;
-        address signatureValidator;
+        ISignatureValidator signatureValidator;
         uint64 unlockAt;
         uint64 challengeExpireAt;
         uint256 lockedAmount;
@@ -100,7 +100,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         EscrowStatus status;
         address user;
         address node;
-        address signatureValidator;
+        ISignatureValidator signatureValidator;
         uint64 challengeExpireAt;
         uint256 lockedAmount;
         State initState;
@@ -828,21 +828,15 @@ contract ChannelHub is IVault, ReentrancyGuard {
         bytes memory signingData = Utils.toSigningData(state);
 
         // Validate user signature
-        SigValidatorType userValidatorType = SigValidatorType(uint8(state.userSig[0]));
+        ISignatureValidator userValidator = _selectValidator(uint8(state.userSig[0]), DEFAULT_SIG_VALIDATOR, def.signatureValidator);
         bytes memory userSigData = state.userSig[1:];
-        ISignatureValidator userValidator = userValidatorType == SigValidatorType.DEFAULT
-            ? DEFAULT_SIG_VALIDATOR
-            : ISignatureValidator(def.signatureValidator);
 
         ValidationResult userResult = userValidator.validateSignature(channelId, signingData, userSigData, def.user);
         require(ValidationResult.unwrap(userResult) != ValidationResult.unwrap(VALIDATION_FAILURE), "invalid user signature");
 
         // Validate node signature
-        SigValidatorType nodeValidatorType = SigValidatorType(uint8(state.nodeSig[0]));
+        ISignatureValidator nodeValidator = _selectValidator(uint8(state.nodeSig[0]), DEFAULT_SIG_VALIDATOR, def.signatureValidator);
         bytes memory nodeSigData = state.nodeSig[1:];
-        ISignatureValidator nodeValidator = nodeValidatorType == SigValidatorType.DEFAULT
-            ? DEFAULT_SIG_VALIDATOR
-            : ISignatureValidator(def.signatureValidator);
 
         ValidationResult nodeResult = nodeValidator.validateSignature(channelId, signingData, nodeSigData, def.node);
         require(ValidationResult.unwrap(nodeResult) != ValidationResult.unwrap(VALIDATION_FAILURE), "invalid node signature");
@@ -859,16 +853,18 @@ contract ChannelHub is IVault, ReentrancyGuard {
         require(challengerSig.length > 0, "empty challenger signature");
 
         bytes memory signingData = Utils.toSigningData(state);
-
-        // Extract validator type and signature data
-        SigValidatorType validatorType = SigValidatorType(uint8(challengerSig[0]));
+        ISignatureValidator validator = _selectValidator(uint8(challengerSig[0]), DEFAULT_SIG_VALIDATOR, def.signatureValidator);
         bytes memory sigData = challengerSig[1:];
-        ISignatureValidator validator = validatorType == SigValidatorType.DEFAULT
-            ? DEFAULT_SIG_VALIDATOR
-            : ISignatureValidator(def.signatureValidator);
 
         ValidationResult result = validator.validateChallengerSignature(channelId, signingData, sigData, user, node);
         require(ValidationResult.unwrap(result) != ValidationResult.unwrap(VALIDATION_FAILURE), "invalid challenger signature");
+    }
+
+    function _selectValidator(uint8 sigFirstByte, ISignatureValidator defaultValidator, ISignatureValidator channelValidator) internal pure returns (ISignatureValidator) {
+        require(sigFirstByte <= uint8(type(SigValidatorType).max), "invalid signature validator type");
+
+        SigValidatorType validatorType = SigValidatorType(sigFirstByte);
+        return validatorType == SigValidatorType.DEFAULT ? defaultValidator : channelValidator;
     }
 
     function _buildChannelContext(bytes32 channelId, uint256 nodeBalance)
@@ -1039,7 +1035,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         EscrowDepositEngine.TransitionEffects memory effects,
         address user,
         address node,
-        address signatureValidator
+        ISignatureValidator signatureValidator
     ) internal {
         EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
 
@@ -1099,7 +1095,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         EscrowWithdrawalEngine.TransitionEffects memory effects,
         address user,
         address node,
-        address signatureValidator
+        ISignatureValidator signatureValidator
     ) internal {
         EscrowWithdrawalMeta storage meta = _escrowWithdrawals[escrowId];
 
@@ -1153,6 +1149,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
         require(def.node != address(0), InvalidAddress());
         require(def.user != def.node, AddressCollision(def.user));
         require(def.challengeDuration >= MIN_CHALLENGE_DURATION, IncorrectChallengeDuration());
-        require(def.signatureValidator != address(0), InvalidAddress());
+        require(address(def.signatureValidator) != address(0), InvalidAddress());
     }
 }

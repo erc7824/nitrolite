@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {ISignatureValidator} from "./ISignatureValidator.sol";
+
 // ========= Channel Types ==========
 
 struct ChannelDefinition {
@@ -8,7 +10,7 @@ struct ChannelDefinition {
     address user;
     address node;
     uint64 nonce;
-    address signatureValidator;
+    ISignatureValidator signatureValidator;
     bytes32 metadata;
 }
 

@@ -106,13 +106,13 @@ Where:
 ### Error Response Example
 
 ```json
-[4, 12345, "error", {"error": "Invalid session key"}, 1741344819500]
+[4, 12345, "node.v1.get_config", {"error": "Server error"}, 1741344819500]
 ```
 
 - Type: `4` (ErrorResponse)
 - Request ID: `12345`
-- Method: `"error"`
-- Params: `{"error": "Invalid session key"}`
+- Method: `"node.v1.get_config"`
+- Params: `{"error": "Server error"}`
 - Timestamp: `1741344819500`
 
 ## Architecture
@@ -312,8 +312,8 @@ The following methods are no longer supported:
 - `get_ledger_balances` → Use `get_balances`
 - `get_ledger_transactions` → Use `get_transactions`
 - `get_ledger_entries` → Removed
-- `resize_channel`, `close_channel` → Use state operations
-- `close_app_session` → Use state operations
+- `resize_channel`, `close_channel` → Use channel state operations
+- `close_app_session` → Use channel state operations
 - `transfer` → Use state transitions
 - `get_user_tag`, `get_rpc_history` → Removed
 - `cleanup_session_key_cache`, `pong` → Removed
@@ -418,7 +418,7 @@ createRebalanceAppSessionsMessage()
 
 3. **Request ID Matching**: Always verify response request IDs match the original request.
 
-4. **Session Key Management**: Session keys should have appropriate allowances and expiration times. Revoke keys when no longer needed.
+4. **Session Key Management**: Session keys should have expiration times. Revoke keys when no longer needed.
 
 5. **State Validation**: When receiving states, verify signatures before using the data.
 
@@ -427,7 +427,7 @@ createRebalanceAppSessionsMessage()
 Errors are returned as ErrorResponse messages (type 4):
 
 ```typescript
-[4, requestId, "error", {"error": "Error description"}, timestamp]
+[4, requestId, method, {"error": "Error description"}, timestamp]
 ```
 
 Parse errors using `parseErrorResponse()`:

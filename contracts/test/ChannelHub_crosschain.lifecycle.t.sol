@@ -16,7 +16,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         super.setUp();
 
         bobDef = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: bob, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION, user: bob, node: node, nonce: NONCE, signatureValidator: address(0), metadata: bytes32(0)
         });
 
         bobChannelId = Utils.getChannelId(bobDef, CHANNEL_HUB_VERSION);
@@ -24,7 +24,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
     function test_happyPath_homeChain() public {
         ChannelDefinition memory def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, signatureValidator: address(0), metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);

@@ -9,7 +9,7 @@ import {State, ChannelDefinition, StateIntent, Ledger, ChannelStatus} from "../s
 contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
     function test_happyPath() public {
         ChannelDefinition memory def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, signatureValidator: address(0), metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
@@ -188,7 +188,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
     function test_create_withOperateIntent() public {
         ChannelDefinition memory def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, signatureValidator: address(0), metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
@@ -248,7 +248,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
     function test_create_withDepositIntent() public {
         ChannelDefinition memory def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, signatureValidator: address(0), metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
@@ -308,7 +308,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
     function test_create_withWithdrawIntent() public {
         ChannelDefinition memory def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, signatureValidator: address(0), metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);

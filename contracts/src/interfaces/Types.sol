@@ -8,10 +8,8 @@ struct ChannelDefinition {
     address user;
     address node;
     uint64 nonce;
+    address signatureValidator;
     bytes32 metadata;
-    // to be added later:
-    // address executionModule;
-    // address signatureValidator;
 }
 
 enum ChannelStatus {
@@ -41,6 +39,13 @@ enum StateIntent {
     FINALIZE_ESCROW_WITHDRAWAL,
     INITIATE_MIGRATION,
     FINALIZE_MIGRATION
+}
+
+// Signature validator type selector
+// Signature format: bytes signature = abi.encode(sigValidatorType, sigBody)
+enum SigValidatorType {
+    DEFAULT,
+    CHANNEL
 }
 
 struct State {

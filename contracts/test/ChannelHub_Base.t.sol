@@ -7,6 +7,7 @@ import {MockERC20} from "./mocks/MockERC20.sol";
 import {TestUtils} from "./TestUtils.sol";
 
 import {ChannelHub} from "../src/ChannelHub.sol";
+import {ECDSAValidator} from "../src/sigValidators/ECDSAValidator.sol";
 import {State, StateIntent, Ledger} from "../src/interfaces/Types.sol";
 
 // forge-lint: disable-next-item(unsafe-typecast)
@@ -30,7 +31,8 @@ contract ChannelHubTest_Base is Test {
 
     function setUp() public virtual {
         // Deploy contracts
-        cHub = new ChannelHub();
+        ECDSAValidator defaultValidator = new ECDSAValidator();
+        cHub = new ChannelHub(defaultValidator);
         token = new MockERC20("Test Token", "TST", 18);
 
         node = vm.addr(NODE_PK);

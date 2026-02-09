@@ -126,6 +126,20 @@ type DatabaseStore interface {
 	// RecordLedgerEntry logs a movement of funds within the internal ledger.
 	RecordLedgerEntry(userWallet, accountID, asset string, amount decimal.Decimal) error
 
+	// --- Session Key State Operations ---
+
+	// StoreSessionKeyState stores or updates a session key state.
+	StoreSessionKeyState(state app.AppSessionKeyStateV1) error
+
+	GetAppSessionKeyOwner(sessionKey, appSessionId string) (string, error)
+
+	// GetLatestSessionKeyState retrieves the latest version of a specific session key for a user.
+	// Returns nil if no state exists.
+	GetLatestSessionKeyState(wallet, sessionKey string) (*app.AppSessionKeyStateV1, error)
+
+	// GetLastKeyStates retrieves the latest session key states for a user with optional filtering.
+	GetLastKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error)
+
 	// --- Contract Event Operations ---
 
 	// StoreContractEvent stores a blockchain event to prevent duplicate processing.

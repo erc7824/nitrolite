@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/shopspring/decimal"
 
+	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -44,11 +45,16 @@ func NewHandler(
 	}
 }
 
-func (h *Handler) verifyQuorum(participantWeights map[string]uint8, requiredQuorum uint8, data []byte, signatures []string) error {
+func (h *Handler) verifyQuorum(tx Store, appSessionId string, participantWeights map[string]uint8, requiredQuorum uint8, data []byte, signatures []string) error {
 	// Verify signatures and calculate quorum
-	sigRecoverer := h.sigValidator[EcdsaSigType]
 	signedWeights := make(map[string]bool)
 	var achievedQuorum uint8
+
+	appSessionSignerValidator := app.NewAppSessionKeySigValidatorV1(
+		func(sessionKeyAddr string) (string, error) {
+			return tx.GetAppSessionKeyOwner(sessionKeyAddr, appSessionId)
+		},
+	)
 
 	for _, sigHex := range signatures {
 		sigBytes, err := hexutil.Decode(sigHex)
@@ -56,21 +62,20 @@ func (h *Handler) verifyQuorum(participantWeights map[string]uint8, requiredQuor
 			return rpc.Errorf("failed to decode signature: %v", err)
 		}
 
-		// Recover the signer address from the signature
-		signerAddress, err := sigRecoverer.Recover(data, sigBytes)
+		userWallet, err := appSessionSignerValidator.Recover(data, sigBytes)
 		if err != nil {
-			return rpc.Errorf("failed to recover signer address: %v", err)
+			return rpc.Errorf("failed to recover user wallet: %v", err)
 		}
 
 		// Check if signer is a participant
-		weight, isParticipant := participantWeights[signerAddress]
+		weight, isParticipant := participantWeights[userWallet]
 		if !isParticipant {
-			return rpc.Errorf("signature from non-participant: %s", signerAddress)
+			return rpc.Errorf("signature from non-participant: %s", userWallet)
 		}
 
 		// Add weight if not already counted
-		if !signedWeights[signerAddress] {
-			signedWeights[signerAddress] = true
+		if !signedWeights[userWallet] {
+			signedWeights[userWallet] = true
 			achievedQuorum += weight
 		}
 	}

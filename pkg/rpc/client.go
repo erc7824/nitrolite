@@ -186,31 +186,22 @@ func (c *Client) AppSessionsV1RebalanceAppSessions(ctx context.Context, req AppS
 // ============================================================================
 
 // SessionKeysV1Register initiates session key registration.
-func (c *Client) SessionKeysV1Register(ctx context.Context, req SessionKeysV1RegisterRequest) (SessionKeysV1RegisterResponse, error) {
-	var resp SessionKeysV1RegisterResponse
+func (c *Client) SessionKeysV1SubmitSessionKeyState(ctx context.Context, req AppSessionsV1SubmitSessionKeyStateRequest) (AppSessionsV1SubmitSessionKeyStateRequest, error) {
+	var resp AppSessionsV1SubmitSessionKeyStateRequest
 	if err := c.call(ctx, SessionKeysV1RegisterMethod, req, &resp); err != nil {
 		return resp, err
 	}
 	return resp, nil
 }
 
-// SessionKeysV1RevokeSessionKey revokes a session key by immediately invalidating it.
-func (c *Client) SessionKeysV1RevokeSessionKey(ctx context.Context, req SessionKeysV1RevokeSessionKeyRequest) (SessionKeysV1RevokeSessionKeyResponse, error) {
-	var resp SessionKeysV1RevokeSessionKeyResponse
-	if err := c.call(ctx, SessionKeysV1RevokeSessionKeyMethod, req, &resp); err != nil {
-		return resp, err
-	}
-	return resp, nil
-}
-
-// SessionKeysV1GetSessionKeys retrieves all active session keys for the authenticated user.
-func (c *Client) SessionKeysV1GetSessionKeys(ctx context.Context, req SessionKeysV1GetSessionKeysRequest) (SessionKeysV1GetSessionKeysResponse, error) {
-	var resp SessionKeysV1GetSessionKeysResponse
-	if err := c.call(ctx, SessionKeysV1GetSessionKeysMethod, req, &resp); err != nil {
-		return resp, err
-	}
-	return resp, nil
-}
+// // SessionKeysV1GetSessionKeys retrieves all active session keys for the authenticated user.
+// func (c *Client) SessionKeysV1GetSessionKeys(ctx context.Context, req SessionKeysV1GetSessionKeysRequest) (SessionKeysV1GetSessionKeysResponse, error) {
+// 	var resp SessionKeysV1GetSessionKeysResponse
+// 	if err := c.call(ctx, SessionKeysV1GetSessionKeysMethod, req, &resp); err != nil {
+// 		return resp, err
+// 	}
+// 	return resp, nil
+// }
 
 // ============================================================================
 // User Group - V1 API Methods

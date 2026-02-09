@@ -29,11 +29,11 @@ type Store interface {
 	StoreUserState(state core.State) error
 	EnsureNoOngoingStateTransitions(wallet, asset string) error
 
-	// TODO: add session keys support
-	// Session key operations
-	// GetActiveSessionKey(sessionKeyAddress string) (*app.SessionKeyV1, error)
-	// ValidateSessionKeyApplication(sessionKey *app.SessionKeyV1, application string) error
-	// ValidateSessionKeySpending(sessionKey *app.SessionKeyV1, asset string, amount decimal.Decimal) error
+	// Session key state operations
+	StoreSessionKeyState(state app.AppSessionKeyStateV1) error
+	GetLatestSessionKeyState(wallet, sessionKey string) (*app.AppSessionKeyStateV1, error)
+	GetLastKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error)
+	GetAppSessionKeyOwner(sessionKey, appSessionId string) (string, error)
 }
 
 // StoreTxHandler is a function that executes Store operations within a transaction.

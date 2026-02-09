@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -233,6 +234,52 @@ func mapPaginationMetadataV1(meta core.PaginationMetadata) rpc.PaginationMetadat
 		PerPage:    meta.PerPage,
 		TotalCount: meta.TotalCount,
 		PageCount:  meta.PageCount,
+	}
+}
+
+// unmapSessionKeyStateV1 converts an RPC AppSessionKeyStateV1 to a core app.AppSessionKeyStateV1.
+func unmapSessionKeyStateV1(state *rpc.AppSessionKeyStateV1) (app.AppSessionKeyStateV1, error) {
+	version, err := strconv.ParseUint(state.Version, 10, 64)
+	if err != nil {
+		return app.AppSessionKeyStateV1{}, fmt.Errorf("invalid version: %w", err)
+	}
+
+	expiresAtUnix, err := strconv.ParseInt(state.ExpiresAt, 10, 64)
+	if err != nil {
+		return app.AppSessionKeyStateV1{}, fmt.Errorf("invalid expires_at: %w", err)
+	}
+
+	applicationIDs := state.ApplicationIDs
+	if applicationIDs == nil {
+		applicationIDs = []string{}
+	}
+
+	appSessionIDs := state.AppSessionIDs
+	if appSessionIDs == nil {
+		appSessionIDs = []string{}
+	}
+
+	return app.AppSessionKeyStateV1{
+		UserAddress:    strings.ToLower(state.UserAddress),
+		SessionKey:     strings.ToLower(state.SessionKey),
+		Version:        version,
+		ApplicationIDs: applicationIDs,
+		AppSessionIDs:  appSessionIDs,
+		ExpiresAt:      time.Unix(expiresAtUnix, 0),
+		UserSig:        state.UserSig,
+	}, nil
+}
+
+// mapSessionKeyStateV1 converts a core app.AppSessionKeyStateV1 to an RPC AppSessionKeyStateV1.
+func mapSessionKeyStateV1(state *app.AppSessionKeyStateV1) rpc.AppSessionKeyStateV1 {
+	return rpc.AppSessionKeyStateV1{
+		UserAddress:    state.UserAddress,
+		SessionKey:     state.SessionKey,
+		Version:        strconv.FormatUint(state.Version, 10),
+		ApplicationIDs: state.ApplicationIDs,
+		AppSessionIDs:  state.AppSessionIDs,
+		ExpiresAt:      strconv.FormatInt(state.ExpiresAt.Unix(), 10),
+		UserSig:        state.UserSig,
 	}
 }
 

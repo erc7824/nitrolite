@@ -1,7 +1,6 @@
 package app_session_v1
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -81,11 +80,6 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		return
 	}
 
-	if err := h.verifyQuorum(participantWeights, appDef.Quorum, packedRequest, reqPayload.QuorumSigs); err != nil {
-		c.Fail(err, "failed to verify quorum")
-		return
-	}
-
 	// Generate app session ID (deterministic)
 	appSessionID, err := app.GenerateAppSessionIDV1(appDef)
 	if err != nil {
@@ -93,22 +87,26 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		return
 	}
 
-	// Create app session with 0 allocations
-	appSession := app.AppSessionV1{
-		SessionID:    appSessionID,
-		Application:  appDef.Application,
-		Participants: appDef.Participants,
-		Quorum:       appDef.Quorum,
-		Nonce:        appDef.Nonce,
-		Status:       app.AppSessionStatusOpen,
-		Version:      1,
-		SessionData:  reqPayload.SessionData,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
-	}
+	err = h.useStoreInTx(func(tx Store) error {
+		if err := h.verifyQuorum(tx, appSessionID, participantWeights, appDef.Quorum, packedRequest, reqPayload.QuorumSigs); err != nil {
+			return err
+		}
 
-	err = h.useStoreInTx(func(store Store) error {
-		if err := store.CreateAppSession(appSession); err != nil {
+		// Create app session with 0 allocations
+		appSession := app.AppSessionV1{
+			SessionID:    appSessionID,
+			Application:  appDef.Application,
+			Participants: appDef.Participants,
+			Quorum:       appDef.Quorum,
+			Nonce:        appDef.Nonce,
+			Status:       app.AppSessionStatusOpen,
+			Version:      1,
+			SessionData:  reqPayload.SessionData,
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+		}
+
+		if err := tx.CreateAppSession(appSession); err != nil {
 			return rpc.Errorf("failed to create app session: %v", err)
 		}
 
@@ -123,7 +121,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 
 	resp := rpc.AppSessionsV1CreateAppSessionResponse{
 		AppSessionID: appSessionID,
-		Version:      fmt.Sprintf("%d", appSession.Version),
+		Version:      "1",
 		Status:       app.AppSessionStatusOpen.String(),
 	}
 

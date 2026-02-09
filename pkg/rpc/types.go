@@ -178,36 +178,23 @@ type AppSessionInfoV1 struct {
 	Allocations []AppAllocationV1 `json:"allocations"`
 }
 
-// ============================================================================
-// Session Key Types
-// ============================================================================
-
-// AssetAllowanceV1 represents an asset allowance with usage tracking.
-type AssetAllowanceV1 struct {
-	// Asset is the symbol of the asset
-	Asset string `json:"asset"`
-	// Allowance is the maximum amount the session key can spend
-	Allowance string `json:"allowance"`
-	// Used is the amount already spent by this session key
-	Used string `json:"used"`
-}
-
-// SessionKeyV1 represents a session key with spending allowances.
-type SessionKeyV1 struct {
-	// ID is the unique identifier for the session key record
-	ID uint `json:"id"`
-	// SessionKey is the address of the session key
+// AppSessionKeyStateV1 represents the state of a session key.
+type AppSessionKeyStateV1 struct {
+	// ID Hash(user_address + session_key + version)
+	// UserAddress is the user wallet address
+	UserAddress string `json:"user_address"`
+	// SessionKey is the session key address for delegation
 	SessionKey string `json:"session_key"`
-	// Application is the name of the application authorized for this session key
-	Application string `json:"application"`
-	// Allowances contains asset allowances with usage tracking
-	Allowances []AssetAllowanceV1 `json:"allowances"`
-	// Scope is the permission scope for this session key
-	Scope *string `json:"scope,omitempty"`
-	// ExpiresAt is when the session key expires (ISO 8601 format)
+	// Version is the version of the session key format
+	Version string `json:"version"`
+	// ApplicationID is the application IDs associated with this session key
+	ApplicationIDs []string `json:"application_id"`
+	// AppSessionID is the application session IDs associated with this session key
+	AppSessionIDs []string `json:"app_session_id"`
+	// ExpiresAt is Unix timestamp in seconds indicating when the session key expires
 	ExpiresAt string `json:"expires_at"`
-	// CreatedAt is when the session key was created (ISO 8601 format)
-	CreatedAt string `json:"created_at"`
+	// UserSig is the user's signature over the session key metadata to authorize the registration/update of the session key
+	UserSig string `json:"user_sig"`
 }
 
 // ============================================================================

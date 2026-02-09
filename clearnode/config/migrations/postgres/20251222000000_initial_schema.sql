@@ -157,6 +157,43 @@ CREATE TABLE blockchain_actions (
 CREATE INDEX idx_blockchain_actions_pending ON blockchain_actions(status, created_at) WHERE status = 0;
 CREATE INDEX idx_blockchain_actions_state_id ON blockchain_actions(state_id);
 
+-- Session key states: Stores session key delegation metadata signed by the user
+-- ID is Hash(user_address + session_key + version)
+CREATE TABLE session_key_states_v1 (
+    id CHAR(66) PRIMARY KEY,
+    user_address CHAR(42) NOT NULL,
+    session_key CHAR(42) NOT NULL,
+    version NUMERIC(20,0) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    user_sig TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_address, session_key, version)
+);
+
+CREATE INDEX idx_session_key_states_v1_user ON session_key_states_v1(user_address);
+CREATE INDEX idx_session_key_states_v1_expires ON session_key_states_v1(expires_at);
+
+-- Session key application IDs: Links session keys to application IDs
+CREATE TABLE session_key_applications_v1 (
+    session_key_state_id CHAR(66) NOT NULL,
+    application_id VARCHAR(66) NOT NULL,
+    PRIMARY KEY (session_key_state_id, application_id),
+    FOREIGN KEY (session_key_state_id) REFERENCES session_key_states_v1(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_session_key_applications_v1_app_id ON session_key_applications_v1(application_id);
+
+-- Session key app session IDs: Links session keys to app session IDs
+CREATE TABLE session_key_app_sessions_v1 (
+    session_key_state_id CHAR(66) NOT NULL,
+    app_session_id CHAR(66) NOT NULL,
+    PRIMARY KEY (session_key_state_id, app_session_id),
+    FOREIGN KEY (session_key_state_id) REFERENCES session_key_states_v1(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_session_key_app_sessions_v1_session_id ON session_key_app_sessions_v1(app_session_id);
+
 -- Session keys table (LEGACY): Session keys with spending caps
 CREATE TABLE session_keys (
     id SERIAL PRIMARY KEY,
@@ -174,6 +211,13 @@ CREATE INDEX idx_session_keys_wallet_address ON session_keys(wallet_address);
 CREATE UNIQUE INDEX idx_session_keys_unique_wallet_app ON session_keys(wallet_address, application);
 
 -- +goose Down
+DROP INDEX IF EXISTS idx_session_key_app_sessions_v1_session_id;
+DROP TABLE IF EXISTS session_key_app_sessions_v1;
+DROP INDEX IF EXISTS idx_session_key_applications_v1_app_id;
+DROP TABLE IF EXISTS session_key_applications_v1;
+DROP INDEX IF EXISTS idx_session_key_states_v1_expires;
+DROP INDEX IF EXISTS idx_session_key_states_v1_user;
+DROP TABLE IF EXISTS session_key_states_v1;
 DROP INDEX IF EXISTS idx_session_keys_unique_wallet_app;
 DROP INDEX IF EXISTS idx_session_keys_wallet_address;
 DROP TABLE IF EXISTS session_keys;

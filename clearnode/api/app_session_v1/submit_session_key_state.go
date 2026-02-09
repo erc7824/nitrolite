@@ -1,0 +1,130 @@
+package app_session_v1
+
+import (
+	"strings"
+	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
+	"github.com/erc7824/nitrolite/pkg/app"
+	"github.com/erc7824/nitrolite/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/rpc"
+)
+
+// SubmitSessionKeyState processes session key state submissions for registration and updates.
+func (h *Handler) SubmitSessionKeyState(c *rpc.Context) {
+	ctx := c.Context
+	logger := log.FromContext(ctx)
+
+	var reqPayload rpc.AppSessionsV1SubmitSessionKeyStateRequest
+	if err := c.Request.Payload.Translate(&reqPayload); err != nil {
+		c.Fail(err, "failed to parse parameters")
+		return
+	}
+
+	logger.Debug("processing session key state submission",
+		"userAddress", reqPayload.State.UserAddress,
+		"sessionKey", reqPayload.State.SessionKey,
+		"version", reqPayload.State.Version)
+
+	// Convert RPC type to core type
+	coreState, err := unmapSessionKeyStateV1(&reqPayload.State)
+	if err != nil {
+		c.Fail(rpc.Errorf("invalid_session_key_state: %v", err), "")
+		return
+	}
+
+	// Validate required fields
+	if !common.IsHexAddress(coreState.UserAddress) {
+		c.Fail(rpc.Errorf("invalid_session_key_state: invalid user_address"), "")
+		return
+	}
+	if !common.IsHexAddress(coreState.SessionKey) {
+		c.Fail(rpc.Errorf("invalid_session_key_state: invalid session_key"), "")
+		return
+	}
+	if coreState.Version == 0 {
+		c.Fail(rpc.Errorf("invalid_session_key_state: version must be greater than 0"), "")
+		return
+	}
+	if coreState.ExpiresAt.Before(time.Now()) {
+		c.Fail(rpc.Errorf("invalid_session_key_state: expires_at must be in the future"), "")
+		return
+	}
+	if coreState.UserSig == "" {
+		c.Fail(rpc.Errorf("invalid_session_key_state: user_sig is required"), "")
+		return
+	}
+
+	// Pack the session key state for signature verification (ABI encoding)
+	packedState, err := app.PackAppSessionKeyStateV1(coreState)
+	if err != nil {
+		c.Fail(rpc.Errorf("invalid_session_key_state: failed to pack state: %v", err), "")
+		return
+	}
+
+	// Decode the user signature
+	sigBytes, err := hexutil.Decode(coreState.UserSig)
+	if err != nil {
+		c.Fail(rpc.Errorf("invalid_session_key_state: failed to decode user_sig: %v", err), "")
+		return
+	}
+
+	// Recover signer address from signature
+	sigRecoverer := h.sigValidator[EcdsaSigType]
+	recoveredAddress, err := sigRecoverer.Recover(packedState, sigBytes)
+	if err != nil {
+		c.Fail(rpc.Errorf("invalid_session_key_state: failed to recover signer: %v", err), "")
+		return
+	}
+
+	// Verify the recovered address matches user_address
+	if !strings.EqualFold(recoveredAddress, coreState.UserAddress) {
+		c.Fail(rpc.Errorf("invalid_session_key_state: signature does not match user_address"), "")
+		return
+	}
+
+	// Validate version and store the session key state
+	err = h.useStoreInTx(func(tx Store) error {
+		// Look up the latest state for this (user_address, session_key) pair
+		existing, err := tx.GetLatestSessionKeyState(coreState.UserAddress, coreState.SessionKey)
+		if err != nil {
+			return rpc.Errorf("failed to check existing session key state: %v", err)
+		}
+
+		if existing == nil {
+			// New session key: version must be 1
+			if coreState.Version != 1 {
+				return rpc.Errorf("invalid_session_key_state: initial version must be 1, got %d", coreState.Version)
+			}
+		} else {
+			// Existing session key: version must be current + 1
+			if coreState.Version != existing.Version+1 {
+				return rpc.Errorf("invalid_session_key_state: expected version %d, got %d", existing.Version+1, coreState.Version)
+			}
+		}
+
+		return tx.StoreSessionKeyState(coreState)
+	})
+
+	if err != nil {
+		logger.Error("failed to store session key state", "error", err)
+		c.Fail(err, "failed to store session key state")
+		return
+	}
+
+	resp := rpc.AppSessionsV1SubmitSessionKeyStateResponse{}
+
+	payload, err := rpc.NewPayload(resp)
+	if err != nil {
+		c.Fail(err, "failed to create response")
+		return
+	}
+
+	c.Succeed(c.Request.Method, payload)
+	logger.Info("successfully stored session key state",
+		"userAddress", coreState.UserAddress,
+		"sessionKey", coreState.SessionKey,
+		"version", coreState.Version)
+}

@@ -67,11 +67,6 @@ func (m *MockStore) RecordLedgerEntry(userWallet, accountID, asset string, amoun
 	return args.Error(0)
 }
 
-func (m *MockStore) GetAccountBalance(accountID, asset string) (decimal.Decimal, error) {
-	args := m.Called(accountID, asset)
-	return args.Get(0).(decimal.Decimal), args.Error(1)
-}
-
 func (m *MockStore) RecordTransaction(tx core.Transaction) error {
 	args := m.Called(tx)
 	return args.Error(0)
@@ -101,9 +96,30 @@ func (m *MockStore) EnsureNoOngoingStateTransitions(wallet, asset string) error 
 	return args.Error(0)
 }
 
-func (m *MockStore) EnsureWalletHasAllAllocationsEmpty(wallet string) error {
-	args := m.Called(wallet)
+func (m *MockStore) StoreSessionKeyState(state app.AppSessionKeyStateV1) error {
+	args := m.Called(state)
 	return args.Error(0)
+}
+
+func (m *MockStore) GetLatestSessionKeyState(wallet, sessionKey string) (*app.AppSessionKeyStateV1, error) {
+	args := m.Called(wallet, sessionKey)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*app.AppSessionKeyStateV1), args.Error(1)
+}
+
+func (m *MockStore) GetLastKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error) {
+	args := m.Called(wallet, sessionKey)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]app.AppSessionKeyStateV1), args.Error(1)
+}
+
+func (m *MockStore) GetAppSessionKeyOwner(sessionKey, appSessionId string) (string, error) {
+	args := m.Called(sessionKey, appSessionId)
+	return args.String(0), args.Error(1)
 }
 
 // MockSigValidator is a mock implementation of the SigValidator interface

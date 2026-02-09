@@ -24,7 +24,9 @@ const (
 	AppSessionsV1GetAppDefinitionMethod     Method = "app_sessions.v1.get_app_definition"
 	AppSessionsV1GetAppSessionsMethod       Method = "app_sessions.v1.get_app_sessions"
 	AppSessionsV1CreateAppSessionMethod     Method = "app_sessions.v1.create_app_session"
-	AppSessionsV1CloseAppSessionMethod      Method = "app_sessions.v1.close_app_session"
+	AppSessionsV1CloseAppSessionMethod          Method = "app_sessions.v1.close_app_session"
+	AppSessionsV1SubmitSessionKeyStateMethod    Method = "app_sessions.v1.submit_session_key_state"
+	AppSessionsV1GetLastKeyStatesMethod         Method = "app_sessions.v1.get_last_key_states"
 
 	// Session Keys Group - V1 Methods
 	SessionKeysV1Group                  Group  = "session_keys.v1"

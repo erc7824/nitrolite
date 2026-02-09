@@ -22,7 +22,7 @@ types:
           description: Challenge period for the channel in seconds
         - name: challenge_expires_at
           type: string
-          description: Challenge expiration timestamp (ISO 8601 format)
+          description: Challenge expiration timestamp (in unix seconds)
           optional: true
         - name: nonce
           type: string
@@ -217,47 +217,6 @@ types:
             type: string
           description: The signature quorum for the application session
 
-  - session_key:
-      description: Represents a session key with spending allowances
-      fields:
-        - name: id
-          type: integer
-          description: Unique identifier for the session key record
-        - name: session_key
-          type: string
-          description: The address of the session key
-        - name: application
-          type: string
-          description: Name of the application authorized for this session key
-        - name: allowances
-          type: array
-          items:
-            type: asset_allowance
-          description: Asset allowances with usage tracking
-        - name: scope
-          type: string
-          description: Permission scope for this session key
-          optional: true
-        - name: expires_at
-          type: string
-          description: When this session key expires (ISO 8601 format)
-        - name: created_at
-          type: string
-          description: When the session key was created (ISO 8601 format)
-
-  - asset_allowance:
-      description: Asset allowance with usage tracking
-      fields:
-        - name: asset
-          type: string
-          description: Symbol of the asset
-        - name: allowance
-          type: string
-          description: Maximum amount the session key can spend
-        - name: used
-          type: string
-          description: Amount already spent by this session key
-
   - token:
       description: Information about a supported token
       fields:
@@ -288,7 +247,7 @@ types:
           description: Asset symbol
         - name: decimals
           type: integer
-          description: Number of decimal places
+          description: Number of decimal places for the asset
         - name: suggested_blockchain_id
           type: string
           description: Suggested blockchain network ID for this asset
@@ -402,6 +361,35 @@ types:
           items:
             type: app_allocation
           description: List of allocations in the app state
+
+  - app_session_key_state:
+      description: Represents the state of a session key
+      fields:
+        - name: user_address
+          type: string
+          description: User wallet address
+        - name: session_key
+          type: string
+          description: Session key address for delegation
+        - name: version
+          type: string
+          description: Version of the session key format
+        - name: application_id
+          type: array
+          items:
+            type: string
+          description: Application IDs associated with this session key
+        - name: app_session_id
+          type: array
+          items:
+            type: string
+          description: Application session IDs associated with this session key
+        - name: expires_at
+          type: string
+          description: Unix timestamp in seconds indicating when the session key expires
+        - name: user_sig
+          type: string
+          description: User's signature over the session key metadata to authorize the registration/update of the session key
 
   - pagination_params:
       description: Pagination request parameters
@@ -748,70 +736,41 @@ api:
                   description: The application definition is invalid
                 - message: insufficient_balance
                   description: Participant has insufficient balance for allocations
-
-    - name: session_keys (DRAFT)
-      description: Operations related to session key management
-      versions:
-        - version: v1
-          methods:
-            - name: register
+            - name: submit_session_key_state
+              description: Submit the session key state for registration and updates
               request:
-                - field_name: address
-                  type: string
-                  description: User wallet address
-                - field_name: session_key
-                  type: string
-                  description: Session key address for delegation
-                  optional: true
-                - field_name: application
-                  type: string
-                  description: Application name for analytics
-                  optional: true
-                - field_name: allowances
-                  type: array
-                  items:
-                    type: asset_allowance
-                  description: Asset allowances for the session
-                  optional: true
-                - field_name: scope
-                  type: string
-                  description: Permission scope
-                  optional: true
-                - field_name: expires_at
-                  type: integer
-                  description: Session expiration timestamp
-                  optional: true
+                - field_name: state
+                  type: app_session_key_state
+                  description: Session key metadata and delegation information
               response: []
               errors:
-                - message: invalid_address
-                  description: The wallet address is invalid
-                - message: unsupported_token
-                  description: One or more assets in allowances are not supported
-            - name: revoke_session_key
-              description: Revoke a session key by immediately invalidating it
-              request:
-                - field_name: session_key
-                  type: string
-                  description: The address of the session key to revoke
-              response:
-                - field_name: session_key
-                  type: string
-                  description: The address of the revoked session key
-              errors:
-                - message: session_key_not_found
-                  description: The session key does not exist or is already expired
-            - name: get_session_keys
-              description: Retrieve all active session keys for the authenticated user
+                - message: invalid_session_key_state
+                  description: The session key state is invalid
+            - name: get_last_key_states
+              description: Retrieve the latest session key states for a user with optional filtering by session key
               request:
                 - field_name: wallet
                   type: string
                   description: User's wallet address
+                - field_name: session_key
+                  type: string
+                  description: Optionally filter by session key
+                  optional: true
               response:
-                - field_name: session_keys
+                - field_name: states
                   type: array
                   items:
-                    type: session_key
-                  description: List of active session keys
+                    type: app_session_key_state
+                  description: List of active session key states for the user
+              errors:
+                - message: account_not_found
+                  description: The specified account was not found
+
+    - name: session_keys
+      description: Operations related to session key management
+      versions:
+        - version: v1
+          methods:
 
     - name: user
       description: Operations related to user account

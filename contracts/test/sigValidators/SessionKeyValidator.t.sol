@@ -40,12 +40,11 @@ contract SessionKeyValidatorTest_Base is Test {
         sessionKey2 = vm.addr(SESSION_KEY2_PK);
     }
 
-    function createSkAuth(
-        address sessionKey,
-        bytes32 metadataHash,
-        uint256 authorizerPk,
-        bool useEip191
-    ) internal pure returns (SessionKeyAuthorization memory) {
+    function createSkAuth(address sessionKey, bytes32 metadataHash, uint256 authorizerPk, bool useEip191)
+        internal
+        pure
+        returns (SessionKeyAuthorization memory)
+    {
         bytes memory authMessage = abi.encode(sessionKey, metadataHash);
         bytes memory authSignature;
 
@@ -55,19 +54,15 @@ contract SessionKeyValidatorTest_Base is Test {
             authSignature = TestUtils.signRaw(vm, authorizerPk, authMessage);
         }
 
-        return SessionKeyAuthorization({
-            sessionKey: sessionKey,
-            metadataHash: metadataHash,
-            authSignature: authSignature
-        });
+        return
+            SessionKeyAuthorization({sessionKey: sessionKey, metadataHash: metadataHash, authSignature: authSignature});
     }
 
-    function signStateWithSk(
-        bytes32 channelId,
-        bytes memory signingData,
-        uint256 skPk,
-        bool useEip191
-    ) internal pure returns (bytes memory) {
+    function signStateWithSk(bytes32 channelId, bytes memory signingData, uint256 skPk, bool useEip191)
+        internal
+        pure
+        returns (bytes memory)
+    {
         bytes memory stateMessage = Utils.pack(channelId, signingData);
 
         if (useEip191) {
@@ -77,12 +72,11 @@ contract SessionKeyValidatorTest_Base is Test {
         }
     }
 
-    function signChallengeWithSk(
-        bytes32 channelId,
-        bytes memory signingData,
-        uint256 skPk,
-        bool useEip191
-    ) internal pure returns (bytes memory) {
+    function signChallengeWithSk(bytes32 channelId, bytes memory signingData, uint256 skPk, bool useEip191)
+        internal
+        pure
+        returns (bytes memory)
+    {
         bytes memory challengeMessage = abi.encodePacked(Utils.pack(channelId, signingData), "challenge");
 
         if (useEip191) {

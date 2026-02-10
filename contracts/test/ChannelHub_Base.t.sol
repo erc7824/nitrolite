@@ -180,11 +180,12 @@ contract ChannelHubTest_Base is Test {
         return state;
     }
 
-    function mutualSignStateUserWithSkValidator(State memory state, bytes32 channelId, uint256 userPk, SessionKeyAuthorization memory skAuth)
-        internal
-        pure
-        returns (State memory)
-    {
+    function mutualSignStateUserWithSkValidator(
+        State memory state,
+        bytes32 channelId,
+        uint256 userPk,
+        SessionKeyAuthorization memory skAuth
+    ) internal pure returns (State memory) {
         state.userSig = TestUtils.signStateEip191WithSkValidator(vm, channelId, state, userPk, skAuth);
         state.nodeSig = TestUtils.signStateEip191WithEcdsaValidator(vm, channelId, state, NODE_PK);
         return state;

@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ISignatureValidator, ValidationResult, VALIDATION_SUCCESS, VALIDATION_FAILURE} from "../interfaces/ISignatureValidator.sol";
+import {
+    ISignatureValidator,
+    ValidationResult,
+    VALIDATION_SUCCESS,
+    VALIDATION_FAILURE
+} from "../interfaces/ISignatureValidator.sol";
 import {BaseValidator} from "./BaseValidator.sol";
 import {Utils} from "../Utils.sol";
 
@@ -15,7 +20,6 @@ import {Utils} from "../Utils.sol";
  * The validator prepends channelId to the signingData to construct the full message.
  */
 contract ECDSAValidator is BaseValidator, ISignatureValidator {
-
     /**
      * @notice Validates a single participant's signature
      * @dev Constructs the full message by prepending channelId to signingData, then tries EIP-191 recovery first, then raw ECDSA if that fails
@@ -32,7 +36,7 @@ contract ECDSAValidator is BaseValidator, ISignatureValidator {
         address participant
     ) external pure returns (ValidationResult) {
         bytes memory message = Utils.pack(channelId, signingData);
-        if(validateEcdsaSigner(message, signature, participant)) {
+        if (validateEcdsaSigner(message, signature, participant)) {
             return VALIDATION_SUCCESS;
         } else {
             return VALIDATION_FAILURE;

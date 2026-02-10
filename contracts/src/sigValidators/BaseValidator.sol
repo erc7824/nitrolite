@@ -22,11 +22,11 @@ abstract contract BaseValidator {
      * @param expectedSigner The address that should have signed the message
      * @return result VALIDATION_SUCCESS if signature is from expectedSigner, VALIDATION_FAILURE otherwise
      */
-    function validateEcdsaSigner(
-        bytes memory message,
-        bytes memory signature,
-        address expectedSigner
-    ) internal pure returns (bool) {
+    function validateEcdsaSigner(bytes memory message, bytes memory signature, address expectedSigner)
+        internal
+        pure
+        returns (bool)
+    {
         bytes32 eip191Digest = message.toEthSignedMessageHash();
         address recovered = eip191Digest.recover(signature);
 
@@ -54,12 +54,11 @@ abstract contract BaseValidator {
      * @param addr2 Second possible signer address
      * @return result VALIDATION_SUCCESS if signature is from addr1 or addr2, VALIDATION_FAILURE otherwise
      */
-    function validateEcdsaSignerIsEither(
-        bytes memory message,
-        bytes memory signature,
-        address addr1,
-        address addr2
-    ) internal pure returns (bool) {
+    function validateEcdsaSignerIsEither(bytes memory message, bytes memory signature, address addr1, address addr2)
+        internal
+        pure
+        returns (bool)
+    {
         bytes32 eip191Digest = message.toEthSignedMessageHash();
         address recovered = eip191Digest.recover(signature);
 

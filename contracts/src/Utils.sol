@@ -18,7 +18,10 @@ library Utils {
         assembly ("memory-safe") {
             // Store the version in the first byte (most significant byte) of the channelId
             // Clear the first byte of baseId, then set it to version
-            channelId := or(and(baseId, 0x00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff), shl(248, version))
+            channelId := or(
+                and(baseId, 0x00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                shl(248, version)
+            )
         }
     }
 
@@ -30,17 +33,11 @@ library Utils {
     // ========== Cross-Chain State ==========
 
     function pack(State memory ccs, bytes32 channelId) internal pure returns (bytes memory) {
-        return abi.encode(
-            channelId,
-            toSigningData(ccs)
-        );
+        return abi.encode(channelId, toSigningData(ccs));
     }
 
     function pack(bytes32 channelId, bytes memory signingData) internal pure returns (bytes memory) {
-        return abi.encode(
-            channelId,
-            signingData
-        );
+        return abi.encode(channelId, signingData);
     }
 
     function toSigningData(State memory ccs) internal pure returns (bytes memory) {

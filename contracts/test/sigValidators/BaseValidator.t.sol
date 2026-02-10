@@ -2,7 +2,6 @@
 pragma solidity 0.8.30;
 
 import {Test} from "lib/forge-std/src/Test.sol";
-import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import {TestUtils} from "../TestUtils.sol";
 
@@ -12,11 +11,11 @@ import {BaseValidator} from "../../src/sigValidators/BaseValidator.sol";
  * @notice Test harness that exposes internal BaseValidator functions for testing
  */
 contract TestBaseValidator is BaseValidator {
-    function exposed_validateEcdsaSigner(
-        bytes memory message,
-        bytes memory signature,
-        address expectedSigner
-    ) external pure returns (bool) {
+    function exposed_validateEcdsaSigner(bytes memory message, bytes memory signature, address expectedSigner)
+        external
+        pure
+        returns (bool)
+    {
         return validateEcdsaSigner(message, signature, expectedSigner);
     }
 

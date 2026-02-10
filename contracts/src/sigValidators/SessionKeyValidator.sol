@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ISignatureValidator, ValidationResult, VALIDATION_SUCCESS, VALIDATION_FAILURE} from "../interfaces/ISignatureValidator.sol";
+import {
+    ISignatureValidator,
+    ValidationResult,
+    VALIDATION_SUCCESS,
+    VALIDATION_FAILURE
+} from "../interfaces/ISignatureValidator.sol";
 import {BaseValidator} from "./BaseValidator.sol";
 import {Utils} from "../Utils.sol";
 
@@ -40,7 +45,6 @@ struct SessionKeyAuthorization {
  * - Participants are responsible for session key management
  */
 contract SessionKeyValidator is BaseValidator, ISignatureValidator {
-
     /**
      * @notice Validates a signature using a delegated session key
      * @dev Validates:

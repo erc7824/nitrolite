@@ -30,24 +30,26 @@ library TestUtils {
         return abi.encodePacked(uint8(SigValidatorType.DEFAULT), signature);
     }
 
-    function signStateEip191WithSkValidator(Vm vm, bytes32 channelId, State memory state, uint256 skPk, SessionKeyAuthorization memory skAuth)
-        internal
-        pure
-        returns (bytes memory)
-    {
+    function signStateEip191WithSkValidator(
+        Vm vm,
+        bytes32 channelId,
+        State memory state,
+        uint256 skPk,
+        SessionKeyAuthorization memory skAuth
+    ) internal pure returns (bytes memory) {
         bytes memory packedState = Utils.pack(state, channelId);
         bytes memory skSig = TestUtils.signEip191(vm, skPk, packedState);
         bytes memory skModuleSig = abi.encode(skAuth, skSig);
         return abi.encodePacked(uint8(SigValidatorType.CHANNEL), skModuleSig);
     }
 
-    function buildAndSignSkAuth(Vm vm, address sessionKey, bytes32 metadataHash, uint256 authorizerPk) internal pure returns (SessionKeyAuthorization memory) {
+    function buildAndSignSkAuth(Vm vm, address sessionKey, bytes32 metadataHash, uint256 authorizerPk)
+        internal
+        pure
+        returns (SessionKeyAuthorization memory)
+    {
         bytes memory authMessage = abi.encode(sessionKey, metadataHash);
         bytes memory signature = TestUtils.signEip191(vm, authorizerPk, authMessage);
-        return SessionKeyAuthorization({
-            sessionKey: sessionKey,
-            metadataHash: metadataHash,
-            authSignature: signature
-        });
+        return SessionKeyAuthorization({sessionKey: sessionKey, metadataHash: metadataHash, authSignature: signature});
     }
 }

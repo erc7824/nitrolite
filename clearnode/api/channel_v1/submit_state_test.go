@@ -22,7 +22,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -38,16 +38,15 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 			return nil
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
-	// Test data
-	senderWallet := "0x1234567890123456789012345678901234567890"
+	// Test data - derive senderWallet from a user signer key
+	userSigner := NewMockSigner()
+	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	senderWallet := userSigner.PublicKey().Address().String()
 	receiverWallet := "0x0987654321098765432109876543210987654321"
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -82,13 +81,12 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	transferSendTransition, err := incomingSenderState.ApplyTransferSendTransition(receiverWallet, transferAmount)
 	require.NoError(t, err)
 
-	// Sign the incoming sender state with user's signature
-	userKey, _ := crypto.GenerateKey()
+	// Sign the incoming sender state with user's wallet signer (adds 0x01 prefix)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Once()
 	packedSenderState, _ := core.PackState(*incomingSenderState, mockAssetStore)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedSenderState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingSenderState.UserSig = &userSigHex
+	userSig, _ := userWalletSigner.Sign(packedSenderState)
+	userSigStr := userSig.String()
+	incomingSenderState.UserSig = &userSigStr
 
 	// Create receiver's current state
 	currentReceiverState := core.State{
@@ -186,7 +184,6 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 
 	// Verify all mock expectations
 	mockTxStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitState_EscrowLock_Success(t *testing.T) {
@@ -196,7 +193,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -212,16 +209,15 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 			return nil
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
-	// Test data
-	userWallet := "0x1234567890123456789012345678901234567890"
+	// Test data - derive userWallet from a user signer key
+	userSigner := NewMockSigner()
+	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
 	lockAmount := decimal.NewFromInt(100)
@@ -258,15 +254,14 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	require.NoError(t, err)
 	escrowChannelID := *incomingState.EscrowChannelID
 
-	// Sign the incoming state with user's signature
-	userKey, _ := crypto.GenerateKey()
+	// Sign the incoming state with user's wallet signer (adds 0x01 prefix)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xEscrowToken").Return(uint8(6), nil).Maybe()
 	packedState, _ := core.PackState(*incomingState, mockAssetStore)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingState.UserSig = &userSigHex
+	userSig, _ := userWalletSigner.Sign(packedState)
+	userSigStr := userSig.String()
+	incomingState.UserSig = &userSigStr
 
 	// Create home channel for mocking
 	homeChannel := core.Channel{
@@ -287,7 +282,6 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xTokenAddress").Return(uint8(6), nil)
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
-	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("GetChannelByID", homeChannelID).Return(&homeChannel, nil)
 	mockMemoryStore.On("IsAssetSupported", asset, "0xTokenAddress", uint64(2)).Return(true, nil)
@@ -342,7 +336,6 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 
 	// Verify all mock expectations
 	mockTxStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
@@ -352,7 +345,7 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -368,16 +361,15 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 			return nil
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
-	// Test data
-	userWallet := "0x1234567890123456789012345678901234567890"
+	// Test data - derive userWallet from a user signer key
+	userSigner := NewMockSigner()
+	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
 	escrowChannelID := "0xEscrowChannel456"
@@ -426,15 +418,14 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	_, err := incomingState.ApplyEscrowWithdrawTransition(withdrawAmount)
 	require.NoError(t, err)
 
-	// Sign the incoming state with user's signature
-	userKey, _ := crypto.GenerateKey()
+	// Sign the incoming state with user's wallet signer (adds 0x01 prefix)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xEscrowToken").Return(uint8(6), nil).Maybe()
 	packedState, _ := core.PackState(*incomingState, mockAssetStore)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingState.UserSig = &userSigHex
+	userSig, _ := userWalletSigner.Sign(packedState)
+	userSigStr := userSig.String()
+	incomingState.UserSig = &userSigStr
 
 	// Create a copy for the unsigned state mock
 	currentUnsignedState := currentSignedState
@@ -497,7 +488,6 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 
 	// Verify all mock expectations
 	mockTxStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitState_HomeDeposit_Success(t *testing.T) {
@@ -506,7 +496,7 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -522,16 +512,15 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 			return nil
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
-	// Test data
-	userWallet := "0x1234567890123456789012345678901234567890"
+	// Test data - derive userWallet from a user signer key
+	userSigner := NewMockSigner()
+	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
 	depositAmount := decimal.NewFromInt(100)
@@ -565,15 +554,14 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 	_, err := incomingState.ApplyHomeDepositTransition(depositAmount)
 	require.NoError(t, err)
 
-	// Sign the incoming state with user's signature
-	userKey, _ := crypto.GenerateKey()
+	// Sign the incoming state with user's wallet signer (adds 0x01 prefix)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xEscrowToken").Return(uint8(6), nil).Maybe()
 	packedState, _ := core.PackState(*incomingState, mockAssetStore)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingState.UserSig = &userSigHex
+	userSig, _ := userWalletSigner.Sign(packedState)
+	userSigStr := userSig.String()
+	incomingState.UserSig = &userSigStr
 
 	// Mock expectations
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
@@ -628,7 +616,6 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 
 	// Verify all mock expectations
 	mockTxStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
@@ -637,7 +624,7 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -653,16 +640,15 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 			return nil
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
-	// Test data
-	userWallet := "0x1234567890123456789012345678901234567890"
+	// Test data - derive userWallet from a user signer key
+	userSigner := NewMockSigner()
+	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
 	withdrawalAmount := decimal.NewFromInt(100)
@@ -696,15 +682,14 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 	_, err := incomingState.ApplyHomeWithdrawalTransition(withdrawalAmount)
 	require.NoError(t, err)
 
-	// Sign the incoming state with user's signature
-	userKey, _ := crypto.GenerateKey()
+	// Sign the incoming state with user's wallet signer (adds 0x01 prefix)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xEscrowToken").Return(uint8(6), nil).Maybe()
 	packedState, _ := core.PackState(*incomingState, mockAssetStore)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingState.UserSig = &userSigHex
+	userSig, _ := userWalletSigner.Sign(packedState)
+	userSigStr := userSig.String()
+	incomingState.UserSig = &userSigStr
 
 	// Mock expectations
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
@@ -760,7 +745,6 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 
 	// Verify all mock expectations
 	mockTxStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitState_MutualLock_Success(t *testing.T) {
@@ -770,7 +754,7 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -786,16 +770,15 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 			return nil
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
-	// Test data
-	userWallet := "0x1234567890123456789012345678901234567890"
+	// Test data - derive userWallet from a user signer key
+	userSigner := NewMockSigner()
+	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
 	lockAmount := decimal.NewFromInt(100)
@@ -832,15 +815,14 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	require.NoError(t, err)
 	escrowChannelID := *incomingState.EscrowChannelID
 
-	// Sign the incoming state with user's signature
-	userKey, _ := crypto.GenerateKey()
+	// Sign the incoming state with user's wallet signer (adds 0x01 prefix)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xEscrowToken").Return(uint8(6), nil).Maybe()
 	packedState, _ := core.PackState(*incomingState, mockAssetStore)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingState.UserSig = &userSigHex
+	userSig, _ := userWalletSigner.Sign(packedState)
+	userSigStr := userSig.String()
+	incomingState.UserSig = &userSigStr
 
 	// Create home channel for mocking
 	homeChannel := core.Channel{
@@ -861,7 +843,6 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xTokenAddress").Return(uint8(6), nil)
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
-	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("GetChannelByID", homeChannelID).Return(&homeChannel, nil)
 	mockMemoryStore.On("IsAssetSupported", asset, "0xTokenAddress", uint64(2)).Return(true, nil)
@@ -916,7 +897,6 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 
 	// Verify all mock expectations
 	mockTxStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
@@ -926,7 +906,7 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -942,16 +922,15 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 			return nil
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
-	// Test data
-	userWallet := "0x1234567890123456789012345678901234567890"
+	// Test data - derive userWallet from a user signer key
+	userSigner := NewMockSigner()
+	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
 	escrowChannelID := "0xEscrowChannel456"
@@ -1001,15 +980,14 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	_, err := incomingState.ApplyEscrowDepositTransition(depositAmount)
 	require.NoError(t, err)
 
-	// Sign the incoming state with user's signature
-	userKey, _ := crypto.GenerateKey()
+	// Sign the incoming state with user's wallet signer (adds 0x01 prefix)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xEscrowToken").Return(uint8(6), nil).Maybe()
 	packedState, _ := core.PackState(*incomingState, mockAssetStore)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingState.UserSig = &userSigHex
+	userSig, _ := userWalletSigner.Sign(packedState)
+	userSigStr := userSig.String()
+	incomingState.UserSig = &userSigStr
 
 	// Create a copy for the unsigned state mock
 	currentUnsignedState := currentSignedState
@@ -1073,7 +1051,6 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 
 	// Verify all mock expectations
 	mockTxStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitState_Finalize_Success(t *testing.T) {
@@ -1082,7 +1059,7 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -1098,16 +1075,15 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 			return nil
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
-	// Test data
-	userWallet := "0x1234567890123456789012345678901234567890"
+	// Test data - derive userWallet from a user signer key
+	userSigner := NewMockSigner()
+	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
 	userBalance := decimal.NewFromInt(300)
@@ -1141,15 +1117,14 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 	finalizeTransition, err := incomingState.ApplyFinalizeTransition()
 	require.NoError(t, err)
 
-	// Sign the incoming state with user's signature
-	userKey, _ := crypto.GenerateKey()
+	// Sign the incoming state with user's wallet signer (adds 0x01 prefix)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetTokenDecimals", uint64(2), "0xEscrowToken").Return(uint8(6), nil).Maybe()
 	packedState, _ := core.PackState(*incomingState, mockAssetStore)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingState.UserSig = &userSigHex
+	userSig, _ := userWalletSigner.Sign(packedState)
+	userSigStr := userSig.String()
+	incomingState.UserSig = &userSigStr
 
 	// Mock expectations
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
@@ -1207,7 +1182,6 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 
 	// Verify all mock expectations
 	mockTxStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 
 	// Additional assertions specific to finalize transition
 	assert.True(t, incomingState.IsFinal(), "State should be marked as final")

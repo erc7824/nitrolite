@@ -21,7 +21,6 @@ type Handler struct {
 	signer        sign.Signer
 	stateAdvancer core.StateAdvancer
 	statePacker   core.StatePacker
-	sigValidator  map[SigType]SigValidator
 	nodeAddress   string // Node's wallet address
 }
 
@@ -32,7 +31,6 @@ func NewHandler(
 	signer sign.Signer,
 	stateAdvancer core.StateAdvancer,
 	statePacker core.StatePacker,
-	sigValidators map[SigType]SigValidator,
 	nodeAddress string,
 ) *Handler {
 	return &Handler{
@@ -41,7 +39,6 @@ func NewHandler(
 		signer:        signer,
 		stateAdvancer: stateAdvancer,
 		statePacker:   statePacker,
-		sigValidator:  sigValidators,
 		nodeAddress:   nodeAddress,
 	}
 }

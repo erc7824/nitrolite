@@ -50,6 +50,23 @@ type ChannelDefinitionV1 struct {
 	Challenge uint32 `json:"challenge"`
 }
 
+// ChannelSessionKeyStateV1 represents the state of a session key.
+type ChannelSessionKeyStateV1 struct {
+	// ID Hash(user_address + session_key + version)
+	// UserAddress is the user wallet address
+	UserAddress string `json:"user_address"`
+	// SessionKey is the session key address for delegation
+	SessionKey string `json:"session_key"`
+	// Version is the version of the session key format
+	Version string `json:"version"`
+	// Assets associated with this session key
+	Assets []string `json:"assets"`
+	// Expiration time as unix timestamp of this session key
+	ExpiresAt string `json:"expires_at"`
+	// UserSig is the user's signature over the session key metadata to authorize the registration/update of the session key
+	UserSig string `json:"user_sig"`
+}
+
 // ============================================================================
 // State Types
 // ============================================================================

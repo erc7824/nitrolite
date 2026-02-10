@@ -362,8 +362,32 @@ types:
             type: app_allocation
           description: List of allocations in the app state
 
+  - channel_session_key_state:
+      description: Represents the state of a channel session key
+      fields:
+        - name: user_address
+          type: string
+          description: User wallet address
+        - name: session_key
+          type: string
+          description: Session key address for delegation
+        - name: version
+          type: string
+          description: Version of the session key format
+        - name: assets
+          type: array
+          items:
+            type: string
+          description: Assets associated with this session key
+        - name: expires_at
+          type: string
+          description: Unix timestamp in seconds indicating when the session key expires
+        - name: user_sig
+          type: string
+          description: User's signature over the session key metadata to authorize the registration/update of the session key
+
   - app_session_key_state:
-      description: Represents the state of a session key
+      description: Represents the state of an app session key
       fields:
         - name: user_address
           type: string
@@ -586,6 +610,35 @@ api:
                   description: The specified channel was not found
                 - message: denied_until_checkpoint
                   description: State submissions are denied until the next checkpoint
+            - name: submit_session_key_state
+              description: Submit the session key state for registration and updates
+              request:
+                - field_name: state
+                  type: channel_session_key_state
+                  description: Session key metadata and delegation information
+              response: []
+              errors:
+                - message: invalid_session_key_state
+                  description: The session key state is invalid
+            - name: get_last_key_states
+              description: Retrieve the latest session key states for a user with optional filtering by session key
+              request:
+                - field_name: user_address
+                  type: string
+                  description: User's wallet address
+                - field_name: session_key
+                  type: string
+                  description: Optionally filter by session key
+                  optional: true
+              response:
+                - field_name: states
+                  type: array
+                  items:
+                    type: app_session_key_state
+                  description: List of active session key states for the user
+              errors:
+                - message: account_not_found
+                  description: The specified account was not found
 
           events:
             - name: home_channel_created

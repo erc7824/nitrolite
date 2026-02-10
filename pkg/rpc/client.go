@@ -123,6 +123,24 @@ func (c *Client) ChannelsV1SubmitState(ctx context.Context, req ChannelsV1Submit
 	return resp, nil
 }
 
+// ChannelsV1SubmitSessionKeyState submits a channel session key state for registration or update.
+func (c *Client) ChannelsV1SubmitSessionKeyState(ctx context.Context, req ChannelsV1SubmitSessionKeyStateRequest) (ChannelsV1SubmitSessionKeyStateResponse, error) {
+	var resp ChannelsV1SubmitSessionKeyStateResponse
+	if err := c.call(ctx, ChannelsV1SubmitSessionKeyStateMethod, req, &resp); err != nil {
+		return resp, err
+	}
+	return resp, nil
+}
+
+// ChannelsV1GetLastKeyStates retrieves the latest channel session key states for a user.
+func (c *Client) ChannelsV1GetLastKeyStates(ctx context.Context, req ChannelsV1GetLastKeyStatesRequest) (ChannelsV1GetLastKeyStatesResponse, error) {
+	var resp ChannelsV1GetLastKeyStatesResponse
+	if err := c.call(ctx, ChannelsV1GetLastKeyStatesMethod, req, &resp); err != nil {
+		return resp, err
+	}
+	return resp, nil
+}
+
 // ============================================================================
 // App Sessions Group - V1 API Methods
 // ============================================================================

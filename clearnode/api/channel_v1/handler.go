@@ -6,17 +6,15 @@ import (
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
-	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 // Handler manages channel state transitions and provides RPC endpoints for state submission.
 type Handler struct {
 	useStoreInTx  StoreTxProvider
 	memoryStore   MemoryStore
-	signer        sign.Signer
+	nodeSigner    *core.ChannelWalletSignerV1
 	stateAdvancer core.StateAdvancer
 	statePacker   core.StatePacker
-	sigValidators map[SigValidatorType]SigValidator
 	nodeAddress   string // Node's wallet address for channel ID calculation
 	minChallenge  uint32
 }
@@ -25,10 +23,9 @@ type Handler struct {
 func NewHandler(
 	useStoreInTx StoreTxProvider,
 	memoryStore MemoryStore,
-	signer sign.Signer,
+	nodeSigner *core.ChannelWalletSignerV1,
 	stateAdvancer core.StateAdvancer,
 	statePacker core.StatePacker,
-	sigValidators map[SigValidatorType]SigValidator,
 	nodeAddress string,
 	minChallenge uint32,
 ) *Handler {
@@ -37,11 +34,16 @@ func NewHandler(
 		statePacker:   statePacker,
 		useStoreInTx:  useStoreInTx,
 		memoryStore:   memoryStore,
-		signer:        signer,
-		sigValidators: sigValidators,
+		nodeSigner:    nodeSigner,
 		nodeAddress:   nodeAddress,
 		minChallenge:  minChallenge,
 	}
+}
+
+func (h *Handler) getChannelSigValidator(tx Store, asset string) *core.ChannelSigValidatorV1 {
+	return core.NewChannelSigValidatorV1(func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error) {
+		return tx.ValidateChannelSessionKeyForAsset(walletAddr, sessionKeyAddr, asset, metadataHash)
+	})
 }
 
 // issueTransferReceiverState creates and stores a new state for the receiver of a transfer.
@@ -104,7 +106,7 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 			return nil, rpc.Errorf("failed to pack receiver state: %v", err)
 		}
 
-		_nodeSig, err := h.signer.Sign(packedState)
+		_nodeSig, err := h.nodeSigner.Sign(packedState)
 		if err != nil {
 			return nil, rpc.Errorf("failed to sign receiver state")
 		}

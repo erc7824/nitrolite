@@ -55,17 +55,13 @@ func NewRPCRouter(
 	statePacker := core.NewStatePackerV1(memoryStore)
 	stateAdvancer := core.NewStateAdvancerV1(memoryStore)
 
-	validator, err := sign.NewSigValidator(sign.TypeEthereumMsg)
+	nodeChannelSigner, err := core.NewChannelWalletSignerV1(signer)
 	if err != nil {
-		panic("failed to create signature validator: " + err.Error())
+		panic("failed to create channel wallet signer: " + err.Error())
 	}
 
-	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, map[channel_v1.SigValidatorType]channel_v1.SigValidator{
-		channel_v1.EcdsaSigValidatorType: validator,
-	}, nodeAddress, minChallenge)
-	appSessionV1Handler := app_session_v1.NewHandler(useAppSessionV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, map[app_session_v1.SigType]app_session_v1.SigValidator{
-		app_session_v1.EcdsaSigType: validator,
-	}, nodeAddress)
+	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, nodeChannelSigner, stateAdvancer, statePacker, nodeAddress, minChallenge)
+	appSessionV1Handler := app_session_v1.NewHandler(useAppSessionV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, nodeAddress)
 	nodeV1Handler := node_v1.NewHandler(memoryStore, nodeAddress, nodeVersion)
 	userV1Handler := user_v1.NewHandler(useUserV1StoreInTx)
 
@@ -85,6 +81,8 @@ func NewRPCRouter(
 	channelV1Group.Handle(rpc.ChannelsV1GetLatestStateMethod.String(), channelV1Handler.GetLatestState)
 	channelV1Group.Handle(rpc.ChannelsV1RequestCreationMethod.String(), channelV1Handler.RequestCreation)
 	channelV1Group.Handle(rpc.ChannelsV1SubmitStateMethod.String(), channelV1Handler.SubmitState)
+	channelV1Group.Handle(rpc.ChannelsV1SubmitSessionKeyStateMethod.String(), channelV1Handler.SubmitSessionKeyState)
+	channelV1Group.Handle(rpc.ChannelsV1GetLastKeyStatesMethod.String(), channelV1Handler.GetLastKeyStates)
 
 	nodeV1Group := r.Node.NewGroup(rpc.NodeV1Group.String())
 	nodeV1Group.Handle(rpc.NodeV1PingMethod.String(), nodeV1Handler.Ping)

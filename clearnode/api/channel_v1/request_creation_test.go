@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -21,7 +20,7 @@ func TestRequestCreation_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600) // 1 hour
 	mockStatePacker := new(MockStatePacker)
@@ -37,16 +36,15 @@ func TestRequestCreation_Success(t *testing.T) {
 			return nil
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
-	// Test data
-	userWallet := "0x1234567890123456789012345678901234567890"
+	// Test data - derive userWallet from a user signer key
+	userSigner := NewMockSigner()
+	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	tokenAddress := "0xTokenAddress"
 	blockchainID := uint64(1)
@@ -74,11 +72,10 @@ func TestRequestCreation_Success(t *testing.T) {
 	// Set up mock for PackState (called during signing)
 	mockAssetStore.On("GetTokenDecimals", blockchainID, tokenAddress).Return(uint8(6), nil)
 
-	// Sign the initial state
+	// Sign the initial state with user's wallet signer (adds 0x01 prefix)
 	packedState, err := core.PackState(*initialState, mockAssetStore)
 	require.NoError(t, err)
-	stateHash := crypto.Keccak256Hash(packedState).Bytes()
-	userSig, err := mockSigner.Sign(stateHash)
+	userSig, err := userWalletSigner.Sign(packedState)
 	require.NoError(t, err)
 	userSigStr := userSig.String()
 	initialState.UserSig = &userSigStr
@@ -87,7 +84,6 @@ func TestRequestCreation_Success(t *testing.T) {
 	mockMemoryStore.On("IsAssetSupported", asset, tokenAddress, blockchainID).Return(true, nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil).Once()
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil).Once()
-	mockSigValidator.On("Verify", userWallet, packedState, mock.Anything).Return(nil).Once()
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("CreateChannel", mock.MatchedBy(func(channel core.Channel) bool {
 		return channel.UserWallet == userWallet &&
@@ -160,7 +156,6 @@ func TestRequestCreation_Success(t *testing.T) {
 	mockMemoryStore.AssertExpectations(t)
 	mockAssetStore.AssertExpectations(t)
 	mockTxStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestRequestCreation_Acknowledgement_Success(t *testing.T) {
@@ -313,7 +308,7 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600) // 1 hour
 	mockStatePacker := new(MockStatePacker)
@@ -325,12 +320,9 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 			return handler(mockTxStore)
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
 	// Test data

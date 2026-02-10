@@ -45,7 +45,6 @@ func TestRebalanceAppSessions_Success_TwoSessions(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		nil,
 		"0xNode",
 	)
 
@@ -208,7 +207,6 @@ func TestRebalanceAppSessions_Success_MultiAsset(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		nil,
 		"0xNode",
 	)
 
@@ -360,7 +358,6 @@ func TestRebalanceAppSessions_Error_InsufficientSessions(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		nil,
 		"0xNode",
 	)
 
@@ -412,7 +409,6 @@ func TestRebalanceAppSessions_Error_InvalidIntent(t *testing.T) {
 
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -488,7 +484,6 @@ func TestRebalanceAppSessions_Error_DuplicateSession(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		nil,
 		"0xNode",
 	)
 
@@ -558,7 +553,6 @@ func TestRebalanceAppSessions_Error_ConservationViolation(t *testing.T) {
 
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -700,7 +694,6 @@ func TestRebalanceAppSessions_Error_SessionNotFound(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		nil,
 		"0xNode",
 	)
 
@@ -775,7 +768,6 @@ func TestRebalanceAppSessions_Error_ClosedSession(t *testing.T) {
 
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -859,7 +851,6 @@ func TestRebalanceAppSessions_Error_InvalidVersion(t *testing.T) {
 
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
 		nil,
 		nil,
 		nil,

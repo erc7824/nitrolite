@@ -7,14 +7,16 @@ type Method string
 
 const (
 	// Channels Group - V1 Methods
-	ChannelV1Group                   Group  = "channels.v1"
-	ChannelsV1GetHomeChannelMethod   Method = "channels.v1.get_home_channel"
-	ChannelsV1GetEscrowChannelMethod Method = "channels.v1.get_escrow_channel"
-	ChannelsV1GetChannelsMethod      Method = "channels.v1.get_channels"
-	ChannelsV1GetLatestStateMethod   Method = "channels.v1.get_latest_state"
-	ChannelsV1GetStatesMethod        Method = "channels.v1.get_states"
-	ChannelsV1RequestCreationMethod  Method = "channels.v1.request_creation"
-	ChannelsV1SubmitStateMethod      Method = "channels.v1.submit_state"
+	ChannelV1Group                        Group  = "channels.v1"
+	ChannelsV1GetHomeChannelMethod        Method = "channels.v1.get_home_channel"
+	ChannelsV1GetEscrowChannelMethod      Method = "channels.v1.get_escrow_channel"
+	ChannelsV1GetChannelsMethod           Method = "channels.v1.get_channels"
+	ChannelsV1GetLatestStateMethod        Method = "channels.v1.get_latest_state"
+	ChannelsV1GetStatesMethod             Method = "channels.v1.get_states"
+	ChannelsV1RequestCreationMethod       Method = "channels.v1.request_creation"
+	ChannelsV1SubmitStateMethod           Method = "channels.v1.submit_state"
+	ChannelsV1SubmitSessionKeyStateMethod Method = "channels.v1.submit_session_key_state"
+	ChannelsV1GetLastKeyStatesMethod      Method = "channels.v1.get_last_key_states"
 
 	// App Sessions Group - V1 Methods
 	AppSessionsV1Group                       Group  = "app_sessions.v1"

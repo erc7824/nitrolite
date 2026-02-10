@@ -508,7 +508,63 @@ func transformSignedAppStateUpdateToRPC(signed app.SignedAppStateUpdateV1) rpc.S
 }
 
 // ============================================================================
-// Session Key State Transformations
+// Channel Session Key State Transformations
+// ============================================================================
+
+// transformChannelSessionKeyStateToRPC converts core.ChannelSessionKeyStateV1 to RPC ChannelSessionKeyStateV1.
+func transformChannelSessionKeyStateToRPC(state core.ChannelSessionKeyStateV1) rpc.ChannelSessionKeyStateV1 {
+	return rpc.ChannelSessionKeyStateV1{
+		UserAddress: state.UserAddress,
+		SessionKey:  state.SessionKey,
+		Version:     strconv.FormatUint(state.Version, 10),
+		Assets:      state.Assets,
+		ExpiresAt:   strconv.FormatInt(state.ExpiresAt.Unix(), 10),
+		UserSig:     state.UserSig,
+	}
+}
+
+// transformChannelSessionKeyState converts RPC ChannelSessionKeyStateV1 to core.ChannelSessionKeyStateV1.
+func transformChannelSessionKeyState(state rpc.ChannelSessionKeyStateV1) (core.ChannelSessionKeyStateV1, error) {
+	version, err := strconv.ParseUint(state.Version, 10, 64)
+	if err != nil {
+		return core.ChannelSessionKeyStateV1{}, fmt.Errorf("failed to parse version: %w", err)
+	}
+
+	expiresAtUnix, err := strconv.ParseInt(state.ExpiresAt, 10, 64)
+	if err != nil {
+		return core.ChannelSessionKeyStateV1{}, fmt.Errorf("failed to parse expires_at: %w", err)
+	}
+
+	assets := state.Assets
+	if assets == nil {
+		assets = []string{}
+	}
+
+	return core.ChannelSessionKeyStateV1{
+		UserAddress: strings.ToLower(state.UserAddress),
+		SessionKey:  strings.ToLower(state.SessionKey),
+		Version:     version,
+		Assets:      assets,
+		ExpiresAt:   time.Unix(expiresAtUnix, 0),
+		UserSig:     state.UserSig,
+	}, nil
+}
+
+// transformChannelSessionKeyStates converts a slice of RPC ChannelSessionKeyStateV1 to core.ChannelSessionKeyStateV1.
+func transformChannelSessionKeyStates(states []rpc.ChannelSessionKeyStateV1) ([]core.ChannelSessionKeyStateV1, error) {
+	result := make([]core.ChannelSessionKeyStateV1, 0, len(states))
+	for _, s := range states {
+		state, err := transformChannelSessionKeyState(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to transform channel session key state: %w", err)
+		}
+		result = append(result, state)
+	}
+	return result, nil
+}
+
+// ============================================================================
+// App Session Key State Transformations
 // ============================================================================
 
 // transformSessionKeyStateToRPC converts app.AppSessionKeyStateV1 to RPC AppSessionKeyStateV1.

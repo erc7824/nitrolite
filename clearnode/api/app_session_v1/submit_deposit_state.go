@@ -62,22 +62,6 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("missing user signature on user state")
 		}
 
-		packedUserState, err := h.statePacker.PackState(userState)
-		if err != nil {
-			return rpc.Errorf("failed to pack user state: %v", err)
-		}
-
-		userSigBytes, err := hexutil.Decode(*userState.UserSig)
-		if err != nil {
-			return rpc.Errorf("failed to decode user signature: %v", err)
-		}
-
-		sigValidator := h.sigValidator[EcdsaSigType]
-		err = sigValidator.Verify(userState.UserWallet, packedUserState, userSigBytes)
-		if err != nil {
-			return rpc.Errorf("failed to validate signature: %v", err)
-		}
-
 		currentState, err := tx.GetLastUserState(userState.UserWallet, userState.Asset, false)
 		if err != nil {
 			return rpc.Errorf("failed to get last user state: %v", err)
@@ -92,6 +76,24 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 
 		if err := h.stateAdvancer.ValidateAdvancement(*currentState, userState); err != nil {
 			return rpc.Errorf("invalid state transitions: %v", err)
+		}
+
+		packedUserState, err := h.statePacker.PackState(userState)
+		if err != nil {
+			return rpc.Errorf("failed to pack user state: %v", err)
+		}
+
+		userSigBytes, err := hexutil.Decode(*userState.UserSig)
+		if err != nil {
+			return rpc.Errorf("failed to decode user signature: %v", err)
+		}
+
+		sigValidator := core.NewChannelSigValidatorV1(func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error) {
+			return tx.ValidateChannelSessionKeyForAsset(walletAddr, sessionKeyAddr, userState.Asset, metadataHash)
+		})
+		err = sigValidator.Verify(userState.UserWallet, packedUserState, userSigBytes)
+		if err != nil {
+			return rpc.Errorf("failed to validate signature: %v", err)
 		}
 
 		appSession, err := tx.GetAppSession(appStateUpd.AppSessionID)

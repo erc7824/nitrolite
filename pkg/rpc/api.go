@@ -133,6 +133,29 @@ type ChannelsV1HomeChannelCreatedEvent struct {
 	InitialState StateV1 `json:"initial_state"`
 }
 
+// ChannelsV1SubmitSessionKeyStateRequest submits the session key state for registration and updates.
+type ChannelsV1SubmitSessionKeyStateRequest struct {
+	// State contains the session key metadata and delegation information
+	State ChannelSessionKeyStateV1 `json:"state"`
+}
+
+// ChannelsV1SubmitSessionKeyStateResponse returns the result of session key state submission.
+type ChannelsV1SubmitSessionKeyStateResponse struct {
+}
+
+// ChannelsV1GetLastKeyStatesRequest retrieves the latest session key states for a user with optional filtering by session key.
+type ChannelsV1GetLastKeyStatesRequest struct {
+	// UserAddress is the user's wallet address
+	UserAddress string  `json:"user_address"`
+	SessionKey  *string `json:"session_key,omitempty"` // Optionally filter by SessionKey
+}
+
+// ChannelsV1GetSessionKeysResponse returns the list of active session keys.
+type ChannelsV1GetLastKeyStatesResponse struct {
+	// States is the list of active session key states for the user
+	States []ChannelSessionKeyStateV1 `json:"states"`
+}
+
 // ============================================================================
 // App Sessions Group - V1 API
 // ============================================================================

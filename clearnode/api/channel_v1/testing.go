@@ -74,6 +74,29 @@ func (m *MockStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, e
 	return args.Get(0).(*core.Channel), args.Error(1)
 }
 
+func (m *MockStore) StoreChannelSessionKeyState(state core.ChannelSessionKeyStateV1) error {
+	args := m.Called(state)
+	return args.Error(0)
+}
+
+func (m *MockStore) GetLastChannelSessionKeyVersion(wallet, sessionKey string) (uint64, error) {
+	args := m.Called(wallet, sessionKey)
+	return args.Get(0).(uint64), args.Error(1)
+}
+
+func (m *MockStore) GetLastChannelSessionKeyStates(wallet string, sessionKey *string) ([]core.ChannelSessionKeyStateV1, error) {
+	args := m.Called(wallet, sessionKey)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]core.ChannelSessionKeyStateV1), args.Error(1)
+}
+
+func (m *MockStore) ValidateChannelSessionKeyForAsset(wallet, sessionKey, asset, metadataHash string) (bool, error) {
+	args := m.Called(wallet, sessionKey, asset, metadataHash)
+	return args.Bool(0), args.Error(1)
+}
+
 func NewMockSigner() sign.Signer {
 	key, _ := crypto.GenerateKey()
 

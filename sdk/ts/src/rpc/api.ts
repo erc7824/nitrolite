@@ -8,6 +8,7 @@ import { Address } from 'viem';
 import {
   ChannelV1,
   ChannelDefinitionV1,
+  ChannelSessionKeyStateV1,
   StateV1,
   BalanceEntryV1,
   TransactionV1,
@@ -133,6 +134,29 @@ export interface ChannelsV1HomeChannelCreatedEvent {
   channel: ChannelV1;
   /** Initial state of the home channel */
   initial_state: StateV1;
+}
+
+// ============================================================================
+// Channel Session Key State Group - V1 API
+// ============================================================================
+
+export interface ChannelsV1SubmitSessionKeyStateRequest {
+  /** Session key state containing delegation information */
+  state: ChannelSessionKeyStateV1;
+}
+
+export interface ChannelsV1SubmitSessionKeyStateResponse {}
+
+export interface ChannelsV1GetLastKeyStatesRequest {
+  /** User's wallet address */
+  user_address: string;
+  /** Optionally filter by session key address */
+  session_key?: string;
+}
+
+export interface ChannelsV1GetLastKeyStatesResponse {
+  /** List of active channel session key states for the user */
+  states: ChannelSessionKeyStateV1[];
 }
 
 // ============================================================================

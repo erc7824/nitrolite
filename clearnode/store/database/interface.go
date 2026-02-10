@@ -144,6 +144,24 @@ type DatabaseStore interface {
 	// GetLastKeyStates retrieves the latest session key states for a user with optional filtering.
 	GetLastAppSessionKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error)
 
+	// --- Channel Session Key State Operations ---
+
+	// StoreChannelSessionKeyState stores or updates a channel session key state.
+	StoreChannelSessionKeyState(state core.ChannelSessionKeyStateV1) error
+
+	// GetLastChannelSessionKeyVersion returns the latest version for a (wallet, sessionKey) pair.
+	// Returns 0 if no state exists.
+	GetLastChannelSessionKeyVersion(wallet, sessionKey string) (uint64, error)
+
+	// GetLastChannelSessionKeyStates retrieves the latest channel session key states for a user,
+	// optionally filtered by session key.
+	GetLastChannelSessionKeyStates(wallet string, sessionKey *string) ([]core.ChannelSessionKeyStateV1, error)
+
+	// ValidateChannelSessionKeyForAsset checks that a valid, non-expired session key state
+	// exists at its latest version for the (wallet, sessionKey) pair, includes the given asset,
+	// and matches the metadata hash.
+	ValidateChannelSessionKeyForAsset(wallet, sessionKey, asset, metadataHash string) (bool, error)
+
 	// --- Contract Event Operations ---
 
 	// StoreContractEvent stores a blockchain event to prevent duplicate processing.

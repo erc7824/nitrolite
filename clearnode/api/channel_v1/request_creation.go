@@ -119,9 +119,9 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 			return rpc.Errorf("failed to decode user signature: %v", err)
 		}
 
-		sigValidator := h.sigValidators[EcdsaSigValidatorType]
+		sigValidator := h.getChannelSigValidator(tx, incomingState.Asset)
 		if err := sigValidator.Verify(incomingState.UserWallet, packedState, userSigBytes); err != nil {
-			return rpc.Errorf("invalid user signature: %v", err)
+			return rpc.Errorf("invalid incoming state user signature: %v", err)
 		}
 
 		newHomeChannel := core.NewChannel(
@@ -140,7 +140,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		}
 
 		// Provide node's signature
-		_nodeSig, err := h.signer.Sign(packedState)
+		_nodeSig, err := h.nodeSigner.Sign(packedState)
 		if err != nil {
 			return rpc.Errorf("failed to sign state: %v", err)
 		}

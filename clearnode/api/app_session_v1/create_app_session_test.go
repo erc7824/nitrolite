@@ -16,7 +16,6 @@ import (
 func TestCreateAppSession_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
@@ -32,9 +31,6 @@ func TestCreateAppSession_Success(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xnode",
 	)
 
@@ -120,7 +116,6 @@ func TestCreateAppSession_Success(t *testing.T) {
 func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
@@ -136,9 +131,6 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xnode",
 	)
 
@@ -222,7 +214,6 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 func TestCreateAppSession_ZeroNonce(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
@@ -238,9 +229,6 @@ func TestCreateAppSession_ZeroNonce(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xnode",
 	)
 
@@ -284,13 +272,11 @@ func TestCreateAppSession_ZeroNonce(t *testing.T) {
 
 	// Verify no mocks were called since we fail early
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestCreateAppSession_QuorumExceedsTotalWeights(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
@@ -306,9 +292,6 @@ func TestCreateAppSession_QuorumExceedsTotalWeights(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xnode",
 	)
 
@@ -358,13 +341,11 @@ func TestCreateAppSession_QuorumExceedsTotalWeights(t *testing.T) {
 
 	// Verify no mocks were called since we fail early
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestCreateAppSession_NoSignatures(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
@@ -380,9 +361,6 @@ func TestCreateAppSession_NoSignatures(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xnode",
 	)
 
@@ -426,13 +404,11 @@ func TestCreateAppSession_NoSignatures(t *testing.T) {
 
 	// Verify no mocks were called since we fail early
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
@@ -448,9 +424,6 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xnode",
 	)
 
@@ -512,7 +485,6 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
@@ -528,9 +500,6 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xnode",
 	)
 
@@ -606,7 +575,6 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
@@ -622,9 +590,6 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xnode",
 	)
 
@@ -697,7 +662,6 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
@@ -713,9 +677,6 @@ func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xnode",
 	)
 
@@ -759,13 +720,11 @@ func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 
 	// Verify no mocks were called since we fail at signature decoding
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
@@ -781,9 +740,6 @@ func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xnode",
 	)
 

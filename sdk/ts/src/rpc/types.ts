@@ -120,6 +120,28 @@ export interface StateV1 {
 // Note: App session types are exported from the app module
 
 // ============================================================================
+// Channel Session Key Types
+// ============================================================================
+
+/**
+ * ChannelSessionKeyStateV1 represents the state of a channel session key delegation
+ */
+export interface ChannelSessionKeyStateV1 {
+  /** User wallet address */
+  user_address: string;
+  /** Session key address for delegation */
+  session_key: string;
+  /** Version of the session key state */
+  version: string;
+  /** Assets associated with this session key */
+  assets: string[];
+  /** Unix timestamp in seconds indicating when the session key expires */
+  expires_at: string;
+  /** User's signature over the session key metadata */
+  user_sig: string;
+}
+
+// ============================================================================
 // Asset and Blockchain Types
 // ============================================================================
 

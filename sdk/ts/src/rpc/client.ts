@@ -110,6 +110,24 @@ export class RPCClient {
   }
 
   // ============================================================================
+  // Channel Session Key State - V1 API Methods
+  // ============================================================================
+
+  async channelsV1SubmitSessionKeyState(
+    req: API.ChannelsV1SubmitSessionKeyStateRequest,
+    signal?: AbortSignal
+  ): Promise<API.ChannelsV1SubmitSessionKeyStateResponse> {
+    return this.call(Methods.ChannelsV1SubmitSessionKeyStateMethod, req, signal);
+  }
+
+  async channelsV1GetLastKeyStates(
+    req: API.ChannelsV1GetLastKeyStatesRequest,
+    signal?: AbortSignal
+  ): Promise<API.ChannelsV1GetLastKeyStatesResponse> {
+    return this.call(Methods.ChannelsV1GetLastKeyStatesMethod, req, signal);
+  }
+
+  // ============================================================================
   // App Sessions Group - V1 API Methods
   // ============================================================================
 

@@ -709,3 +709,123 @@ func (c *Client) requestChannelCreation(ctx context.Context, state core.State, c
 	}
 	return resp.Signature, nil
 }
+
+// ============================================================================
+// Channel Session Key Methods
+// ============================================================================
+
+// GetLastChannelKeyStatesOptions contains optional filters for GetLastChannelKeyStates.
+type GetLastChannelKeyStatesOptions struct {
+	// SessionKey filters by a specific session key address
+	SessionKey *string
+}
+
+// SubmitChannelSessionKeyState submits a channel session key state for registration or update.
+// The state must be signed by the user's wallet to authorize the session key delegation.
+//
+// Parameters:
+//   - state: The channel session key state containing delegation information
+//
+// Returns:
+//   - Error if the request fails
+//
+// Example:
+//
+//	state := core.ChannelSessionKeyStateV1{
+//	    UserAddress: "0x1234...",
+//	    SessionKey:  "0xabcd...",
+//	    Version:     1,
+//	    Assets:      []string{"usdc", "weth"},
+//	    ExpiresAt:   time.Now().Add(24 * time.Hour),
+//	    UserSig:     "0x...",
+//	}
+//	err := client.SubmitChannelSessionKeyState(ctx, state)
+func (c *Client) SubmitChannelSessionKeyState(ctx context.Context, state core.ChannelSessionKeyStateV1) error {
+	req := rpc.ChannelsV1SubmitSessionKeyStateRequest{
+		State: transformChannelSessionKeyStateToRPC(state),
+	}
+	_, err := c.rpcClient.ChannelsV1SubmitSessionKeyState(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to submit channel session key state: %w", err)
+	}
+	return nil
+}
+
+// GetLastChannelKeyStates retrieves the latest channel session key states for a user.
+//
+// Parameters:
+//   - userAddress: The user's wallet address
+//   - opts: Optional filters (pass nil for no filters)
+//
+// Returns:
+//   - Slice of ChannelSessionKeyStateV1 with the latest non-expired session key states
+//   - Error if the request fails
+//
+// Example:
+//
+//	states, err := client.GetLastChannelKeyStates(ctx, "0x1234...", nil)
+//	for _, state := range states {
+//	    fmt.Printf("Session key %s expires at %s\n", state.SessionKey, state.ExpiresAt)
+//	}
+func (c *Client) GetLastChannelKeyStates(ctx context.Context, userAddress string, opts *GetLastChannelKeyStatesOptions) ([]core.ChannelSessionKeyStateV1, error) {
+	req := rpc.ChannelsV1GetLastKeyStatesRequest{
+		UserAddress: userAddress,
+	}
+	if opts != nil {
+		req.SessionKey = opts.SessionKey
+	}
+
+	resp, err := c.rpcClient.ChannelsV1GetLastKeyStates(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last channel key states: %w", err)
+	}
+
+	states, err := transformChannelSessionKeyStates(resp.States)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform channel session key states: %w", err)
+	}
+
+	return states, nil
+}
+
+// SignChannelSessionKeyState signs a channel session key state using the client's state signer.
+// This creates a properly formatted signature that can be set on the state's UserSig field
+// before submitting via SubmitChannelSessionKeyState.
+//
+// Parameters:
+//   - state: The channel session key state to sign (UserSig field is excluded from signing)
+//
+// Returns:
+//   - The hex-encoded signature string
+//   - Error if signing fails
+//
+// Example:
+//
+//	state := core.ChannelSessionKeyStateV1{
+//	    UserAddress: client.GetUserAddress(),
+//	    SessionKey:  "0xabcd...",
+//	    Version:     1,
+//	    Assets:      []string{"usdc"},
+//	    ExpiresAt:   time.Now().Add(24 * time.Hour),
+//	}
+//	sig, err := client.SignChannelSessionKeyState(state)
+//	state.UserSig = sig
+//	err = client.SubmitChannelSessionKeyState(ctx, state)
+func (c *Client) SignChannelSessionKeyState(state core.ChannelSessionKeyStateV1) (string, error) {
+	metadataHash, err := core.GetChannelSessionKeyAuthMetadataHashV1(state.Version, state.Assets, state.ExpiresAt.Unix())
+	if err != nil {
+		return "", fmt.Errorf("failed to compute metadata hash: %w", err)
+	}
+
+	packed, err := core.PackChannelKeyStateV1(state.SessionKey, metadataHash)
+	if err != nil {
+		return "", fmt.Errorf("failed to pack channel session key state: %w", err)
+	}
+
+	sig, err := c.stateSigner.Sign(packed)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign channel session key state: %w", err)
+	}
+
+	return fmt.Sprintf("0x%x", sig), nil
+}

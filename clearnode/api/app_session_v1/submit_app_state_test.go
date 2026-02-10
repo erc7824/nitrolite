@@ -17,8 +17,6 @@ import (
 func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -33,9 +31,6 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -131,8 +126,6 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -147,9 +140,6 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -250,7 +240,6 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 	mockSigner := NewMockSigner()
 
 	storeTxProvider := func(fn StoreTxHandler) error {
@@ -266,9 +255,6 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -361,7 +347,6 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 	mockSigner := NewMockSigner()
 
 	storeTxProvider := func(fn StoreTxHandler) error {
@@ -377,9 +362,6 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -486,8 +468,6 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -502,9 +482,6 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -584,8 +561,6 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -600,9 +575,6 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -695,7 +667,6 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 	mockSigner := NewMockSigner()
 
 	storeTxProvider := func(fn StoreTxHandler) error {
@@ -711,9 +682,6 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -818,7 +786,6 @@ func TestSubmitAppState_DepositIntent_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{},
 		"0xNode",
 	)
 
@@ -857,8 +824,6 @@ func TestSubmitAppState_DepositIntent_Rejected(t *testing.T) {
 func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -873,9 +838,6 @@ func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -940,7 +902,6 @@ func TestSubmitAppState_InvalidVersion_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{},
 		"0xNode",
 	)
 
@@ -1005,7 +966,6 @@ func TestSubmitAppState_SessionNotFound_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{},
 		"0xNode",
 	)
 
@@ -1049,8 +1009,6 @@ func TestSubmitAppState_SessionNotFound_Rejected(t *testing.T) {
 func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -1065,9 +1023,6 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -1155,7 +1110,6 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 	mockSigner := NewMockSigner()
 
 	storeTxProvider := func(fn StoreTxHandler) error {
@@ -1171,9 +1125,6 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -1258,8 +1209,6 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *testing.T) {
 	// Test redistributing funds to a participant who didn't have any allocation before
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -1274,9 +1223,6 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 

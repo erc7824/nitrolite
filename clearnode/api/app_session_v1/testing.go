@@ -123,6 +123,11 @@ func (m *MockStore) GetAppSessionKeyOwner(sessionKey, appSessionId string) (stri
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockStore) ValidateChannelSessionKeyForAsset(wallet, sessionKey, asset, metadataHash string) (bool, error) {
+	args := m.Called(wallet, sessionKey, asset, metadataHash)
+	return args.Bool(0), args.Error(1)
+}
+
 // MockSigValidator is a mock implementation of the SigValidator interface
 type MockSigValidator struct {
 	mock.Mock

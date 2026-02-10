@@ -51,6 +51,24 @@ type Store interface {
 	// GetActiveHomeChannel retrieves the active home channel for a user's wallet and asset.
 	// Returns nil if no home channel exists for the given wallet and asset.
 	GetActiveHomeChannel(wallet, asset string) (*core.Channel, error)
+
+	// Session key state operations
+
+	// StoreChannelSessionKeyState persists a channel session key state.
+	StoreChannelSessionKeyState(state core.ChannelSessionKeyStateV1) error
+
+	// GetLastChannelSessionKeyVersion returns the latest version for a (wallet, sessionKey) pair.
+	// Returns 0 if no state exists.
+	GetLastChannelSessionKeyVersion(wallet, sessionKey string) (uint64, error)
+
+	// GetLastChannelSessionKeyStates retrieves the latest channel session key states for a user,
+	// optionally filtered by session key.
+	GetLastChannelSessionKeyStates(wallet string, sessionKey *string) ([]core.ChannelSessionKeyStateV1, error)
+
+	// ValidateChannelSessionKeyForAsset checks that a valid, non-expired session key state
+	// exists at its latest version for the (wallet, sessionKey) pair, includes the given asset,
+	// and matches the metadata hash.
+	ValidateChannelSessionKeyForAsset(wallet, sessionKey, asset, metadataHash string) (bool, error)
 }
 
 // SigValidator validates cryptographic signatures on state transitions.

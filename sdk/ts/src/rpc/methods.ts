@@ -22,6 +22,10 @@ export const ChannelsV1GetStatesMethod: Method = 'channels.v1.get_states';
 export const ChannelsV1RequestCreationMethod: Method = 'channels.v1.request_creation';
 export const ChannelsV1SubmitStateMethod: Method = 'channels.v1.submit_state';
 
+// Channel Session Key Methods - V1
+export const ChannelsV1SubmitSessionKeyStateMethod: Method = 'channels.v1.submit_session_key_state';
+export const ChannelsV1GetLastKeyStatesMethod: Method = 'channels.v1.get_last_key_states';
+
 // App Sessions Group - V1 Methods
 export const AppSessionsV1Group: Group = 'app_sessions.v1';
 export const AppSessionsV1SubmitDepositStateMethod: Method = 'app_sessions.v1.submit_deposit_state';

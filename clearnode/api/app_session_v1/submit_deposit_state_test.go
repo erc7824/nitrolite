@@ -2,6 +2,7 @@ package app_session_v1
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,7 +22,6 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	mockAssetStore := new(MockAssetStore)
 	mockStatePacker := new(MockStatePacker)
@@ -35,14 +35,13 @@ func TestSubmitDepositState_Success(t *testing.T) {
 		},
 		signer:      mockSigner,
 		nodeAddress: nodeAddress,
-		sigValidator: map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 	}
 
-	// Test data - use TestAppSessionWallet for quorum signer
-	wallet1 := NewTestAppSessionWallet(t)
-	participant1 := wallet1.Address
+	// Test data - create one key for both app session and channel state signing
+	userRawSigner := NewMockSigner()
+	channelWalletSigner, _ := core.NewChannelWalletSignerV1(userRawSigner)
+	appWalletSigner, _ := app.NewAppSessionWalletSignerV1(userRawSigner)
+	participant1 := strings.ToLower(userRawSigner.PublicKey().Address().String())
 	participant2 := "0x2222222222222222222222222222222222222222"
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -102,15 +101,14 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	_, err := incomingUserState.ApplyCommitTransition(appSessionID, depositAmount)
 	require.NoError(t, err)
 
-	// Sign the incoming user state with user's signature
-	userKey, _ := crypto.GenerateKey()
+	// Sign the incoming user state with channel wallet signer (adds 0x01 prefix)
 	mockStatePacker.On("PackState", mock.Anything).Return([]byte("packed"), nil)
 	packedUserState, _ := mockStatePacker.PackState(*incomingUserState)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingUserState.UserSig = &userSigHex
+	userSig, _ := channelWalletSigner.Sign(packedUserState)
+	userSigStr := userSig.String()
+	incomingUserState.UserSig = &userSigStr
 
-	// Create app state update and sign with wallet1 (includes 0xA1 prefix for verifyQuorum)
+	// Create app state update and sign with app wallet signer (includes 0xA1 prefix for verifyQuorum)
 	appStateUpdateCore := app.AppStateUpdateV1{
 		AppSessionID: appSessionID,
 		Intent:       app.AppStateUpdateIntentDeposit,
@@ -124,7 +122,9 @@ func TestSubmitDepositState_Success(t *testing.T) {
 		},
 		SessionData: `{"updated": "data"}`,
 	}
-	appSigHex := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+	packedAppUpdate, _ := app.PackAppStateUpdateV1(appStateUpdateCore)
+	appSigBytes, _ := appWalletSigner.Sign(packedAppUpdate)
+	appSigHex := hexutil.Encode(appSigBytes)
 
 	appStateUpdate := rpc.AppStateUpdateV1{
 		AppSessionID: appSessionID,
@@ -142,7 +142,6 @@ func TestSubmitDepositState_Success(t *testing.T) {
 
 	// Mock expectations
 	mockStore.On("CheckOpenChannel", participant1, asset).Return(true, nil).Once()
-	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
@@ -216,14 +215,12 @@ func TestSubmitDepositState_Success(t *testing.T) {
 
 	// Verify all mock expectations
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	mockAssetStore := new(MockAssetStore)
 	mockStatePacker := new(MockStatePacker)
@@ -237,9 +234,6 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 		},
 		signer:      mockSigner,
 		nodeAddress: nodeAddress,
-		sigValidator: map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 	}
 
 	// Test data
@@ -342,14 +336,12 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 
 	// Verify no mocks were called since we fail early
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	mockAssetStore := new(MockAssetStore)
 	mockStatePacker := new(MockStatePacker)
@@ -363,14 +355,13 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 		},
 		signer:      mockSigner,
 		nodeAddress: nodeAddress,
-		sigValidator: map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 	}
 
-	// Test data - use TestAppSessionWallet for quorum signer
-	wallet1 := NewTestAppSessionWallet(t)
-	participant1 := wallet1.Address
+	// Test data - create one key for both app session and channel state signing
+	userRawSigner := NewMockSigner()
+	channelWalletSigner, _ := core.NewChannelWalletSignerV1(userRawSigner)
+	appWalletSigner, _ := app.NewAppSessionWalletSignerV1(userRawSigner)
+	participant1 := strings.ToLower(userRawSigner.PublicKey().Address().String())
 	participant2 := "0x2222222222222222222222222222222222222222"
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -423,14 +414,13 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	_, err := incomingUserState.ApplyCommitTransition(appSessionID, depositAmount)
 	require.NoError(t, err)
 
-	userKey, _ := crypto.GenerateKey()
 	mockStatePacker.On("PackState", mock.Anything).Return([]byte("packed"), nil)
 	packedUserState, _ := mockStatePacker.PackState(*incomingUserState)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingUserState.UserSig = &userSigHex
+	userSig, _ := channelWalletSigner.Sign(packedUserState)
+	userSigStr := userSig.String()
+	incomingUserState.UserSig = &userSigStr
 
-	// Create app state update and sign with wallet1 (includes 0xA1 prefix for verifyQuorum)
+	// Create app state update and sign with app wallet signer (includes 0xA1 prefix for verifyQuorum)
 	appStateUpdateCore := app.AppStateUpdateV1{
 		AppSessionID: appSessionID,
 		Intent:       app.AppStateUpdateIntentDeposit,
@@ -444,7 +434,9 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 		},
 		SessionData: "",
 	}
-	appSigHex := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+	packedAppUpdate, _ := app.PackAppStateUpdateV1(appStateUpdateCore)
+	appSigBytes, _ := appWalletSigner.Sign(packedAppUpdate)
+	appSigHex := hexutil.Encode(appSigBytes)
 
 	appStateUpdate := rpc.AppStateUpdateV1{
 		AppSessionID: appSessionID,
@@ -461,7 +453,6 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 
 	// Mock expectations
 	mockStore.On("CheckOpenChannel", participant1, asset).Return(true, nil).Once()
-	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
@@ -496,5 +487,4 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 
 	// Verify all mocks were called
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }

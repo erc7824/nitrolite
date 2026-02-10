@@ -17,7 +17,6 @@ func TestGetAppDefinition_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
 
 	mockAssetStore := new(MockAssetStore)
 	mockStatePacker := new(MockStatePacker)
@@ -26,11 +25,8 @@ func TestGetAppDefinition_Success(t *testing.T) {
 		useStoreInTx: func(fn StoreTxHandler) error {
 			return fn(mockStore)
 		},
-		signer:      mockSigner,
-		nodeAddress: mockSigner.PublicKey().Address().String(),
-		sigValidator: map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
+		signer:        mockSigner,
+		nodeAddress:   mockSigner.PublicKey().Address().String(),
 		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
 		statePacker:   mockStatePacker,
 	}
@@ -104,7 +100,6 @@ func TestGetAppDefinition_NotFound(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
 
 	mockAssetStore := new(MockAssetStore)
 	mockStatePacker := new(MockStatePacker)
@@ -113,11 +108,8 @@ func TestGetAppDefinition_NotFound(t *testing.T) {
 		useStoreInTx: func(fn StoreTxHandler) error {
 			return fn(mockStore)
 		},
-		signer:      mockSigner,
-		nodeAddress: mockSigner.PublicKey().Address().String(),
-		sigValidator: map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
+		signer:        mockSigner,
+		nodeAddress:   mockSigner.PublicKey().Address().String(),
 		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
 		statePacker:   mockStatePacker,
 	}

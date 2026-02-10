@@ -21,7 +21,6 @@ type AppSessionKeyStateV1 struct {
 	ExpiresAt      time.Time                     `gorm:"column:expires_at;not null"`
 	UserSig        string                        `gorm:"column:user_sig;not null"`
 	CreatedAt      time.Time
-	UpdatedAt      time.Time
 }
 
 func (AppSessionKeyStateV1) TableName() string {
@@ -65,8 +64,6 @@ func (s *DBStore) StoreAppSessionKeyState(state app.AppSessionKeyStateV1) error 
 		Version:     state.Version,
 		ExpiresAt:   state.ExpiresAt.UTC(),
 		UserSig:     state.UserSig,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
 	}
 
 	if err := s.db.Create(&dbState).Error; err != nil {
@@ -121,7 +118,7 @@ func (s *DBStore) GetLastAppSessionKeyStates(wallet string, sessionKey *string) 
 		Joins("JOIN (?) AS latest ON app_session_key_states_v1.user_address = latest.user_address AND app_session_key_states_v1.session_key = latest.session_key AND app_session_key_states_v1.version = latest.max_version", subQuery).
 		Preload("ApplicationIDs").
 		Preload("AppSessionIDs").
-		Order("app_session_key_states_v1.updated_at DESC")
+		Order("app_session_key_states_v1.created_at DESC")
 
 	var dbStates []AppSessionKeyStateV1
 	if err := query.Find(&dbStates).Error; err != nil {

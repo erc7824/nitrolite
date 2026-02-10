@@ -10,7 +10,7 @@ import Decimal from 'decimal.js';
 import * as core from './core/types';
 import * as app from './app/types';
 import * as API from './rpc/api';
-import { StateV1, ChannelDefinitionV1 } from './rpc/types';
+import { StateV1, ChannelDefinitionV1, ChannelSessionKeyStateV1 } from './rpc/types';
 import { RPCClient } from './rpc/client';
 import { WebsocketDialer } from './rpc/dialer';
 import { ClientAssetStore } from './asset_store';
@@ -1254,11 +1254,47 @@ export class Client {
   }
 
   // ============================================================================
-  // Session Key Methods
+  // Channel Session Key Methods
   // ============================================================================
 
   /**
-   * Submit a session key state for registration or update.
+   * Submit a channel session key state for registration or update.
+   * The state must be signed by the user's wallet to authorize the session key delegation.
+   *
+   * @param state - The channel session key state containing delegation information
+   */
+  async submitChannelSessionKeyState(state: ChannelSessionKeyStateV1): Promise<void> {
+    const req: API.ChannelsV1SubmitSessionKeyStateRequest = {
+      state,
+    };
+    await this.rpcClient.channelsV1SubmitSessionKeyState(req);
+  }
+
+  /**
+   * Retrieve the latest channel session key states for a user.
+   *
+   * @param userAddress - The user's wallet address
+   * @param sessionKey - Optional session key address to filter by
+   * @returns List of active channel session key states
+   */
+  async getLastChannelKeyStates(
+    userAddress: string,
+    sessionKey?: string
+  ): Promise<ChannelSessionKeyStateV1[]> {
+    const req: API.ChannelsV1GetLastKeyStatesRequest = {
+      user_address: userAddress,
+      session_key: sessionKey,
+    };
+    const resp = await this.rpcClient.channelsV1GetLastKeyStates(req);
+    return resp.states;
+  }
+
+  // ============================================================================
+  // App Session Key Methods
+  // ============================================================================
+
+  /**
+   * Submit an app session key state for registration or update.
    * The state must be signed by the user's wallet to authorize the session key delegation.
    *
    * @param state - The session key state containing delegation information

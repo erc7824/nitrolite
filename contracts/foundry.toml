@@ -6,5 +6,15 @@ dynamic_test_linking = true
 
 via_ir = true
 
-# empirically picked not to overflow contract code size limit
-optimizer_runs = 500
+# high optimizer runs for better gas efficiency
+optimizer_runs = 1_000_000
+
+# special compiler profile for ChannelHub to prevent code size overflow
+additional_compiler_profiles = [
+  { name = "channelhub", optimizer_runs = 500 }
+]
+
+# compile ChannelHub with lower optimizer runs to stay within size limits
+compilation_restrictions = [
+  { paths = "src/ChannelHub.sol", optimizer_runs = 500 }
+]

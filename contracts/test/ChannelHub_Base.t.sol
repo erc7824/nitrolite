@@ -8,6 +8,7 @@ import {TestUtils} from "./TestUtils.sol";
 
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {ECDSAValidator} from "../src/sigValidators/ECDSAValidator.sol";
+import {SessionKeyValidator, SessionKeyAuthorization} from "../src/sigValidators/SessionKeyValidator.sol";
 import {State, StateIntent, Ledger} from "../src/interfaces/Types.sol";
 import {ISignatureValidator} from "../src/interfaces/ISignatureValidator.sol";
 
@@ -18,13 +19,17 @@ contract ChannelHubTest_Base is Test {
 
     uint256 constant NODE_PK = 1;
     uint256 constant ALICE_PK = 2;
-    uint256 constant BOB_PK = 3;
+    uint256 constant ALICE_SK1_PK = 3;
+    uint256 constant BOB_PK = 4;
 
     address node;
     address alice;
+    address aliceSk1;
     address bob;
 
-    ISignatureValidator immutable DEFAULT_SIG_VALIDATOR = ISignatureValidator(address(1));
+    ISignatureValidator immutable EMPTY_SIG_VALIDATOR = ISignatureValidator(address(1));
+    ISignatureValidator immutable ECDSA_SIG_VALIDATOR = new ECDSAValidator();
+    ISignatureValidator immutable SK_SIG_VALIDATOR = new SessionKeyValidator();
 
     uint8 constant CHANNEL_HUB_VERSION = 1;
     uint32 constant CHALLENGE_DURATION = 86400; // 1 day
@@ -34,12 +39,12 @@ contract ChannelHubTest_Base is Test {
 
     function setUp() public virtual {
         // Deploy contracts
-        ECDSAValidator defaultValidator = new ECDSAValidator();
-        cHub = new ChannelHub(defaultValidator);
+        cHub = new ChannelHub(ECDSA_SIG_VALIDATOR);
         token = new MockERC20("Test Token", "TST", 18);
 
         node = vm.addr(NODE_PK);
         alice = vm.addr(ALICE_PK);
+        aliceSk1 = vm.addr(ALICE_SK1_PK);
         bob = vm.addr(BOB_PK);
 
         token.mint(node, INITIAL_BALANCE);
@@ -165,13 +170,23 @@ contract ChannelHubTest_Base is Test {
         });
     }
 
-    function mutualSignStateWithDefaultValidator(State memory state, bytes32 channelId, uint256 userPk)
+    function mutualSignStateBothWithEcdsaValidator(State memory state, bytes32 channelId, uint256 userPk)
         internal
         pure
         returns (State memory)
     {
-        state.userSig = TestUtils.signStateEip191WithDefaultValidator(vm, channelId, state, userPk);
-        state.nodeSig = TestUtils.signStateEip191WithDefaultValidator(vm, channelId, state, NODE_PK);
+        state.userSig = TestUtils.signStateEip191WithEcdsaValidator(vm, channelId, state, userPk);
+        state.nodeSig = TestUtils.signStateEip191WithEcdsaValidator(vm, channelId, state, NODE_PK);
+        return state;
+    }
+
+    function mutualSignStateUserWithSkValidator(State memory state, bytes32 channelId, uint256 userPk, SessionKeyAuthorization memory skAuth)
+        internal
+        pure
+        returns (State memory)
+    {
+        state.userSig = TestUtils.signStateEip191WithSkValidator(vm, channelId, state, userPk, skAuth);
+        state.nodeSig = TestUtils.signStateEip191WithEcdsaValidator(vm, channelId, state, NODE_PK);
         return state;
     }
 

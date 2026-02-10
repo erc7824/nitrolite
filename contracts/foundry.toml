@@ -7,4 +7,4 @@ dynamic_test_linking = true
 via_ir = true
 
 # empirically picked not to overflow contract code size limit
-optimizer_runs = 1000
+optimizer_runs = 500

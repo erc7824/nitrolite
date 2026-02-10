@@ -6,6 +6,19 @@ import {BaseValidator} from "./BaseValidator.sol";
 import {Utils} from "../Utils.sol";
 
 /**
+ * @notice Authorization struct for delegating signing authority to a session key
+ * @dev The participant signs this authorization to allow the session key to sign on their behalf
+ * @param sessionKey The address of the delegated session key
+ * @param metadataHash Hashed application-specific data (e.g., expiration timestamp, nonce, permissions)
+ * @param authSignature The participant's signature authorizing this session key (65 bytes ECDSA)
+ */
+struct SessionKeyAuthorization {
+    address sessionKey;
+    bytes32 metadataHash;
+    bytes authSignature;
+}
+
+/**
  * @title SessionKeyValidator
  * @notice Validator supporting session key delegation for temporary signing authority
  * @dev Enables a participant to delegate signing authority to a session key with metadata.
@@ -27,19 +40,6 @@ import {Utils} from "../Utils.sol";
  * - Participants are responsible for session key management
  */
 contract SessionKeyValidator is BaseValidator, ISignatureValidator {
-
-    /**
-     * @notice Authorization struct for delegating signing authority to a session key
-     * @dev The participant signs this authorization to allow the session key to sign on their behalf
-     * @param sessionKey The address of the delegated session key
-     * @param metadataHash Hashed application-specific data (e.g., expiration timestamp, nonce, permissions)
-     * @param authSignature The participant's signature authorizing this session key (65 bytes ECDSA)
-     */
-    struct SessionKeyAuthorization {
-        address sessionKey;
-        bytes32 metadataHash;
-        bytes authSignature;
-    }
 
     /**
      * @notice Validates a signature using a delegated session key

@@ -9,8 +9,12 @@ import {SessionKeyAuthorization} from "../src/sigValidators/SessionKeyValidator.
 import {Utils} from "../src/Utils.sol";
 
 library TestUtils {
+    function signRaw(Vm vm, uint256 privateKey, bytes memory message) internal pure returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, keccak256(message));
+        return abi.encodePacked(r, s, v);
+    }
+
     function signEip191(Vm vm, uint256 privateKey, bytes memory message) internal pure returns (bytes memory) {
-        // Apply EIP-191 prefix and sign
         bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(message);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, ethSignedMessageHash);
         return abi.encodePacked(r, s, v);

@@ -206,7 +206,7 @@ When a **node** employs SessionKeyValidator (NOT RECOMMENDED):
    - User cannot decode or validate node's session key metadata
    - No user-side software validates expiration or scope
 
-2. **No countersignature protection**: User must sign every state and cannot independently verify session key is legitimate
+2. **No countersignature protection**: The user's signature provides no protection in this scenario, as the user has no mechanism to validate the node's session key authorization. A compromised node session key has full, unchecked authority from the user's perspective.
 
 3. **Unlimited and irrevocable authority**: If node's session key is compromised:
    - On-chain validation only checks cryptographic signatures

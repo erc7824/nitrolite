@@ -66,9 +66,10 @@ The off-chain protocol is responsible for:
 
    * Both User and Node sign the full state:
 
-     ```
+     ```text
      (channelId, version, intent, homeState, nonHomeState)
      ```
+
    * A party **never signs two different states with the same version**.
 
 3. **Liquidity enforcement (Node responsibility)**
@@ -353,13 +354,13 @@ If enforcement stalls:
 
 If an escrow process is challenged (status becomes `DISPUTED`) and the challenge period expires (`challengeExpireAt` passed) without a resolution:
 
-*   The `finalize` function handles this case explicitly.
-*   If called when `DISPUTED` and expired:
-    1.  Do **not** invoke the channel engine.
-    2.  Manually **unlock the locked funds to the Node**.
-    3.  Zero out `lockedFunds` and `challengeExpireAt`.
-    4.  Set status to `FINALIZED`.
-    5.  Emit a finalization event.
+* The `finalize` function handles this case explicitly.
+* If called when `DISPUTED` and expired:
+    1. Do **not** invoke the channel engine.
+    2. Manually **unlock the locked funds to the Node**.
+    3. Zero out `lockedFunds` and `challengeExpireAt`.
+    4. Set status to `FINALIZED`.
+    5. Emit a finalization event.
 
 This logic mirrors the channel closure mechanism: if a challenge is not substantiated by a newer state within the timeout, the system defaults to a finalized state that releases locked resources.
 
@@ -468,6 +469,7 @@ To maintain the invariant that **homeState always represents the chain where exe
 * `FINALIZE_MIGRATION`: Single intent used on both old home and new home chains
 
 The same signed state can be submitted on both chains. The contract determines the correct behavior based on the channel status:
+
 * INITIATE_MIGRATION + status VOID/MIGRATED_OUT → non-home chain behavior (create MIGRATING_IN)
 * INITIATE_MIGRATION + status OPERATING/DISPUTED → home chain behavior (update state)
 * FINALIZE_MIGRATION + status MIGRATING_IN → new home chain behavior (move to OPERATING)
@@ -554,11 +556,12 @@ The protocol supports flexible signature validation through a **signature valida
 
 Signatures follow this structure:
 
-```
+```text
 [validator_type: 1 byte][signature_data: variable length]
 ```
 
 Where:
+
 * `validator_type` is `0x00` for DEFAULT or `0x01` for CHANNEL
 * `signature_data` is passed to the selected validator for verification
 

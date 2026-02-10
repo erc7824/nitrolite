@@ -27,7 +27,7 @@ contract ChannelHubTest_Base is Test {
     address aliceSk1;
     address bob;
 
-    ISignatureValidator immutable EMPTY_SIG_VALIDATOR = ISignatureValidator(address(1));
+    ISignatureValidator immutable EMPTY_SIG_VALIDATOR = ISignatureValidator(address(0));
     ISignatureValidator immutable ECDSA_SIG_VALIDATOR = new ECDSAValidator();
     ISignatureValidator immutable SK_SIG_VALIDATOR = new SessionKeyValidator();
 

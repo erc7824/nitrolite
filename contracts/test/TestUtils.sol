@@ -50,10 +50,4 @@ library TestUtils {
             authSignature: signature
         });
     }
-
-    function buildSkSig(Vm vm, SessionKeyAuthorization memory skAuth, bytes32 channelId, bytes memory signingData, uint256 sessionKeyPk) internal pure returns (bytes memory) {
-        bytes memory stateMessage = Utils.pack(channelId, signingData);
-        bytes memory signature = TestUtils.signEip191(vm, sessionKeyPk, stateMessage);
-        return abi.encode(skAuth, signature);
-    }
 }

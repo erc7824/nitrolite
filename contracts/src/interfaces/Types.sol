@@ -43,8 +43,19 @@ enum StateIntent {
     FINALIZE_MIGRATION
 }
 
-// Signature validator type selector
-// Signature format: bytes signature = abi.encode(sigValidatorType, sigBody)
+/**
+ * @notice Signature validator type selector for pluggable signature validation
+ * @dev Signature encoding format:
+ *      bytes signature = abi.encodePacked(uint8(SigValidatorType), bytes sigBody)
+ *
+ *      The first byte indicates which validator to use:
+ *      - 0x00 (DEFAULT) -> routes to defaultSigValidator
+ *      - 0x01 (CHANNEL) -> routes to channel's signatureValidator from definition
+ *
+ *      ChannelHub logic reads the first byte to determine routing.
+ *      The remainder (sigBody) is passed to the selected validator's validateSignature
+ *      or validateChallengerSignature method.
+ */
 enum SigValidatorType {
     DEFAULT,
     CHANNEL

@@ -163,28 +163,21 @@ export class RPCClient {
   }
 
   // ============================================================================
-  // Session Keys Group - V1 API Methods
+  // App Session Key State - V1 API Methods
   // ============================================================================
 
-  async sessionKeysV1Register(
-    req: API.SessionKeysV1RegisterRequest,
+  async appSessionsV1SubmitSessionKeyState(
+    req: API.AppSessionsV1SubmitSessionKeyStateRequest,
     signal?: AbortSignal
-  ): Promise<API.SessionKeysV1RegisterResponse> {
-    return this.call(Methods.SessionKeysV1RegisterMethod, req, signal);
+  ): Promise<API.AppSessionsV1SubmitSessionKeyStateResponse> {
+    return this.call(Methods.AppSessionsV1SubmitSessionKeyStateMethod, req, signal);
   }
 
-  async sessionKeysV1RevokeSessionKey(
-    req: API.SessionKeysV1RevokeSessionKeyRequest,
+  async appSessionsV1GetLastKeyStates(
+    req: API.AppSessionsV1GetLastKeyStatesRequest,
     signal?: AbortSignal
-  ): Promise<API.SessionKeysV1RevokeSessionKeyResponse> {
-    return this.call(Methods.SessionKeysV1RevokeSessionKeyMethod, req, signal);
-  }
-
-  async sessionKeysV1GetSessionKeys(
-    req: API.SessionKeysV1GetSessionKeysRequest,
-    signal?: AbortSignal
-  ): Promise<API.SessionKeysV1GetSessionKeysResponse> {
-    return this.call(Methods.SessionKeysV1GetSessionKeysMethod, req, signal);
+  ): Promise<API.AppSessionsV1GetLastKeyStatesResponse> {
+    return this.call(Methods.AppSessionsV1GetLastKeyStatesMethod, req, signal);
   }
 
   // ============================================================================

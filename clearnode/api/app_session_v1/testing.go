@@ -1,10 +1,14 @@
 package app_session_v1
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -96,20 +100,17 @@ func (m *MockStore) EnsureNoOngoingStateTransitions(wallet, asset string) error 
 	return args.Error(0)
 }
 
-func (m *MockStore) StoreSessionKeyState(state app.AppSessionKeyStateV1) error {
+func (m *MockStore) StoreAppSessionKeyState(state app.AppSessionKeyStateV1) error {
 	args := m.Called(state)
 	return args.Error(0)
 }
 
-func (m *MockStore) GetLatestSessionKeyState(wallet, sessionKey string) (*app.AppSessionKeyStateV1, error) {
+func (m *MockStore) GetLastAppSessionKeyVersion(wallet, sessionKey string) (uint64, error) {
 	args := m.Called(wallet, sessionKey)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*app.AppSessionKeyStateV1), args.Error(1)
+	return args.Get(0).(uint64), args.Error(1)
 }
 
-func (m *MockStore) GetLastKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error) {
+func (m *MockStore) GetLastAppSessionKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error) {
 	args := m.Called(wallet, sessionKey)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -166,4 +167,57 @@ func NewMockSigner() sign.Signer {
 	key, _ := crypto.GenerateKey()
 	signer, _ := sign.NewEthereumMsgSigner(hexutil.Encode(crypto.FromECDSA(key)))
 	return signer
+}
+
+// TestAppSessionWallet is a test helper for creating properly signed app session signatures.
+// It generates a real ECDSA key pair and wraps it in an AppSessionSignerV1 (wallet type)
+// so that signatures include the required 0xA1 type prefix.
+type TestAppSessionWallet struct {
+	Address string // lowercase hex address
+	signer  *app.AppSessionSignerV1
+}
+
+// NewTestAppSessionWallet creates a new test wallet with a random private key.
+func NewTestAppSessionWallet(t *testing.T) *TestAppSessionWallet {
+	t.Helper()
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+	privKeyHex := hexutil.Encode(crypto.FromECDSA(key))
+
+	ethSigner, err := sign.NewEthereumMsgSigner(privKeyHex)
+	require.NoError(t, err)
+
+	appSigner, err := app.NewAppSessionWalletSignerV1(ethSigner)
+	require.NoError(t, err)
+
+	return &TestAppSessionWallet{
+		Address: strings.ToLower(addr.Hex()),
+		signer:  appSigner,
+	}
+}
+
+// SignAppStateUpdate signs a packed app state update and returns the hex-encoded signature.
+func (w *TestAppSessionWallet) SignAppStateUpdate(t *testing.T, update app.AppStateUpdateV1) string {
+	t.Helper()
+	packed, err := app.PackAppStateUpdateV1(update)
+	require.NoError(t, err)
+
+	sig, err := w.signer.Sign(packed)
+	require.NoError(t, err)
+
+	return hexutil.Encode(sig)
+}
+
+// SignCreateRequest signs a packed create app session request and returns the hex-encoded signature.
+func (w *TestAppSessionWallet) SignCreateRequest(t *testing.T, def app.AppDefinitionV1, sessionData string) string {
+	t.Helper()
+	packed, err := app.PackCreateAppSessionRequestV1(def, sessionData)
+	require.NoError(t, err)
+
+	sig, err := w.signer.Sign(packed)
+	require.NoError(t, err)
+
+	return hexutil.Encode(sig)
 }

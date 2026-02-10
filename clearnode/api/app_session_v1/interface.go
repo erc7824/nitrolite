@@ -30,9 +30,9 @@ type Store interface {
 	EnsureNoOngoingStateTransitions(wallet, asset string) error
 
 	// Session key state operations
-	StoreSessionKeyState(state app.AppSessionKeyStateV1) error
-	GetLatestSessionKeyState(wallet, sessionKey string) (*app.AppSessionKeyStateV1, error)
-	GetLastKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error)
+	StoreAppSessionKeyState(state app.AppSessionKeyStateV1) error
+	GetLastAppSessionKeyVersion(wallet, sessionKey string) (uint64, error)
+	GetLastAppSessionKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error)
 	GetAppSessionKeyOwner(sessionKey, appSessionId string) (string, error)
 }
 

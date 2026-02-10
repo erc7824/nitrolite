@@ -87,25 +87,17 @@ func (h *Handler) SubmitSessionKeyState(c *rpc.Context) {
 
 	// Validate version and store the session key state
 	err = h.useStoreInTx(func(tx Store) error {
-		// Look up the latest state for this (user_address, session_key) pair
-		existing, err := tx.GetLatestSessionKeyState(coreState.UserAddress, coreState.SessionKey)
+		// Check the latest version for this (user_address, session_key) pair; 0 means no state exists
+		latestVersion, err := tx.GetLastAppSessionKeyVersion(coreState.UserAddress, coreState.SessionKey)
 		if err != nil {
 			return rpc.Errorf("failed to check existing session key state: %v", err)
 		}
 
-		if existing == nil {
-			// New session key: version must be 1
-			if coreState.Version != 1 {
-				return rpc.Errorf("invalid_session_key_state: initial version must be 1, got %d", coreState.Version)
-			}
-		} else {
-			// Existing session key: version must be current + 1
-			if coreState.Version != existing.Version+1 {
-				return rpc.Errorf("invalid_session_key_state: expected version %d, got %d", existing.Version+1, coreState.Version)
-			}
+		if coreState.Version != latestVersion+1 {
+			return rpc.Errorf("invalid_session_key_state: expected version %d, got %d", latestVersion+1, coreState.Version)
 		}
 
-		return tx.StoreSessionKeyState(coreState)
+		return tx.StoreAppSessionKeyState(coreState)
 	})
 
 	if err != nil {

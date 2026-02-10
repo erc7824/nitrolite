@@ -2,7 +2,9 @@ package rpc_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -455,58 +457,57 @@ func TestClientV1_AppSessionsV1SubmitAppState(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// ============================================================================
-// Session Keys Group Tests
-// ============================================================================
+func TestClientV1_AppSessionsV1SubmitSessionKeyState(t *testing.T) {
+	t.Parallel()
 
-// func TestClientV1_SessionKeysV1Register(t *testing.T) {
-// 	t.Parallel()
+	client, dialer := setupClient()
 
-// 	client, dialer := setupClient()
+	response := rpc.AppSessionsV1SubmitSessionKeyStateResponse{}
 
-// 	response := rpc.AppSessionsV1SubmitSessionKeyStateRequest{}
+	registerSimpleHandlerV1(dialer, rpc.AppSessionsV1SubmitSessionKeyStateMethod.String(), response)
 
-// 	registerSimpleHandlerV1(dialer, "session_keys.v1.register", response)
+	_, err := client.AppSessionsV1SubmitSessionKeyState(testCtxV1, rpc.AppSessionsV1SubmitSessionKeyStateRequest{
+		State: rpc.AppSessionKeyStateV1{
+			UserAddress:    testWalletV1,
+			SessionKey:     "0xsession_key_1",
+			ApplicationIDs: []string{"0xapp_1"},
+			AppSessionIDs:  []string{"0xapp_session_2"},
+			Version:        "1",
+			ExpiresAt:      fmt.Sprintf("%d", time.Now().Add(24*time.Hour).UTC().Unix()),
+		},
+	})
+	require.NoError(t, err)
+}
 
-// 	_, err := client.SessionKeysV1SubmitSessionKeyState(testCtxV1, rpc.AppSessionsV1SubmitSessionKeyStateRequest{
-// 		Address: testWalletV1,
-// 	})
-// 	require.NoError(t, err)
-// }
+func TestClientV1_AppSessionsV1GetLastKeyStates(t *testing.T) {
+	t.Parallel()
 
-// func TestClientV1_SessionKeysV1GetSessionKeys(t *testing.T) {
-// 	t.Parallel()
+	client, dialer := setupClient()
 
-// 	client, dialer := setupClient()
+	response := rpc.AppSessionsV1GetLastKeyStatesResponse{
+		States: []rpc.AppSessionKeyStateV1{
+			{
+				UserAddress:    testWalletV1,
+				SessionKey:     "0xsession_key_1",
+				ApplicationIDs: []string{"0xapp_1"},
+				AppSessionIDs:  []string{"0xapp_session_2"},
+				Version:        "1",
+				ExpiresAt:      fmt.Sprintf("%d", time.Now().Add(24*time.Hour).UTC().Unix()),
+			},
+		},
+	}
 
-// 	response := rpc.SessionKeysV1GetSessionKeysResponse{
-// 		SessionKeys: []rpc.SessionKeyV1{
-// 			{
-// 				ID:          1,
-// 				SessionKey:  "0xkey123",
-// 				Application: "test-app",
-// 				Allowances: []rpc.AssetAllowanceV1{
-// 					{Asset: testAssetV1, Allowance: "1000", Used: "100"},
-// 				},
-// 				ExpiresAt: "2025-12-31T23:59:59Z",
-// 				CreatedAt: "2025-01-01T00:00:00Z",
-// 			},
-// 		},
-// 	}
+	registerSimpleHandlerV1(dialer, rpc.AppSessionsV1GetLastKeyStatesMethod.String(), response)
 
-// 	registerSimpleHandlerV1(dialer, "session_keys.v1.get_session_keys", response)
+	res, err := client.AppSessionsV1GetLastKeyStates(testCtxV1, rpc.AppSessionsV1GetLastKeyStatesRequest{
+		UserAddress: testWalletV1,
+		SessionKey:  nil,
+	})
+	require.NoError(t, err)
 
-// 	resp, err := client.SessionKeysV1GetSessionKeys(testCtxV1, rpc.SessionKeysV1GetSessionKeysRequest{
-// 		Wallet: testWalletV1,
-// 	})
-// 	require.NoError(t, err)
-// 	assert.Len(t, resp.SessionKeys, 1)
-// 	assert.Equal(t, "0xkey123", resp.SessionKeys[0].SessionKey)
-// }
-
-// ============================================================================
-// User Group Tests
-// ============================================================================
+	assert.Len(t, res.States, 1)
+	assert.Equal(t, "0xsession_key_1", res.States[0].SessionKey)
+}
 
 func TestClientV1_UserV1GetBalances(t *testing.T) {
 	t.Parallel()

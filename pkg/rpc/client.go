@@ -181,27 +181,23 @@ func (c *Client) AppSessionsV1RebalanceAppSessions(ctx context.Context, req AppS
 	return resp, nil
 }
 
-// ============================================================================
-// Session Keys Group - V1 API Methods
-// ============================================================================
-
-// SessionKeysV1Register initiates session key registration.
-func (c *Client) SessionKeysV1SubmitSessionKeyState(ctx context.Context, req AppSessionsV1SubmitSessionKeyStateRequest) (AppSessionsV1SubmitSessionKeyStateRequest, error) {
+// AppSessionsV1Register initiates session key registration.
+func (c *Client) AppSessionsV1SubmitSessionKeyState(ctx context.Context, req AppSessionsV1SubmitSessionKeyStateRequest) (AppSessionsV1SubmitSessionKeyStateRequest, error) {
 	var resp AppSessionsV1SubmitSessionKeyStateRequest
-	if err := c.call(ctx, SessionKeysV1RegisterMethod, req, &resp); err != nil {
+	if err := c.call(ctx, AppSessionsV1SubmitSessionKeyStateMethod, req, &resp); err != nil {
 		return resp, err
 	}
 	return resp, nil
 }
 
-// // SessionKeysV1GetSessionKeys retrieves all active session keys for the authenticated user.
-// func (c *Client) SessionKeysV1GetSessionKeys(ctx context.Context, req SessionKeysV1GetSessionKeysRequest) (SessionKeysV1GetSessionKeysResponse, error) {
-// 	var resp SessionKeysV1GetSessionKeysResponse
-// 	if err := c.call(ctx, SessionKeysV1GetSessionKeysMethod, req, &resp); err != nil {
-// 		return resp, err
-// 	}
-// 	return resp, nil
-// }
+// AppSessionsV1GetSessionKeys retrieves all active session keys for the authenticated user.
+func (c *Client) AppSessionsV1GetLastKeyStates(ctx context.Context, req AppSessionsV1GetLastKeyStatesRequest) (AppSessionsV1GetLastKeyStatesResponse, error) {
+	var resp AppSessionsV1GetLastKeyStatesResponse
+	if err := c.call(ctx, AppSessionsV1GetLastKeyStatesMethod, req, &resp); err != nil {
+		return resp, err
+	}
+	return resp, nil
+}
 
 // ============================================================================
 // User Group - V1 API Methods

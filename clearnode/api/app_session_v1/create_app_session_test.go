@@ -38,9 +38,23 @@ func TestCreateAppSession_Success(t *testing.T) {
 		"0xnode",
 	)
 
-	// Test data
-	participant1 := "0x1111111111111111111111111111111111111111"
+	// Create a real test wallet for participant1
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 	participant2 := "0x2222222222222222222222222222222222222222"
+
+	// Build the app.AppDefinitionV1 for signing
+	appDef := app.AppDefinitionV1{
+		Application: "test-app",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: participant1, SignatureWeight: 1},
+			{WalletAddress: participant2, SignatureWeight: 1},
+		},
+		Quorum: 1,
+		Nonce:  12345,
+	}
+	sessionData := `{"test": "data"}`
+	sig1 := wallet1.SignCreateRequest(t, appDef, sessionData)
 
 	reqPayload := rpc.AppSessionsV1CreateAppSessionRequest{
 		Definition: rpc.AppDefinitionV1{
@@ -58,14 +72,11 @@ func TestCreateAppSession_Success(t *testing.T) {
 			Quorum: 1, // Only need 1 signature
 			Nonce:  "12345",
 		},
-		QuorumSigs: []string{
-			"0x1234567890abcdef", // Mock signature from participant1
-		},
-		SessionData: `{"test": "data"}`,
+		QuorumSigs:  []string{sig1},
+		SessionData: sessionData,
 	}
 
 	// Mock expectations
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
 	mockStore.On("CreateAppSession", mock.MatchedBy(func(session any) bool {
 		return true // Accept any app session for now
 	})).Return(nil).Once()
@@ -104,7 +115,6 @@ func TestCreateAppSession_Success(t *testing.T) {
 
 	// Verify all mocks were called
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
@@ -132,10 +142,26 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 		"0xnode",
 	)
 
-	// Test data
-	participant1 := "0x1111111111111111111111111111111111111111"
-	participant2 := "0x2222222222222222222222222222222222222222"
+	// Create real test wallets for participant1 and participant2
+	wallet1 := NewTestAppSessionWallet(t)
+	wallet2 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
+	participant2 := wallet2.Address
 	participant3 := "0x3333333333333333333333333333333333333333"
+
+	// Build the app.AppDefinitionV1 for signing
+	appDef := app.AppDefinitionV1{
+		Application: "test-app",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: participant1, SignatureWeight: 2},
+			{WalletAddress: participant2, SignatureWeight: 1},
+			{WalletAddress: participant3, SignatureWeight: 1},
+		},
+		Quorum: 3,
+		Nonce:  12345,
+	}
+	sig1 := wallet1.SignCreateRequest(t, appDef, "")
+	sig2 := wallet2.SignCreateRequest(t, appDef, "")
 
 	reqPayload := rpc.AppSessionsV1CreateAppSessionRequest{
 		Definition: rpc.AppDefinitionV1{
@@ -158,15 +184,13 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 			Nonce:  "12345",
 		},
 		QuorumSigs: []string{
-			"0x1234", // participant1 (weight 2)
-			"0x5678", // participant2 (weight 1)
+			sig1, // participant1 (weight 2)
+			sig2, // participant2 (weight 1)
 		},
 		SessionData: "",
 	}
 
-	// Mock expectations - signatures will be recovered in order
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant2, nil).Once()
+	// Mock expectations
 	mockStore.On("CreateAppSession", mock.Anything).Return(nil).Once()
 
 	// Create RPC context
@@ -193,7 +217,6 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 
 	// Verify all mocks were called
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestCreateAppSession_ZeroNonce(t *testing.T) {
@@ -431,9 +454,21 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 		"0xnode",
 	)
 
-	// Test data
+	// Create a wallet that is NOT a participant
+	nonParticipantWallet := NewTestAppSessionWallet(t)
 	participant1 := "0x1111111111111111111111111111111111111111"
-	nonParticipant := "0x9999999999999999999999999999999999999999"
+
+	// Build the app.AppDefinitionV1 for signing (with participant1 only)
+	appDef := app.AppDefinitionV1{
+		Application: "test-app",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: participant1, SignatureWeight: 1},
+		},
+		Quorum: 1,
+		Nonce:  12345,
+	}
+	// Sign with the non-participant wallet
+	sig := nonParticipantWallet.SignCreateRequest(t, appDef, "")
 
 	reqPayload := rpc.AppSessionsV1CreateAppSessionRequest{
 		Definition: rpc.AppDefinitionV1{
@@ -447,11 +482,8 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 			Quorum: 1,
 			Nonce:  "12345",
 		},
-		QuorumSigs: []string{"0x1234567890abcdef"},
+		QuorumSigs: []string{sig},
 	}
-
-	// Mock expectations - signature recovered from non-participant
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(nonParticipant, nil).Once()
 
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
@@ -475,7 +507,6 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 
 	// Verify mocks were called
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestCreateAppSession_QuorumNotMet(t *testing.T) {
@@ -503,10 +534,25 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 		"0xnode",
 	)
 
-	// Test data
-	participant1 := "0x1111111111111111111111111111111111111111"
+	// Create a real wallet for participant1
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 	participant2 := "0x2222222222222222222222222222222222222222"
 	participant3 := "0x3333333333333333333333333333333333333333"
+
+	// Build the app.AppDefinitionV1 for signing
+	appDef := app.AppDefinitionV1{
+		Application: "test-app",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: participant1, SignatureWeight: 1},
+			{WalletAddress: participant2, SignatureWeight: 1},
+			{WalletAddress: participant3, SignatureWeight: 1},
+		},
+		Quorum: 3,
+		Nonce:  12345,
+	}
+	// Sign with only one wallet (gives weight 1, but need 3)
+	sig1 := wallet1.SignCreateRequest(t, appDef, "")
 
 	reqPayload := rpc.AppSessionsV1CreateAppSessionRequest{
 		Definition: rpc.AppDefinitionV1{
@@ -529,12 +575,9 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 			Nonce:  "12345",
 		},
 		QuorumSigs: []string{
-			"0x1234", // Only one signature, need 3 total weight
+			sig1, // Only one signature, need 3 total weight
 		},
 	}
-
-	// Mock expectations - only one signature provided
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
 
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
@@ -558,7 +601,6 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 
 	// Verify mocks were called
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
@@ -586,9 +628,24 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 		"0xnode",
 	)
 
-	// Test data
-	participant1 := "0x1111111111111111111111111111111111111111"
+	// Create a real wallet for participant1
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 	participant2 := "0x2222222222222222222222222222222222222222"
+
+	// Build the app.AppDefinitionV1 for signing
+	appDef := app.AppDefinitionV1{
+		Application: "test-app",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: participant1, SignatureWeight: 1},
+			{WalletAddress: participant2, SignatureWeight: 1},
+		},
+		Quorum: 2,
+		Nonce:  12345,
+	}
+	// Sign TWICE with the same wallet
+	sig1 := wallet1.SignCreateRequest(t, appDef, "")
+	sig2 := wallet1.SignCreateRequest(t, appDef, "")
 
 	reqPayload := rpc.AppSessionsV1CreateAppSessionRequest{
 		Definition: rpc.AppDefinitionV1{
@@ -607,14 +664,10 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 			Nonce:  "12345",
 		},
 		QuorumSigs: []string{
-			"0x1234", // participant1
-			"0x5678", // participant1 again (duplicate)
+			sig1, // participant1
+			sig2, // participant1 again (duplicate)
 		},
 	}
-
-	// Mock expectations - both signatures from same participant
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
 
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
@@ -639,7 +692,6 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 
 	// Verify mocks were called
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
@@ -750,11 +802,9 @@ func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 			Quorum: 1,
 			Nonce:  "12345",
 		},
-		QuorumSigs: []string{"0x1234567890abcdef"},
+		// Send a signature with the 0xA1 wallet prefix but invalid ECDSA data
+		QuorumSigs: []string{"0xa100000000"},
 	}
-
-	// Mock expectations - signature recovery fails
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return("", assert.AnError).Once()
 
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
@@ -774,9 +824,8 @@ func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 	// Verify response contains error about signature recovery
 	err = ctx.Response.Error()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "recover signer address")
+	assert.Contains(t, err.Error(), "recover user wallet")
 
 	// Verify mocks were called
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }

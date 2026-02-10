@@ -1254,6 +1254,42 @@ export class Client {
   }
 
   // ============================================================================
+  // Session Key Methods
+  // ============================================================================
+
+  /**
+   * Submit a session key state for registration or update.
+   * The state must be signed by the user's wallet to authorize the session key delegation.
+   *
+   * @param state - The session key state containing delegation information
+   */
+  async submitSessionKeyState(state: app.AppSessionKeyStateV1): Promise<void> {
+    const req: API.AppSessionsV1SubmitSessionKeyStateRequest = {
+      state,
+    };
+    await this.rpcClient.appSessionsV1SubmitSessionKeyState(req);
+  }
+
+  /**
+   * Retrieve the latest session key states for a user.
+   *
+   * @param userAddress - The user's wallet address
+   * @param sessionKey - Optional session key address to filter by
+   * @returns List of active session key states
+   */
+  async getLastKeyStates(
+    userAddress: string,
+    sessionKey?: string
+  ): Promise<app.AppSessionKeyStateV1[]> {
+    const req: API.AppSessionsV1GetLastKeyStatesRequest = {
+      user_address: userAddress,
+      session_key: sessionKey,
+    };
+    const resp = await this.rpcClient.appSessionsV1GetLastKeyStates(req);
+    return resp.states;
+  }
+
+  // ============================================================================
   // Private Helper Methods
   // ============================================================================
 

@@ -17,20 +17,20 @@ func (h *Handler) GetLastKeyStates(c *rpc.Context) {
 		return
 	}
 
-	if req.Wallet == "" {
+	if req.UserAddress == "" {
 		c.Fail(rpc.Errorf("wallet is required"), "")
 		return
 	}
 
 	logger.Debug("retrieving session key states",
-		"wallet", req.Wallet,
+		"wallet", req.UserAddress,
 		"sessionKey", req.SessionKey)
 
 	var states []app.AppSessionKeyStateV1
 
 	err := h.useStoreInTx(func(tx Store) error {
 		var err error
-		states, err = tx.GetLastKeyStates(req.Wallet, req.SessionKey)
+		states, err = tx.GetLastAppSessionKeyStates(req.UserAddress, req.SessionKey)
 		return err
 	})
 

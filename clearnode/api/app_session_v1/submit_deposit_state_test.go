@@ -40,8 +40,9 @@ func TestSubmitDepositState_Success(t *testing.T) {
 		},
 	}
 
-	// Test data
-	participant1 := "0x1111111111111111111111111111111111111111"
+	// Test data - use TestAppSessionWallet for quorum signer
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 	participant2 := "0x2222222222222222222222222222222222222222"
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -109,8 +110,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingUserState.UserSig = &userSigHex
 
-	// Create app state update with proper hex signature
-	appSigKey, _ := crypto.GenerateKey()
+	// Create app state update and sign with wallet1 (includes 0xA1 prefix for verifyQuorum)
 	appStateUpdateCore := app.AppStateUpdateV1{
 		AppSessionID: appSessionID,
 		Intent:       app.AppStateUpdateIntentDeposit,
@@ -124,9 +124,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 		},
 		SessionData: `{"updated": "data"}`,
 	}
-	packedAppStateUpdate, _ := app.PackAppStateUpdateV1(appStateUpdateCore)
-	appSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedAppStateUpdate).Bytes(), appSigKey)
-	appSigHex := hexutil.Encode(appSigBytes)
+	appSigHex := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
 
 	appStateUpdate := rpc.AppStateUpdateV1{
 		AppSessionID: appSessionID,
@@ -149,9 +147,6 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
-
-	// Mock signature recovery for app state update
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
 
 	// Mock allocations check - empty initially
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(
@@ -373,8 +368,9 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 		},
 	}
 
-	// Test data
-	participant1 := "0x1111111111111111111111111111111111111111"
+	// Test data - use TestAppSessionWallet for quorum signer
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 	participant2 := "0x2222222222222222222222222222222222222222"
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -434,8 +430,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingUserState.UserSig = &userSigHex
 
-	// Create app state update with only one signature (insufficient) - using proper hex
-	appSigKey, _ := crypto.GenerateKey()
+	// Create app state update and sign with wallet1 (includes 0xA1 prefix for verifyQuorum)
 	appStateUpdateCore := app.AppStateUpdateV1{
 		AppSessionID: appSessionID,
 		Intent:       app.AppStateUpdateIntentDeposit,
@@ -449,9 +444,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 		},
 		SessionData: "",
 	}
-	packedAppStateUpdate, _ := app.PackAppStateUpdateV1(appStateUpdateCore)
-	appSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedAppStateUpdate).Bytes(), appSigKey)
-	appSigHex := hexutil.Encode(appSigBytes)
+	appSigHex := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
 
 	appStateUpdate := rpc.AppStateUpdateV1{
 		AppSessionID: appSessionID,
@@ -473,7 +466,6 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
 
 	// Create RPC request
 	rpcState := toRPCState(*incomingUserState)

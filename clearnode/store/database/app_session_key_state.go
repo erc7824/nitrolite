@@ -9,47 +9,47 @@ import (
 	"gorm.io/gorm"
 )
 
-// SessionKeyStateV1 represents a session key state in the database.
+// AppSessionKeyStateV1 represents a session key state in the database.
 // ID is Hash(user_address + session_key + version).
-type SessionKeyStateV1 struct {
-	ID             string                     `gorm:"column:id;primaryKey"`
-	UserAddress    string                     `gorm:"column:user_address;not null;uniqueIndex:idx_session_key_states_v1_user_key_ver,priority:1"`
-	SessionKey     string                     `gorm:"column:session_key;not null;uniqueIndex:idx_session_key_states_v1_user_key_ver,priority:2"`
-	Version        uint64                     `gorm:"column:version;not null;uniqueIndex:idx_session_key_states_v1_user_key_ver,priority:3"`
-	ApplicationIDs []SessionKeyApplicationV1  `gorm:"foreignKey:SessionKeyStateID;references:ID"`
-	AppSessionIDs  []SessionKeyAppSessionIDV1 `gorm:"foreignKey:SessionKeyStateID;references:ID"`
-	ExpiresAt      time.Time                  `gorm:"column:expires_at;not null"`
-	UserSig        string                     `gorm:"column:user_sig;not null"`
+type AppSessionKeyStateV1 struct {
+	ID             string                        `gorm:"column:id;primaryKey"`
+	UserAddress    string                        `gorm:"column:user_address;not null;uniqueIndex:idx_session_key_states_v1_user_key_ver,priority:1"`
+	SessionKey     string                        `gorm:"column:session_key;not null;uniqueIndex:idx_session_key_states_v1_user_key_ver,priority:2"`
+	Version        uint64                        `gorm:"column:version;not null;uniqueIndex:idx_session_key_states_v1_user_key_ver,priority:3"`
+	ApplicationIDs []AppSessionKeyApplicationV1  `gorm:"foreignKey:SessionKeyStateID;references:ID"`
+	AppSessionIDs  []AppSessionKeyAppSessionIDV1 `gorm:"foreignKey:SessionKeyStateID;references:ID"`
+	ExpiresAt      time.Time                     `gorm:"column:expires_at;not null"`
+	UserSig        string                        `gorm:"column:user_sig;not null"`
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
 
-func (SessionKeyStateV1) TableName() string {
-	return "session_key_states_v1"
+func (AppSessionKeyStateV1) TableName() string {
+	return "app_session_key_states_v1"
 }
 
 // SessionKeyApplicationV1 links a session key state to an application ID.
-type SessionKeyApplicationV1 struct {
+type AppSessionKeyApplicationV1 struct {
 	SessionKeyStateID string `gorm:"column:session_key_state_id;not null;primaryKey;priority:1"`
 	ApplicationID     string `gorm:"column:application_id;not null;primaryKey;priority:2;index"`
 }
 
-func (SessionKeyApplicationV1) TableName() string {
-	return "session_key_applications_v1"
+func (AppSessionKeyApplicationV1) TableName() string {
+	return "app_session_key_applications_v1"
 }
 
-// SessionKeyAppSessionIDV1 links a session key state to an app session ID.
-type SessionKeyAppSessionIDV1 struct {
+// AppSessionKeyAppSessionIDV1 links a session key state to an app session ID.
+type AppSessionKeyAppSessionIDV1 struct {
 	SessionKeyStateID string `gorm:"column:session_key_state_id;not null;primaryKey;priority:1"`
 	AppSessionID      string `gorm:"column:app_session_id;not null;primaryKey;priority:2;index"`
 }
 
-func (SessionKeyAppSessionIDV1) TableName() string {
-	return "session_key_app_sessions_v1"
+func (AppSessionKeyAppSessionIDV1) TableName() string {
+	return "app_session_key_app_sessions_v1"
 }
 
-// StoreSessionKeyState stores a new session key state version.
-func (s *DBStore) StoreSessionKeyState(state app.AppSessionKeyStateV1) error {
+// StoreAppSessionKeyState stores a new session key state version.
+func (s *DBStore) StoreAppSessionKeyState(state app.AppSessionKeyStateV1) error {
 	userAddress := strings.ToLower(state.UserAddress)
 	sessionKey := strings.ToLower(state.SessionKey)
 
@@ -58,7 +58,7 @@ func (s *DBStore) StoreSessionKeyState(state app.AppSessionKeyStateV1) error {
 		return fmt.Errorf("failed to generate session key state ID: %w", err)
 	}
 
-	dbState := SessionKeyStateV1{
+	dbState := AppSessionKeyStateV1{
 		ID:          id,
 		UserAddress: userAddress,
 		SessionKey:  sessionKey,
@@ -74,9 +74,9 @@ func (s *DBStore) StoreSessionKeyState(state app.AppSessionKeyStateV1) error {
 	}
 
 	if len(state.ApplicationIDs) > 0 {
-		applicationIDs := make([]SessionKeyApplicationV1, len(state.ApplicationIDs))
+		applicationIDs := make([]AppSessionKeyApplicationV1, len(state.ApplicationIDs))
 		for i, appID := range state.ApplicationIDs {
-			applicationIDs[i] = SessionKeyApplicationV1{
+			applicationIDs[i] = AppSessionKeyApplicationV1{
 				SessionKeyStateID: id,
 				ApplicationID:     strings.ToLower(appID),
 			}
@@ -87,9 +87,9 @@ func (s *DBStore) StoreSessionKeyState(state app.AppSessionKeyStateV1) error {
 	}
 
 	if len(state.AppSessionIDs) > 0 {
-		appSessionIDs := make([]SessionKeyAppSessionIDV1, len(state.AppSessionIDs))
+		appSessionIDs := make([]AppSessionKeyAppSessionIDV1, len(state.AppSessionIDs))
 		for i, sessID := range state.AppSessionIDs {
-			appSessionIDs[i] = SessionKeyAppSessionIDV1{
+			appSessionIDs[i] = AppSessionKeyAppSessionIDV1{
 				SessionKeyStateID: id,
 				AppSessionID:      strings.ToLower(sessID),
 			}
@@ -102,13 +102,13 @@ func (s *DBStore) StoreSessionKeyState(state app.AppSessionKeyStateV1) error {
 	return nil
 }
 
-// GetLastKeyStates retrieves the latest session key states for a user with optional filtering.
+// GetLastAppSessionKeyStates retrieves the latest session key states for a user with optional filtering.
 // Returns only the highest-version row per session key that has not expired.
-func (s *DBStore) GetLastKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error) {
+func (s *DBStore) GetLastAppSessionKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error) {
 	wallet = strings.ToLower(wallet)
 
 	// Subquery to get the max version per session key for this user
-	subQuery := s.db.Model(&SessionKeyStateV1{}).
+	subQuery := s.db.Model(&AppSessionKeyStateV1{}).
 		Select("user_address, session_key, MAX(version) as max_version").
 		Where("user_address = ? AND expires_at > ?", wallet, time.Now().UTC()).
 		Group("user_address, session_key")
@@ -118,12 +118,12 @@ func (s *DBStore) GetLastKeyStates(wallet string, sessionKey *string) ([]app.App
 	}
 
 	query := s.db.
-		Joins("JOIN (?) AS latest ON session_key_states_v1.user_address = latest.user_address AND session_key_states_v1.session_key = latest.session_key AND session_key_states_v1.version = latest.max_version", subQuery).
+		Joins("JOIN (?) AS latest ON app_session_key_states_v1.user_address = latest.user_address AND app_session_key_states_v1.session_key = latest.session_key AND app_session_key_states_v1.version = latest.max_version", subQuery).
 		Preload("ApplicationIDs").
 		Preload("AppSessionIDs").
-		Order("session_key_states_v1.updated_at DESC")
+		Order("app_session_key_states_v1.updated_at DESC")
 
-	var dbStates []SessionKeyStateV1
+	var dbStates []AppSessionKeyStateV1
 	if err := query.Find(&dbStates).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return []app.AppSessionKeyStateV1{}, nil
@@ -139,13 +139,38 @@ func (s *DBStore) GetLastKeyStates(wallet string, sessionKey *string) ([]app.App
 	return states, nil
 }
 
-// GetLatestSessionKeyState retrieves the latest version of a specific session key for a user.
-// Returns nil if no state exists.
-func (s *DBStore) GetLatestSessionKeyState(wallet, sessionKey string) (*app.AppSessionKeyStateV1, error) {
+// GetLastAppSessionKeyVersion returns the latest version of a non-expired session key state for a user.
+// Returns 0 if no state exists.
+func (s *DBStore) GetLastAppSessionKeyVersion(wallet, sessionKey string) (uint64, error) {
 	wallet = strings.ToLower(wallet)
 	sessionKey = strings.ToLower(sessionKey)
 
-	var dbState SessionKeyStateV1
+	var result struct {
+		Version uint64
+	}
+	err := s.db.Model(&AppSessionKeyStateV1{}).
+		Select("version").
+		Where("user_address = ? AND session_key = ? AND expires_at > ?", wallet, sessionKey, time.Now().UTC()).
+		Order("version DESC").
+		Take(&result).Error
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("failed to check session key state: %w", err)
+	}
+
+	return result.Version, nil
+}
+
+// GetLastAppSessionKeyState retrieves the latest version of a specific session key for a user.
+// Returns nil if no state exists.
+func (s *DBStore) GetLastAppSessionKeyState(wallet, sessionKey string) (*app.AppSessionKeyStateV1, error) {
+	wallet = strings.ToLower(wallet)
+	sessionKey = strings.ToLower(sessionKey)
+
+	var dbState AppSessionKeyStateV1
 	err := s.db.
 		Where("user_address = ? AND session_key = ? AND expires_at > ?", wallet, sessionKey, time.Now().UTC()).
 		Order("version DESC").
@@ -173,13 +198,13 @@ func (s *DBStore) GetAppSessionKeyOwner(sessionKey, appSessionId string) (string
 	// Subquery to get the application ID from the app session
 	appSubQuery := s.db.Model(&AppSessionV1{}).Select("application").Where("id = ?", appSessionId)
 
-	var dbState SessionKeyStateV1
+	var dbState AppSessionKeyStateV1
 	err := s.db.
-		Joins("LEFT JOIN session_key_app_sessions_v1 ON session_key_app_sessions_v1.session_key_state_id = session_key_states_v1.id").
-		Joins("LEFT JOIN session_key_applications_v1 ON session_key_applications_v1.session_key_state_id = session_key_states_v1.id").
-		Where("session_key_states_v1.session_key = ? AND (session_key_app_sessions_v1.app_session_id = ? OR session_key_applications_v1.application_id = (?)) AND session_key_states_v1.expires_at > ?",
+		Joins("LEFT JOIN app_session_key_app_sessions_v1 ON app_session_key_app_sessions_v1.session_key_state_id = app_session_key_states_v1.id").
+		Joins("LEFT JOIN app_session_key_applications_v1 ON app_session_key_applications_v1.session_key_state_id = app_session_key_states_v1.id").
+		Where("app_session_key_states_v1.session_key = ? AND (app_session_key_app_sessions_v1.app_session_id = ? OR app_session_key_applications_v1.application_id = (?)) AND app_session_key_states_v1.expires_at > ?",
 			sessionKey, appSessionId, appSubQuery, time.Now().UTC()).
-		Order("session_key_states_v1.version DESC").
+		Order("app_session_key_states_v1.version DESC").
 		First(&dbState).Error
 
 	if err != nil {
@@ -192,7 +217,7 @@ func (s *DBStore) GetAppSessionKeyOwner(sessionKey, appSessionId string) (string
 	return dbState.UserAddress, nil
 }
 
-func dbSessionKeyStateToCore(dbState *SessionKeyStateV1) app.AppSessionKeyStateV1 {
+func dbSessionKeyStateToCore(dbState *AppSessionKeyStateV1) app.AppSessionKeyStateV1 {
 	applicationIDs := make([]string, len(dbState.ApplicationIDs))
 	for i, a := range dbState.ApplicationIDs {
 		applicationIDs[i] = a.ApplicationID

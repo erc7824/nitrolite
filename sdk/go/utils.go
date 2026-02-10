@@ -3,6 +3,7 @@ package sdk
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/app"
@@ -504,4 +505,67 @@ func transformSignedAppStateUpdateToRPC(signed app.SignedAppStateUpdateV1) rpc.S
 		AppStateUpdate: transformAppStateUpdateToRPC(signed.AppStateUpdate),
 		QuorumSigs:     signed.QuorumSigs,
 	}
+}
+
+// ============================================================================
+// Session Key State Transformations
+// ============================================================================
+
+// transformSessionKeyStateToRPC converts app.AppSessionKeyStateV1 to RPC AppSessionKeyStateV1.
+func transformSessionKeyStateToRPC(state app.AppSessionKeyStateV1) rpc.AppSessionKeyStateV1 {
+	return rpc.AppSessionKeyStateV1{
+		UserAddress:    state.UserAddress,
+		SessionKey:     state.SessionKey,
+		Version:        strconv.FormatUint(state.Version, 10),
+		ApplicationIDs: state.ApplicationIDs,
+		AppSessionIDs:  state.AppSessionIDs,
+		ExpiresAt:      strconv.FormatInt(state.ExpiresAt.Unix(), 10),
+		UserSig:        state.UserSig,
+	}
+}
+
+// transformSessionKeyState converts RPC AppSessionKeyStateV1 to app.AppSessionKeyStateV1.
+func transformSessionKeyState(state rpc.AppSessionKeyStateV1) (app.AppSessionKeyStateV1, error) {
+	version, err := strconv.ParseUint(state.Version, 10, 64)
+	if err != nil {
+		return app.AppSessionKeyStateV1{}, fmt.Errorf("failed to parse version: %w", err)
+	}
+
+	expiresAtUnix, err := strconv.ParseInt(state.ExpiresAt, 10, 64)
+	if err != nil {
+		return app.AppSessionKeyStateV1{}, fmt.Errorf("failed to parse expires_at: %w", err)
+	}
+
+	applicationIDs := state.ApplicationIDs
+	if applicationIDs == nil {
+		applicationIDs = []string{}
+	}
+
+	appSessionIDs := state.AppSessionIDs
+	if appSessionIDs == nil {
+		appSessionIDs = []string{}
+	}
+
+	return app.AppSessionKeyStateV1{
+		UserAddress:    strings.ToLower(state.UserAddress),
+		SessionKey:     strings.ToLower(state.SessionKey),
+		Version:        version,
+		ApplicationIDs: applicationIDs,
+		AppSessionIDs:  appSessionIDs,
+		ExpiresAt:      time.Unix(expiresAtUnix, 0),
+		UserSig:        state.UserSig,
+	}, nil
+}
+
+// transformSessionKeyStates converts a slice of RPC AppSessionKeyStateV1 to app.AppSessionKeyStateV1.
+func transformSessionKeyStates(states []rpc.AppSessionKeyStateV1) ([]app.AppSessionKeyStateV1, error) {
+	result := make([]app.AppSessionKeyStateV1, 0, len(states))
+	for _, s := range states {
+		state, err := transformSessionKeyState(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to transform session key state: %w", err)
+		}
+		result = append(result, state)
+	}
+	return result, nil
 }

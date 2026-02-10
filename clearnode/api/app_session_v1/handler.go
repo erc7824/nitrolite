@@ -2,6 +2,7 @@ package app_session_v1
 
 import (
 	"context"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/shopspring/decimal"
@@ -66,6 +67,7 @@ func (h *Handler) verifyQuorum(tx Store, appSessionId string, participantWeights
 		if err != nil {
 			return rpc.Errorf("failed to recover user wallet: %v", err)
 		}
+		userWallet = strings.ToLower(userWallet)
 
 		// Check if signer is a participant
 		weight, isParticipant := participantWeights[userWallet]

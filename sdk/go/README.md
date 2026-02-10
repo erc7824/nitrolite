@@ -52,6 +52,14 @@ client.SubmitAppState(ctx, update, sigs)                      // Update session
 client.RebalanceAppSessions(ctx, signedUpdates)               // Atomic rebalance
 ```
 
+### Session Keys
+```go
+client.SubmitSessionKeyState(ctx, state)                                          // Register/update session key
+client.GetLastKeyStates(ctx, userAddress, opts)                                   // Get active session key states
+client.SignSessionKeyState(state)                                                 // Sign a session key state
+client.BuildSessionKeyState(ctx, sessionKey, appIDs, sessionIDs, expiresAt)       // Build unsigned state with next version
+```
+
 ### Shared Utilities
 ```go
 client.Close()                          // Close connection
@@ -302,6 +310,22 @@ err := client.SubmitAppState(ctx, update, sigs)
 batchID, err := client.RebalanceAppSessions(ctx, signedUpdates)
 ```
 
+### Session Keys
+
+```go
+// Build, sign, and submit a session key state
+state, err := client.BuildSessionKeyState(ctx, "0xSessionKey...", []string{"app1"}, nil, expiresAt)
+sig, err := client.SignSessionKeyState(state)
+state.UserSig = sig
+err = client.SubmitSessionKeyState(ctx, state)
+
+// Query active session key states
+states, err := client.GetLastKeyStates(ctx, userAddress, nil)
+states, err := client.GetLastKeyStates(ctx, userAddress, &sdk.GetLastKeyStatesOptions{
+    SessionKey: &sessionKeyAddr,
+})
+```
+
 ## Key Concepts
 
 ### State Management
@@ -448,6 +472,7 @@ core.Blockchain      // Blockchain info
 app.AppSessionInfoV1      // Session info
 app.AppDefinitionV1       // Session definition
 app.AppStateUpdateV1      // Session update
+app.AppSessionKeyStateV1  // Session key state
 ```
 
 ## Operation Internals

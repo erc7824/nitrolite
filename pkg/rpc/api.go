@@ -248,9 +248,9 @@ type AppSessionsV1SubmitSessionKeyStateResponse struct {
 
 // AppSessionsV1GetLastKeyStatesRequest retrieves the latest session key states for a user with optional filtering by session key.
 type AppSessionsV1GetLastKeyStatesRequest struct {
-	// Wallet is the user's wallet address
-	Wallet     string  `json:"wallet"`
-	SessionKey *string `json:"session_key,omitempty"` // Optionally filter by SessionKey
+	// UserAddress is the user's wallet address
+	UserAddress string  `json:"user_address"`
+	SessionKey  *string `json:"session_key,omitempty"` // Optionally filter by SessionKey
 }
 
 // SessionKeysV1GetSessionKeysResponse returns the list of active session keys.

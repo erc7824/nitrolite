@@ -170,7 +170,7 @@ func unmapSignedAppStateUpdateV1(signedUpd *rpc.SignedAppStateUpdateV1) (app.Sig
 func getParticipantWeights(participants []app.AppParticipantV1) map[string]uint8 {
 	weights := make(map[string]uint8, len(participants))
 	for _, p := range participants {
-		weights[p.WalletAddress] = p.SignatureWeight
+		weights[strings.ToLower(p.WalletAddress)] = p.SignatureWeight
 	}
 	return weights
 }

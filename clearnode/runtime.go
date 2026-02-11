@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 
 	"github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/erc7824/nitrolite/clearnode/store/memory"
@@ -42,6 +44,8 @@ type Config struct {
 	Database                    database.DatabaseConfig
 	ChannelMinChallengeDuration uint32 `yaml:"channel_min_challenge_duration" env:"CLEARNODE_CHANNEL_MIN_CHALLENGE_DURATION" env-default:"86400"` // 24 hours
 	SignerKey                   string `yaml:"signer_key" env:"CLEARNODE_SIGNER_KEY,required"`
+	SignerType                  string `yaml:"signer_type" env:"CLEARNODE_SIGNER_TYPE" env-default:"local"`
+	AwsRegion                   string `yaml:"aws_region" env:"CLEARNODE_AWS_REGION" env-default:"us-east-1"`
 }
 
 // InitBackbone initializes the backbone components of the application.
@@ -102,13 +106,32 @@ func InitBackbone() *Backbone {
 	// Signer
 	// ------------------------------------------------
 
-	stateSigner, err := sign.NewEthereumMsgSigner(conf.SignerKey)
-	if err != nil {
-		logger.Fatal("failed to initialise state signer", "error", err)
-	}
-	txSigner, err := sign.NewEthereumRawSigner(conf.SignerKey)
-	if err != nil {
-		logger.Fatal("failed to initialise tx signer", "error", err)
+	var stateSigner sign.Signer
+	var txSigner sign.Signer
+
+	if conf.SignerType == "kms" {
+		cfg, err := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(conf.AwsRegion))
+		if err != nil {
+			logger.Fatal("failed to load AWS config", "error", err)
+		}
+		kmsClient := kms.NewFromConfig(cfg)
+
+		rawSigner, err := sign.NewKMSSigner(kmsClient, conf.SignerKey)
+		if err != nil {
+			logger.Fatal("failed to initialise KMS signer", "error", err)
+		}
+
+		txSigner = rawSigner
+		stateSigner = sign.NewEthereumMsgSignerFromSigner(rawSigner)
+	} else {
+		stateSigner, err = sign.NewEthereumMsgSigner(conf.SignerKey)
+		if err != nil {
+			logger.Fatal("failed to initialise state signer", "error", err)
+		}
+		txSigner, err = sign.NewEthereumRawSigner(conf.SignerKey)
+		if err != nil {
+			logger.Fatal("failed to initialise tx signer", "error", err)
+		}
 	}
 	logger.Info("signer initialized", "address", stateSigner.PublicKey().Address())
 

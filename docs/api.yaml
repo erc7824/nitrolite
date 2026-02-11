@@ -289,6 +289,9 @@ types:
         - name: decimals
           type: integer
           description: Number of decimal places
+        - name: suggested_blockchain_id
+          type: string
+          description: Suggested blockchain network ID for this asset
         - name: tokens
           type: array
           items:

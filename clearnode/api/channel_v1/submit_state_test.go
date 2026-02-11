@@ -1215,6 +1215,128 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 	assert.Equal(t, userBalance, finalizeTransition.Amount, "Finalize amount should equal the original user balance")
 }
 
+func TestSubmitState_Acknowledgement_Success(t *testing.T) {
+	// Setup
+	mockTxStore := new(MockStore)
+	mockMemoryStore := new(MockMemoryStore)
+	mockAssetStore := new(MockAssetStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+	minChallenge := uint32(3600)
+	mockStatePacker := new(MockStatePacker)
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
+		useStoreInTx: func(handler StoreTxHandler) error {
+			err := handler(mockTxStore)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		memoryStore:  mockMemoryStore,
+		signer:       mockSigner,
+		nodeAddress:  nodeAddress,
+		minChallenge: minChallenge,
+		sigValidators: map[SigValidatorType]SigValidator{
+			EcdsaSigValidatorType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	userWallet := "0x1234567890123456789012345678901234567890"
+	asset := "USDC"
+	homeChannelID := "0xHomeChannel123"
+
+	// Create user's current state (with existing home channel)
+	currentState := core.State{
+		ID:            core.GetStateID(userWallet, asset, 1, 1),
+		Transition:    core.Transition{},
+		Asset:         asset,
+		UserWallet:    userWallet,
+		Epoch:         1,
+		Version:       1,
+		HomeChannelID: &homeChannelID,
+		HomeLedger: core.Ledger{
+			TokenAddress: "0xTokenAddress",
+			BlockchainID: 1,
+			UserBalance:  decimal.NewFromInt(500),
+			UserNetFlow:  decimal.NewFromInt(500),
+			NodeBalance:  decimal.NewFromInt(0),
+			NodeNetFlow:  decimal.NewFromInt(0),
+		},
+		EscrowLedger: nil,
+		UserSig:      nil,
+		NodeSig:      nil,
+	}
+
+	// Create incoming state with acknowledgement transition
+	incomingState := currentState.NextState()
+	_, err := incomingState.ApplyAcknowledgementTransition()
+	require.NoError(t, err)
+
+	// Sign the incoming state with user's signature
+	userKey, _ := crypto.GenerateKey()
+	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Maybe()
+	packedState, _ := core.PackState(*incomingState, mockAssetStore)
+	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
+	userSigHex := hexutil.Encode(userSigBytes)
+	incomingState.UserSig = &userSigHex
+
+	// Mock expectations
+	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
+	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
+	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
+	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
+	mockSigValidator.On("Verify", userWallet, mock.Anything, userSigBytes).Return(nil)
+	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil).Maybe()
+
+	// For acknowledgement: no RecordTransaction call expected, only StoreUserState
+	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
+		return state.UserWallet == userWallet &&
+			state.Version == incomingState.Version &&
+			state.Transition.Type == core.TransitionTypeAcknowledgement &&
+			state.NodeSig != nil
+	})).Return(nil)
+
+	// Create RPC request
+	rpcState := toRPCState(*incomingState)
+	reqPayload := rpc.ChannelsV1SubmitStateRequest{
+		State: rpcState,
+	}
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	rpcRequest := rpc.Message{
+		Method:  "channels.v1.submit_state",
+		Payload: payload,
+	}
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpcRequest,
+	}
+
+	// Execute
+	handler.SubmitState(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response.Payload)
+
+	var response rpc.ChannelsV1SubmitStateResponse
+	err = ctx.Response.Payload.Translate(&response)
+	require.NoError(t, err)
+	assert.Nil(t, ctx.Response.Error())
+	assert.NotEmpty(t, response.Signature, "Node signature should be present")
+
+	// Verify all mock expectations - notably RecordTransaction should NOT have been called
+	mockTxStore.AssertExpectations(t)
+	mockTxStore.AssertNotCalled(t, "RecordTransaction", mock.Anything)
+	mockSigValidator.AssertExpectations(t)
+}
+
 // Helper function to create a string pointer
 func stringPtr(s string) *string {
 	return &s

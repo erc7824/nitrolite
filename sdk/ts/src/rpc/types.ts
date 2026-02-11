@@ -133,6 +133,8 @@ export interface AssetV1 {
   symbol: string;
   /** Number of decimal places for the asset */
   decimals: number; // uint8
+  /** Suggested blockchain network ID for this asset */
+  suggested_blockchain_id: string; // uint64 as string
   /** List of supported tokens for the asset */
   tokens: TokenV1[];
 }

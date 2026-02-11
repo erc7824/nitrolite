@@ -189,6 +189,25 @@ export function applyReceiverTransitions(state: State, ...transitions: Transitio
 // ============================================================================
 
 /**
+ * ApplyAcknowledgementTransition applies an acknowledgement transition with zero amount
+ * and placeholder txId/accountId. Used when receiving a transfer without an existing state,
+ * or to acknowledge channel creation without a deposit.
+ * @param state - State to modify (mutated in place)
+ * @returns The created transition
+ */
+export function applyAcknowledgementTransition(state: State): Transition {
+  if (state.transition.type !== TransitionType.Void) {
+    throw new Error(`state already has a transition: ${state.transition.type}`);
+  }
+
+  const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
+  const newTransitionObj = newTransition(TransitionType.Acknowledgement, zeroHash, zeroHash, new Decimal(0));
+  state.transition = newTransitionObj;
+
+  return newTransitionObj;
+}
+
+/**
  * ApplyHomeDepositTransition applies a home deposit transition
  * @param state - State to modify (mutated in place)
  * @param amount - Amount to deposit

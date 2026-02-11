@@ -149,6 +149,38 @@ export class ClientAssetStore {
   }
 
   /**
+   * GetSuggestedBlockchainId returns the suggested blockchain ID for a given asset.
+   */
+  async getSuggestedBlockchainId(asset: string): Promise<bigint> {
+    const key = asset.toLowerCase();
+
+    // Check cache first
+    const cached = this.cache.get(key);
+    if (cached) {
+      if (cached.suggestedBlockchainId === 0n) {
+        throw new Error(`no suggested blockchain ID for asset ${asset}`);
+      }
+      return cached.suggestedBlockchainId;
+    }
+
+    // Not in cache, fetch from API
+    const assets = await this.getAssetsFn();
+    for (const a of assets) {
+      this.cache.set(a.symbol.toLowerCase(), a);
+    }
+
+    const fetched = this.cache.get(key);
+    if (fetched) {
+      if (fetched.suggestedBlockchainId === 0n) {
+        throw new Error(`no suggested blockchain ID for asset ${asset}`);
+      }
+      return fetched.suggestedBlockchainId;
+    }
+
+    throw new Error(`asset ${asset} not found`);
+  }
+
+  /**
    * Clear the cache
    */
   clearCache(): void {

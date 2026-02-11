@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 )
 
@@ -174,6 +175,19 @@ func (state *State) ApplyChannelCreation(channelDef ChannelDefinition, blockchai
 
 func (state *State) IsFinal() bool {
 	return state.Transition.Type == TransitionTypeFinalize
+}
+
+func (state *State) ApplyAcknowledgementTransition() (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
+
+	txID := common.Hash{}.Hex()      // Placeholder txID for acknowledgement transition
+	accountID := common.Hash{}.Hex() // Placeholder accountID for acknowledgement transition
+	newTransition := NewTransition(TransitionTypeAcknowledgement, txID, accountID, decimal.Zero)
+	state.Transition = *newTransition
+
+	return *newTransition, nil
 }
 
 func (state *State) ApplyHomeDepositTransition(amount decimal.Decimal) (Transition, error) {
@@ -742,7 +756,8 @@ func NewTransactionFromTransition(senderState *State, receiverState *State, tran
 type TransitionType uint8
 
 const (
-	TransitionTypeVoid = 0 // Void transition, used for the initial state with no activity
+	TransitionTypeVoid                           = 0 // Void transition, used for the initial state with no activity
+	TransitionTypeAcknowledgement TransitionType = 1 // Acknowledgement of a received transfer, used for the initial state when a transfer is received without an existing state
 
 	TransitionTypeHomeDeposit    TransitionType = 10 // AccountID: HomeChannelID
 	TransitionTypeHomeWithdrawal TransitionType = 11 // AccountID: HomeChannelID
@@ -766,6 +781,10 @@ const (
 // String returns the human-readable name of the transition type
 func (t TransitionType) String() string {
 	switch t {
+	case TransitionTypeVoid:
+		return "void"
+	case TransitionTypeAcknowledgement:
+		return "acknowledgement"
 	case TransitionTypeTransferReceive:
 		return "transfer_receive"
 	case TransitionTypeTransferSend:
@@ -792,26 +811,6 @@ func (t TransitionType) String() string {
 		return "finalize"
 	default:
 		return "unknown"
-	}
-}
-
-func (t TransitionType) RequiresOpenChannel() bool {
-	switch t {
-	case TransitionTypeTransferReceive,
-		TransitionTypeRelease:
-		return false
-	case TransitionTypeTransferSend,
-		TransitionTypeCommit,
-		TransitionTypeHomeDeposit,
-		TransitionTypeHomeWithdrawal,
-		TransitionTypeMutualLock,
-		TransitionTypeEscrowDeposit,
-		TransitionTypeEscrowLock,
-		TransitionTypeEscrowWithdraw,
-		TransitionTypeMigrate:
-		return true
-	default:
-		return true
 	}
 }
 
@@ -860,10 +859,11 @@ type Blockchain struct {
 
 // Asset represents information about a supported asset
 type Asset struct {
-	Name     string  `json:"name"`     // Asset name
-	Decimals uint8   `json:"decimals"` // Number of decimal places at YN
-	Symbol   string  `json:"symbol"`   // Asset symbol
-	Tokens   []Token `json:"tokens"`   // Supported tokens for the asset
+	Name                  string  `json:"name"`                    // Asset name
+	Decimals              uint8   `json:"decimals"`                // Number of decimal places at YN
+	Symbol                string  `json:"symbol"`                  // Asset symbol
+	SuggestedBlockchainID uint64  `json:"suggested_blockchain_id"` // Suggested blockchain network ID for this asset
+	Tokens                []Token `json:"tokens"`                  // Supported tokens for the asset
 }
 
 // Token represents information about a supported token

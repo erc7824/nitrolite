@@ -1,6 +1,7 @@
 package node_v1
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -22,10 +23,11 @@ func mapAssetV1(asset core.Asset) rpc.AssetV1 {
 	}
 
 	return rpc.AssetV1{
-		Name:     asset.Name,
-		Symbol:   asset.Symbol,
-		Decimals: asset.Decimals,
-		Tokens:   tokens,
+		Name:                  asset.Name,
+		Symbol:                asset.Symbol,
+		Decimals:              asset.Decimals,
+		SuggestedBlockchainID: fmt.Sprintf("%d", asset.SuggestedBlockchainID),
+		Tokens:                tokens,
 	}
 }
 

@@ -28,8 +28,9 @@ func TestAssetsConfig_verifyVariables(t *testing.T) {
 		cfg := AssetsConfig{
 			Assets: []AssetConfig{
 				{
-					Name:   "USD Coin",
-					Symbol: "USDC",
+					Name:                  "USD Coin",
+					Symbol:                "USDC",
+					SuggestedBlockchainID: 1,
 					Tokens: []TokenConfig{
 						{
 							Name:         "USD Coin",
@@ -51,8 +52,9 @@ func TestAssetsConfig_verifyVariables(t *testing.T) {
 		cfg := AssetsConfig{
 			Assets: []AssetConfig{
 				{
-					Name:   "USD Coin",
-					Symbol: "USDC",
+					Name:                  "USD Coin",
+					Symbol:                "USDC",
+					SuggestedBlockchainID: 1,
 					Tokens: []TokenConfig{
 						{
 							Name:         "USD Coin",
@@ -74,8 +76,9 @@ func TestAssetsConfig_verifyVariables(t *testing.T) {
 		cfg := AssetsConfig{
 			Assets: []AssetConfig{
 				{
-					Name:   "USD Coin",
-					Symbol: "USDC",
+					Name:                  "USD Coin",
+					Symbol:                "USDC",
+					SuggestedBlockchainID: 137,
 					Tokens: []TokenConfig{
 						{
 							Name:         "Bridged USDC",

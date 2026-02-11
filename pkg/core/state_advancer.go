@@ -64,100 +64,79 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 		return fmt.Errorf("user signature is required")
 	}
 
-	transitionLenDiff := len(proposedState.Transitions) - len(expectedState.Transitions)
-	if transitionLenDiff < 0 {
-		return fmt.Errorf("proposed state is missing transitions")
-	}
-	for i := range expectedState.Transitions {
-		expectedTransition := expectedState.Transitions[i]
-		proposedTransition := proposedState.Transitions[i]
+	newTransition := proposedState.Transition
 
-		if err := expectedTransition.Equal(proposedTransition); err != nil {
-			return fmt.Errorf("unexpected transition at index %d: %w", i, err)
-		}
+	decimals, err := v.assetStore.GetAssetDecimals(proposedState.Asset)
+	if err != nil {
+		return fmt.Errorf("failed to get asset decimals: %w", err)
 	}
 
-	if transitionLenDiff > 1 {
-		return fmt.Errorf("proposed state contains more than one new transition")
+	if err := ValidateDecimalPrecision(newTransition.Amount, decimals); err != nil {
+		return fmt.Errorf("invalid amount for asset %s: %w", proposedState.Asset, err)
 	}
 
-	if transitionLenDiff == 0 {
-		return fmt.Errorf("new state transition is expected")
+	lastTransition := currentState.Transition
+
+	switch newTransition.Type {
+	case TransitionTypeVoid:
+		return fmt.Errorf("cannot apply void transition as new transition")
+	case TransitionTypeHomeDeposit:
+		_, err = expectedState.ApplyHomeDepositTransition(newTransition.Amount)
+	case TransitionTypeHomeWithdrawal:
+		_, err = expectedState.ApplyHomeWithdrawalTransition(newTransition.Amount)
+	case TransitionTypeTransferSend:
+		_, err = expectedState.ApplyTransferSendTransition(newTransition.AccountID, newTransition.Amount)
+	case TransitionTypeCommit:
+		_, err = expectedState.ApplyCommitTransition(newTransition.AccountID, newTransition.Amount)
+	case TransitionTypeMutualLock:
+		if proposedState.EscrowLedger == nil {
+			return fmt.Errorf("proposed state escrow ledger is nil")
+		}
+		_, err = expectedState.ApplyMutualLockTransition(
+			proposedState.EscrowLedger.BlockchainID,
+			proposedState.EscrowLedger.TokenAddress,
+			newTransition.Amount)
+	case TransitionTypeEscrowDeposit:
+		if lastTransition.Type == TransitionTypeMutualLock {
+			if !lastTransition.Amount.Equal(newTransition.Amount) {
+				return fmt.Errorf("escrow deposit amount must be the same as mutual lock amount")
+			}
+			_, err = expectedState.ApplyEscrowDepositTransition(newTransition.Amount)
+		} else {
+			return fmt.Errorf("escrow deposit transition must follow a mutual lock transition")
+		}
+	case TransitionTypeEscrowLock:
+		if proposedState.EscrowLedger == nil {
+			return fmt.Errorf("proposed state escrow ledger is nil")
+		}
+		_, err = expectedState.ApplyEscrowLockTransition(
+			proposedState.EscrowLedger.BlockchainID,
+			proposedState.EscrowLedger.TokenAddress,
+			newTransition.Amount)
+	case TransitionTypeEscrowWithdraw:
+		if lastTransition.Type == TransitionTypeEscrowLock {
+			if !lastTransition.Amount.Equal(newTransition.Amount) {
+				return fmt.Errorf("escrow withdraw amount must be the same as escrow lock amount")
+			}
+			_, err = expectedState.ApplyEscrowWithdrawTransition(newTransition.Amount)
+		} else {
+			return fmt.Errorf("escrow withdraw transition must follow an escrow lock transition")
+		}
+	case TransitionTypeMigrate:
+		_, err = expectedState.ApplyMigrateTransition(newTransition.Amount)
+	case TransitionTypeFinalize:
+		_, err = expectedState.ApplyFinalizeTransition()
+
+	default:
+		return fmt.Errorf("unsupported type for new transition: %d", newTransition.Type)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to apply new transition: %w", err)
 	}
 
-	if transitionLenDiff == 1 {
-		newTransition := proposedState.Transitions[len(proposedState.Transitions)-1]
-
-		decimals, err := v.assetStore.GetAssetDecimals(proposedState.Asset)
-		if err != nil {
-			return fmt.Errorf("failed to get asset decimals: %w", err)
-		}
-
-		if err := ValidateDecimalPrecision(newTransition.Amount, decimals); err != nil {
-			return fmt.Errorf("invalid amount for asset %s: %w", proposedState.Asset, err)
-		}
-
-		lastTransition := currentState.GetLastTransition()
-
-		switch newTransition.Type {
-		case TransitionTypeHomeDeposit:
-			_, err = expectedState.ApplyHomeDepositTransition(newTransition.Amount)
-		case TransitionTypeHomeWithdrawal:
-			_, err = expectedState.ApplyHomeWithdrawalTransition(newTransition.Amount)
-		case TransitionTypeTransferSend:
-			_, err = expectedState.ApplyTransferSendTransition(newTransition.AccountID, newTransition.Amount)
-		case TransitionTypeCommit:
-			_, err = expectedState.ApplyCommitTransition(newTransition.AccountID, newTransition.Amount)
-		case TransitionTypeMutualLock:
-			if proposedState.EscrowLedger == nil {
-				return fmt.Errorf("proposed state escrow ledger is nil")
-			}
-			_, err = expectedState.ApplyMutualLockTransition(
-				proposedState.EscrowLedger.BlockchainID,
-				proposedState.EscrowLedger.TokenAddress,
-				newTransition.Amount)
-		case TransitionTypeEscrowDeposit:
-			if lastTransition != nil && lastTransition.Type == TransitionTypeMutualLock {
-				if !lastTransition.Amount.Equal(newTransition.Amount) {
-					return fmt.Errorf("escrow deposit amount must be the same as mutual lock amount")
-				}
-				_, err = expectedState.ApplyEscrowDepositTransition(newTransition.Amount)
-			} else {
-				return fmt.Errorf("escrow deposit transition must follow a mutual lock transition")
-			}
-		case TransitionTypeEscrowLock:
-			if proposedState.EscrowLedger == nil {
-				return fmt.Errorf("proposed state escrow ledger is nil")
-			}
-			_, err = expectedState.ApplyEscrowLockTransition(
-				proposedState.EscrowLedger.BlockchainID,
-				proposedState.EscrowLedger.TokenAddress,
-				newTransition.Amount)
-		case TransitionTypeEscrowWithdraw:
-			if lastTransition != nil && lastTransition.Type == TransitionTypeEscrowLock {
-				if !lastTransition.Amount.Equal(newTransition.Amount) {
-					return fmt.Errorf("escrow withdraw amount must be the same as escrow lock amount")
-				}
-				_, err = expectedState.ApplyEscrowWithdrawTransition(newTransition.Amount)
-			} else {
-				return fmt.Errorf("escrow withdraw transition must follow an escrow lock transition")
-			}
-		case TransitionTypeMigrate:
-			_, err = expectedState.ApplyMigrateTransition(newTransition.Amount)
-		case TransitionTypeFinalize:
-			_, err = expectedState.ApplyFinalizeTransition()
-
-		default:
-			return fmt.Errorf("unsupported type for new transition: %d", newTransition.Type)
-		}
-		if err != nil {
-			return fmt.Errorf("failed to apply new transition: %w", err)
-		}
-
-		expectedTransition := expectedState.Transitions[len(expectedState.Transitions)-1]
-		if err := expectedTransition.Equal(newTransition); err != nil {
-			return fmt.Errorf("new transition does not match expected: %w", err)
-		}
+	expectedTransition := expectedState.Transition
+	if err := expectedTransition.Equal(newTransition); err != nil {
+		return fmt.Errorf("new transition does not match expected: %w", err)
 	}
 
 	if err := proposedState.HomeLedger.Equal(expectedState.HomeLedger); err != nil {

@@ -620,10 +620,11 @@ func (o *Operator) getLatestState(ctx context.Context, wallet, asset string) {
 	fmt.Printf("  User Bal:   %s\n", state.HomeLedger.UserBalance.String())
 	fmt.Printf("  Node Bal:   %s\n", state.HomeLedger.NodeBalance.String())
 	fmt.Printf("  Node NetFlow:   %s\n", state.HomeLedger.NodeNetFlow.String())
-	fmt.Printf("\nTransitions: %d\n", len(state.Transitions))
-	for i, t := range state.Transitions {
-		fmt.Printf("  %d. %s (Amount: %s)\n", i+1, t.Type.String(), t.Amount.String())
-	}
+	fmt.Printf("\nTransition:\n")
+	fmt.Printf("    Type:          %s\n", state.Transition.Type.String())
+	fmt.Printf("    TransactionID: %s\n", state.Transition.TxID)
+	fmt.Printf("    AccountID:     %s\n", state.Transition.TxID)
+	fmt.Printf("    Amount:        %s\n", state.Transition.Amount.String())
 }
 
 // ============================================================================

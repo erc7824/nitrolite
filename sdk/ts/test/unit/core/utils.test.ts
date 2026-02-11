@@ -6,7 +6,7 @@ import {
   getEscrowChannelId,
   generateChannelMetadata,
   transitionToIntent,
-  getStateTransitionsHash,
+  getStateTransitionHash,
 } from '../../../src/core/utils';
 import {
   TransitionType,
@@ -516,74 +516,39 @@ describe('transitionToIntent', () => {
     });
   });
 
-  test('nil_transition', () => {
-    expect(() => transitionToIntent(null)).toThrow('at least one transition is expected');
+  test('void_transition', () => {
+    const transition = newTransition(TransitionType.Void, '', '', new Decimal(0));
+    const intent = transitionToIntent(transition);
+    expect(intent).toBe(INTENT_OPERATE);
   });
 });
 
-describe('getStateTransitionsHash', () => {
-  test('hash_for_empty_transitions', () => {
-    const transitions: any[] = [];
-    const hash = getStateTransitionsHash(transitions);
+describe('getStateTransitionHash', () => {
+  test('hash_for_void_transition', () => {
+    const transition = newTransition(TransitionType.Void, '', '', new Decimal(0));
+    const hash = getStateTransitionHash(transition);
     expect(hash).toBeDefined();
-    // Log for debugging if needed
-    // console.log('Hash for empty transitions:', hash);
   });
 
   test('hash_for_single_transition', () => {
-    const transitions = [
-      newTransition(
-        TransitionType.HomeDeposit,
-        '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef', // 32-byte txId
-        '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0', // 20-byte address
-        new Decimal(1000)
-      ),
-    ];
-    const hash = getStateTransitionsHash(transitions);
+    const transition = newTransition(
+      TransitionType.HomeDeposit,
+      '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef', // 32-byte txId
+      '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0', // 20-byte address
+      new Decimal(1000)
+    );
+    const hash = getStateTransitionHash(transition);
     expect(hash).toBeDefined();
   });
 
-  test('hash_for_multiple_transitions', () => {
-    const transitions = [
-      newTransition(
-        TransitionType.HomeDeposit,
-        '0x1111111111111111111111111111111111111111111111111111111111111111', // 32-byte txId
-        '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0', // 20-byte address
-        new Decimal(100)
-      ),
-      newTransition(
-        TransitionType.TransferSend,
-        '0x2222222222222222222222222222222222222222222222222222222222222222', // 32-byte txId
-        '0x8626f6940e2eb28930efb4cef49b2d1f2c9c1199', // 20-byte address
-        new Decimal(50)
-      ),
-      newTransition(
-        TransitionType.Commit,
-        '0x3333333333333333333333333333333333333333333333333333333333333333', // 32-byte txId
-        '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890', // 32-byte hash
-        new Decimal(25)
-      ),
-    ];
-    const hash = getStateTransitionsHash(transitions);
-    expect(hash).toBeDefined();
-  });
-
-  test('hash_with_negative_amounts', () => {
-    const transitions = [
-      newTransition(
-        TransitionType.HomeWithdrawal,
-        '0x4444444444444444444444444444444444444444444444444444444444444444', // 32-byte txId
-        '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0', // 20-byte address
-        new Decimal(-100)
-      ),
-      newTransition(
-        TransitionType.EscrowWithdraw,
-        '0x5555555555555555555555555555555555555555555555555555555555555555', // 32-byte txId
-        '0x8626f6940e2eb28930efb4cef49b2d1f2c9c1199', // 20-byte address
-        new Decimal(-50)
-      ),
-    ];
-    const hash = getStateTransitionsHash(transitions);
+  test('hash_with_negative_amount', () => {
+    const transition = newTransition(
+      TransitionType.HomeWithdrawal,
+      '0x4444444444444444444444444444444444444444444444444444444444444444', // 32-byte txId
+      '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0', // 20-byte address
+      new Decimal(-100)
+    );
+    const hash = getStateTransitionHash(transition);
     expect(hash).toBeDefined();
   });
 });

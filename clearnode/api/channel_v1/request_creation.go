@@ -147,30 +147,33 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		nodeSig = _nodeSig.String()
 		incomingState.NodeSig = &nodeSig
 
-		incomingTransition := incomingState.GetLastTransition()
+		incomingTransition := incomingState.Transition
 		var transaction *core.Transaction
-		if incomingTransition != nil {
-			switch incomingTransition.Type {
-			case core.TransitionTypeHomeDeposit, core.TransitionTypeHomeWithdrawal:
-				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
-				if err != nil {
-					return rpc.Errorf("failed to create transaction: %v", err)
-				}
 
-				// We return Node's signature, the user is expected to submit this on blockchain.
-			case core.TransitionTypeTransferSend:
-				newReceiverState, err := h.issueTransferReceiverState(ctx, tx, incomingState)
-				if err != nil {
-					return rpc.Errorf("failed to issue receiver state: %v", err)
-				}
-				transaction, err = core.NewTransactionFromTransition(&incomingState, newReceiverState, *incomingTransition)
-				if err != nil {
-					return rpc.Errorf("failed to create transaction: %v", err)
-				}
-			default:
-				return rpc.Errorf("transition '%s' is not supported by this endpoint", incomingTransition.Type.String())
+		switch incomingTransition.Type {
+		case core.TransitionTypeVoid:
+			return rpc.Errorf("incoming state has no transitions")
+
+		case core.TransitionTypeHomeDeposit, core.TransitionTypeHomeWithdrawal:
+			transaction, err = core.NewTransactionFromTransition(&incomingState, nil, incomingTransition)
+			if err != nil {
+				return rpc.Errorf("failed to create transaction: %v", err)
 			}
+
+			// We return Node's signature, the user is expected to submit this on blockchain.
+		case core.TransitionTypeTransferSend:
+			newReceiverState, err := h.issueTransferReceiverState(ctx, tx, incomingState)
+			if err != nil {
+				return rpc.Errorf("failed to issue receiver state: %v", err)
+			}
+			transaction, err = core.NewTransactionFromTransition(&incomingState, newReceiverState, incomingTransition)
+			if err != nil {
+				return rpc.Errorf("failed to create transaction: %v", err)
+			}
+		default:
+			return rpc.Errorf("transition '%s' is not supported by this endpoint", incomingTransition.Type.String())
 		}
+
 		if err := tx.RecordTransaction(*transaction); err != nil {
 			return rpc.Errorf("failed to record transaction")
 		}

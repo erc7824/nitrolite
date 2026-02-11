@@ -234,26 +234,6 @@ type AppSessionsV1CreateAppSessionResponse struct {
 	Status string `json:"status"`
 }
 
-// AppSessionsV1CloseAppSessionRequest closes an application session and redistributes funds.
-type AppSessionsV1CloseAppSessionRequest struct {
-	// AppSessionID is the application session ID to close
-	AppSessionID string `json:"app_session_id"`
-	// Allocations defines the final asset allocations when closing the session
-	Allocations []AppAllocationV1 `json:"allocations"`
-	// SessionData is the optional final JSON stringified session data
-	SessionData *string `json:"session_data,omitempty"`
-}
-
-// AppSessionsV1CloseAppSessionResponse returns the closed application session information.
-type AppSessionsV1CloseAppSessionResponse struct {
-	// AppSessionID is the closed application session ID
-	AppSessionID string `json:"app_session_id"`
-	// Version is the final version of the session
-	Version string `json:"version"`
-	// Status is the status of the session (closed)
-	Status string `json:"status"`
-}
-
 // ============================================================================
 // Session Keys Group - V1 API
 // ============================================================================

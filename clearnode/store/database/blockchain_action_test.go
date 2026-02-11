@@ -24,12 +24,12 @@ func TestDBStore_ScheduleCheckpoint(t *testing.T) {
 
 		// First create a state to reference
 		state := core.State{
-			ID:          "0x1234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  "0x1234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x1234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: "0x1234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 			},
@@ -63,12 +63,12 @@ func TestDBStore_ScheduleInitiateEscrowWithdrawal(t *testing.T) {
 
 		// Create a state
 		state := core.State{
-			ID:          "0x2234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  "0x2234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x2234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: "0x2234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(500),
 			},
@@ -97,12 +97,12 @@ func TestDBStore_ScheduleFinalizeEscrowDeposit(t *testing.T) {
 		store := NewDBStore(db)
 
 		state := core.State{
-			ID:          "0x3234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "ETH",
-			UserWallet:  "0x3234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x3234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "ETH",
+			UserWallet: "0x3234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(100),
 			},
@@ -129,12 +129,12 @@ func TestDBStore_ScheduleFinalizeEscrowWithdrawal(t *testing.T) {
 		store := NewDBStore(db)
 
 		state := core.State{
-			ID:          "0x4234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "ETH",
-			UserWallet:  "0x4234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x4234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "ETH",
+			UserWallet: "0x4234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(200),
 			},
@@ -161,12 +161,12 @@ func TestDBStore_Fail(t *testing.T) {
 		store := NewDBStore(db)
 
 		state := core.State{
-			ID:          "0x5234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  "0x5234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x5234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: "0x5234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(300),
 			},
@@ -201,12 +201,12 @@ func TestDBStore_FailNoRetry(t *testing.T) {
 		store := NewDBStore(db)
 
 		state := core.State{
-			ID:          "0x6234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  "0x6234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x6234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: "0x6234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(400),
 			},
@@ -241,12 +241,12 @@ func TestDBStore_RecordAttempt(t *testing.T) {
 		store := NewDBStore(db)
 
 		state := core.State{
-			ID:          "0x7234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "ETH",
-			UserWallet:  "0x7234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x7234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "ETH",
+			UserWallet: "0x7234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(150),
 			},
@@ -281,12 +281,12 @@ func TestDBStore_Complete(t *testing.T) {
 		store := NewDBStore(db)
 
 		state := core.State{
-			ID:          "0x8234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  "0x8234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x8234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: "0x8234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(600),
 			},
@@ -319,12 +319,12 @@ func TestDBStore_Complete(t *testing.T) {
 		store := NewDBStore(db)
 
 		state := core.State{
-			ID:          "0x9234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "ETH",
-			UserWallet:  "0x9234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x9234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "ETH",
+			UserWallet: "0x9234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(250),
 			},
@@ -363,31 +363,31 @@ func TestDBStore_GetActions(t *testing.T) {
 
 		// Create multiple states and actions
 		state1 := core.State{
-			ID:          "0xa234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  "0xa234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
-			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(100)},
+			ID:         "0xa234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: "0xa234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
+			HomeLedger: core.Ledger{UserBalance: decimal.NewFromInt(100)},
 		}
 		state2 := core.State{
-			ID:          "0xb234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "ETH",
-			UserWallet:  "0xb234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
-			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(200)},
+			ID:         "0xb234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "ETH",
+			UserWallet: "0xb234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
+			HomeLedger: core.Ledger{UserBalance: decimal.NewFromInt(200)},
 		}
 		state3 := core.State{
-			ID:          "0xc234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  "0xc234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
-			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(300)},
+			ID:         "0xc234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: "0xc234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
+			HomeLedger: core.Ledger{UserBalance: decimal.NewFromInt(300)},
 		}
 
 		require.NoError(t, store.StoreUserState(state1))
@@ -417,13 +417,13 @@ func TestDBStore_GetActions(t *testing.T) {
 		// Create 5 states and actions
 		for i := 0; i < 5; i++ {
 			state := core.State{
-				ID:          common.BigToHash(common.Big1).Hex() + string(rune('0'+i)),
-				Asset:       "USDC",
-				UserWallet:  "0xd234567890123456789012345678901234567890",
-				Epoch:       uint64(i + 1),
-				Version:     1,
-				Transitions: []core.Transition{},
-				HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(int64(100 * (i + 1)))},
+				ID:         common.BigToHash(common.Big1).Hex() + string(rune('0'+i)),
+				Asset:      "USDC",
+				UserWallet: "0xd234567890123456789012345678901234567890",
+				Epoch:      uint64(i + 1),
+				Version:    1,
+				Transition: core.Transition{},
+				HomeLedger: core.Ledger{UserBalance: decimal.NewFromInt(int64(100 * (i + 1)))},
 			}
 			require.NoError(t, store.StoreUserState(state))
 			require.NoError(t, store.ScheduleCheckpoint(state.ID, 0))
@@ -444,31 +444,31 @@ func TestDBStore_GetActions(t *testing.T) {
 
 		// Create states
 		state1 := core.State{
-			ID:          "0xe234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  "0xe234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
-			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(100)},
+			ID:         "0xe234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: "0xe234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
+			HomeLedger: core.Ledger{UserBalance: decimal.NewFromInt(100)},
 		}
 		state2 := core.State{
-			ID:          "0xf234567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "ETH",
-			UserWallet:  "0xf234567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
-			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(200)},
+			ID:         "0xf234567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "ETH",
+			UserWallet: "0xf234567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
+			HomeLedger: core.Ledger{UserBalance: decimal.NewFromInt(200)},
 		}
 		state3 := core.State{
-			ID:          "0x0334567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  "0x0334567890123456789012345678901234567890",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
-			HomeLedger:  core.Ledger{UserBalance: decimal.NewFromInt(300)},
+			ID:         "0x0334567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: "0x0334567890123456789012345678901234567890",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
+			HomeLedger: core.Ledger{UserBalance: decimal.NewFromInt(300)},
 		}
 
 		require.NoError(t, store.StoreUserState(state1))

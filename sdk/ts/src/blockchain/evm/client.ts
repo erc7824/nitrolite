@@ -332,22 +332,20 @@ export class Client {
     );
 
     // Check allowance and balance for deposits
-    const lastTransition = initState.transitions[initState.transitions.length - 1];
     if (
-      lastTransition &&
-      (lastTransition.type === core.TransitionType.HomeDeposit ||
-        lastTransition.type === core.TransitionType.EscrowDeposit)
+      initState.transition.type === core.TransitionType.HomeDeposit ||
+      initState.transition.type === core.TransitionType.EscrowDeposit
     ) {
       if (this.requireCheckAllowance) {
         const allowance = await this.getAllowance(initState.asset, initState.userWallet);
-        if (allowance.lessThan(lastTransition.amount)) {
+        if (allowance.lessThan(initState.transition.amount)) {
           throw new Error('Allowance is not sufficient to cover the deposit amount');
         }
       }
 
       if (this.requireCheckBalance) {
         const balance = await this.getTokenBalance(initState.asset, initState.userWallet);
-        if (balance.lessThan(lastTransition.amount)) {
+        if (balance.lessThan(initState.transition.amount)) {
           throw new Error('Balance is not sufficient to cover the deposit amount');
         }
       }
@@ -411,18 +409,17 @@ export class Client {
     );
 
     // Check for deposit intent
-    const lastTransition = candidate.transitions[candidate.transitions.length - 1];
-    if (lastTransition?.type === core.TransitionType.HomeDeposit) {
+    if (candidate.transition.type === core.TransitionType.HomeDeposit) {
       if (this.requireCheckAllowance) {
         const allowance = await this.getAllowance(candidate.asset, candidate.userWallet);
-        if (allowance.lessThan(lastTransition.amount)) {
+        if (allowance.lessThan(candidate.transition.amount)) {
           throw new Error('Allowance is not sufficient to cover the deposit amount');
         }
       }
 
       if (this.requireCheckBalance) {
         const balance = await this.getTokenBalance(candidate.asset, candidate.userWallet);
-        if (balance.lessThan(lastTransition.amount)) {
+        if (balance.lessThan(candidate.transition.amount)) {
           throw new Error('Balance is not sufficient to cover the deposit amount');
         }
       }
@@ -447,7 +444,7 @@ export class Client {
     }
 
     // Check for withdrawal intent
-    if (lastTransition?.type === core.TransitionType.HomeWithdrawal) {
+    if (candidate.transition.type === core.TransitionType.HomeWithdrawal) {
       console.log('💳 EVM Client - Withdraw from channel transaction:', {
         contractAddress: this.contractAddress,
         blockchainId: this.blockchainId.toString(),
@@ -531,8 +528,7 @@ export class Client {
     );
 
     // Verify close intent
-    const lastTransition = candidate.transitions[candidate.transitions.length - 1];
-    if (lastTransition?.type !== core.TransitionType.Finalize) {
+    if (candidate.transition.type !== core.TransitionType.Finalize) {
       throw new Error('Unsupported intent for close');
     }
 

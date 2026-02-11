@@ -1,7 +1,6 @@
 package database
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -52,11 +51,6 @@ func databaseAppSessionToCore(dbSession *AppSessionV1) *app.AppSessionV1 {
 
 // databaseStateToCore converts database.State to core.State
 func databaseStateToCore(dbState *State) (*core.State, error) {
-	var transitions []core.Transition
-	if err := json.Unmarshal([]byte(dbState.Transitions), &transitions); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal transitions: %w", err)
-	}
-
 	// Build home ledger with blockchain ID and token address from joined channels
 	homeLedger := core.Ledger{
 		UserBalance: dbState.HomeUserBalance,
@@ -74,9 +68,16 @@ func databaseStateToCore(dbState *State) (*core.State, error) {
 		homeLedger.TokenAddress = *dbState.HomeTokenAddress
 	}
 
+	transition := core.Transition{
+		Type:      core.TransitionType(dbState.TransitionType),
+		TxID:      dbState.TransitionTxID,
+		AccountID: dbState.TransitionAccountID,
+		Amount:    dbState.TransitionAmount,
+	}
+
 	state := &core.State{
 		ID:              dbState.ID,
-		Transitions:     transitions,
+		Transition:      transition,
 		Asset:           dbState.Asset,
 		UserWallet:      dbState.UserWallet,
 		Epoch:           dbState.Epoch,
@@ -113,33 +114,21 @@ func databaseStateToCore(dbState *State) (*core.State, error) {
 
 // coreStateToDB converts core.State to database.State
 func coreStateToDB(state *core.State) (*State, error) {
-	transitions := make([]core.Transition, len(state.Transitions))
-	for i, t := range state.Transitions {
-		transitions[i] = core.Transition{
-			Type:      t.Type,
-			TxID:      strings.ToLower(t.TxID),
-			AccountID: strings.ToLower(t.TxID),
-			Amount:    t.Amount,
-		}
-	}
-
-	bytes, err := json.Marshal(transitions)
-	if err != nil {
-		return nil, fmt.Errorf("marshal checkpoint data: %w", err)
-	}
-
 	dbState := &State{
-		ID:              strings.ToLower(state.ID),
-		Transitions:     bytes,
-		Asset:           state.Asset,
-		UserWallet:      strings.ToLower(state.UserWallet),
-		Epoch:           state.Epoch,
-		Version:         state.Version,
-		HomeUserBalance: state.HomeLedger.UserBalance,
-		HomeUserNetFlow: state.HomeLedger.UserNetFlow,
-		HomeNodeBalance: state.HomeLedger.NodeBalance,
-		HomeNodeNetFlow: state.HomeLedger.NodeNetFlow,
-		CreatedAt:       time.Now(),
+		ID:                  strings.ToLower(state.ID),
+		TransitionType:      uint8(state.Transition.Type),
+		TransitionTxID:      strings.ToLower(state.Transition.TxID),
+		TransitionAccountID: strings.ToLower(state.Transition.AccountID),
+		TransitionAmount:    state.Transition.Amount,
+		Asset:               state.Asset,
+		UserWallet:          strings.ToLower(state.UserWallet),
+		Epoch:               state.Epoch,
+		Version:             state.Version,
+		HomeUserBalance:     state.HomeLedger.UserBalance,
+		HomeUserNetFlow:     state.HomeLedger.UserNetFlow,
+		HomeNodeBalance:     state.HomeLedger.NodeBalance,
+		HomeNodeNetFlow:     state.HomeLedger.NodeNetFlow,
+		CreatedAt:           time.Now(),
 	}
 	if state.HomeChannelID != nil {
 		lowered := strings.ToLower(*state.HomeChannelID)

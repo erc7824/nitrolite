@@ -26,7 +26,7 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -61,7 +61,7 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -78,7 +78,7 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(5),
 				UserNetFlow: decimal.Zero,
@@ -128,7 +128,7 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -144,7 +144,7 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 			Epoch:         1,
 			Version:       2,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(2000),
 				UserNetFlow: decimal.Zero,
@@ -180,7 +180,7 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 			Epoch:         1,
 			Version:       5,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -196,7 +196,7 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 			Epoch:         2,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(3000),
 				UserNetFlow: decimal.Zero,
@@ -234,7 +234,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 
 		store := NewDBStore(db)
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC", core.TransitionTypeHomeDeposit)
+		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		require.NoError(t, err)
 	})
 
@@ -270,8 +270,8 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions: []core.Transition{
-				{Type: core.TransitionTypeHomeDeposit},
+			Transition: core.Transition{
+				Type: core.TransitionTypeHomeDeposit,
 			},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
@@ -284,7 +284,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC", core.TransitionTypeHomeDeposit)
+		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		require.NoError(t, err)
 	})
 
@@ -320,8 +320,8 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions: []core.Transition{
-				{Type: core.TransitionTypeHomeDeposit},
+			Transition: core.Transition{
+				Type: core.TransitionTypeHomeDeposit,
 			},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
@@ -334,7 +334,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC", core.TransitionTypeHomeDeposit)
+		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "home deposit is still ongoing")
 	})
@@ -387,8 +387,8 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			Version:         2,
 			HomeChannelID:   &homeChannelID,
 			EscrowChannelID: &escrowChannelID,
-			Transitions: []core.Transition{
-				{Type: core.TransitionTypeMutualLock},
+			Transition: core.Transition{
+				Type: core.TransitionTypeMutualLock,
 			},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(500),
@@ -407,7 +407,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC", core.TransitionTypeMutualLock)
+		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		require.NoError(t, err)
 	})
 
@@ -459,8 +459,8 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			Version:         2,
 			HomeChannelID:   &homeChannelID,
 			EscrowChannelID: &escrowChannelID,
-			Transitions: []core.Transition{
-				{Type: core.TransitionTypeMutualLock},
+			Transition: core.Transition{
+				Type: core.TransitionTypeMutualLock,
 			},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(500),
@@ -479,7 +479,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC", core.TransitionTypeMutualLock)
+		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mutual lock is still ongoing")
 	})
@@ -518,8 +518,8 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			Version:         4,
 			HomeChannelID:   &homeChannelID,
 			EscrowChannelID: &escrowChannelID,
-			Transitions: []core.Transition{
-				{Type: core.TransitionTypeEscrowWithdraw},
+			Transition: core.Transition{
+				Type: core.TransitionTypeEscrowWithdraw,
 			},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(500),
@@ -538,7 +538,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC", core.TransitionTypeEscrowWithdraw)
+		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		require.NoError(t, err)
 	})
 
@@ -572,8 +572,8 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions: []core.Transition{
-				{Type: core.TransitionTypeHomeDeposit},
+			Transition: core.Transition{
+				Type: core.TransitionTypeHomeDeposit,
 			},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
@@ -586,7 +586,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		require.NoError(t, store.StoreUserState(state))
 
 		// Should not error because there's no signed state
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC", core.TransitionTypeHomeDeposit)
+		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		require.NoError(t, err)
 	})
 }

@@ -218,6 +218,9 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 			Epoch:         "1",
 			Version:       "1",
 			HomeChannelID: &homeChannelID,
+			Transition: rpc.TransitionV1{
+				Amount: "0",
+			},
 			HomeLedger: rpc.LedgerV1{
 				TokenAddress: tokenAddress,
 				BlockchainID: "1",

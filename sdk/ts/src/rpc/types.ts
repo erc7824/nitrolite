@@ -90,8 +90,8 @@ export interface LedgerV1 {
 export interface StateV1 {
   /** Deterministic ID (hash) of the state */
   id: string;
-  /** List of transitions included in the state */
-  transitions: TransitionV1[];
+  /** Transition included in the state */
+  transition: TransitionV1;
   /** Asset type of the state */
   asset: string;
   /** User wallet address */

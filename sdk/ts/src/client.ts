@@ -340,9 +340,7 @@ export class Client {
       // If state has a home channel ID, check if it's usable
       if (state && state.homeChannelId) {
         // Check if state has a finalize transition (channel is being closed)
-        const hasFinalize = state.transitions.some(
-          (t) => t.type === core.TransitionType.Finalize
-        );
+        const hasFinalize = state.transition.type === core.TransitionType.Finalize;
         // If no finalize transition, channel is still open and usable
         channelIsOpen = !hasFinalize;
       }
@@ -438,9 +436,7 @@ export class Client {
       // If state has a home channel ID, check if it's usable
       if (state && state.homeChannelId) {
         // Check if state has a finalize transition (channel is being closed)
-        const hasFinalize = state.transitions.some(
-          (t) => t.type === core.TransitionType.Finalize
-        );
+        const hasFinalize = state.transition.type === core.TransitionType.Finalize;
         // If no finalize transition, channel is still open and usable
         channelIsOpen = !hasFinalize;
       }
@@ -1247,12 +1243,12 @@ export class Client {
     // This is a simplified version - you'll need to implement the full transformation
     return {
       id: state.id,
-      transitions: state.transitions.map((t) => ({
-        type: t.type, // Keep as TransitionType enum
-        tx_id: t.txId,
-        account_id: t.accountId,
-        amount: t.amount.toString(),
-      })),
+      transition: {
+        type: state.transition.type,
+        tx_id: state.transition.txId,
+        account_id: state.transition.accountId,
+        amount: state.transition.amount.toString(),
+      },
       asset: state.asset,
       user_wallet: state.userWallet,
       epoch: state.epoch.toString(), // Convert bigint to string
@@ -1297,6 +1293,7 @@ export class Client {
    */
   private transitionTypeToString(type: core.TransitionType): string {
     const typeMap: Record<core.TransitionType, string> = {
+      [core.TransitionType.Void]: 'void',
       [core.TransitionType.HomeDeposit]: 'home_deposit',
       [core.TransitionType.HomeWithdrawal]: 'home_withdrawal',
       [core.TransitionType.EscrowDeposit]: 'escrow_deposit',

@@ -38,8 +38,8 @@ func (m *MockStore) StoreUserState(state core.State) error {
 	return args.Error(0)
 }
 
-func (m *MockStore) EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error {
-	args := m.Called(wallet, asset, prevTransitionType)
+func (m *MockStore) EnsureNoOngoingStateTransitions(wallet, asset string) error {
+	args := m.Called(wallet, asset)
 	return args.Error(0)
 }
 

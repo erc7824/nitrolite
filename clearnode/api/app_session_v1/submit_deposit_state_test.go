@@ -73,8 +73,10 @@ func TestSubmitDepositState_Success(t *testing.T) {
 
 	// Create user's current state (before deposit)
 	currentUserState := core.State{
-		ID:            core.GetStateID(participant1, asset, 1, 1),
-		Transitions:   []core.Transition{},
+		ID: core.GetStateID(participant1, asset, 1, 1),
+		Transition: core.Transition{
+			Type: core.TransitionTypeVoid,
+		},
 		Asset:         asset,
 		UserWallet:    participant1,
 		Epoch:         1,
@@ -144,6 +146,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	mockStore.On("CheckOpenChannel", participant1, asset).Return(true, nil).Once()
 	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
+	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
 
@@ -170,8 +173,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	mockStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
 		return state.UserWallet == participant1 &&
 			state.Version == incomingUserState.Version &&
-			len(state.Transitions) == 1 &&
-			state.Transitions[0].Type == core.TransitionTypeCommit &&
+			state.Transition.Type == core.TransitionTypeCommit &&
 			state.NodeSig != nil
 	})).Return(nil).Once()
 
@@ -258,13 +260,11 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 		UserWallet: participant1,
 		Epoch:      1,
 		Version:    2,
-		Transitions: []core.Transition{
-			{
-				Type:      core.TransitionTypeTransferSend, // Wrong type!
-				TxID:      "tx-id",
-				AccountID: appSessionID,
-				Amount:    decimal.NewFromInt(100),
-			},
+		Transition: core.Transition{
+			Type:      core.TransitionTypeTransferSend, // Wrong type!
+			TxID:      "tx-id",
+			AccountID: appSessionID,
+			Amount:    decimal.NewFromInt(100),
 		},
 		HomeChannelID: &homeChannelID,
 		HomeLedger: core.Ledger{
@@ -403,8 +403,10 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 
 	// Create user state
 	currentUserState := core.State{
-		ID:            core.GetStateID(participant1, asset, 1, 1),
-		Transitions:   []core.Transition{},
+		ID: core.GetStateID(participant1, asset, 1, 1),
+		Transition: core.Transition{
+			Type: core.TransitionTypeVoid,
+		},
 		Asset:         asset,
 		UserWallet:    participant1,
 		Epoch:         1,
@@ -468,6 +470,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	mockStore.On("CheckOpenChannel", participant1, asset).Return(true, nil).Once()
 	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
+	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()

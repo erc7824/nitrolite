@@ -207,17 +207,15 @@ export default function LowLevelSection({ client, defaultAddress, showStatus }: 
                   </div>
                 </div>
               </div>
-              {result.transitions && result.transitions.length > 0 && (
+              {result.transition && (
                 <div className="mt-4 pt-3 border-t border-border">
                   <div className="font-semibold uppercase tracking-wider text-xs mb-2">
-                    Transitions: {result.transitions.length}
+                    Transition
                   </div>
                   <div className="ml-4 space-y-1">
-                    {result.transitions.map((t: any, idx: number) => (
-                      <div key={idx} className="text-xs font-mono">
-                        {idx + 1}. {t.type} (Amount: {t.amount?.toString()})
-                      </div>
-                    ))}
+                    <div className="text-xs font-mono">
+                      {result.transition.type} (Amount: {result.transition.amount?.toString()})
+                    </div>
                   </div>
                 </div>
               )}

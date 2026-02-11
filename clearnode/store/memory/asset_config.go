@@ -30,6 +30,8 @@ type AssetConfig struct {
 	Symbol string `yaml:"symbol"`
 	// Decimals is the number of decimal places for the asset
 	Decimals uint8
+	// SuggestedBlockchainID is the chain ID of the blockchain where this asset is primarily used
+	SuggestedBlockchainID uint64 `yaml:"suggested_blockchain_id"`
 	// Disabled determines if this asset should be processed
 	Disabled bool `yaml:"disabled"`
 	// Tokens contains the blockchain-specific token implementations
@@ -103,6 +105,9 @@ func verifyAssetsConfig(cfg *AssetsConfig) error {
 		}
 		if asset.Name == "" {
 			cfg.Assets[i].Name = asset.Symbol
+		}
+		if asset.SuggestedBlockchainID == 0 {
+			return fmt.Errorf("missing suggested blockchain id for asset with symbol '%s'", asset.Symbol)
 		}
 
 		asset = cfg.Assets[i]

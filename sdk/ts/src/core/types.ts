@@ -19,6 +19,7 @@ export enum ChannelStatus {
 
 export enum TransitionType {
   Void = 0,
+  Acknowledgement = 1,
   HomeDeposit = 10,
   HomeWithdrawal = 11,
   EscrowDeposit = 20,
@@ -166,6 +167,7 @@ export interface Asset {
   name: string;
   decimals: number; // uint8
   symbol: string;
+  suggestedBlockchainId: bigint; // uint64
   tokens: Token[];
 }
 
@@ -346,6 +348,8 @@ export function transitionToString(type: TransitionType): string {
   switch (type) {
     case TransitionType.Void:
       return 'Void';
+    case TransitionType.Acknowledgement:
+      return 'Acknowledgement';
     case TransitionType.HomeDeposit:
       return 'HomeDeposit';
     case TransitionType.HomeWithdrawal:

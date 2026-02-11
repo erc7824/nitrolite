@@ -16,7 +16,7 @@ type MemoryStoreV1 struct {
 	assetDecimals   map[string]uint8             // map[asset]decimals
 }
 
-func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]BlockchainConfig) MemoryStore {
+func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]BlockchainConfig) (MemoryStore, error) {
 	supportedBlockchainIDs := make(map[uint64]struct{})
 	blockchains := make([]core.Blockchain, 0, len(blockchainsConfig))
 	for _, bc := range blockchainsConfig {
@@ -50,6 +50,7 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 			continue
 		}
 
+		var suggestedBlockchainID uint64
 		tokens := make([]core.Token, 0, len(asset.Tokens))
 		for _, token := range asset.Tokens {
 			if _, ok := supportedBlockchainIDs[token.BlockchainID]; !ok {
@@ -77,9 +78,16 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 				tokenDecimals[token.BlockchainID] = make(map[string]uint8)
 			}
 			tokenDecimals[token.BlockchainID][tokenAddress] = token.Decimals
+
+			if asset.SuggestedBlockchainID == token.BlockchainID {
+				suggestedBlockchainID = token.BlockchainID
+			}
 		}
 		if len(tokens) == 0 {
 			continue
+		}
+		if suggestedBlockchainID == 0 {
+			return nil, fmt.Errorf("asset '%s' does not have a valid suggested blockchain ID", asset.Symbol)
 		}
 
 		slices.SortFunc(tokens, func(a, b core.Token) int {
@@ -92,10 +100,11 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 		})
 
 		assets = append(assets, core.Asset{
-			Symbol:   asset.Symbol,
-			Name:     asset.Name,
-			Decimals: asset.Decimals,
-			Tokens:   tokens,
+			Symbol:                asset.Symbol,
+			Name:                  asset.Name,
+			Decimals:              asset.Decimals,
+			SuggestedBlockchainID: suggestedBlockchainID,
+			Tokens:                tokens,
 		})
 
 		assetDecimals[asset.Symbol] = asset.Decimals
@@ -116,7 +125,7 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 		supportedAssets: supportedAssets,
 		tokenDecimals:   tokenDecimals,
 		assetDecimals:   assetDecimals,
-	}
+	}, nil
 }
 
 func NewMemoryStoreV1FromConfig(configDirPath string) (MemoryStore, error) {
@@ -128,7 +137,7 @@ func NewMemoryStoreV1FromConfig(configDirPath string) (MemoryStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewMemoryStoreV1(assetsConfig, blockchainConfig), nil
+	return NewMemoryStoreV1(assetsConfig, blockchainConfig)
 }
 
 // GetBlockchains retrieves the list of supported blockchains.

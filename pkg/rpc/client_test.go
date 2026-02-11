@@ -90,23 +90,26 @@ func TestClientV1_NodeV1GetAssets(t *testing.T) {
 
 	assets := []rpc.AssetV1{
 		{
-			Name:   "USD Coin",
-			Symbol: testSymbolV1,
+			Name:                  "USD Coin",
+			Symbol:                testSymbolV1,
+			SuggestedBlockchainID: testChainIDV1,
 			Tokens: []rpc.TokenV1{
 				{Name: "USDC on Ethereum", Symbol: testSymbolV1, Address: testTokenV1, BlockchainID: testChainIDV1, Decimals: 6},
 				{Name: "USDC on Polygon", Symbol: testSymbolV1, Address: "0xUSDC2", BlockchainID: "137", Decimals: 6},
 			},
 		},
 		{
-			Name:   "Ethereum",
-			Symbol: "ETH",
+			Name:                  "Ethereum",
+			Symbol:                "ETH",
+			SuggestedBlockchainID: testChainIDV1,
 			Tokens: []rpc.TokenV1{
 				{Name: "ETH on Ethereum", Symbol: "ETH", Address: "0xETH", BlockchainID: testChainIDV1, Decimals: 18},
 			},
 		},
 		{
-			Name:   "DAI",
-			Symbol: "DAI",
+			Name:                  "DAI",
+			Symbol:                "DAI",
+			SuggestedBlockchainID: "137",
 			Tokens: []rpc.TokenV1{
 				{Name: "DAI on Polygon", Symbol: "DAI", Address: "0xDAI", BlockchainID: "137", Decimals: 18},
 			},

@@ -26,9 +26,10 @@ func TestGetAssets_Success(t *testing.T) {
 	// Test data
 	assets := []core.Asset{
 		{
-			Name:     "USD Coin",
-			Symbol:   "USDC",
-			Decimals: 6,
+			Name:                  "USD Coin",
+			Symbol:                "USDC",
+			Decimals:              6,
+			SuggestedBlockchainID: 1,
 			Tokens: []core.Token{
 				{
 					Name:         "USDC on Ethereum",
@@ -47,8 +48,9 @@ func TestGetAssets_Success(t *testing.T) {
 			},
 		},
 		{
-			Name:   "Tether",
-			Symbol: "USDT",
+			Name:                  "Tether",
+			Symbol:                "USDT",
+			SuggestedBlockchainID: 1,
 			Tokens: []core.Token{
 				{
 					Name:         "USDT on Ethereum",

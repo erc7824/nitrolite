@@ -49,6 +49,7 @@ export function transformAssets(assets: AssetV1[]): core.Asset[] {
     name: asset.name,
     symbol: asset.symbol,
     decimals: asset.decimals,
+    suggestedBlockchainId: BigInt(asset.suggested_blockchain_id),
     tokens: asset.tokens.map((token) => ({
       name: token.name,
       symbol: token.symbol,

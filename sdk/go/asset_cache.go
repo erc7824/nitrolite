@@ -11,7 +11,7 @@ import (
 // clientAssetStore implements core.AssetStore by fetching data from the Clearnode API.
 type clientAssetStore struct {
 	client *Client
-	cache  map[string]core.Asset // asset symbol -> Asset
+	cache  map[string]core.Asset // lowercase asset symbol -> Asset
 }
 
 func newClientAssetStore(client *Client) *clientAssetStore {
@@ -21,25 +21,34 @@ func newClientAssetStore(client *Client) *clientAssetStore {
 	}
 }
 
+// populateCache fetches all assets from the node and populates the cache.
+func (s *clientAssetStore) populateCache() error {
+	assets, err := s.client.GetAssets(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to fetch assets: %w", err)
+	}
+	for _, a := range assets {
+		s.cache[strings.ToLower(a.Symbol)] = a
+	}
+	return nil
+}
+
 // GetAssetDecimals returns the decimals for an asset as stored in Clearnode.
 func (s *clientAssetStore) GetAssetDecimals(asset string) (uint8, error) {
+	key := strings.ToLower(asset)
+
 	// Check cache first
-	if cached, ok := s.cache[asset]; ok {
+	if cached, ok := s.cache[key]; ok {
 		return cached.Decimals, nil
 	}
 
 	// Fetch from node
-	assets, err := s.client.GetAssets(context.Background(), nil)
-	if err != nil {
-		return 0, fmt.Errorf("failed to fetch assets: %w", err)
+	if err := s.populateCache(); err != nil {
+		return 0, err
 	}
 
-	// Update cache and find asset
-	for _, a := range assets {
-		s.cache[a.Symbol] = a
-		if strings.EqualFold(a.Symbol, asset) {
-			return a.Decimals, nil
-		}
+	if cached, ok := s.cache[key]; ok {
+		return cached.Decimals, nil
 	}
 
 	return 0, fmt.Errorf("asset %s not found", asset)
@@ -49,21 +58,17 @@ func (s *clientAssetStore) GetAssetDecimals(asset string) (uint8, error) {
 func (s *clientAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error) {
 	// Fetch all assets if cache is empty
 	if len(s.cache) == 0 {
-		assets, err := s.client.GetAssets(context.Background(), nil)
-		if err != nil {
-			return 0, fmt.Errorf("failed to fetch assets: %w", err)
-		}
-		for _, a := range assets {
-			s.cache[a.Symbol] = a
+		if err := s.populateCache(); err != nil {
+			return 0, err
 		}
 	}
 
 	// Search through all assets for matching token
-	tokenAddress = strings.ToLower(tokenAddress)
+	tokenAddressLower := strings.ToLower(tokenAddress)
 	for _, asset := range s.cache {
 		for _, token := range asset.Tokens {
 			if token.BlockchainID == blockchainID &&
-				strings.EqualFold(token.Address, tokenAddress) {
+				strings.EqualFold(token.Address, tokenAddressLower) {
 				return token.Decimals, nil
 			}
 		}
@@ -74,82 +79,94 @@ func (s *clientAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress st
 
 // GetTokenAddress returns the token address for a given asset on a specific blockchain.
 func (s *clientAssetStore) GetTokenAddress(asset string, blockchainID uint64) (string, error) {
+	key := strings.ToLower(asset)
+
 	// Fetch all assets if cache is empty
 	if len(s.cache) == 0 {
-		assets, err := s.client.GetAssets(context.Background(), nil)
-		if err != nil {
-			return "", fmt.Errorf("failed to fetch assets: %w", err)
-		}
-		for _, a := range assets {
-			s.cache[a.Symbol] = a
+		if err := s.populateCache(); err != nil {
+			return "", err
 		}
 	}
 
-	// Search for the asset and its token on the specified blockchain
-	for _, a := range s.cache {
-		if strings.EqualFold(a.Symbol, asset) {
-			for _, token := range a.Tokens {
-				if token.BlockchainID == blockchainID {
-					return token.Address, nil
-				}
+	// Check cache by key
+	if a, ok := s.cache[key]; ok {
+		for _, token := range a.Tokens {
+			if token.BlockchainID == blockchainID {
+				return token.Address, nil
 			}
-			return "", fmt.Errorf("asset %s not available on blockchain %d", asset, blockchainID)
 		}
+		return "", fmt.Errorf("asset %s not available on blockchain %d", asset, blockchainID)
 	}
 
 	// Asset not found in cache, try fetching again
-	assets, err := s.client.GetAssets(context.Background(), nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch assets: %w", err)
+	if err := s.populateCache(); err != nil {
+		return "", err
 	}
 
-	for _, a := range assets {
-		s.cache[a.Symbol] = a
-		if strings.EqualFold(a.Symbol, asset) {
-			for _, token := range a.Tokens {
-				if token.BlockchainID == blockchainID {
-					return token.Address, nil
-				}
+	if a, ok := s.cache[key]; ok {
+		for _, token := range a.Tokens {
+			if token.BlockchainID == blockchainID {
+				return token.Address, nil
 			}
-			return "", fmt.Errorf("asset %s not available on blockchain %d", asset, blockchainID)
 		}
+		return "", fmt.Errorf("asset %s not available on blockchain %d", asset, blockchainID)
 	}
 
 	return "", fmt.Errorf("asset %s not found", asset)
 }
 
+// GetSuggestedBlockchainID returns the suggested blockchain ID for a given asset.
+func (s *clientAssetStore) GetSuggestedBlockchainID(asset string) (uint64, error) {
+	key := strings.ToLower(asset)
+
+	// Check cache first
+	if a, ok := s.cache[key]; ok {
+		if a.SuggestedBlockchainID == 0 {
+			return 0, fmt.Errorf("no suggested blockchain ID for asset %s", asset)
+		}
+		return a.SuggestedBlockchainID, nil
+	}
+
+	// Not in cache, fetch from API
+	if err := s.populateCache(); err != nil {
+		return 0, err
+	}
+
+	if a, ok := s.cache[key]; ok {
+		if a.SuggestedBlockchainID == 0 {
+			return 0, fmt.Errorf("no suggested blockchain ID for asset %s", asset)
+		}
+		return a.SuggestedBlockchainID, nil
+	}
+
+	return 0, fmt.Errorf("asset %s not found", asset)
+}
+
 // AssetExistsOnBlockchain checks if a specific asset is supported on a specific blockchain.
 func (s *clientAssetStore) AssetExistsOnBlockchain(blockchainID uint64, asset string) (bool, error) {
-	for _, a := range s.cache {
-		if strings.EqualFold(a.Symbol, asset) {
-			for _, token := range a.Tokens {
-				if token.BlockchainID == blockchainID {
-					return true, nil
-				}
+	key := strings.ToLower(asset)
+
+	if a, ok := s.cache[key]; ok {
+		for _, token := range a.Tokens {
+			if token.BlockchainID == blockchainID {
+				return true, nil
 			}
-			// Asset found in cache, but not on this chain
-			return false, nil
 		}
+		return false, nil
 	}
 
-	assets, err := s.client.GetAssets(context.Background(), nil)
-	if err != nil {
-		return false, fmt.Errorf("failed to fetch assets: %w", err)
+	if err := s.populateCache(); err != nil {
+		return false, err
 	}
 
-	for _, a := range assets {
-		s.cache[a.Symbol] = a
-		if strings.EqualFold(a.Symbol, asset) {
-			for _, token := range a.Tokens {
-				if token.BlockchainID == blockchainID {
-					return true, nil
-				}
+	if a, ok := s.cache[key]; ok {
+		for _, token := range a.Tokens {
+			if token.BlockchainID == blockchainID {
+				return true, nil
 			}
-			// Asset found after fetch, but not on this chain
-			return false, nil
 		}
+		return false, nil
 	}
 
-	// Asset symbol not found at all
 	return false, nil
 }

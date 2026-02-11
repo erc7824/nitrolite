@@ -62,11 +62,17 @@ func transformAssets(assets []rpc.AssetV1) ([]core.Asset, error) {
 				Decimals:     token.Decimals,
 			})
 		}
+		suggestedBlockchainID, err := strconv.ParseUint(asset.SuggestedBlockchainID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse suggested blockchain ID: %w", err)
+		}
+
 		result = append(result, core.Asset{
-			Name:     asset.Name,
-			Symbol:   asset.Symbol,
-			Decimals: asset.Decimals,
-			Tokens:   tokens,
+			Name:                  asset.Name,
+			Symbol:                asset.Symbol,
+			Decimals:              asset.Decimals,
+			SuggestedBlockchainID: suggestedBlockchainID,
+			Tokens:                tokens,
 		})
 	}
 	return result, nil

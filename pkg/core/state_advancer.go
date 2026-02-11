@@ -80,6 +80,11 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 	switch newTransition.Type {
 	case TransitionTypeVoid:
 		return fmt.Errorf("cannot apply void transition as new transition")
+	case TransitionTypeAcknowledgement:
+		if currentState.UserSig != nil {
+			return fmt.Errorf("current state is already acknowledged")
+		}
+		_, err = expectedState.ApplyAcknowledgementTransition()
 	case TransitionTypeHomeDeposit:
 		_, err = expectedState.ApplyHomeDepositTransition(newTransition.Amount)
 	case TransitionTypeHomeWithdrawal:

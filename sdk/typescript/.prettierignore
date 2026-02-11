@@ -1,0 +1,7 @@
+.gitignore
+.prettierignore
+package-lock.lock
+npm-error.log
+.next
+public
+src/abis/generates.ts

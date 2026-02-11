@@ -5,11 +5,18 @@ import {ChannelHubTest_Base} from "./ChannelHub_Base.t.sol";
 
 import {Utils} from "../src/Utils.sol";
 import {State, ChannelDefinition, StateIntent, Ledger, ChannelStatus} from "../src/interfaces/Types.sol";
+import {SessionKeyAuthorization} from "../src/sigValidators/SessionKeyValidator.sol";
+import {TestUtils} from "./TestUtils.sol";
 
 contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
     function test_happyPath() public {
         ChannelDefinition memory def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION,
+            user: alice,
+            node: node,
+            nonce: NONCE,
+            signatureValidator: SK_SIG_VALIDATOR,
+            metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
@@ -49,7 +56,8 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             nodeSig: ""
         });
 
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        // both sign with default validator
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         vm.prank(alice);
         cHub.createChannel(def, state);
@@ -59,22 +67,28 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
         // transfer 42 (allocation decreases by 42, node net flow decreases by 42)
         state = nextState(state, StateIntent.OPERATE, [uint256(958), uint256(0)], [int256(1000), int256(-42)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+
+        // NOTE: user registers a Session Key
+        SessionKeyAuthorization memory skAuth = TestUtils.buildAndSignSkAuth(vm, aliceSk1, bytes32(0), ALICE_PK);
+
+        // NOTE: user signs with Session key validator
+        state = mutualSignStateUserWithSkValidator(state, channelId, ALICE_SK1_PK, skAuth);
 
         // invoke a checkpoint
         // Expected: user allocation = 958, user net flow = 1000, node allocation = 0, node net flow = -42
         vm.prank(alice);
-        cHub.checkpointChannel(channelId, state, new State[](0));
+        cHub.checkpointChannel(channelId, state);
         verifyChannelState(channelId, 958, 1000, 0, -42, "after checkpoint");
 
         // receive 24 (allocation increases by 24, node net flow increases by 24)
         state = nextState(state, StateIntent.OPERATE, [uint256(982), uint256(0)], [int256(1000), int256(-18)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // invoke a deposit (500)
         // Expected: user allocation = 1482, user net flow = 1500, node allocation = 0, node net flow = -18
         state = nextState(state, StateIntent.DEPOSIT, [uint256(1482), uint256(0)], [int256(1500), int256(-18)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        // NOTE: both sign with ECDSA validator
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         vm.prank(alice);
         cHub.depositToChannel(channelId, state);
@@ -85,16 +99,17 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
         // transfer 1
         state = nextState(state, StateIntent.OPERATE, [uint256(1481), uint256(0)], [int256(1500), int256(-19)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // transfer 2
         state = nextState(state, StateIntent.OPERATE, [uint256(1479), uint256(0)], [int256(1500), int256(-21)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // invoke a withdrawal (100)
         // Expected: user allocation = 1379, user net flow = 1400, node allocation = 0, node net flow = -21
         state = nextState(state, StateIntent.WITHDRAW, [uint256(1379), uint256(0)], [int256(1400), int256(-21)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        // NOTE: user signs with Session key validator
+        state = mutualSignStateUserWithSkValidator(state, channelId, ALICE_SK1_PK, skAuth);
 
         vm.prank(alice);
         cHub.withdrawFromChannel(channelId, state);
@@ -105,16 +120,17 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
         // transfer 3
         state = nextState(state, StateIntent.OPERATE, [uint256(1376), uint256(0)], [int256(1400), int256(-24)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // receive 10
         state = nextState(state, StateIntent.OPERATE, [uint256(1386), uint256(0)], [int256(1400), int256(-14)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // invoke a deposit (200)
         // Expected: user allocation = 1586, user net flow = 1600, node allocation = 0, node net flow = -14
         state = nextState(state, StateIntent.DEPOSIT, [uint256(1586), uint256(0)], [int256(1600), int256(-14)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        // NOTE: user signs with Session key validator
+        state = mutualSignStateUserWithSkValidator(state, channelId, ALICE_SK1_PK, skAuth);
 
         vm.prank(alice);
         cHub.depositToChannel(channelId, state);
@@ -125,28 +141,29 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
         // receive 1
         state = nextState(state, StateIntent.OPERATE, [uint256(1587), uint256(0)], [int256(1600), int256(-13)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // transfer 2
         state = nextState(state, StateIntent.OPERATE, [uint256(1585), uint256(0)], [int256(1600), int256(-15)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // receive 3
         state = nextState(state, StateIntent.OPERATE, [uint256(1588), uint256(0)], [int256(1600), int256(-12)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // transfer 4
         state = nextState(state, StateIntent.OPERATE, [uint256(1584), uint256(0)], [int256(1600), int256(-16)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // receive 5
         state = nextState(state, StateIntent.OPERATE, [uint256(1589), uint256(0)], [int256(1600), int256(-11)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // withdraw (300)
         // Expected: user allocation = 1289, user net flow = 1300, node allocation = 0, node net flow = -11
         state = nextState(state, StateIntent.WITHDRAW, [uint256(1289), uint256(0)], [int256(1300), int256(-11)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        // NOTE: user signs with ECDSA validator
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         vm.prank(alice);
         cHub.withdrawFromChannel(channelId, state);
@@ -158,25 +175,27 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
         // transfer 1
         // Expected: user allocation = 1288, user net flow = 1300, node allocation = 0, node net flow = -12
         state = nextState(state, StateIntent.OPERATE, [uint256(1288), uint256(0)], [int256(1300), int256(-12)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // receive 2
         // Expected: user allocation = 1290, user net flow = 1300, node allocation = 0, node net flow = -10
         state = nextState(state, StateIntent.OPERATE, [uint256(1290), uint256(0)], [int256(1300), int256(-10)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // transfer 3
         // Expected: user allocation = 1287, user net flow = 1300, node allocation = 0, node net flow = -13
         state = nextState(state, StateIntent.OPERATE, [uint256(1287), uint256(0)], [int256(1300), int256(-13)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // close channel
         // Expected: allocations = 0, user net flow 13, node net flow -13
         state = nextState(state, StateIntent.CLOSE, [uint256(0), uint256(0)], [int256(13), int256(-13)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+
+        // NOTE: user signs with Channel validator
+        state = mutualSignStateUserWithSkValidator(state, channelId, ALICE_SK1_PK, skAuth);
 
         vm.prank(alice);
-        cHub.closeChannel(channelId, state, new State[](0));
+        cHub.closeChannel(channelId, state);
 
         // Check CLOSED status after channel closure
         (ChannelStatus finalStatus,,,,) = cHub.getChannelData(channelId);
@@ -188,7 +207,12 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
     function test_create_withOperateIntent() public {
         ChannelDefinition memory def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION,
+            user: alice,
+            node: node,
+            nonce: NONCE,
+            signatureValidator: EMPTY_SIG_VALIDATOR,
+            metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
@@ -226,7 +250,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         vm.prank(alice);
         cHub.createChannel(def, state);
@@ -248,7 +272,12 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
     function test_create_withDepositIntent() public {
         ChannelDefinition memory def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION,
+            user: alice,
+            node: node,
+            nonce: NONCE,
+            signatureValidator: EMPTY_SIG_VALIDATOR,
+            metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
@@ -286,7 +315,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         vm.prank(alice);
         cHub.createChannel(def, state);
@@ -308,7 +337,12 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
     function test_create_withWithdrawIntent() public {
         ChannelDefinition memory def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION,
+            user: alice,
+            node: node,
+            nonce: NONCE,
+            signatureValidator: EMPTY_SIG_VALIDATOR,
+            metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
@@ -346,7 +380,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         vm.prank(alice);
         cHub.createChannel(def, state);

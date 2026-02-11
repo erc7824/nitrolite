@@ -15,25 +15,24 @@ import { getHomeChannelId, getEscrowChannelId, getStateId, getSenderTransactionI
 // ============================================================================
 
 /**
- * GetLastTransition returns the last transition, or null if the state is empty
- * or if the last transition is a receive type (TransferReceive or Release)
+ * GetLastTransition returns the transition, or null if the state has a void transition
+ * or if the transition is a receive type (TransferReceive or Release)
  * @param state - The state to query
- * @returns The last transition or null
+ * @returns The transition or null
  */
 export function getLastTransition(state: State): Transition | null {
-  if (state.transitions.length === 0) {
+  if (state.transition.type === TransitionType.Void) {
     return null;
   }
 
-  const lastTransition = state.transitions[state.transitions.length - 1];
   if (
-    lastTransition.type === TransitionType.TransferReceive ||
-    lastTransition.type === TransitionType.Release
+    state.transition.type === TransitionType.TransferReceive ||
+    state.transition.type === TransitionType.Release
   ) {
     return null;
   }
 
-  return lastTransition;
+  return state.transition;
 }
 
 /**
@@ -42,8 +41,7 @@ export function getLastTransition(state: State): Transition | null {
  * @returns True if the state is final
  */
 export function isFinal(state: State): boolean {
-  const lastTransition = getLastTransition(state);
-  return lastTransition !== null && lastTransition.type === TransitionType.Finalize;
+  return state.transition.type === TransitionType.Finalize;
 }
 
 // ============================================================================
@@ -58,11 +56,13 @@ export function isFinal(state: State): boolean {
 export function nextState(state: State): State {
   let newState: State;
 
+  const voidTransition: Transition = { type: TransitionType.Void, txId: '', amount: new Decimal(0) };
+
   if (isFinal(state)) {
     // After finalization, increment epoch and reset version
     newState = {
       id: '',
-      transitions: [],
+      transition: voidTransition,
       asset: state.asset,
       userWallet: state.userWallet,
       epoch: state.epoch + 1n,
@@ -83,7 +83,7 @@ export function nextState(state: State): State {
     // Normal advancement, increment version
     newState = {
       id: '',
-      transitions: [],
+      transition: voidTransition,
       asset: state.asset,
       userWallet: state.userWallet,
       epoch: state.epoch,
@@ -100,14 +100,12 @@ export function nextState(state: State): State {
     newState.escrowLedger = { ...state.escrowLedger };
 
     if (!state.userSig) {
-      // Copy transitions if user hasn't signed yet
-      newState.transitions = [...state.transitions];
+      // Copy transition if user hasn't signed yet
+      newState.transition = { ...state.transition };
     } else {
-      const lastTrans = getLastTransition(state);
       if (
-        lastTrans &&
-        (lastTrans.type === TransitionType.EscrowDeposit ||
-          lastTrans.type === TransitionType.EscrowWithdraw)
+        state.transition.type === TransitionType.EscrowDeposit ||
+        state.transition.type === TransitionType.EscrowWithdraw
       ) {
         // Clear escrow channel and ledger after escrow operations complete
         newState.escrowChannelId = undefined;
@@ -205,7 +203,7 @@ export function applyHomeDepositTransition(state: State, amount: Decimal): Trans
   const txId = getSenderTransactionId(accountId, state.id);
 
   const newTransitionObj = newTransition(TransitionType.HomeDeposit, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
   state.homeLedger.userNetFlow = state.homeLedger.userNetFlow.add(newTransitionObj.amount);
   state.homeLedger.userBalance = state.homeLedger.userBalance.add(newTransitionObj.amount);
 
@@ -227,7 +225,7 @@ export function applyHomeWithdrawalTransition(state: State, amount: Decimal): Tr
   const txId = getSenderTransactionId(accountId, state.id);
 
   const newTransitionObj = newTransition(TransitionType.HomeWithdrawal, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
   state.homeLedger.userNetFlow = state.homeLedger.userNetFlow.sub(newTransitionObj.amount);
   state.homeLedger.userBalance = state.homeLedger.userBalance.sub(newTransitionObj.amount);
 
@@ -250,7 +248,7 @@ export function applyTransferSendTransition(
   const txId = getSenderTransactionId(accountId, state.id);
 
   const newTransitionObj = newTransition(TransitionType.TransferSend, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
   state.homeLedger.userBalance = state.homeLedger.userBalance.sub(newTransitionObj.amount);
   state.homeLedger.nodeNetFlow = state.homeLedger.nodeNetFlow.sub(newTransitionObj.amount);
 
@@ -274,7 +272,7 @@ export function applyTransferReceiveTransition(
   const accountId = sender;
 
   const newTransitionObj = newTransition(TransitionType.TransferReceive, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
   state.homeLedger.userBalance = state.homeLedger.userBalance.add(newTransitionObj.amount);
   state.homeLedger.nodeNetFlow = state.homeLedger.nodeNetFlow.add(newTransitionObj.amount);
 
@@ -292,7 +290,7 @@ export function applyCommitTransition(state: State, accountId: string, amount: D
   const txId = getSenderTransactionId(accountId, state.id);
 
   const newTransitionObj = newTransition(TransitionType.Commit, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
   state.homeLedger.userBalance = state.homeLedger.userBalance.sub(newTransitionObj.amount);
   state.homeLedger.nodeNetFlow = state.homeLedger.nodeNetFlow.sub(newTransitionObj.amount);
 
@@ -310,7 +308,7 @@ export function applyReleaseTransition(state: State, accountId: string, amount: 
   const txId = getReceiverTransactionId(accountId, state.id);
 
   const newTransitionObj = newTransition(TransitionType.Release, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
   state.homeLedger.userBalance = state.homeLedger.userBalance.add(newTransitionObj.amount);
   state.homeLedger.nodeNetFlow = state.homeLedger.nodeNetFlow.add(newTransitionObj.amount);
 
@@ -348,7 +346,7 @@ export function applyMutualLockTransition(
   const txId = getSenderTransactionId(accountId, state.id);
 
   const newTransitionObj = newTransition(TransitionType.MutualLock, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
 
   state.homeLedger.nodeBalance = state.homeLedger.nodeBalance.add(newTransitionObj.amount);
   state.homeLedger.nodeNetFlow = state.homeLedger.nodeNetFlow.add(newTransitionObj.amount);
@@ -383,7 +381,7 @@ export function applyEscrowDepositTransition(state: State, amount: Decimal): Tra
   const txId = getSenderTransactionId(accountId, state.id);
 
   const newTransitionObj = newTransition(TransitionType.EscrowDeposit, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
 
   state.homeLedger.userBalance = state.homeLedger.userBalance.add(newTransitionObj.amount);
   state.homeLedger.nodeNetFlow = state.homeLedger.nodeNetFlow.add(newTransitionObj.amount);
@@ -425,7 +423,7 @@ export function applyEscrowLockTransition(
   const txId = getSenderTransactionId(accountId, state.id);
 
   const newTransitionObj = newTransition(TransitionType.EscrowLock, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
 
   state.escrowLedger = {
     blockchainId,
@@ -457,7 +455,7 @@ export function applyEscrowWithdrawTransition(state: State, amount: Decimal): Tr
   const txId = getSenderTransactionId(accountId, state.id);
 
   const newTransitionObj = newTransition(TransitionType.EscrowWithdraw, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
 
   state.homeLedger.userBalance = state.homeLedger.userBalance.sub(newTransitionObj.amount);
   state.homeLedger.nodeNetFlow = state.homeLedger.nodeNetFlow.sub(newTransitionObj.amount);
@@ -493,7 +491,7 @@ export function applyFinalizeTransition(state: State): Transition {
   const txId = getSenderTransactionId(accountId, state.id);
 
   const newTransitionObj = newTransition(TransitionType.Finalize, txId, accountId, amount);
-  state.transitions.push(newTransitionObj);
+  state.transition = newTransitionObj;
 
   state.homeLedger.userNetFlow = state.homeLedger.userNetFlow.sub(state.homeLedger.userBalance);
   state.homeLedger.userBalance = new Decimal(0);

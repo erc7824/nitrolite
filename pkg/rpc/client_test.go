@@ -409,30 +409,6 @@ func TestClientV1_AppSessionsV1CreateAppSession(t *testing.T) {
 	assert.Equal(t, "open", resp.Status)
 }
 
-func TestClientV1_AppSessionsV1CloseAppSession(t *testing.T) {
-	t.Parallel()
-
-	client, dialer := setupClient()
-
-	response := rpc.AppSessionsV1CloseAppSessionResponse{
-		AppSessionID: testAppSession,
-		Version:      "5",
-		Status:       "closed",
-	}
-
-	registerSimpleHandlerV1(dialer, "app_sessions.v1.close_app_session", response)
-
-	resp, err := client.AppSessionsV1CloseAppSession(testCtxV1, rpc.AppSessionsV1CloseAppSessionRequest{
-		AppSessionID: testAppSession,
-		Allocations: []rpc.AppAllocationV1{
-			{Participant: testWalletV1, Asset: testAssetV1, Amount: "100"},
-		},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, testAppSession, resp.AppSessionID)
-	assert.Equal(t, "closed", resp.Status)
-}
-
 func TestClientV1_AppSessionsV1SubmitDepositState(t *testing.T) {
 	t.Parallel()
 

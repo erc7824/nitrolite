@@ -47,7 +47,7 @@ func TestGetLatestState_Success(t *testing.T) {
 
 	state := core.State{
 		ID:            core.GetStateID(userWallet, asset, 1, 5),
-		Transitions:   []core.Transition{},
+		Transition:    core.Transition{},
 		Asset:         asset,
 		UserWallet:    userWallet,
 		Epoch:         1,
@@ -146,7 +146,7 @@ func TestGetLatestState_OnlySigned(t *testing.T) {
 
 	state := core.State{
 		ID:            core.GetStateID(userWallet, asset, 1, 3),
-		Transitions:   []core.Transition{},
+		Transition:    core.Transition{},
 		Asset:         asset,
 		UserWallet:    userWallet,
 		Epoch:         1,

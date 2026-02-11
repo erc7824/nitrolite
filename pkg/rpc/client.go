@@ -172,15 +172,6 @@ func (c *Client) AppSessionsV1CreateAppSession(ctx context.Context, req AppSessi
 	return resp, nil
 }
 
-// AppSessionsV1CloseAppSession closes an application session and redistributes funds.
-func (c *Client) AppSessionsV1CloseAppSession(ctx context.Context, req AppSessionsV1CloseAppSessionRequest) (AppSessionsV1CloseAppSessionResponse, error) {
-	var resp AppSessionsV1CloseAppSessionResponse
-	if err := c.call(ctx, AppSessionsV1CloseAppSessionMethod, req, &resp); err != nil {
-		return resp, err
-	}
-	return resp, nil
-}
-
 // AppSessionsV1RebalanceAppSessions rebalances multiple application sessions atomically.
 func (c *Client) AppSessionsV1RebalanceAppSessions(ctx context.Context, req AppSessionsV1RebalanceAppSessionsRequest) (AppSessionsV1RebalanceAppSessionsResponse, error) {
 	var resp AppSessionsV1RebalanceAppSessionsResponse

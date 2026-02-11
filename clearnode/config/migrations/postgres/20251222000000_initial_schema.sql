@@ -23,11 +23,15 @@ CREATE INDEX idx_channels_status ON channels(status);
 -- Channel States table: Immutable state records
 CREATE TABLE channel_states (
     id CHAR(66) PRIMARY KEY, -- Deterministic hash: Hash(UserWallet, Asset, Epoch, Version)
-    transitions JSONB NOT NULL, -- JSON array of state transitions
     asset VARCHAR(20) NOT NULL,
     user_wallet CHAR(42) NOT NULL,
     epoch NUMERIC(20,0) NOT NULL,
     version NUMERIC(20,0) NOT NULL,
+
+    transition_type SMALLINT NOT NULL, -- TransactionType enum for the transition that led to this state
+    transition_tx_id CHAR(66), -- Transaction that caused this state transition
+    transition_account_id VARCHAR(66), -- Account (wallet or channel) that initiated the transition
+    transition_amount NUMERIC(78, 18) NOT NULL DEFAULT 0, -- Amount involved in the transition (positive for credits to user, negative for debits)
 
     -- Optional channel references
     home_channel_id CHAR(66),
@@ -53,6 +57,7 @@ CREATE TABLE channel_states (
 
 CREATE INDEX idx_channel_states_user_wallet ON channel_states(user_wallet);
 CREATE INDEX idx_channel_states_asset ON channel_states(asset);
+CREATE INDEX idx_channel_states_transition_type ON channel_states(transition_type);
 CREATE INDEX idx_channel_states_user_wallet_asset ON channel_states(user_wallet, asset);
 CREATE INDEX idx_channel_states_epoch_version ON channel_states(epoch DESC, version DESC);
 CREATE INDEX idx_channel_states_home_channel_id ON channel_states(home_channel_id) WHERE home_channel_id IS NOT NULL;

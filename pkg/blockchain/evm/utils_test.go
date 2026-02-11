@@ -163,11 +163,9 @@ func TestCoreStateToContractState_BasicState(t *testing.T) {
 			NodeBalance:  decimal.NewFromInt(50),
 			NodeNetFlow:  decimal.NewFromInt(50),
 		},
-		UserSig: &userSigHex,
-		NodeSig: &nodeSigHex,
-		Transitions: []core.Transition{
-			{Type: core.TransitionTypeTransferSend, Amount: decimal.NewFromInt(10)},
-		},
+		UserSig:    &userSigHex,
+		NodeSig:    &nodeSigHex,
+		Transition: core.Transition{Type: core.TransitionTypeTransferSend, Amount: decimal.NewFromInt(10)},
 	}
 
 	mockTokenGetter := func(blockchainID uint64, tokenAddress string) (uint8, error) {
@@ -216,9 +214,7 @@ func TestCoreStateToContractState_WithEscrowLedger(t *testing.T) {
 			NodeBalance:  decimal.NewFromInt(100),
 			NodeNetFlow:  decimal.NewFromInt(100),
 		},
-		Transitions: []core.Transition{
-			{Type: core.TransitionTypeMutualLock, Amount: decimal.NewFromInt(10)},
-		},
+		Transition: core.Transition{Type: core.TransitionTypeMutualLock, Amount: decimal.NewFromInt(10)},
 	}
 
 	mockTokenGetter := func(blockchainID uint64, tokenAddress string) (uint8, error) {
@@ -257,9 +253,7 @@ func TestCoreStateToContractState_WithoutEscrowLedger(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(50),
 		},
 		EscrowLedger: nil, // Explicitly nil
-		Transitions: []core.Transition{
-			{Type: core.TransitionTypeHomeDeposit, Amount: decimal.NewFromInt(100)},
-		},
+		Transition:   core.Transition{Type: core.TransitionTypeHomeDeposit, Amount: decimal.NewFromInt(100)},
 	}
 
 	mockTokenGetter := func(blockchainID uint64, tokenAddress string) (uint8, error) {
@@ -300,10 +294,8 @@ func TestCoreStateToContractState_InvalidUserSig(t *testing.T) {
 			NodeBalance:  decimal.NewFromInt(50),
 			NodeNetFlow:  decimal.NewFromInt(50),
 		},
-		UserSig: &invalidSigHex,
-		Transitions: []core.Transition{
-			{Type: core.TransitionTypeTransferSend},
-		},
+		UserSig:    &invalidSigHex,
+		Transition: core.Transition{Type: core.TransitionTypeTransferSend},
 	}
 
 	mockTokenGetter := func(blockchainID uint64, tokenAddress string) (uint8, error) {

@@ -97,12 +97,12 @@ func TestPostgres_StateOperations(t *testing.T) {
 
 	t.Run("Store and retrieve state", func(t *testing.T) {
 		state := core.State{
-			ID:          "0x3334567890123456789012345678901234567890123456789012345678901234",
-			Asset:       asset,
-			UserWallet:  wallet,
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x3334567890123456789012345678901234567890123456789012345678901234",
+			Asset:      asset,
+			UserWallet: wallet,
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.NewFromInt(100),
@@ -132,36 +132,36 @@ func TestPostgres_StateOperations(t *testing.T) {
 		wallet2 := "0x4234567890123456789012345678901234567890"
 
 		state1 := core.State{
-			ID:          "0x4334567890123456789012345678901234567890123456789012345678901234",
-			Asset:       asset,
-			UserWallet:  wallet2,
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x4334567890123456789012345678901234567890123456789012345678901234",
+			Asset:      asset,
+			UserWallet: wallet2,
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 			},
 		}
 
 		state2 := core.State{
-			ID:          "0x4434567890123456789012345678901234567890123456789012345678901234",
-			Asset:       asset,
-			UserWallet:  wallet2,
-			Epoch:       1,
-			Version:     2,
-			Transitions: []core.Transition{},
+			ID:         "0x4434567890123456789012345678901234567890123456789012345678901234",
+			Asset:      asset,
+			UserWallet: wallet2,
+			Epoch:      1,
+			Version:    2,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(900),
 			},
 		}
 
 		state3 := core.State{
-			ID:          "0x4534567890123456789012345678901234567890123456789012345678901234",
-			Asset:       asset,
-			UserWallet:  wallet2,
-			Epoch:       2,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x4534567890123456789012345678901234567890123456789012345678901234",
+			Asset:      asset,
+			UserWallet: wallet2,
+			Epoch:      2,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(850),
 			},
@@ -415,24 +415,24 @@ func TestPostgres_UserBalances(t *testing.T) {
 
 	t.Run("Get user balances across multiple assets", func(t *testing.T) {
 		state1 := core.State{
-			ID:          "0x9334567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  wallet,
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x9334567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: wallet,
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 			},
 		}
 
 		state2 := core.State{
-			ID:          "0x9434567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "ETH",
-			UserWallet:  wallet,
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0x9434567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "ETH",
+			UserWallet: wallet,
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(5),
 			},
@@ -476,12 +476,12 @@ func TestPostgres_DecimalPrecision(t *testing.T) {
 		largeNetFlow := decimal.RequireFromString("999999999999999999")
 
 		state := core.State{
-			ID:          "0xa334567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "USDC",
-			UserWallet:  wallet,
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0xa334567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "USDC",
+			UserWallet: wallet,
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: largeBalance,
 				UserNetFlow: largeNetFlow,
@@ -504,12 +504,12 @@ func TestPostgres_DecimalPrecision(t *testing.T) {
 		negativeNetFlow := decimal.RequireFromString("-12345678901234567")
 
 		state := core.State{
-			ID:          "0xb334567890123456789012345678901234567890123456789012345678901234",
-			Asset:       "ETH",
-			UserWallet:  wallet,
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "0xb334567890123456789012345678901234567890123456789012345678901234",
+			Asset:      "ETH",
+			UserWallet: wallet,
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(500),
 				UserNetFlow: negativeNetFlow,

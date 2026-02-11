@@ -320,7 +320,7 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 			if err != nil {
 				return "", errors.Wrap(err, "failed to get allowance")
 			}
-			if allowance.LessThan(initCCS.GetLastTransition().Amount) {
+			if allowance.LessThan(initCCS.Transition.Amount) {
 				return "", errors.New("allowance is not sufficient to cover the deposit amount")
 			}
 
@@ -330,7 +330,7 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 			if err != nil {
 				return "", errors.Wrap(err, "failed to check token balance")
 			}
-			if tokenBalance.LessThan(initCCS.GetLastTransition().Amount) {
+			if tokenBalance.LessThan(initCCS.Transition.Amount) {
 				return "", errors.New("balance is not sufficient to cover the deposit amount")
 			}
 		}
@@ -405,7 +405,7 @@ func (c *Client) Checkpoint(candidate core.State, _ []core.State) (string, error
 			if err != nil {
 				return "", errors.Wrap(err, "failed to get allowance")
 			}
-			if allowance.LessThan(candidate.GetLastTransition().Amount) {
+			if allowance.LessThan(candidate.Transition.Amount) {
 				return "", errors.New("allowance is not sufficient to cover the deposit amount")
 			}
 
@@ -415,7 +415,7 @@ func (c *Client) Checkpoint(candidate core.State, _ []core.State) (string, error
 			if err != nil {
 				return "", errors.Wrap(err, "failed to check token balance")
 			}
-			if tokenBalance.LessThan(candidate.GetLastTransition().Amount) {
+			if tokenBalance.LessThan(candidate.Transition.Amount) {
 				return "", errors.New("balance is not sufficient to cover the deposit amount")
 			}
 		}

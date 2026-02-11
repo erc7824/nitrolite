@@ -226,19 +226,16 @@ func transformState(state rpc.StateV1) (core.State, error) {
 		return core.State{}, fmt.Errorf("failed to parse version: %w", err)
 	}
 
-	// Transform transitions
-	transitions := make([]core.Transition, 0, len(state.Transitions))
-	for _, t := range state.Transitions {
-		amount, err := decimal.NewFromString(t.Amount)
-		if err != nil {
-			return core.State{}, fmt.Errorf("failed to parse transition amount: %w", err)
-		}
-		transitions = append(transitions, core.Transition{
-			Type:      t.Type,
-			TxID:      t.TxID,
-			AccountID: t.AccountID,
-			Amount:    amount,
-		})
+	// Transform transition
+	transitionAmount, err := decimal.NewFromString(state.Transition.Amount)
+	if err != nil {
+		return core.State{}, fmt.Errorf("failed to parse transition amount: %w", err)
+	}
+	transition := core.Transition{
+		Type:      state.Transition.Type,
+		TxID:      state.Transition.TxID,
+		AccountID: state.Transition.AccountID,
+		Amount:    transitionAmount,
 	}
 
 	// Transform ledgers
@@ -258,7 +255,7 @@ func transformState(state rpc.StateV1) (core.State, error) {
 
 	result := core.State{
 		ID:              state.ID,
-		Transitions:     transitions,
+		Transition:      transition,
 		Asset:           state.Asset,
 		UserWallet:      state.UserWallet,
 		Epoch:           epoch,
@@ -277,15 +274,12 @@ func transformState(state rpc.StateV1) (core.State, error) {
 
 // transformStateToRPC converts core.State to RPC StateV1.
 func transformStateToRPC(state core.State) rpc.StateV1 {
-	// Transform transitions
-	transitions := make([]rpc.TransitionV1, 0, len(state.Transitions))
-	for _, t := range state.Transitions {
-		transitions = append(transitions, rpc.TransitionV1{
-			Type:      t.Type,
-			TxID:      t.TxID,
-			AccountID: t.AccountID,
-			Amount:    t.Amount.String(),
-		})
+	// Transform transition
+	transition := rpc.TransitionV1{
+		Type:      state.Transition.Type,
+		TxID:      state.Transition.TxID,
+		AccountID: state.Transition.AccountID,
+		Amount:    state.Transition.Amount.String(),
 	}
 
 	// Transform ledgers
@@ -299,7 +293,7 @@ func transformStateToRPC(state core.State) rpc.StateV1 {
 
 	result := rpc.StateV1{
 		ID:              state.ID,
-		Transitions:     transitions,
+		Transition:      transition,
 		Asset:           state.Asset,
 		UserWallet:      state.UserWallet,
 		Epoch:           strconv.FormatUint(state.Epoch, 10),

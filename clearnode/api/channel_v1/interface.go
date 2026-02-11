@@ -29,7 +29,7 @@ type Store interface {
 
 	// EnsureNoOngoingStateTransitions validates that no blockchain operations are pending
 	// that would conflict with submitting a new state transition.
-	EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error
+	EnsureNoOngoingStateTransitions(wallet, asset string) error
 
 	// ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate
 	// withdrawal from an escrow channel (triggered by escrow_lock transition).

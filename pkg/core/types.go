@@ -72,18 +72,18 @@ type ChannelDefinition struct {
 
 // State represents the current state of the user stored on Node
 type State struct {
-	ID              string       `json:"id"`                          // Deterministic ID (hash) of the state
-	Transitions     []Transition `json:"transitions"`                 // List of transitions included in the state
-	Asset           string       `json:"asset"`                       // Asset type of the state
-	UserWallet      string       `json:"user_wallet"`                 // User wallet address
-	Epoch           uint64       `json:"epoch"`                       // User Epoch Index
-	Version         uint64       `json:"version"`                     // Version of the state
-	HomeChannelID   *string      `json:"home_channel_id,omitempty"`   // Identifier for the home Channel ID
-	EscrowChannelID *string      `json:"escrow_channel_id,omitempty"` // Identifier for the escrow Channel ID
-	HomeLedger      Ledger       `json:"home_ledger"`                 // User and node balances for the home channel
-	EscrowLedger    *Ledger      `json:"escrow_ledger,omitempty"`     // User and node balances for the escrow channel
-	UserSig         *string      `json:"user_sig,omitempty"`          // User signature for the state
-	NodeSig         *string      `json:"node_sig,omitempty"`          // Node signature for the state
+	ID              string     `json:"id"`                          // Deterministic ID (hash) of the state
+	Transition      Transition `json:"transition"`                  // The transition that led to this state
+	Asset           string     `json:"asset"`                       // Asset type of the state
+	UserWallet      string     `json:"user_wallet"`                 // User wallet address
+	Epoch           uint64     `json:"epoch"`                       // User Epoch Index
+	Version         uint64     `json:"version"`                     // Version of the state
+	HomeChannelID   *string    `json:"home_channel_id,omitempty"`   // Identifier for the home Channel ID
+	EscrowChannelID *string    `json:"escrow_channel_id,omitempty"` // Identifier for the escrow Channel ID
+	HomeLedger      Ledger     `json:"home_ledger"`                 // User and node balances for the home channel
+	EscrowLedger    *Ledger    `json:"escrow_ledger,omitempty"`     // User and node balances for the escrow channel
+	UserSig         *string    `json:"user_sig,omitempty"`          // User signature for the state
+	NodeSig         *string    `json:"node_sig,omitempty"`          // Node signature for the state
 }
 
 func NewVoidState(asset, userWallet string) *State {
@@ -99,24 +99,10 @@ func NewVoidState(asset, userWallet string) *State {
 	}
 }
 
-func (state State) GetLastTransition() *Transition {
-	if len(state.Transitions) == 0 {
-		return nil
-	}
-
-	lastTransition := state.Transitions[len(state.Transitions)-1]
-	if lastTransition.Type == TransitionTypeTransferReceive || lastTransition.Type == TransitionTypeRelease {
-		return nil
-	}
-
-	return &lastTransition
-}
-
 func (state State) NextState() *State {
 	var nextState *State
 	if state.IsFinal() {
 		nextState = &State{
-			Transitions:     []Transition{},
 			Asset:           state.Asset,
 			UserWallet:      state.UserWallet,
 			Epoch:           state.Epoch + 1,
@@ -133,7 +119,6 @@ func (state State) NextState() *State {
 		}
 	} else {
 		nextState = &State{
-			Transitions:     []Transition{},
 			Asset:           state.Asset,
 			UserWallet:      state.UserWallet,
 			Epoch:           state.Epoch,
@@ -154,9 +139,7 @@ func (state State) NextState() *State {
 			NodeNetFlow:  state.EscrowLedger.NodeNetFlow,
 		}
 
-		if state.UserSig == nil {
-			nextState.Transitions = state.Transitions
-		} else if t := state.GetLastTransition(); t != nil && (t.Type == TransitionTypeEscrowDeposit || t.Type == TransitionTypeEscrowWithdraw) {
+		if transitionType := state.Transition.Type; transitionType == TransitionTypeEscrowDeposit || transitionType == TransitionTypeEscrowWithdraw {
 			// escrowChannelID, escrowLedger: not-nil -> nil
 			nextState.EscrowChannelID = nil
 			nextState.EscrowLedger = nil
@@ -190,32 +173,13 @@ func (state *State) ApplyChannelCreation(channelDef ChannelDefinition, blockchai
 }
 
 func (state *State) IsFinal() bool {
-	if state.GetLastTransition() != nil && state.GetLastTransition().Type == TransitionTypeFinalize {
-		return true
-	}
-	return false
-}
-
-func (state *State) ApplyReceiverTransitions(transitions ...Transition) error {
-	for _, transition := range transitions {
-		var err error
-		switch transition.Type {
-		case TransitionTypeTransferReceive:
-			_, err = state.ApplyTransferReceiveTransition(transition.AccountID, transition.Amount, transition.TxID)
-		case TransitionTypeRelease:
-			_, err = state.ApplyReleaseTransition(transition.AccountID, transition.Amount)
-		default:
-			return fmt.Errorf("transition '%s' cannot be applied by receiver", transition.Type.String())
-		}
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return state.Transition.Type == TransitionTypeFinalize
 }
 
 func (state *State) ApplyHomeDepositTransition(amount decimal.Decimal) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	if state.HomeChannelID == nil {
 		return Transition{}, fmt.Errorf("missing home channel ID")
 	}
@@ -227,7 +191,7 @@ func (state *State) ApplyHomeDepositTransition(amount decimal.Decimal) (Transiti
 	}
 
 	newTransition := NewTransition(TransitionTypeHomeDeposit, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 	state.HomeLedger.UserNetFlow = state.HomeLedger.UserNetFlow.Add(newTransition.Amount)
 	state.HomeLedger.UserBalance = state.HomeLedger.UserBalance.Add(newTransition.Amount)
 
@@ -235,6 +199,9 @@ func (state *State) ApplyHomeDepositTransition(amount decimal.Decimal) (Transiti
 }
 
 func (state *State) ApplyHomeWithdrawalTransition(amount decimal.Decimal) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	if state.HomeChannelID == nil {
 		return Transition{}, fmt.Errorf("missing home channel ID")
 	}
@@ -246,7 +213,7 @@ func (state *State) ApplyHomeWithdrawalTransition(amount decimal.Decimal) (Trans
 	}
 
 	newTransition := NewTransition(TransitionTypeHomeWithdrawal, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 	state.HomeLedger.UserNetFlow = state.HomeLedger.UserNetFlow.Sub(newTransition.Amount)
 	state.HomeLedger.UserBalance = state.HomeLedger.UserBalance.Sub(newTransition.Amount)
 
@@ -254,6 +221,9 @@ func (state *State) ApplyHomeWithdrawalTransition(amount decimal.Decimal) (Trans
 }
 
 func (state *State) ApplyTransferSendTransition(recipient string, amount decimal.Decimal) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	// TODO: maybe validate that recipient is a correct UserWallet format
 	accountID := recipient
 	txID, err := GetSenderTransactionID(accountID, state.ID)
@@ -262,7 +232,7 @@ func (state *State) ApplyTransferSendTransition(recipient string, amount decimal
 	}
 
 	newTransition := NewTransition(TransitionTypeTransferSend, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 	state.HomeLedger.UserBalance = state.HomeLedger.UserBalance.Sub(newTransition.Amount)
 	state.HomeLedger.NodeNetFlow = state.HomeLedger.NodeNetFlow.Sub(newTransition.Amount)
 
@@ -270,17 +240,23 @@ func (state *State) ApplyTransferSendTransition(recipient string, amount decimal
 }
 
 func (state *State) ApplyTransferReceiveTransition(sender string, amount decimal.Decimal, txID string) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	// TODO: maybe validate that recipient is a correct UserWallet format
 	accountID := sender
 
 	newTransition := NewTransition(TransitionTypeTransferReceive, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 	state.HomeLedger.UserBalance = state.HomeLedger.UserBalance.Add(newTransition.Amount)
 	state.HomeLedger.NodeNetFlow = state.HomeLedger.NodeNetFlow.Add(newTransition.Amount)
 	return *newTransition, nil
 }
 
 func (state *State) ApplyCommitTransition(accountID string, amount decimal.Decimal) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	// TODO: maybe validate that AccountID has correct AppSessionID format
 	txID, err := GetSenderTransactionID(accountID, state.ID)
 	if err != nil {
@@ -288,7 +264,7 @@ func (state *State) ApplyCommitTransition(accountID string, amount decimal.Decim
 	}
 
 	newTransition := NewTransition(TransitionTypeCommit, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 	state.HomeLedger.UserBalance = state.HomeLedger.UserBalance.Sub(newTransition.Amount)
 	state.HomeLedger.NodeNetFlow = state.HomeLedger.NodeNetFlow.Sub(newTransition.Amount)
 
@@ -296,6 +272,9 @@ func (state *State) ApplyCommitTransition(accountID string, amount decimal.Decim
 }
 
 func (state *State) ApplyReleaseTransition(accountID string, amount decimal.Decimal) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	// TODO: maybe validate that recipient is a correct UserWallet format
 	txID, err := GetReceiverTransactionID(accountID, state.ID)
 	if err != nil {
@@ -303,13 +282,16 @@ func (state *State) ApplyReleaseTransition(accountID string, amount decimal.Deci
 	}
 
 	newTransition := NewTransition(TransitionTypeRelease, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 	state.HomeLedger.UserBalance = state.HomeLedger.UserBalance.Add(newTransition.Amount)
 	state.HomeLedger.NodeNetFlow = state.HomeLedger.NodeNetFlow.Add(newTransition.Amount)
 	return *newTransition, nil
 }
 
 func (state *State) ApplyMutualLockTransition(blockchainID uint64, tokenAddress string, amount decimal.Decimal) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	if state.HomeChannelID == nil {
 		return Transition{}, fmt.Errorf("missing home channel ID")
 	}
@@ -333,7 +315,7 @@ func (state *State) ApplyMutualLockTransition(blockchainID uint64, tokenAddress 
 	}
 
 	newTransition := NewTransition(TransitionTypeMutualLock, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 
 	state.HomeLedger.NodeBalance = state.HomeLedger.NodeBalance.Add(newTransition.Amount)
 	state.HomeLedger.NodeNetFlow = state.HomeLedger.NodeNetFlow.Add(newTransition.Amount)
@@ -351,6 +333,9 @@ func (state *State) ApplyMutualLockTransition(blockchainID uint64, tokenAddress 
 }
 
 func (state *State) ApplyEscrowDepositTransition(amount decimal.Decimal) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	if state.EscrowChannelID == nil {
 		return Transition{}, fmt.Errorf("internal error: escrow channel ID is nil")
 	}
@@ -365,7 +350,7 @@ func (state *State) ApplyEscrowDepositTransition(amount decimal.Decimal) (Transi
 	}
 
 	newTransition := NewTransition(TransitionTypeEscrowDeposit, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 
 	state.HomeLedger.UserBalance = state.HomeLedger.UserBalance.Add(newTransition.Amount)
 	state.HomeLedger.NodeNetFlow = state.HomeLedger.NodeNetFlow.Add(newTransition.Amount)
@@ -377,6 +362,9 @@ func (state *State) ApplyEscrowDepositTransition(amount decimal.Decimal) (Transi
 }
 
 func (state *State) ApplyEscrowLockTransition(blockchainID uint64, tokenAddress string, amount decimal.Decimal) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	if state.HomeChannelID == nil {
 		return Transition{}, fmt.Errorf("missing home channel ID")
 	}
@@ -400,7 +388,7 @@ func (state *State) ApplyEscrowLockTransition(blockchainID uint64, tokenAddress 
 	}
 
 	newTransition := NewTransition(TransitionTypeEscrowLock, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 
 	state.EscrowLedger = &Ledger{
 		BlockchainID: blockchainID,
@@ -415,6 +403,9 @@ func (state *State) ApplyEscrowLockTransition(blockchainID uint64, tokenAddress 
 }
 
 func (state *State) ApplyEscrowWithdrawTransition(amount decimal.Decimal) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	if state.EscrowChannelID == nil {
 		return Transition{}, fmt.Errorf("internal error: escrow channel ID is nil")
 	}
@@ -429,7 +420,7 @@ func (state *State) ApplyEscrowWithdrawTransition(amount decimal.Decimal) (Trans
 	}
 
 	newTransition := NewTransition(TransitionTypeEscrowWithdraw, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 
 	state.HomeLedger.UserBalance = state.HomeLedger.UserBalance.Sub(newTransition.Amount)
 	state.HomeLedger.NodeNetFlow = state.HomeLedger.NodeNetFlow.Sub(newTransition.Amount)
@@ -441,10 +432,16 @@ func (state *State) ApplyEscrowWithdrawTransition(amount decimal.Decimal) (Trans
 }
 
 func (state *State) ApplyMigrateTransition(amount decimal.Decimal) (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	return Transition{}, fmt.Errorf("migrate transition not implemented yet")
 }
 
 func (state *State) ApplyFinalizeTransition() (Transition, error) {
+	if state.Transition.Type != TransitionTypeVoid {
+		return Transition{}, fmt.Errorf("state already has a transition: %s", state.Transition.Type.String())
+	}
 	if state.HomeChannelID == nil {
 		return Transition{}, fmt.Errorf("missing home channel ID")
 	}
@@ -457,7 +454,7 @@ func (state *State) ApplyFinalizeTransition() (Transition, error) {
 	}
 
 	newTransition := NewTransition(TransitionTypeFinalize, txID, accountID, amount)
-	state.Transitions = append(state.Transitions, *newTransition)
+	state.Transition = *newTransition
 
 	state.HomeLedger.UserNetFlow = state.HomeLedger.UserNetFlow.Sub(state.HomeLedger.UserBalance)
 	state.HomeLedger.UserBalance = decimal.Zero
@@ -745,6 +742,8 @@ func NewTransactionFromTransition(senderState *State, receiverState *State, tran
 type TransitionType uint8
 
 const (
+	TransitionTypeVoid = 0 // Void transition, used for the initial state with no activity
+
 	TransitionTypeHomeDeposit    TransitionType = 10 // AccountID: HomeChannelID
 	TransitionTypeHomeWithdrawal TransitionType = 11 // AccountID: HomeChannelID
 

@@ -36,8 +36,8 @@ func (p *StatePackerV1) PackState(state State) ([]byte, error) {
 	// Convert HomeChannelID to bytes32
 	channelID := common.HexToHash(*state.HomeChannelID)
 
-	// Generate metadata from state transitions
-	metadata, err := GetStateTransitionsHash(state.Transitions)
+	// Generate metadata from the state transition
+	metadata, err := GetStateTransitionHash(state.Transition)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate state transitions hash: %w", err)
 	}
@@ -159,13 +159,7 @@ func (p *StatePackerV1) PackState(state State) ([]byte, error) {
 	}
 
 	// Determine intent based on last transition
-	intent := uint8(0)
-	if lastTransition := state.GetLastTransition(); lastTransition != nil {
-		intent, err = TransitionToIntent(lastTransition)
-		if err != nil {
-			return nil, err
-		}
-	}
+	intent := TransitionToIntent(state.Transition)
 
 	packed, err := args.Pack(
 		channelID,

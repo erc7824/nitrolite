@@ -219,7 +219,7 @@ func TestDBStore_GetActiveHomeChannel(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -279,7 +279,7 @@ func TestDBStore_GetActiveHomeChannel(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -324,7 +324,7 @@ func TestDBStore_GetActiveHomeChannel(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -347,12 +347,12 @@ func TestDBStore_GetActiveHomeChannel(t *testing.T) {
 
 		// Create state without home channel
 		state := core.State{
-			ID:          "state1",
-			Asset:       "USDC",
-			UserWallet:  "0xuser123",
-			Epoch:       1,
-			Version:     1,
-			Transitions: []core.Transition{},
+			ID:         "state1",
+			Asset:      "USDC",
+			UserWallet: "0xuser123",
+			Epoch:      1,
+			Version:    1,
+			Transition: core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -399,7 +399,7 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -455,7 +455,7 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -500,7 +500,7 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,

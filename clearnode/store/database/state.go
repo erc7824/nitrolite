@@ -7,7 +7,6 @@ import (
 
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/shopspring/decimal"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -21,13 +20,17 @@ type Allocation struct {
 // ID is deterministic: Hash(UserWallet, Asset, CycleIndex, Version)
 type State struct {
 	// ID is a 64-character deterministic hash
-	ID          string         `gorm:"column:id;primaryKey;size:64"`
-	Transitions datatypes.JSON `gorm:"column:transitions;type:text;not null"`
-	Asset       string         `gorm:"column:asset;not null"`
-	UserWallet  string         `gorm:"column:user_wallet;not null"`
-	Epoch       uint64         `gorm:"column:epoch;not null"`
+	ID         string `gorm:"column:id;primaryKey;size:64"`
+	Asset      string `gorm:"column:asset;not null"`
+	UserWallet string `gorm:"column:user_wallet;not null"`
+	Epoch      uint64 `gorm:"column:epoch;not null"`
+	Version    uint64 `gorm:"column:version;not null"`
 
-	Version uint64 `gorm:"column:version;not null"`
+	// Transition
+	TransitionType      uint8           `gorm:"column:transition_type;not null"`
+	TransitionTxID      string          `gorm:"column:transition_tx_id;size:66;not null"`
+	TransitionAccountID string          `gorm:"column:transition_account_id;size:66;not null"`
+	TransitionAmount    decimal.Decimal `gorm:"column:transition_amount;type:varchar(78);not null"`
 
 	// Optional channel references
 	HomeChannelID   *string `gorm:"column:home_channel_id"`

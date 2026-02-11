@@ -69,8 +69,10 @@ e.g. when processing "receive X, withdraw Y", increase `lockedFunds` (and "lock"
 1. **Channel uniqueness**: A channel identified by `channelId = hash(Definition)` can be created at most once.
 2. **Cross-deployment replay protection**: Each ChannelHub deployment has a `VERSION` constant (currently 1). The version is encoded as the first byte of `channelId = setFirstByte(hash(Definition), VERSION)`, ensuring that the same channel definition produces different `channelId` values across different ChannelHub versions. This prevents signature replay attacks across different ChannelHub deployments on the same chain. Only one ChannelHub deployment per version per chain is intended. The `escrowId = hash(channelId, stateVersion)` inherits this protection.
 3. **Signature authorization**: Every enforceable state must be signed by both User and Node (unless explicitly relaxed in future versions).
-4. **Version monotonicity**: For a given channel, every valid state has a strictly increasing `version`.
-5. **Version uniqueness**: No two different states with the same `version` may exist for the same channel.
+4. **Pluggable signature validation**: Signature validation is performed by validator contracts implementing the `ISignatureValidator` interface. The ChannelHub has a `defaultSigValidator`, and each channel may specify a custom `sigValidator` in its Channel Definition. The first byte of each signature determines which validator is used: `0x00` for default, `0x01` for channel-specific.
+5. **Validator security requirements**: Signature validators must be trustworthy, gas-efficient, and correctly implement validation logic. A compromised or buggy validator can break authorization for affected channels. Validators should be immutable or have strict upgrade controls.
+6. **Version monotonicity**: For a given channel, every valid state has a strictly increasing `version`.
+7. **Version uniqueness**: No two different states with the same `version` may exist for the same channel.
 
 ---
 
@@ -122,3 +124,95 @@ e.g. when processing "receive X, withdraw Y", increase `lockedFunds` (and "lock"
 23. **Enforcement determinism**: Enforcing the same `(prevState, candidateState)` pair always yields the same on-chain result.
 24. **Invariant preservation**: Every state transition that can be enforced on-chain preserves all invariants listed above.
 25. **Latest-state dominance**: The economically correct outcome is always determined by the latest valid signed state, regardless of enforcement order.
+
+---
+
+## Signature Validation Security
+
+The Nitrolite protocol uses a pluggable signature validation system to support flexible authorization schemes. This section describes the security model and considerations for signature validators.
+
+### Validator Architecture
+
+- **Default validator**: The ChannelHub is initialized with a `defaultSigValidator` address that implements `ISignatureValidator`. This validator is used when the signature's first byte is `0x00`.
+- **Channel-specific validator**: Each channel may optionally specify a `sigValidator` address in its Channel Definition. This validator is used when the signature's first byte is `0x01`.
+- **Validator selection**: The first byte of each signature determines which validator to use for verification.
+
+#### Available Validator Implementations
+
+1. **ECDSAValidator** (`src/sigValidators/ECDSAValidator.sol`)
+   - Standard ECDSA signature validation
+   - Automatically tries EIP-191 (with Ethereum prefix) and raw ECDSA
+   - 65-byte signatures: `[r: 32 bytes][s: 32 bytes][v: 1 byte]`
+   - Recommended for all users and nodes
+
+2. **SessionKeyValidator** (`src/sigValidators/SessionKeyValidator.sol`)
+   - Session key delegation with metadata
+   - Enables temporary signing authority (hot wallets, time-limited access)
+   - Two-level validation: participant authorizes session key, session key signs state
+   - **Safe for user usage** (with Clearnode validation)
+   - **NOT safe for node usage** (no user-side validation) - see SessionKeyValidator Security Considerations below
+
+See `signature-validators.md` for detailed documentation on each validator.
+
+### Trust Model
+
+- **Default validator trust**: All channels using the default validator trust the ChannelHub deployer's choice of default validator.
+- **Channel validator trust**: Channels using a custom validator trust that specific validator implementation.
+- **Validator immutability**: Once a channel is created, its validator choice cannot be changed (it's part of the Channel Definition used to compute `channelId`).
+
+---
+
+### SessionKeyValidator Security Considerations
+
+⚠️ **CRITICAL: SessionKeyValidator is designed primarily for USER usage, not NODE usage.**
+
+#### Background
+
+SessionKeyValidator enables delegation of signing authority to temporary session keys. The session key is authorized by a participant's signature, and metadata (expiration, scope, permissions) is hashed and included in the authorization.
+
+**Key architectural decision**: Metadata validation is performed **off-chain** by the Clearnode, not on-chain. The smart contract only validates cryptographic signatures, not the semantic meaning of the metadata.
+
+#### User Usage (Safe)
+
+When a **user** employs SessionKeyValidator:
+
+1. **Off-chain enforcement layer**: The Clearnode (node software) retrieves and validates session key metadata
+   - Checks expiration timestamps
+   - Enforces allowed channel IDs
+   - Validates operation permissions
+   - Refuses to countersign if metadata is invalid
+
+2. **Countersignature protection**: Every state requires the Node to countersign
+   - Node verifies session key authorization
+   - Node rejects suspicious or invalid activity
+
+3. **Limited blast radius**: If a user's session key is compromised:
+   - Expired keys are rejected by Clearnode
+   - Out-of-scope operations are rejected by Clearnode
+   - Node refuses to countersign
+   - Channel can be challenged and closed
+   - User's main key remains secure
+
+4. **Revocability**: User can stop using the session key at any time
+   - Switch back to main key
+   - Issue new authorization with different session key
+   - No on-chain action required
+
+#### Node Usage (Unsafe - Current Implementation)
+
+When a **node** employs SessionKeyValidator (NOT RECOMMENDED):
+
+1. **No off-chain enforcement**: The user has no equivalent to Clearnode
+   - User cannot decode or validate node's session key metadata
+   - No user-side software validates expiration or scope
+
+2. **No countersignature protection**: The user's signature provides no protection in this scenario, as the user has no mechanism to validate the node's session key authorization. A compromised node session key has full, unchecked authority from the user's perspective.
+
+3. **Unlimited and irrevocable authority**: If node's session key is compromised:
+   - On-chain validation only checks cryptographic signatures
+   - User cannot verify expiration (metadata is hashed)
+   - User cannot verify scope limitations (metadata is hashed)
+   - Session key has full node authority
+   - User has no protection against misuse
+
+4. **Asymmetric security**: User-side session keys are safe (Clearnode validates), node-side session keys are unsafe (no user-side validator)

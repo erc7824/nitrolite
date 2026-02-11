@@ -16,7 +16,12 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         super.setUp();
 
         bobDef = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: bob, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION,
+            user: bob,
+            node: node,
+            nonce: NONCE,
+            signatureValidator: EMPTY_SIG_VALIDATOR,
+            metadata: bytes32(0)
         });
 
         bobChannelId = Utils.getChannelId(bobDef, CHANNEL_HUB_VERSION);
@@ -24,7 +29,12 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
     function test_happyPath_homeChain() public {
         ChannelDefinition memory def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION, user: alice, node: node, nonce: NONCE, metadata: bytes32(0)
+            challengeDuration: CHALLENGE_DURATION,
+            user: alice,
+            node: node,
+            nonce: NONCE,
+            signatureValidator: EMPTY_SIG_VALIDATOR,
+            metadata: bytes32(0)
         });
 
         bytes32 channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
@@ -64,7 +74,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             nodeSig: ""
         });
 
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         vm.prank(alice);
         cHub.createChannel(def, state);
@@ -74,7 +84,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         // transfer 42 (allocation decreases by 42, node net flow decreases by 42)
         state = nextState(state, StateIntent.OPERATE, [uint256(958), uint256(0)], [int256(1000), int256(-42)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // deposit from another chain
         state = nextState(
@@ -89,7 +99,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(500), uint256(0)],
             [int256(500), int256(0)]
         );
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // on chainId 42:
         // channelsHub.initiateEscrowDeposit(channelId, state)
@@ -114,20 +124,20 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(0)],
             [int256(500), int256(-500)]
         );
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // receive 24 (allocation increases by 24, node net flow increases by 24)
         state = nextState(state, StateIntent.OPERATE, [uint256(1482), uint256(0)], [int256(1000), int256(482)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // send 12 (allocation decreases by 12, node net flow decreases by 12)
         state = nextState(state, StateIntent.OPERATE, [uint256(1470), uint256(0)], [int256(1000), int256(470)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // withdraw 250 on home chain
         // Expected: user allocation = 1220, user net flow = 750, node allocation = 0, node net flow = 470
         state = nextState(state, StateIntent.WITHDRAW, [uint256(1220), uint256(0)], [int256(750), int256(470)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         vm.prank(alice);
         cHub.withdrawFromChannel(channelId, state);
@@ -138,15 +148,15 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         // send 2 (allocation decreases by 2, node net flow decreases by 2)
         state = nextState(state, StateIntent.OPERATE, [uint256(1218), uint256(0)], [int256(750), int256(468)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // receive 3 (allocation increases by 3, node net flow increases by 3)
         state = nextState(state, StateIntent.OPERATE, [uint256(1221), uint256(0)], [int256(750), int256(471)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // send 4 (allocation decreases by 4, node net flow decreases by 4)
         state = nextState(state, StateIntent.OPERATE, [uint256(1217), uint256(0)], [int256(750), int256(467)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // withdrawal to another chain
         state = nextState(
@@ -161,7 +171,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(750)],
             [int256(0), int256(750)]
         );
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         // on chainId 42:
         // channelsHub.initiateEscrowWithdrawal(channelId, state)
@@ -180,15 +190,15 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(0)],
             [int256(-750), int256(750)]
         );
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // receive 10 (allocation increases by 10, node net flow increases by 10)
         state = nextState(state, StateIntent.OPERATE, [uint256(477), uint256(0)], [int256(750), int256(-273)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // checkpoint on home chain
         vm.prank(alice);
-        cHub.checkpointChannel(channelId, state, new State[](0));
+        cHub.checkpointChannel(channelId, state);
         verifyChannelState(channelId, 477, 750, 0, -273, "after checkpoint");
 
         // Verify user balance hasn't changed
@@ -196,15 +206,15 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         // send 9 (allocation decreases by 9, node net flow decreases by 9)
         state = nextState(state, StateIntent.OPERATE, [uint256(468), uint256(0)], [int256(750), int256(-282)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // receive 8 (allocation increases by 8, node net flow increases by 8)
         state = nextState(state, StateIntent.OPERATE, [uint256(476), uint256(0)], [int256(750), int256(-274)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // send 7 (allocation decreases by 7, node net flow decreases by 7)
         state = nextState(state, StateIntent.OPERATE, [uint256(469), uint256(0)], [int256(750), int256(-281)]);
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         // migrate channel
         state = nextState(
@@ -219,7 +229,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(469)],
             [int256(0), int256(469)]
         );
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         // on chainId 42:
         // channelsHub.initiateMigrationIn(channelId, state)
@@ -242,7 +252,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         Ledger memory temp = state.homeState;
         state.homeState = state.nonHomeState;
         state.nonHomeState = temp;
-        state = signStateWithBothParties(state, channelId, ALICE_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         vm.prank(node);
         cHub.finalizeMigration(channelId, state);
@@ -294,7 +304,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
@@ -343,7 +353,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(0)],
             [int256(500), int256(-500)]
         );
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
         cHub.finalizeEscrowDeposit(escrowId, state);
@@ -408,7 +418,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
@@ -456,7 +466,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(0)], // Non-home: allocations zero out
             [int256(10 * 1e14), int256(-10 * 1e14)] // Non-home: node releases deposited amount
         );
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
         cHub.finalizeEscrowDeposit(escrowId, state);
@@ -511,7 +521,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
@@ -547,7 +557,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(0)],
             [int256(-750), int256(750)]
         );
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
         cHub.finalizeEscrowWithdrawal(escrowId, state);
@@ -608,7 +618,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         bytes32 escrowId = Utils.getEscrowId(bobChannelId, state.version);
 
@@ -647,7 +657,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(0)],
             [int256(-5 * 1e8), int256(5 * 1e8)] // Non-home: user withdraws, node releases
         );
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
         cHub.finalizeEscrowWithdrawal(escrowId, state);
@@ -698,11 +708,10 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(bob);
         cHub.initiateMigration(bobDef, state);
-        // TODO: in ChannelEngine it should be checked that no channel exists with such channelId, and that nonHomeState only includes the same `userAllocation` as in the homeState
 
         // Verify node's balance after migration (should have locked 469)
         uint256 nodeBalanceAfter = cHub.getAccountBalance(node, address(token));
@@ -742,25 +751,25 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         // perform some operations to verify channel is operating as normal
         // send 9 (allocation decreases by 9, node net flow decreases by 9)
         state = nextState(state, StateIntent.OPERATE, [uint256(460), uint256(0)], [int256(0), int256(460)]);
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         // receive 8 (allocation increases by 8, node net flow increases by 8)
         state = nextState(state, StateIntent.OPERATE, [uint256(468), uint256(0)], [int256(0), int256(468)]);
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         // send 7 (allocation decreases by 7, node net flow decreases by 7)
         state = nextState(state, StateIntent.OPERATE, [uint256(461), uint256(0)], [int256(0), int256(461)]);
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         // withdraw 400 on home chain
         // Expected: user allocation = 61, user net flow = -400, node allocation = 0, node net flow = 461
         state = nextState(state, StateIntent.WITHDRAW, [uint256(61), uint256(0)], [int256(-400), int256(461)]);
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(bob);
         cHub.withdrawFromChannel(bobChannelId, state);
@@ -815,7 +824,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             userSig: "",
             nodeSig: ""
         });
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(bob);
         cHub.createChannel(bobDef, state);
@@ -829,7 +838,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         state = nextState(
             state, StateIntent.OPERATE, [uint256(45 * 1e10), uint256(0)], [int256(50 * 1e10), int256(-5 * 1e10)]
         );
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         // 3. Initiate Migration to New Home Chain (14 decimals)
         // Deploy 14-decimal token for new home chain
@@ -856,7 +865,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [uint256(0), uint256(45 * 1e14)], // Node locks user allocation on new home
             [int256(0), int256(45 * 1e14)]
         );
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         // Submit on old home chain
         vm.prank(bob);
@@ -885,7 +894,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         Ledger memory temp = state.homeState;
         state.homeState = state.nonHomeState;
         state.nonHomeState = temp;
-        state = signStateWithBothParties(state, bobChannelId, BOB_PK);
+        state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         // Submit finalization on old home chain
         vm.prank(node);

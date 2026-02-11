@@ -69,8 +69,8 @@ e.g. when processing "receive X, withdraw Y", increase `lockedFunds` (and "lock"
 1. **Channel uniqueness**: A channel identified by `channelId = hash(Definition)` can be created at most once.
 2. **Cross-deployment replay protection**: Each ChannelHub deployment has a `VERSION` constant (currently 1). The version is encoded as the first byte of `channelId = setFirstByte(hash(Definition), VERSION)`, ensuring that the same channel definition produces different `channelId` values across different ChannelHub versions. This prevents signature replay attacks across different ChannelHub deployments on the same chain. Only one ChannelHub deployment per version per chain is intended. The `escrowId = hash(channelId, stateVersion)` inherits this protection.
 3. **Signature authorization**: Every enforceable state must be signed by both User and Node (unless explicitly relaxed in future versions).
-4. **Pluggable signature validation**: Signature validation is performed by validator contracts implementing the `ISignatureValidator` interface. The ChannelHub has a `defaultSigValidator`, and each channel may specify a custom `sigValidator` in its Channel Definition. The first byte of each signature determines which validator is used: `0x00` for default, `0x01` for channel-specific.
-5. **Validator security requirements**: Signature validators must be trustworthy, gas-efficient, and correctly implement validation logic. A compromised or buggy validator can break authorization for affected channels. Validators should be immutable or have strict upgrade controls.
+4. **Pluggable signature validation**: Signature validation is performed by validator contracts implementing the `ISignatureValidator` interface. The ChannelHub has a `defaultSigValidator` (0x00), and nodes maintain a registry of validators (0x01-0xFF). The first byte of each signature determines which validator is used: `0x00` for default, `0x01-0xFF` for node-registered validators.
+5. **Validator security requirements**: Signature validators must be trustworthy, gas-efficient, and correctly implement validation logic. A compromised or buggy validator can break authorization for all channels using that validator. Validators should be immutable or have strict upgrade controls. Nodes are responsible for registering only trusted validators in their registry.
 6. **Version monotonicity**: For a given channel, every valid state has a strictly increasing `version`.
 7. **Version uniqueness**: No two different states with the same `version` may exist for the same channel.
 
@@ -133,9 +133,26 @@ The Nitrolite protocol uses a pluggable signature validation system to support f
 
 ### Validator Architecture
 
-- **Default validator**: The ChannelHub is initialized with a `defaultSigValidator` address that implements `ISignatureValidator`. This validator is used when the signature's first byte is `0x00`.
-- **Channel-specific validator**: Each channel may optionally specify a `sigValidator` address in its Channel Definition. This validator is used when the signature's first byte is `0x01`.
-- **Validator selection**: The first byte of each signature determines which validator to use for verification.
+The protocol uses a **per-node validator registry** system where nodes register signature validators and assign them 1-byte identifiers (0x01-0xFF). Both users and nodes select validators from the node's registry when signing channel states.
+
+**Validator selection:**
+
+- **Default validator** (0x00): The ChannelHub is initialized with a `defaultSigValidator` address that implements `ISignatureValidator`. This validator is used when the signature's first byte is `0x00`.
+- **Node-registered validators** (0x01-0xFF): Nodes register validators on-chain with unique IDs. The first byte of each signature determines which validator from the node's registry is used for verification.
+
+**Registration security:**
+
+- Nodes register validators by signing `abi.encode(validatorId, validatorAddress)` off-chain
+- Anyone can relay the registration transaction (relayer-friendly)
+- Registration uses ECDSA recovery (EIP-191 with raw ECDSA fallback)
+- Registration is immutable (cannot change once set)
+- Node's private key only signs, never sends transactions (supports cold storage/HSM usage)
+
+**Cross-chain compatibility:**
+The node registry design enables cross-chain operation without requiring validators to deploy to the same address on all chains. Validators are referenced by 1-byte IDs rather than addresses, ensuring channelId remains consistent across chains (derived from user, node, nonce, metadata - no validator addresses). The same validator ID can map to different addresses on different chains, and nodes register their validators independently on each chain.
+
+**Domain separation:**
+The protocol maintains clear separation between protocol concerns (ChannelHub) and cryptographic concerns (validators). ChannelHub defines protocol message structure (when and how channelId binds to states) and manages channel lifecycle. Validators verify cryptographic signatures using specific schemes and remain agnostic to protocol-level message structure. This separation is important for validator registration: it uses direct ECDSA recovery in ChannelHub (infrastructure concern, no channelId) rather than going through the validator abstraction (protocol state validation with channelId binding). This keeps `ISignatureValidator` focused on its primary purpose while allowing registration to be operational setup rather than protocol-critical security.
 
 #### Available Validator Implementations
 
@@ -156,9 +173,10 @@ See `signature-validators.md` for detailed documentation on each validator.
 
 ### Trust Model
 
-- **Default validator trust**: All channels using the default validator trust the ChannelHub deployer's choice of default validator.
-- **Channel validator trust**: Channels using a custom validator trust that specific validator implementation.
-- **Validator immutability**: Once a channel is created, its validator choice cannot be changed (it's part of the Channel Definition used to compute `channelId`).
+- **Default validator trust**: All participants using the default validator (0x00) trust the ChannelHub deployer's choice of default validator.
+- **Node validator trust**: Both users and nodes select validators from the node's registry. Users trust the node's choice of supported validators. In the Nitrolite off-chain protocol, the node acts as the orchestrator and decides which signature validators are supported. Users select from node-approved validators.
+- **Registration immutability**: Once a node registers a validator at a specific ID, it cannot be changed. This ensures that signatures created with a given validator ID remain valid for the lifetime of the ChannelHub deployment.
+- **Cross-chain consistency**: The same validator ID may map to different validator addresses on different chains, but the security properties must remain equivalent. Nodes are responsible for registering compatible validators across chains.
 
 ---
 

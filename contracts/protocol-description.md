@@ -534,38 +534,50 @@ This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
 
 ## Signature validation
 
-The protocol supports flexible signature validation through a **signature validator module** system. This enables channels to use custom signature schemes beyond the default EIP-191 standard.
+The protocol supports flexible signature validation through a **per-node validator registry** system. This enables channels to use custom signature schemes while maintaining cross-chain compatibility.
 
-### Signature validator architecture
+### Node validator registry
 
-* **Default validator**: The ChannelHub is initialized with a `defaultSigValidator` address that implements the `ISignatureValidator` interface. This validator is used for standard signature verification.
+The protocol uses a per-node validator registry where each node registers signature validators and assigns them 1-byte identifiers (0x01-0xFF). Both users and nodes select validators from the node's registry when signing channel states.
 
-* **Channel-specific validator**: Each channel can optionally specify a custom `sigValidator` address in its Channel Definition. This allows per-channel signature validation logic.
+**Design rationale:** In the Nitrolite off-chain protocol, the node acts as the orchestrator and decides which signature validators are supported. Users select from the node-approved validators. This ensures:
 
-* **Validator selection**: The first byte of a signature determines which validator is used:
+* Nodes can enforce their security requirements
+* Users benefit from node-vetted validator implementations
+* Cross-chain compatibility (validator addresses don't affect channelId or signature verification)
 
-  * `0x00` (DEFAULT) → use the ChannelHub's `defaultSigValidator`
-  * `0x01` (CHANNEL) → use the channel's custom `sigValidator` from the Channel Definition
+### Validator registration
 
-* **ISignatureValidator interface**: All validators must implement this interface, which provides two methods:
+Nodes register validators by providing a signature over the validator configuration. This allows node operators to use cold storage or hardware wallets without exposing private keys to send transactions.
 
-  * `validateSignature()` — validates a single participant's signature
-  * `validateChallengerSignature()` — validates a challenger's signature in dispute scenarios
+**Registration message:**
+
+```solidity
+bytes memory message = abi.encode(validatorId, validatorAddress);
+```
+
+The signature is verified using ECDSA recovery:
+
+1. Try EIP-191 recovery first (standard for wallet software)
+2. Fall back to raw ECDSA if needed
+3. Verify recovered address matches the node address
 
 ### Signature format
 
-Signatures follow this structure:
+All signatures in the protocol follow this structure:
 
 ```text
-[validator_type: 1 byte][signature_data: variable length]
+[validator_id: 1 byte][signature_data: variable length]
 ```
 
-Where:
+* `0x00` = Use ChannelHub's default validator
+* `0x01-0xFF` = Look up validator in node's registry
 
-* `validator_type` is `0x00` for DEFAULT or `0x01` for CHANNEL
-* `signature_data` is passed to the selected validator for verification
+The first byte determines which validator verifies the signature. The remaining bytes are passed to the selected validator for verification.
 
-This design allows channels to support advanced signature schemes (multi-sig, threshold signatures, account abstraction) while maintaining backwards compatibility with standard ECDSA signatures.
+### Cross-chain compatibility
+
+The node validator registry design solves a critical cross-chain problem: validator contracts may not deploy to the same address on all chains.
 
 ---
 

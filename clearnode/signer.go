@@ -79,7 +79,9 @@ func RecoverAddress(message []byte, sig Signature) (string, error) {
 	return addr.Hex(), nil
 }
 
-func RecoverAddressFromEip712Signature(
+// ComputeAuthTypedDataHash computes the EIP-712 typed data hash for the auth
+// challenge. This hash is used both for ECDSA recovery and ERC-1271 verification.
+func ComputeAuthTypedDataHash(
 	walletAddress string,
 	challengeToken string,
 	sessionKey string,
@@ -87,7 +89,7 @@ func RecoverAddressFromEip712Signature(
 	allowances []Allowance,
 	scope string,
 	expiresAt uint64,
-	sig Signature) (string, error) {
+) ([]byte, error) {
 	convertedAllowances := convertAllowances(allowances)
 
 	typedData := apitypes.TypedData{
@@ -121,18 +123,37 @@ func RecoverAddressFromEip712Signature(
 		},
 	}
 
-	// 1. Hash the typed data (domain separator + message struct hash)
-	typedDataHash, _, err := apitypes.TypedDataAndHash(typedData)
+	hash, _, err := apitypes.TypedDataAndHash(typedData)
+	if err != nil {
+		return nil, err
+	}
+	return hash, nil
+}
+
+func RecoverAddressFromEip712Signature(
+	walletAddress string,
+	challengeToken string,
+	sessionKey string,
+	application string,
+	allowances []Allowance,
+	scope string,
+	expiresAt uint64,
+	sig Signature) (string, error) {
+
+	typedDataHash, err := ComputeAuthTypedDataHash(
+		walletAddress, challengeToken, sessionKey, application,
+		allowances, scope, expiresAt,
+	)
 	if err != nil {
 		return "", err
 	}
 
-	// 2. Fix V if needed (Ethereum uses 27/28, go-ethereum expects 0/1)
+	// Fix V if needed (Ethereum uses 27/28, go-ethereum expects 0/1)
 	if sig[64] >= 27 {
 		sig[64] -= 27
 	}
 
-	// 3. Recover public key
+	// Recover public key via ECDSA
 	pubKey, err := crypto.SigToPub(typedDataHash, sig)
 	if err != nil {
 		return "", err

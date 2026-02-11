@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shopspring/decimal"
@@ -183,7 +185,9 @@ func (r *RPCRouter) handleAuthJWTVerify(ctx context.Context, authParams AuthVeri
 	}, nil
 }
 
-// handleAuthJWTVerify verifies the challenge signature and returns the policy, response data and error.
+// handleAuthSigVerify verifies the challenge signature and returns the policy, response data and error.
+// It first attempts ECDSA recovery. If that fails or the recovered address doesn't match,
+// it falls back to ERC-1271 smart contract wallet verification.
 func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, authParams AuthVerifyParams) (*Policy, any, error) {
 	logger := LoggerFromContext(ctx)
 
@@ -192,7 +196,13 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		logger.Error("failed to get challenge", "error", err)
 		return nil, nil, RPCErrorf("invalid challenge")
 	}
-	recoveredAddress, err := RecoverAddressFromEip712Signature(
+
+	// Copy sig so ECDSA recovery's V-byte mutation (27/28 → 0/1) doesn't
+	// corrupt the original for the ERC-1271 fallback path.
+	ecdsaSig := make(Signature, len(sig))
+	copy(ecdsaSig, sig)
+
+	recoveredAddress, ecdsaErr := RecoverAddressFromEip712Signature(
 		challenge.Address,
 		challenge.Token.String(),
 		challenge.SessionKey,
@@ -200,10 +210,56 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		challenge.Allowances,
 		challenge.Scope,
 		challenge.SessionKeyExpiresAt,
-		sig)
-	if err != nil {
-		logger.Error("failed to recover address from signature", "error", err)
-		return nil, nil, RPCErrorf("invalid signature")
+		ecdsaSig)
+
+	// If ECDSA recovery failed or recovered address doesn't match, try ERC-1271
+	ecdsaMatch := ecdsaErr == nil && strings.EqualFold(recoveredAddress, challenge.Address)
+	if !ecdsaMatch {
+		erc1271Verified := false
+		expectedAddr := common.HexToAddress(challenge.Address)
+
+		typedDataHash, hashErr := ComputeAuthTypedDataHash(
+			challenge.Address,
+			challenge.Token.String(),
+			challenge.SessionKey,
+			challenge.Application,
+			challenge.Allowances,
+			challenge.Scope,
+			challenge.SessionKeyExpiresAt,
+		)
+
+		if hashErr == nil {
+			// Try ERC-1271 verification on all configured chains
+			for chainID, client := range r.EthClients {
+				isContract, cErr := IsContract(ctx, client, expectedAddr)
+				if cErr != nil || !isContract {
+					continue
+				}
+
+				verified, vErr := VerifyERC1271Signature(ctx, client, expectedAddr, typedDataHash, sig)
+				if vErr == nil && verified {
+					logger.Info("ERC-1271 signature verified for smart wallet",
+						"address", challenge.Address, "chainID", chainID)
+					erc1271Verified = true
+					break
+				}
+			}
+		} else {
+			logger.Warn("failed to compute typed data hash for ERC-1271 fallback", "error", hashErr)
+		}
+
+		if !erc1271Verified {
+			if ecdsaErr != nil {
+				logger.Error("failed to recover address from signature", "error", ecdsaErr)
+			} else {
+				logger.Debug("signature address mismatch and ERC-1271 verification failed",
+					"expected", challenge.Address, "recovered", recoveredAddress)
+			}
+			return nil, nil, RPCErrorf("invalid signature")
+		}
+
+		// ERC-1271 verified — use the challenge address as the recovered address
+		recoveredAddress = challenge.Address
 	}
 
 	if err := r.AuthManager.ValidateChallenge(authParams.Challenge, recoveredAddress); err != nil {

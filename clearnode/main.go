@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -61,7 +62,20 @@ func main() {
 	appSessionService := NewAppSessionService(db, wsNotifier)
 	channelService := NewChannelService(db, config.blockchains, &config.assets, signer)
 
-	NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, wsNotifier, logger)
+	// Create ethClients for ERC-1271 smart wallet signature verification
+	ethClients := make(map[uint32]*ethclient.Client)
+	for chainID, blockchain := range config.blockchains {
+		client, err := ethclient.Dial(blockchain.BlockchainRPC)
+		if err != nil {
+			logger.Warn("failed to create ethClient for ERC-1271 verification", "chainID", chainID, "error", err)
+			continue
+		}
+		ethClients[chainID] = client
+		logger.Info("ethClient for ERC-1271 ready", "chainID", chainID)
+	}
+
+	router := NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, wsNotifier, logger)
+	router.EthClients = ethClients
 
 	rpcListenAddr := ":8000"
 	rpcListenEndpoint := "/ws"
@@ -143,6 +157,12 @@ func main() {
 	defer cancel()
 	if err := rpcServer.Shutdown(ctx); err != nil {
 		logger.Error("failed to shut down RPC server", "error", err)
+	}
+
+	// Close ethClients used for ERC-1271 verification
+	for chainID, client := range ethClients {
+		client.Close()
+		logger.Info("ethClient closed", "chainID", chainID)
 	}
 
 	logger.Info("shutdown complete")

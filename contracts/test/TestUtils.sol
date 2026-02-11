@@ -5,7 +5,7 @@ import {Vm} from "lib/forge-std/src/Vm.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import {State, SigValidatorType} from "../src/interfaces/Types.sol";
-import {SessionKeyAuthorization} from "../src/sigValidators/SessionKeyValidator.sol";
+import {SessionKeyAuthorization, toSigningData} from "../src/sigValidators/SessionKeyValidator.sol";
 import {Utils} from "../src/Utils.sol";
 
 library TestUtils {
@@ -48,7 +48,7 @@ library TestUtils {
         pure
         returns (SessionKeyAuthorization memory)
     {
-        bytes memory authMessage = abi.encode(sessionKey, metadataHash);
+        bytes memory authMessage = toSigningData(SessionKeyAuthorization({sessionKey: sessionKey, metadataHash: metadataHash, authSignature: ""}));
         bytes memory signature = TestUtils.signEip191(vm, authorizerPk, authMessage);
         return SessionKeyAuthorization({sessionKey: sessionKey, metadataHash: metadataHash, authSignature: signature});
     }

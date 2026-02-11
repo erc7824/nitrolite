@@ -23,6 +23,14 @@ struct SessionKeyAuthorization {
     bytes authSignature;
 }
 
+function toSigningData(SessionKeyAuthorization memory skAuth) pure returns (bytes memory) {
+    return abi.encode(
+        skAuth.sessionKey,
+        skAuth.metadataHash
+        // omit authSignature
+    );
+}
+
 /**
  * @title SessionKeyValidator
  * @notice Validator supporting session key delegation for temporary signing authority
@@ -67,7 +75,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
             abi.decode(signature, (SessionKeyAuthorization, bytes));
 
         // Step 1: Verify participant authorized this session key
-        bytes memory authMessage = _toSigningData(skAuth);
+        bytes memory authMessage = toSigningData(skAuth);
         bool authResult = validateEcdsaSigner(authMessage, skAuth.authSignature, participant);
 
         if (!authResult) {
@@ -105,7 +113,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
             abi.decode(signature, (SessionKeyAuthorization, bytes));
 
         // Step 1: Verify participant authorized this session key
-        bytes memory authMessage = _toSigningData(skAuth);
+        bytes memory authMessage = toSigningData(skAuth);
         bool authResult = validateEcdsaSignerIsEither(authMessage, skAuth.authSignature, user, node);
 
         if (!authResult) {
@@ -119,13 +127,5 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
         } else {
             return VALIDATION_FAILURE;
         }
-    }
-
-    function _toSigningData(SessionKeyAuthorization memory skAuth) internal pure returns (bytes memory) {
-        return abi.encode(
-            skAuth.sessionKey,
-            skAuth.metadataHash
-            // omit authSignature
-        );
     }
 }

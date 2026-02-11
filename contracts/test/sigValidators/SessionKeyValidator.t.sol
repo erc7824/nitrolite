@@ -3,10 +3,11 @@ pragma solidity 0.8.30;
 
 import {Test} from "lib/forge-std/src/Test.sol";
 
-import {SessionKeyValidator, SessionKeyAuthorization} from "../../src/sigValidators/SessionKeyValidator.sol";
+import {TestUtils} from "../TestUtils.sol";
+
+import {SessionKeyValidator, SessionKeyAuthorization, toSigningData} from "../../src/sigValidators/SessionKeyValidator.sol";
 import {ValidationResult, VALIDATION_SUCCESS, VALIDATION_FAILURE} from "../../src/interfaces/ISignatureValidator.sol";
 import {Utils} from "../../src/Utils.sol";
-import {TestUtils} from "../TestUtils.sol";
 
 contract SessionKeyValidatorTest_Base is Test {
     SessionKeyValidator public validator;
@@ -45,7 +46,7 @@ contract SessionKeyValidatorTest_Base is Test {
         pure
         returns (SessionKeyAuthorization memory)
     {
-        bytes memory authMessage = abi.encode(sessionKey, metadataHash);
+        bytes memory authMessage = toSigningData(SessionKeyAuthorization({sessionKey: sessionKey, metadataHash: metadataHash, authSignature: ""}));
         bytes memory authSignature;
 
         if (useEip191) {

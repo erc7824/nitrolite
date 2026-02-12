@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -121,7 +119,6 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	mockTxStore.On("CheckOpenChannel", senderWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", senderWallet, asset, false).Return(currentSenderState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", senderWallet, asset).Return(nil)
-	mockSigValidator.On("Verify", senderWallet, mock.Anything, userSigBytes).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedSenderState, nil).Maybe()
 
 	// For issueTransferReceiverState
@@ -438,7 +435,7 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentUnsignedState, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, true).Return(currentSignedState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
-	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
+
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
@@ -569,7 +566,7 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
-	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
+
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeHomeDeposit &&
@@ -697,7 +694,7 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
-	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
+
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeHomeWithdrawal &&
@@ -1000,7 +997,7 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentUnsignedState, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, true).Return(currentSignedState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
-	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
+
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
@@ -1132,7 +1129,7 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
-	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
+
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeFinalize &&
@@ -1195,7 +1192,7 @@ func TestSubmitState_Acknowledgement_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -1211,16 +1208,15 @@ func TestSubmitState_Acknowledgement_Success(t *testing.T) {
 			return nil
 		},
 		memoryStore:  mockMemoryStore,
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
-	// Test data
-	userWallet := "0x1234567890123456789012345678901234567890"
+	// Test data - derive userWallet from a user signer key
+	userSigner := NewMockSigner()
+	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
 
@@ -1251,20 +1247,18 @@ func TestSubmitState_Acknowledgement_Success(t *testing.T) {
 	_, err := incomingState.ApplyAcknowledgementTransition()
 	require.NoError(t, err)
 
-	// Sign the incoming state with user's signature
-	userKey, _ := crypto.GenerateKey()
+	// Sign the incoming state with user's wallet signer (adds 0x01 prefix)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Maybe()
 	packedState, _ := core.PackState(*incomingState, mockAssetStore)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingState.UserSig = &userSigHex
+	userSig, _ := userWalletSigner.Sign(packedState)
+	userSigStr := userSig.String()
+	incomingState.UserSig = &userSigStr
 
 	// Mock expectations
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
-	mockSigValidator.On("Verify", userWallet, mock.Anything, userSigBytes).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil).Maybe()
 
 	// For acknowledgement: no RecordTransaction call expected, only StoreUserState
@@ -1308,7 +1302,6 @@ func TestSubmitState_Acknowledgement_Success(t *testing.T) {
 	// Verify all mock expectations - notably RecordTransaction should NOT have been called
 	mockTxStore.AssertExpectations(t)
 	mockTxStore.AssertNotCalled(t, "RecordTransaction", mock.Anything)
-	mockSigValidator.AssertExpectations(t)
 }
 
 // Helper function to create a string pointer

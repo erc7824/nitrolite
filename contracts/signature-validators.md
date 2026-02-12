@@ -34,7 +34,7 @@ Nodes register validators by providing a signature over the validator configurat
 **Registration message:**
 
 ```solidity
-bytes memory message = abi.encode(validatorId, validatorAddress);
+bytes memory message = abi.encode(validatorId, validatorAddress, block.chainid);
 ```
 
 The signature is verified using ECDSA recovery:
@@ -44,6 +44,8 @@ The signature is verified using ECDSA recovery:
 3. Verify recovered address matches the node address
 
 **Key properties:**
+
+- Includes `block.chainid` for cross-chain replay protection (registrations are chain-specific)
 
 - Anyone can submit a registration transaction (relayer-friendly)
 - Node's private key only signs, never sends transactions

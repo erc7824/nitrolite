@@ -142,7 +142,8 @@ The protocol uses a **per-node validator registry** system where nodes register 
 
 **Registration security:**
 
-- Nodes register validators by signing `abi.encode(validatorId, validatorAddress)` off-chain
+- Nodes register validators by signing `abi.encode(validatorId, validatorAddress, block.chainid)` off-chain
+- The signature includes `block.chainid` for cross-chain replay protection (chain-specific registrations)
 - Anyone can relay the registration transaction (relayer-friendly)
 - Registration uses ECDSA recovery (EIP-191 with raw ECDSA fallback)
 - Registration is immutable (cannot change once set)

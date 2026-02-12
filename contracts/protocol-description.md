@@ -553,7 +553,7 @@ Nodes register validators by providing a signature over the validator configurat
 **Registration message:**
 
 ```solidity
-bytes memory message = abi.encode(validatorId, validatorAddress);
+bytes memory message = abi.encode(validatorId, validatorAddress, block.chainid);
 ```
 
 The signature is verified using ECDSA recovery:
@@ -561,6 +561,8 @@ The signature is verified using ECDSA recovery:
 1. Try EIP-191 recovery first (standard for wallet software)
 2. Fall back to raw ECDSA if needed
 3. Verify recovered address matches the node address
+
+The registration signature includes `block.chainid` for cross-chain replay protection, ensuring validator registrations are chain-specific and cannot be replayed across chains.
 
 ### Signature format
 

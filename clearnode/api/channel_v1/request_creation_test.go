@@ -20,7 +20,7 @@ func TestRequestCreation_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600) // 1 hour
 	mockStatePacker := new(MockStatePacker)
@@ -43,7 +43,7 @@ func TestRequestCreation_Success(t *testing.T) {
 
 	// Test data - derive userWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	tokenAddress := "0xTokenAddress"
@@ -164,7 +164,7 @@ func TestRequestCreation_Acknowledgement_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600) // 1 hour
 	mockStatePacker := new(MockStatePacker)
@@ -187,7 +187,7 @@ func TestRequestCreation_Acknowledgement_Success(t *testing.T) {
 
 	// Test data - derive userWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	tokenAddress := "0xTokenAddress"
@@ -298,14 +298,13 @@ func TestRequestCreation_Acknowledgement_Success(t *testing.T) {
 	mockTxStore.AssertNotCalled(t, "RecordTransaction", mock.Anything)
 }
 
-
 func TestRequestCreation_InvalidChallenge(t *testing.T) {
 	// Setup
 	mockTxStore := new(MockStore)
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600) // 1 hour
 	mockStatePacker := new(MockStatePacker)

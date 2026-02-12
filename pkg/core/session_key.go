@@ -12,6 +12,49 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+type VerifyChannelSessionKePermissionsV1 func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error)
+
+type ChannelSessionKeySignerV1 struct {
+	sign.Signer
+
+	metadataHash common.Hash
+	authSig      []byte
+}
+
+func NewChannelSessionKeySignerV1(signer sign.Signer, metadataHash, authSig string) (*ChannelSessionKeySignerV1, error) {
+	authSigBytes, err := hexutil.Decode(authSig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode auth signature: %w", err)
+	}
+
+	return &ChannelSessionKeySignerV1{
+		Signer:       signer,
+		metadataHash: common.HexToHash(metadataHash),
+		authSig:      authSigBytes,
+	}, nil
+}
+
+func (s *ChannelSessionKeySignerV1) Sign(data []byte) (sign.Signature, error) {
+	sessionKeySig, err := s.Signer.Sign(data)
+	if err != nil {
+		return sign.Signature{}, err
+	}
+
+	fullSig, err := encodeChannelSessionKeySignature(
+		channelSessionKeyAuthorization{
+			SessionKey:    common.HexToAddress(s.Signer.PublicKey().Address().String()),
+			MetadataHash:  s.metadataHash,
+			AuthSignature: s.authSig,
+		},
+		sessionKeySig,
+	)
+	if err != nil {
+		return sign.Signature{}, fmt.Errorf("failed to encode session key signature: %w", err)
+	}
+
+	return append([]byte{byte(ChannelSignerType_SessionKey)}, fullSig...), nil
+}
+
 // PackChannelKeyStateV1 packs the session key state for signing using ABI encoding.
 // This is used to generate a deterministic hash that the user signs when registering/updating a session key.
 // The user_sig field is excluded from packing since it is the signature itself.
@@ -90,151 +133,6 @@ func ValidateChannelSessionKeyAuthSigV1(state ChannelSessionKeyStateV1) error {
 	return nil
 }
 
-type ChannelSessionSignerTypeV1 uint8
-
-const (
-	ChannelSessionSignerTypeV1_Wallet     ChannelSessionSignerTypeV1 = 0x01
-	ChannelSessionSignerTypeV1_SessionKey ChannelSessionSignerTypeV1 = 0x02
-)
-
-type ChannelWalletSignerV1 struct {
-	sign.Signer
-}
-
-func NewChannelWalletSignerV1(signer sign.Signer) (*ChannelWalletSignerV1, error) {
-	return &ChannelWalletSignerV1{
-		Signer: signer,
-	}, nil
-}
-
-func (s *ChannelWalletSignerV1) Sign(data []byte) (sign.Signature, error) {
-	sig, err := s.Signer.Sign(data)
-	if err != nil {
-		return sign.Signature{}, err
-	}
-
-	return append([]byte{byte(ChannelSessionSignerTypeV1_Wallet)}, sig...), nil
-}
-
-type ChannelSessionKeySignerV1 struct {
-	sign.Signer
-
-	metadataHash common.Hash
-	authSig      []byte
-}
-
-func NewChannelSessionKeySignerV1(signer sign.Signer, metadataHash, authSig string) (*ChannelSessionKeySignerV1, error) {
-	authSigBytes, err := hexutil.Decode(authSig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode auth signature: %w", err)
-	}
-
-	return &ChannelSessionKeySignerV1{
-		Signer:       signer,
-		metadataHash: common.HexToHash(metadataHash),
-		authSig:      authSigBytes,
-	}, nil
-}
-
-func (s *ChannelSessionKeySignerV1) Sign(data []byte) (sign.Signature, error) {
-	sessionKeySig, err := s.Signer.Sign(data)
-	if err != nil {
-		return sign.Signature{}, err
-	}
-
-	fullSig, err := encodeChannelSessionKeySignature(
-		channelSessionKeyAuthorization{
-			SessionKey:    common.HexToAddress(s.Signer.PublicKey().Address().String()),
-			MetadataHash:  s.metadataHash,
-			AuthSignature: s.authSig,
-		},
-		sessionKeySig,
-	)
-	if err != nil {
-		return sign.Signature{}, fmt.Errorf("failed to encode session key signature: %w", err)
-	}
-
-	return append([]byte{byte(ChannelSessionSignerTypeV1_SessionKey)}, fullSig...), nil
-}
-
-type ChannelSigValidator struct {
-	recoverer         sign.AddressRecoverer
-	verifyPermissions VerifyChannelSessionKePermissionsV1
-}
-
-type VerifyChannelSessionKePermissionsV1 func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error)
-
-func NewChannelSigValidator(permissionsVerifier VerifyChannelSessionKePermissionsV1) *ChannelSigValidator {
-	recoverer, err := sign.NewAddressRecoverer(sign.TypeEthereumMsg)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create address recoverer: %v", err))
-	}
-
-	return &ChannelSigValidator{
-		recoverer:         recoverer,
-		verifyPermissions: permissionsVerifier,
-	}
-}
-
-func (s *ChannelSigValidator) Recover(data, sig []byte) (string, error) {
-	if len(sig) < 1 {
-		return "", fmt.Errorf("invalid signature: too short")
-	}
-
-	signerType := ChannelSessionSignerTypeV1(sig[0])
-	switch signerType {
-	case ChannelSessionSignerTypeV1_Wallet:
-		addr, err := s.recoverer.RecoverAddress(data, sig[1:])
-		if err != nil {
-			return "", fmt.Errorf("failed to recover wallet address: %w", err)
-		}
-		return addr.String(), nil
-	case ChannelSessionSignerTypeV1_SessionKey:
-		// Decode: (SessionKeyAuthorization memory skAuth, bytes memory skSignature) =
-		//     abi.decode(signature, (SessionKeyAuthorization, bytes));
-		skAuth, skSignature, err := decodeChannelSessionKeySignature(sig[1:])
-		if err != nil {
-			return "", fmt.Errorf("failed to decode session key signature: %w", err)
-		}
-
-		// Step 1: Verify participant authorized this session key
-		// authMessage = _toSigningData(skAuth) = abi.encode(skAuth.sessionKey, skAuth.metadataHash)
-		packedAuth, err := PackChannelKeyStateV1(skAuth.SessionKey.Hex(), skAuth.MetadataHash)
-		if err != nil {
-			return "", fmt.Errorf("failed to pack auth data: %w", err)
-		}
-
-		walletAddr, err := s.recoverer.RecoverAddress(packedAuth, skAuth.AuthSignature)
-		if err != nil {
-			return "", fmt.Errorf("failed to recover wallet address from auth signature: %w", err)
-		}
-
-		// Step 2: Verify session key signed the state data
-		sessionKeyAddr, err := s.recoverer.RecoverAddress(data, skSignature)
-		if err != nil {
-			return "", fmt.Errorf("failed to recover session key address: %w", err)
-		}
-
-		if !strings.EqualFold(sessionKeyAddr.String(), skAuth.SessionKey.Hex()) {
-			return "", fmt.Errorf("session key mismatch: recovered %s, expected %s", sessionKeyAddr.String(), skAuth.SessionKey.Hex())
-		}
-
-		ok, err := s.verifyPermissions(walletAddr.String(), sessionKeyAddr.String(), common.Hash(skAuth.MetadataHash).String())
-		if err != nil {
-			return "", err
-		}
-
-		if !ok {
-			return "", fmt.Errorf("session key does not have permission to sign for this data")
-		}
-		// VerifyChannelSessionKeyPermissions(walletAddr, sessionKey, asset, metadataHash) (bool, error)
-
-		return walletAddr.String(), nil
-	default:
-		return "", fmt.Errorf("invalid signature: unknown signer type %d", signerType)
-	}
-}
-
 // GenerateSessionKeyStateIDV1 generates a deterministic ID from user_address, session_key, and version.
 func GenerateSessionKeyStateIDV1(userAddress, sessionKey string, version uint64) (string, error) {
 	args := abi.Arguments{
@@ -253,17 +151,6 @@ func GenerateSessionKeyStateIDV1(userAddress, sessionKey string, version uint64)
 	}
 
 	return crypto.Keccak256Hash(packed).Hex(), nil
-}
-func (s *ChannelSigValidator) Verify(wallet string, data, sig []byte) error {
-	address, err := s.Recover(data, sig)
-	if err != nil {
-		return err
-	}
-
-	if !strings.EqualFold(address, wallet) {
-		return fmt.Errorf("invalid signature")
-	}
-	return nil
 }
 
 // channelSessionKeyAuthorization matches the Solidity SessionKeyAuthorization struct.

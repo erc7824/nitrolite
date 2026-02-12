@@ -12,7 +12,7 @@ import (
 type Handler struct {
 	useStoreInTx  StoreTxProvider
 	memoryStore   MemoryStore
-	nodeSigner    *core.ChannelWalletSignerV1
+	nodeSigner    *core.ChannelDefaultSigner
 	stateAdvancer core.StateAdvancer
 	statePacker   core.StatePacker
 	nodeAddress   string // Node's wallet address for channel ID calculation
@@ -23,7 +23,7 @@ type Handler struct {
 func NewHandler(
 	useStoreInTx StoreTxProvider,
 	memoryStore MemoryStore,
-	nodeSigner *core.ChannelWalletSignerV1,
+	nodeSigner *core.ChannelDefaultSigner,
 	stateAdvancer core.StateAdvancer,
 	statePacker core.StatePacker,
 	nodeAddress string,

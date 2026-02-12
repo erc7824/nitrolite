@@ -1,6 +1,7 @@
 package node_v1
 
 import (
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
@@ -19,9 +20,10 @@ func (h *Handler) GetConfig(c *rpc.Context) {
 	}
 
 	response := rpc.NodeV1GetConfigResponse{
-		NodeAddress: h.nodeAddress,
-		NodeVersion: h.nodeVersion,
-		Blockchains: []rpc.BlockchainInfoV1{},
+		NodeAddress:            h.nodeAddress,
+		NodeVersion:            h.nodeVersion,
+		SupportedSigValidators: core.ChannelSignerTypes,
+		Blockchains:            []rpc.BlockchainInfoV1{},
 	}
 
 	for _, bc := range blockchains {

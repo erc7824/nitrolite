@@ -341,6 +341,8 @@ type NodeV1GetConfigResponse struct {
 	NodeAddress string `json:"node_address"`
 	// NodeVersion is the node software version
 	NodeVersion string `json:"node_version"`
+	// SupportedSigValidators is the list of supported signature validators identifiers for state sig verification
+	SupportedSigValidators []core.ChannelSignerType `json:"supported_sig_validators"`
 	// Blockchains is the list of supported networks
 	Blockchains []BlockchainInfoV1 `json:"blockchains"`
 }

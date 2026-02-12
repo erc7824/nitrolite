@@ -55,7 +55,7 @@ func NewRPCRouter(
 	statePacker := core.NewStatePackerV1(memoryStore)
 	stateAdvancer := core.NewStateAdvancerV1(memoryStore)
 
-	nodeChannelSigner, err := core.NewChannelWalletSignerV1(signer)
+	nodeChannelSigner, err := core.NewChannelDefaultSigner(signer)
 	if err != nil {
 		panic("failed to create channel wallet signer: " + err.Error())
 	}

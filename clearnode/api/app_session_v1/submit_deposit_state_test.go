@@ -39,7 +39,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 
 	// Test data - create one key for both app session and channel state signing
 	userRawSigner := NewMockSigner()
-	channelWalletSigner, _ := core.NewChannelWalletSignerV1(userRawSigner)
+	channelWalletSigner, _ := core.NewChannelDefaultSigner(userRawSigner)
 	appWalletSigner, _ := app.NewAppSessionWalletSignerV1(userRawSigner)
 	participant1 := strings.ToLower(userRawSigner.PublicKey().Address().String())
 	participant2 := "0x2222222222222222222222222222222222222222"
@@ -359,7 +359,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 
 	// Test data - create one key for both app session and channel state signing
 	userRawSigner := NewMockSigner()
-	channelWalletSigner, _ := core.NewChannelWalletSignerV1(userRawSigner)
+	channelWalletSigner, _ := core.NewChannelDefaultSigner(userRawSigner)
 	appWalletSigner, _ := app.NewAppSessionWalletSignerV1(userRawSigner)
 	participant1 := strings.ToLower(userRawSigner.PublicKey().Address().String())
 	participant2 := "0x2222222222222222222222222222222222222222"

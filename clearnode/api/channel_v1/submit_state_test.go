@@ -20,7 +20,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -43,7 +43,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 
 	// Test data - derive senderWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	senderWallet := userSigner.PublicKey().Address().String()
 	receiverWallet := "0x0987654321098765432109876543210987654321"
 	asset := "USDC"
@@ -190,7 +190,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -213,7 +213,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 
 	// Test data - derive userWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -342,7 +342,7 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -365,7 +365,7 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 
 	// Test data - derive userWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -493,7 +493,7 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -516,7 +516,7 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 
 	// Test data - derive userWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -621,7 +621,7 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -644,7 +644,7 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 
 	// Test data - derive userWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -751,7 +751,7 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -774,7 +774,7 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 
 	// Test data - derive userWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -903,7 +903,7 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -926,7 +926,7 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 
 	// Test data - derive userWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -1056,7 +1056,7 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -1079,7 +1079,7 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 
 	// Test data - derive userWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"
@@ -1192,7 +1192,7 @@ func TestSubmitState_Acknowledgement_Success(t *testing.T) {
 	mockMemoryStore := new(MockMemoryStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -1215,7 +1215,7 @@ func TestSubmitState_Acknowledgement_Success(t *testing.T) {
 
 	// Test data - derive userWallet from a user signer key
 	userSigner := NewMockSigner()
-	userWalletSigner, _ := core.NewChannelWalletSignerV1(userSigner)
+	userWalletSigner, _ := core.NewChannelDefaultSigner(userSigner)
 	userWallet := userSigner.PublicKey().Address().String()
 	asset := "USDC"
 	homeChannelID := "0xHomeChannel123"

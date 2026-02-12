@@ -16,7 +16,7 @@ func TestGetEscrowChannel_Success(t *testing.T) {
 	mockTxStore := new(MockStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	nodeSigner, _ := core.NewChannelWalletSignerV1(mockSigner)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)

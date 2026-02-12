@@ -90,23 +90,26 @@ func TestClientV1_NodeV1GetAssets(t *testing.T) {
 
 	assets := []rpc.AssetV1{
 		{
-			Name:   "USD Coin",
-			Symbol: testSymbolV1,
+			Name:                  "USD Coin",
+			Symbol:                testSymbolV1,
+			SuggestedBlockchainID: testChainIDV1,
 			Tokens: []rpc.TokenV1{
 				{Name: "USDC on Ethereum", Symbol: testSymbolV1, Address: testTokenV1, BlockchainID: testChainIDV1, Decimals: 6},
 				{Name: "USDC on Polygon", Symbol: testSymbolV1, Address: "0xUSDC2", BlockchainID: "137", Decimals: 6},
 			},
 		},
 		{
-			Name:   "Ethereum",
-			Symbol: "ETH",
+			Name:                  "Ethereum",
+			Symbol:                "ETH",
+			SuggestedBlockchainID: testChainIDV1,
 			Tokens: []rpc.TokenV1{
 				{Name: "ETH on Ethereum", Symbol: "ETH", Address: "0xETH", BlockchainID: testChainIDV1, Decimals: 18},
 			},
 		},
 		{
-			Name:   "DAI",
-			Symbol: "DAI",
+			Name:                  "DAI",
+			Symbol:                "DAI",
+			SuggestedBlockchainID: "137",
 			Tokens: []rpc.TokenV1{
 				{Name: "DAI on Polygon", Symbol: "DAI", Address: "0xDAI", BlockchainID: "137", Decimals: 18},
 			},
@@ -407,30 +410,6 @@ func TestClientV1_AppSessionsV1CreateAppSession(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, testAppSession, resp.AppSessionID)
 	assert.Equal(t, "open", resp.Status)
-}
-
-func TestClientV1_AppSessionsV1CloseAppSession(t *testing.T) {
-	t.Parallel()
-
-	client, dialer := setupClient()
-
-	response := rpc.AppSessionsV1CloseAppSessionResponse{
-		AppSessionID: testAppSession,
-		Version:      "5",
-		Status:       "closed",
-	}
-
-	registerSimpleHandlerV1(dialer, "app_sessions.v1.close_app_session", response)
-
-	resp, err := client.AppSessionsV1CloseAppSession(testCtxV1, rpc.AppSessionsV1CloseAppSessionRequest{
-		AppSessionID: testAppSession,
-		Allocations: []rpc.AppAllocationV1{
-			{Participant: testWalletV1, Asset: testAssetV1, Amount: "100"},
-		},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, testAppSession, resp.AppSessionID)
-	assert.Equal(t, "closed", resp.Status)
 }
 
 func TestClientV1_AppSessionsV1SubmitDepositState(t *testing.T) {

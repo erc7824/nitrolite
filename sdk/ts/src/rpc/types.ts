@@ -90,8 +90,8 @@ export interface LedgerV1 {
 export interface StateV1 {
   /** Deterministic ID (hash) of the state */
   id: string;
-  /** List of transitions included in the state */
-  transitions: TransitionV1[];
+  /** Transition included in the state */
+  transition: TransitionV1;
   /** Asset type of the state */
   asset: string;
   /** User wallet address */
@@ -133,6 +133,8 @@ export interface AssetV1 {
   symbol: string;
   /** Number of decimal places for the asset */
   decimals: number; // uint8
+  /** Suggested blockchain network ID for this asset */
+  suggested_blockchain_id: string; // uint64 as string
   /** List of supported tokens for the asset */
   tokens: TokenV1[];
 }

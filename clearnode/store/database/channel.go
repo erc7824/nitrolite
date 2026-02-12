@@ -76,34 +76,18 @@ func (s *DBStore) GetChannelByID(channelID string) (*core.Channel, error) {
 
 // GetActiveHomeChannel retrieves the active home channel for a user's wallet and asset.
 func (s *DBStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, error) {
-	// TODO: rewrite the query
-	var state State
-	err := s.db.Where("user_wallet = ? AND asset = ?", strings.ToLower(wallet), asset).
-		Order("epoch DESC, version DESC").
-		First(&state).Error
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to get user state: %w", err)
-	}
-
-	if state.HomeChannelID == nil {
-		return nil, nil
-	}
-
-	// Get the channel by its ID
 	var dbChannel Channel
-	err = s.db.Where("channel_id = ?", *state.HomeChannelID).First(&dbChannel).Error
+	err := s.db.
+		Joins("JOIN channel_states ON channel_states.home_channel_id = channels.channel_id").
+		Where("channel_states.user_wallet = ? AND channel_states.asset = ?", strings.ToLower(wallet), asset).
+		Where("channels.status <= ? AND channels.type = ?", core.ChannelStatusOpen, core.ChannelTypeHome).
+		Order("channel_states.epoch DESC, channel_states.version DESC").
+		First(&dbChannel).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to get home channel: %w", err)
-	}
-
-	if dbChannel.Status != core.ChannelStatusOpen || dbChannel.Type != core.ChannelTypeHome {
-		return nil, nil
+		return nil, fmt.Errorf("failed to get active home channel: %w", err)
 	}
 
 	return databaseChannelToCore(&dbChannel), nil
@@ -118,7 +102,7 @@ func (s *DBStore) CheckOpenChannel(wallet, asset string) (bool, error) {
 		INNER JOIN channels c ON c.channel_id = s.home_channel_id
 		WHERE s.user_wallet = ?
 			AND s.asset = ?
-			AND c.status = ?
+			AND c.status <= ?
 			AND c.type = ?
 		LIMIT 1
 	`, strings.ToLower(wallet), asset, core.ChannelStatusOpen, core.ChannelTypeHome).Scan(&count).Error

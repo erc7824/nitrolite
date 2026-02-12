@@ -134,13 +134,8 @@ func coreStateToContractState(state core.State, tokenGetter func(blockchainID ui
 		}
 	}
 
-	lastTransition := state.GetLastTransition()
-	intent, err := core.TransitionToIntent(lastTransition)
-	if err != nil {
-		return State{}, err
-	}
-
-	metadata, err := core.GetStateTransitionsHash(state.Transitions)
+	intent := core.TransitionToIntent(state.Transition)
+	metadata, err := core.GetStateTransitionHash(state.Transition)
 	if err != nil {
 		return State{}, errors.Wrap(err, "failed to compute state transitions hash")
 	}

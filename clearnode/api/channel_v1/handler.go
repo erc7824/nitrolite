@@ -50,10 +50,7 @@ func NewHandler(
 func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, senderState core.State) (*core.State, error) {
 	logger := log.FromContext(ctx)
 
-	incomingTransition := senderState.GetLastTransition()
-	if incomingTransition == nil {
-		return nil, rpc.Errorf("incoming state has no transitions")
-	}
+	incomingTransition := senderState.Transition
 	if incomingTransition.Type != core.TransitionTypeTransferSend {
 		return nil, rpc.Errorf("incoming state doesn't have 'transfer_send' transition")
 	}
@@ -94,12 +91,10 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 	// TODO: move to DB query
 	shouldSign := true
 	if lastSignedState != nil {
-		lastStateTransition := lastSignedState.GetLastTransition()
-		if lastStateTransition != nil {
-			if lastStateTransition.Type == core.TransitionTypeMutualLock ||
-				lastStateTransition.Type == core.TransitionTypeEscrowLock {
-				shouldSign = false
-			}
+		lastStateTransition := lastSignedState.Transition
+		if lastStateTransition.Type == core.TransitionTypeMutualLock ||
+			lastStateTransition.Type == core.TransitionTypeEscrowLock {
+			shouldSign = false
 		}
 	}
 
@@ -128,45 +123,45 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 // When a user submits a signed state (e.g., after escrow_deposit or escrow_withdraw), any pending
 // unsigned transitions from the previous state are reapplied to create a new unsigned state.
 // This ensures that pending operations are preserved across state updates that require user signatures.
-func (h *Handler) issueExtraState(ctx context.Context, tx Store, incomingState core.State, extraTransitions []core.Transition) (*core.State, error) {
-	logger := log.FromContext(ctx)
+// func (h *Handler) issueExtraState(ctx context.Context, tx Store, incomingState core.State, extraTransitions []core.Transition) (*core.State, error) {
+// 	logger := log.FromContext(ctx)
 
-	lastTransition := incomingState.GetLastTransition()
-	if lastTransition == nil {
-		return nil, rpc.Errorf("incoming state has no transitions")
-	}
+// 	lastTransition := incomingState.GetLastTransition()
+// 	if lastTransition == nil {
+// 		return nil, rpc.Errorf("incoming state has no transitions")
+// 	}
 
-	if len(extraTransitions) == 0 {
-		return &incomingState, nil
-	}
+// 	if len(extraTransitions) == 0 {
+// 		return &incomingState, nil
+// 	}
 
-	logger = logger.
-		WithKV("userWallet", incomingState.UserWallet).
-		WithKV("asset", incomingState.Asset)
+// 	logger = logger.
+// 		WithKV("userWallet", incomingState.UserWallet).
+// 		WithKV("asset", incomingState.Asset)
 
-	extraState := incomingState.NextState()
-	logger.Debug("issuing extra state", "extraStateVersion", extraState.Version)
+// 	extraState := incomingState.NextState()
+// 	logger.Debug("issuing extra state", "extraStateVersion", extraState.Version)
 
-	if err := extraState.ApplyReceiverTransitions(extraTransitions...); err != nil {
-		return nil, err
-	}
+// 	if err := extraState.ApplyReceiverTransitions(extraTransitions...); err != nil {
+// 		return nil, err
+// 	}
 
-	packedState, err := h.statePacker.PackState(*extraState)
-	if err != nil {
-		return nil, rpc.Errorf("failed to pack extra state")
-	}
+// 	packedState, err := h.statePacker.PackState(*extraState)
+// 	if err != nil {
+// 		return nil, rpc.Errorf("failed to pack extra state")
+// 	}
 
-	_nodeSig, err := h.signer.Sign(packedState)
-	if err != nil {
-		return nil, rpc.Errorf("failed to sign extra state")
-	}
-	nodeSig := _nodeSig.String()
-	extraState.NodeSig = &nodeSig
+// 	_nodeSig, err := h.signer.Sign(packedState)
+// 	if err != nil {
+// 		return nil, rpc.Errorf("failed to sign extra state")
+// 	}
+// 	nodeSig := _nodeSig.String()
+// 	extraState.NodeSig = &nodeSig
 
-	if err := tx.StoreUserState(*extraState); err != nil {
-		return nil, rpc.Errorf("failed to store extra state")
-	}
+// 	if err := tx.StoreUserState(*extraState); err != nil {
+// 		return nil, rpc.Errorf("failed to store extra state")
+// 	}
 
-	logger.Info("issued extra state", "extraStateVersion", extraState.Version)
-	return extraState, nil
-}
+// 	logger.Info("issued extra state", "extraStateVersion", extraState.Version)
+// 	return extraState, nil
+// }

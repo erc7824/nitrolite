@@ -29,7 +29,7 @@ import {
   transformSignedAppStateUpdateToRPC,
 } from './utils';
 import * as blockchain from './blockchain';
-import { nextState, applyChannelCreation, applyHomeDepositTransition, applyHomeWithdrawalTransition, applyTransferSendTransition, applyFinalizeTransition, applyCommitTransition } from './core/state';
+import { nextState, applyChannelCreation, applyAcknowledgementTransition, applyHomeDepositTransition, applyHomeWithdrawalTransition, applyTransferSendTransition, applyFinalizeTransition, applyCommitTransition } from './core/state';
 import { newVoidState } from './core/types';
 import { packState } from './core/state_packer';
 import { StateSigner, TransactionSigner } from './signers';
@@ -340,9 +340,7 @@ export class Client {
       // If state has a home channel ID, check if it's usable
       if (state && state.homeChannelId) {
         // Check if state has a finalize transition (channel is being closed)
-        const hasFinalize = state.transitions.some(
-          (t) => t.type === core.TransitionType.Finalize
-        );
+        const hasFinalize = state.transition.type === core.TransitionType.Finalize;
         // If no finalize transition, channel is still open and usable
         channelIsOpen = !hasFinalize;
       }
@@ -438,9 +436,7 @@ export class Client {
       // If state has a home channel ID, check if it's usable
       if (state && state.homeChannelId) {
         // Check if state has a finalize transition (channel is being closed)
-        const hasFinalize = state.transitions.some(
-          (t) => t.type === core.TransitionType.Finalize
-        );
+        const hasFinalize = state.transition.type === core.TransitionType.Finalize;
         // If no finalize transition, channel is still open and usable
         channelIsOpen = !hasFinalize;
       }
@@ -541,9 +537,13 @@ export class Client {
       }
       const newState = nextState(state!);
 
-      const blockchainId = this.homeBlockchains.get(asset);
+      let blockchainId = this.homeBlockchains.get(asset);
       if (!blockchainId) {
-        throw new Error(`home blockchain not set for asset ${asset}`);
+        if (state.homeLedger.blockchainId !== 0n) {
+          blockchainId = state.homeLedger.blockchainId;
+        } else {
+          blockchainId = await this.assetStore.getSuggestedBlockchainId(asset);
+        }
       }
 
       // Get node address
@@ -587,6 +587,83 @@ export class Client {
 
     // Return transaction ID from the transition
     return transition.txId;
+  }
+
+  /**
+   * Acknowledge sends an acknowledgement transition for the given asset.
+   * This is used when a user receives a transfer but hasn't yet acknowledged the state,
+   * or to acknowledge channel creation without a deposit.
+   *
+   * This method handles two scenarios automatically:
+   * 1. If no channel exists: Creates a new channel with the acknowledgement transition
+   * 2. If channel exists: Submits the acknowledgement transition to the existing channel
+   *
+   * @param asset - The asset symbol to acknowledge (e.g., "usdc")
+   *
+   * @example
+   * ```typescript
+   * await client.acknowledge('usdc');
+   * console.log('Acknowledgement successful');
+   * ```
+   */
+  async acknowledge(asset: string): Promise<void> {
+    const userWallet = this.getUserAddress();
+
+    // Try to get latest state to determine if channel exists
+    let state: core.State | null = null;
+    try {
+      state = await this.getLatestState(userWallet, asset, false);
+    } catch (err) {
+      // No state exists
+    }
+
+    // No channel path - create channel with acknowledgement
+    if (!state || !state.homeChannelId) {
+      const channelDef: core.ChannelDefinition = {
+        nonce: generateNonce(),
+        challenge: DEFAULT_CHALLENGE_PERIOD,
+      };
+
+      if (!state) {
+        state = newVoidState(asset, userWallet);
+      }
+      const newState = nextState(state);
+
+      const blockchainId = this.homeBlockchains.get(asset);
+      if (!blockchainId) {
+        throw new Error(`home blockchain not set for asset ${asset}`);
+      }
+
+      const nodeAddress = await this.getNodeAddress();
+      if (!nodeAddress) {
+        throw new Error('node address is undefined - ensure node config is properly loaded');
+      }
+
+      const tokenAddress = await this.assetStore.getTokenAddress(asset, blockchainId);
+      if (!tokenAddress) {
+        throw new Error(`token address not found for asset ${asset} on blockchain ${blockchainId}`);
+      }
+
+      applyChannelCreation(newState, channelDef, blockchainId, tokenAddress as Address, nodeAddress);
+      applyAcknowledgementTransition(newState);
+
+      const sig = await this.signState(newState);
+      newState.userSig = sig;
+
+      await this.requestChannelCreation(newState, channelDef);
+
+      return;
+    }
+
+    if (state.userSig) {
+      throw new Error('state already acknowledged by user');
+    }
+
+    // Has channel path - submit acknowledgement
+    const newState = nextState(state);
+    applyAcknowledgementTransition(newState);
+
+    await this.signAndSubmitState(newState);
   }
 
   /**
@@ -1247,12 +1324,12 @@ export class Client {
     // This is a simplified version - you'll need to implement the full transformation
     return {
       id: state.id,
-      transitions: state.transitions.map((t) => ({
-        type: t.type, // Keep as TransitionType enum
-        tx_id: t.txId,
-        account_id: t.accountId,
-        amount: t.amount.toString(),
-      })),
+      transition: {
+        type: state.transition.type,
+        tx_id: state.transition.txId,
+        account_id: state.transition.accountId,
+        amount: state.transition.amount.toString(),
+      },
       asset: state.asset,
       user_wallet: state.userWallet,
       epoch: state.epoch.toString(), // Convert bigint to string
@@ -1297,6 +1374,8 @@ export class Client {
    */
   private transitionTypeToString(type: core.TransitionType): string {
     const typeMap: Record<core.TransitionType, string> = {
+      [core.TransitionType.Void]: 'void',
+      [core.TransitionType.Acknowledgement]: 'acknowledgement',
       [core.TransitionType.HomeDeposit]: 'home_deposit',
       [core.TransitionType.HomeWithdrawal]: 'home_withdrawal',
       [core.TransitionType.EscrowDeposit]: 'escrow_deposit',

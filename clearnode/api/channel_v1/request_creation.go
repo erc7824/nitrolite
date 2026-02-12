@@ -147,12 +147,17 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		nodeSig = _nodeSig.String()
 		incomingState.NodeSig = &nodeSig
 
-		incomingTransition := incomingState.GetLastTransition()
-		var transaction *core.Transaction
-		if incomingTransition != nil {
+		incomingTransition := incomingState.Transition
+
+		if incomingTransition.Type != core.TransitionTypeAcknowledgement {
+			var transaction *core.Transaction
+
 			switch incomingTransition.Type {
+			case core.TransitionTypeVoid:
+				return rpc.Errorf("incoming state has no transitions")
+
 			case core.TransitionTypeHomeDeposit, core.TransitionTypeHomeWithdrawal:
-				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
@@ -163,26 +168,26 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 				if err != nil {
 					return rpc.Errorf("failed to issue receiver state: %v", err)
 				}
-				transaction, err = core.NewTransactionFromTransition(&incomingState, newReceiverState, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, newReceiverState, incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
 			default:
 				return rpc.Errorf("transition '%s' is not supported by this endpoint", incomingTransition.Type.String())
 			}
-		}
-		if err := tx.RecordTransaction(*transaction); err != nil {
-			return rpc.Errorf("failed to record transaction")
-		}
 
-		logger.Info("recorded transaction",
-			"txID", transaction.ID,
-			"txType", transaction.TxType.String(),
-			"from", transaction.FromAccount,
-			"to", transaction.ToAccount,
-			"asset", transaction.Asset,
-			"amount", transaction.Amount.String())
+			if err := tx.RecordTransaction(*transaction); err != nil {
+				return rpc.Errorf("failed to record transaction")
+			}
 
+			logger.Info("recorded transaction",
+				"txID", transaction.ID,
+				"txType", transaction.TxType.String(),
+				"from", transaction.FromAccount,
+				"to", transaction.ToAccount,
+				"asset", transaction.Asset,
+				"amount", transaction.Amount.String())
+		}
 		// Store the pending state
 		if err := tx.StoreUserState(incomingState); err != nil {
 			return rpc.Errorf("failed to store state: %v", err)

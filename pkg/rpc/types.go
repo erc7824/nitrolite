@@ -86,8 +86,8 @@ type LedgerV1 struct {
 type StateV1 struct {
 	// ID is the deterministic ID (hash) of the state
 	ID string `json:"id"`
-	// Transitions is the list of transitions included in the state
-	Transitions []TransitionV1 `json:"transitions"`
+	// Transition is the state transition that led to this state
+	Transition TransitionV1 `json:"transition"`
 	// Asset is the asset type of the state
 	Asset string `json:"asset"`
 	// UserWallet is the user wallet address
@@ -222,6 +222,8 @@ type AssetV1 struct {
 	Symbol string `json:"symbol"`
 	// Decimals is the number of decimal places for the asset
 	Decimals uint8 `json:"decimals"`
+	// SuggestedBlockchainID is the suggested blockchain network ID for this asset
+	SuggestedBlockchainID string `json:"suggested_blockchain_id"`
 	// Tokens is the list of supported tokens for the asset
 	Tokens []TokenV1 `json:"tokens"`
 }

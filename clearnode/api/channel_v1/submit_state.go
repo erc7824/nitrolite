@@ -28,19 +28,14 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 	}
 
 	var nodeSig string
-	incomingTransition := incomingState.GetLastTransition()
+	incomingTransition := incomingState.Transition
 	err = h.useStoreInTx(func(tx Store) error {
-		if incomingTransition == nil {
-			return rpc.Errorf("incoming state has no transitions")
+		userHasOpenChannel, err := tx.CheckOpenChannel(incomingState.UserWallet, incomingState.Asset)
+		if err != nil {
+			return rpc.Errorf("failed to check open channel: %v", err)
 		}
-		if incomingTransition.Type.RequiresOpenChannel() {
-			userHasOpenChannel, err := tx.CheckOpenChannel(incomingState.UserWallet, incomingState.Asset)
-			if err != nil {
-				return rpc.Errorf("failed to check open channel: %v", err)
-			}
-			if !userHasOpenChannel {
-				return rpc.Errorf("user has no open channel")
-			}
+		if !userHasOpenChannel {
+			return rpc.Errorf("user has no open channel")
 		}
 
 		logger.Debug("processing incoming state",
@@ -82,10 +77,9 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 				currentState = core.NewVoidState(incomingState.Asset, incomingState.UserWallet)
 			}
 		}
-		if prevTransition := currentState.GetLastTransition(); prevTransition != nil {
-			if err := tx.EnsureNoOngoingStateTransitions(currentState.UserWallet, currentState.Asset, prevTransition.Type); err != nil {
-				return rpc.Errorf("ongoing state transitions check failed: %v", err)
-			}
+
+		if err := tx.EnsureNoOngoingStateTransitions(currentState.UserWallet, currentState.Asset); err != nil {
+			return rpc.Errorf("ongoing state transitions check failed: %v", err)
 		}
 
 		if err := h.stateAdvancer.ValidateAdvancement(*currentState, incomingState); err != nil {
@@ -119,12 +113,12 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 		nodeSig = _nodeSig.String()
 		incomingState.NodeSig = &nodeSig
 
-		var transaction *core.Transaction
-		if incomingTransition != nil {
+		if incomingTransition.Type != core.TransitionTypeAcknowledgement {
+			var transaction *core.Transaction
 			switch incomingTransition.Type {
 			case core.TransitionTypeHomeDeposit, core.TransitionTypeHomeWithdrawal:
 				// We return Node's signature, the user is expected to submit this on blockchain.
-				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
@@ -134,7 +128,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 				if err != nil {
 					return rpc.Errorf("failed to issue receiver state: %v", err)
 				}
-				transaction, err = core.NewTransactionFromTransition(&incomingState, newReceiverState, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, newReceiverState, incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
@@ -185,7 +179,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 				// }
 				// logger.Info("extra state issued", "userID", extraState.UserWallet, "asset", extraState.Asset, "version", extraState.Version)
 			case core.TransitionTypeFinalize:
-				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
@@ -198,18 +192,19 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 			default:
 				return rpc.Errorf("transition '%s' is not supported by this endpoint", incomingTransition.Type.String())
 			}
-		}
-		if err := tx.RecordTransaction(*transaction); err != nil {
-			return rpc.Errorf("failed to record transaction")
-		}
 
-		logger.Info("recorded transaction",
-			"txID", transaction.ID,
-			"txType", transaction.TxType.String(),
-			"from", transaction.FromAccount,
-			"to", transaction.ToAccount,
-			"asset", transaction.Asset,
-			"amount", transaction.Amount.String())
+			if err := tx.RecordTransaction(*transaction); err != nil {
+				return rpc.Errorf("failed to record transaction")
+			}
+
+			logger.Info("recorded transaction",
+				"txID", transaction.ID,
+				"txType", transaction.TxType.String(),
+				"from", transaction.FromAccount,
+				"to", transaction.ToAccount,
+				"asset", transaction.Asset,
+				"amount", transaction.Amount.String())
+		}
 
 		if err := tx.StoreUserState(incomingState); err != nil {
 			return rpc.Errorf("failed to store user state: %v", err)

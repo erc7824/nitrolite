@@ -39,22 +39,17 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 
 	var nodeSig string
 	err = h.useStoreInTx(func(tx Store) error {
-		lastTransition := userState.GetLastTransition()
-		if lastTransition == nil {
-			return rpc.Errorf("user state has no transitions")
-		}
+		lastTransition := userState.Transition
 		if lastTransition.Type != core.TransitionTypeCommit {
 			return rpc.Errorf("user state transition must have 'commit' type, got '%s'", lastTransition.Type.String())
 		}
 
-		if lastTransition.Type.RequiresOpenChannel() {
-			userHasOpenChannel, err := tx.CheckOpenChannel(userState.UserWallet, userState.Asset)
-			if err != nil {
-				return rpc.Errorf("failed to check open channel: %v", err)
-			}
-			if !userHasOpenChannel {
-				return rpc.Errorf("user has no open channel")
-			}
+		userHasOpenChannel, err := tx.CheckOpenChannel(userState.UserWallet, userState.Asset)
+		if err != nil {
+			return rpc.Errorf("failed to check open channel: %v", err)
+		}
+		if !userHasOpenChannel {
+			return rpc.Errorf("user has no open channel")
 		}
 
 		if lastTransition.AccountID != appStateUpd.AppSessionID {
@@ -89,8 +84,8 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		}
 		if currentState == nil {
 			currentState = core.NewVoidState(userState.Asset, userState.UserWallet)
-		} else if prevTransition := currentState.GetLastTransition(); prevTransition != nil {
-			if err := tx.EnsureNoOngoingStateTransitions(userState.UserWallet, userState.Asset, prevTransition.Type); err != nil {
+		} else {
+			if err := tx.EnsureNoOngoingStateTransitions(userState.UserWallet, userState.Asset); err != nil {
 				return rpc.Errorf("ongoing state transitions check failed: %v", err)
 			}
 		}
@@ -241,7 +236,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("failed to store user state: %v", err)
 		}
 
-		transaction, err := core.NewTransactionFromTransition(&userState, nil, *lastTransition)
+		transaction, err := core.NewTransactionFromTransition(&userState, nil, lastTransition)
 		if err != nil {
 			return rpc.Errorf("failed to create transaction: %v", err)
 		}
@@ -283,5 +278,5 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		"userWallet", userState.UserWallet,
 		"userStateVersion", userState.Version,
 		"asset", userState.Asset,
-		"amount", userState.GetLastTransition().Amount)
+		"amount", userState.Transition.Amount)
 }

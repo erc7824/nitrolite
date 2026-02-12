@@ -27,7 +27,7 @@ type Store interface {
 	CheckOpenChannel(wallet, asset string) (bool, error)
 	GetLastUserState(wallet, asset string, signed bool) (*core.State, error)
 	StoreUserState(state core.State) error
-	EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error
+	EnsureNoOngoingStateTransitions(wallet, asset string) error
 
 	// TODO: add session keys support
 	// Session key operations

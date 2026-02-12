@@ -18,6 +18,8 @@ export enum ChannelStatus {
 }
 
 export enum TransitionType {
+  Void = 0,
+  Acknowledgement = 1,
   HomeDeposit = 10,
   HomeWithdrawal = 11,
   EscrowDeposit = 20,
@@ -114,7 +116,7 @@ export interface Transition {
  */
 export interface State {
   id: string; // Deterministic ID (hash) of the state
-  transitions: Transition[]; // List of transitions included in the state
+  transition: Transition; // Transition included in the state
   asset: string; // Asset type of the state
   userWallet: Address; // User wallet address
   epoch: bigint; // uint64 - User Epoch Index
@@ -165,6 +167,7 @@ export interface Asset {
   name: string;
   decimals: number; // uint8
   symbol: string;
+  suggestedBlockchainId: bigint; // uint64
   tokens: Token[];
 }
 
@@ -282,7 +285,7 @@ export function newChannel(
 export function newVoidState(asset: string, userWallet: Address): State {
   return {
     id: '', // Will be set by getStateId
-    transitions: [],
+    transition: { type: TransitionType.Void, txId: '', amount: new Decimal(0) },
     asset,
     userWallet,
     epoch: 0n,
@@ -343,6 +346,10 @@ export function newTransaction(
 
 export function transitionToString(type: TransitionType): string {
   switch (type) {
+    case TransitionType.Void:
+      return 'Void';
+    case TransitionType.Acknowledgement:
+      return 'Acknowledgement';
     case TransitionType.HomeDeposit:
       return 'HomeDeposit';
     case TransitionType.HomeWithdrawal:

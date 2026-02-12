@@ -8,29 +8,30 @@ types:
         - name: user_wallet
           type: string
           description: User wallet address
-        - name: node_wallet
-          type: string
-          description: Node wallet address
         - name: type
           type: string
           description: Type of the channel (home, escrow)
         - name: blockchain_id
-          type: integer
+          type: string
           description: Unique identifier for the blockchain
         - name: token_address
           type: string
           description: Address of the token used in the channel
-        - name: challenge
+        - name: challenge_duration
           type: integer
           description: Challenge period for the channel in seconds
+        - name: challenge_expires_at
+          type: string
+          description: Challenge expiration timestamp (ISO 8601 format)
+          optional: true
         - name: nonce
-          type: integer
+          type: string
           description: Nonce for the channel
         - name: status
           type: string
           description: Current status of the channel (void, open, challenged, closed)
         - name: state_version
-          type: integer
+          type: string
           description: On-chain state version of the channel
 
   - transition_type:
@@ -47,6 +48,7 @@ types:
         - escrow_lock
         - escrow_withdraw
         - migrate
+        - finalize
 
   - transition:
       description: Represents a state transition
@@ -54,9 +56,9 @@ types:
         - name: type
           type: transition_type
           description: Type of state transition
-        - name: tx_hash
+        - name: tx_id
           type: string
-          description: Transaction hash associated with the transition
+          description: Transaction ID associated with the transition
         - name: account_id
           type: string
           description: Account identifier (varies based on transition type)
@@ -70,11 +72,9 @@ types:
         - name: id
           type: string
           description: Deterministic ID (hash) of the state
-        - name: transitions
-          type: array
-          items:
-            type: transition
-          description: List of transitions included in the state
+        - name: transition
+          type: transition
+          description: The state transition that led to this state
         - name: asset
           type: string
           description: Asset type of the state
@@ -82,10 +82,10 @@ types:
           type: string
           description: User wallet address
         - name: epoch
-          type: integer
+          type: string
           description: User Epoch Index
         - name: version
-          type: integer
+          type: string
           description: Version of the state
         - name: home_channel_id
           type: string
@@ -118,7 +118,7 @@ types:
           type: string
           description: Address of the token used in this channel
         - name: blockchain_id
-          type: integer
+          type: string
           description: Unique identifier for the blockchain
         - name: user_balance
           type: string
@@ -137,7 +137,7 @@ types:
       description: Configuration for creating a channel
       fields:
         - name: nonce
-          type: integer
+          type: string
           description: A unique number to prevent replay attacks
         - name: challenge
           type: integer
@@ -168,8 +168,8 @@ types:
           type: integer
           description: Quorum required for the app session
         - name: nonce
-          type: integer
-          description: A unique number to prevent replay attacks  
+          type: string
+          description: A unique number to prevent replay attacks
 
   - app_allocation:
       description: Allocation of assets to a participant in an app session
@@ -192,9 +192,9 @@ types:
           description: A unique application session identifier
         - name: intent
           type: string
-          description: The intent of the app session update (operate, deposit, withdraw)
+          description: The intent of the app session update (operate, deposit, withdraw, close, rebalance)
         - name: version
-          type: integer
+          type: string
           description: Version of the app state
         - name: allocations
           type: array
@@ -271,7 +271,7 @@ types:
           type: string
           description: Token contract address
         - name: blockchain_id
-          type: integer
+          type: string
           description: Blockchain network ID
         - name: decimals
           type: integer
@@ -286,6 +286,12 @@ types:
         - name: symbol
           type: string
           description: Asset symbol
+        - name: decimals
+          type: integer
+          description: Number of decimal places
+        - name: suggested_blockchain_id
+          type: string
+          description: Suggested blockchain network ID for this asset
         - name: tokens
           type: array
           items:
@@ -299,7 +305,7 @@ types:
           type: string
           description: Blockchain name
         - name: blockchain_id
-          type: integer
+          type: string
           description: Blockchain network ID
         - name: contract_address
           type: string
@@ -328,6 +334,8 @@ types:
         - escrow_lock
         - escrow_withdraw
         - migrate
+        - rebalance
+        - finalize
 
   - transaction:
       description: Transaction record
@@ -384,10 +392,10 @@ types:
           type: integer
           description: Quorum required for operations
         - name: version
-          type: integer
+          type: string
           description: Current version of the session state
         - name: nonce
-          type: integer
+          type: string
           description: Nonce for the session
         - name: allocations
           type: array
@@ -524,7 +532,7 @@ api:
                   type: string
                   description: Filter by asset symbol
                 - field_name: epoch
-                  type: integer
+                  type: string
                   description: Filter by user epoch index
                   optional: true
                 - field_name: channel_id
@@ -590,7 +598,7 @@ api:
                   description: The specified channel was not found
                 - message: denied_until_checkpoint
                   description: State submissions are denied until the next checkpoint
-        
+
           events:
             - name: home_channel_created
               description: Event emitted when a home channel is created
@@ -601,7 +609,7 @@ api:
                 - field_name: initial_state
                   type: state
                   description: The initial state of the home channel
-  
+
     - name: app_sessions
       description: Operations related to application session management
       versions:
@@ -613,7 +621,7 @@ api:
                 - field_name: app_state_update
                   type: app_state_update
                   description: The application session state update to be submitted
-                - name: quorum_sigs
+                - field_name: quorum_sigs
                   type: array
                   description: App Session State Update signatures
                   items:
@@ -638,7 +646,7 @@ api:
                 - field_name: app_state_update
                   type: app_state_update
                   description: The application session state update to be submitted
-                - name: quorum_sigs
+                - field_name: quorum_sigs
                   type: array
                   description: App Session State Update signatures required for quorum
                   items:
@@ -659,11 +667,11 @@ api:
                   description: List of signed application session state updates to be submitted (each update must have intent 'rebalance')
                   items:
                     type: signed_app_state_update
-              response: 
+              response:
                 - field_name: batch_id
                   type: string
-                  description: A unitque identifier of executed rebalance operation
-              
+                  description: A unique identifier of executed rebalance operation
+
               errors: []
             - name: get_app_definition
               description: Retrieve the application definition for a specific app session
@@ -718,13 +726,13 @@ api:
                   description: Application definition including participants and quorum
                 - field_name: session_data
                   type: string
-                  description: Optional JSON stringified session data
-                  optional: true
-                - name: quorum_sigs
+                  description: JSON stringified session data
+                - field_name: quorum_sigs
                   type: array
-                  description: App Session creation signatures
+                  description: Participant signatures for the app session creation
                   items:
                     type: string
+                  optional: true
               response:
                 - field_name: app_session_id
                   type: string
@@ -773,10 +781,7 @@ api:
                   type: integer
                   description: Session expiration timestamp
                   optional: true
-              response:
-                - field_name: challenge_message
-                  type: string
-                  description: Challenge token for the client to sign
+              response: []
               errors:
                 - message: invalid_address
                   description: The wallet address is invalid
@@ -845,13 +850,13 @@ api:
                 - field_name: pagination
                   type: pagination_params
                   description: Pagination parameters (offset, limit, sort)
-                  optional: true                            
+                  optional: true
                 - field_name: from_time
                   type: integer
-                  optional: true   
+                  optional: true
                 - field_name: to_time
                   type: integer
-                  optional: true   
+                  optional: true
               response:
                 - field_name: transactions
                   type: array
@@ -892,8 +897,8 @@ api:
             - name: get_assets
               description: Retrieve all supported assets with optional blockchain filter
               request:
-                - field_name: chain_id
-                  type: integer
+                - field_name: blockchain_id
+                  type: string
                   description: Filter by blockchain network ID
                   optional: true
               response:
@@ -901,5 +906,5 @@ api:
                   type: array
                   items:
                     type: asset
-                  description: List of supported assets (filtered by blockchain if chain_id is provided)
+                  description: List of supported assets (filtered by blockchain if blockchain_id is provided)
               errors: []

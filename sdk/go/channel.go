@@ -297,7 +297,14 @@ func (c *Client) Transfer(ctx context.Context, recipientWallet string, asset str
 
 		blockchainID, ok := c.homeBlockchains[asset]
 		if !ok {
-			return "", fmt.Errorf("home blockchain not set for asset %s", asset)
+			if state.HomeLedger.BlockchainID != 0 {
+				blockchainID = state.HomeLedger.BlockchainID
+			} else {
+				blockchainID, err = c.assetStore.GetSuggestedBlockchainID(asset)
+				if err != nil {
+					return "", err
+				}
+			}
 		}
 
 		// Get node address (Required for channel creation flow)
@@ -433,6 +440,104 @@ func (c *Client) CloseHomeChannel(ctx context.Context, asset string) (string, er
 	}
 
 	return txHash, nil
+}
+
+// Acknowledge sends an acknowledgement transition for the given asset.
+// This is used when a user receives a transfer but hasn't yet acknowledged the state,
+// or to acknowledge channel creation without a deposit.
+//
+// This method handles two scenarios automatically:
+//  1. If no channel exists: Creates a new channel with the acknowledgement transition
+//  2. If channel exists: Submits the acknowledgement transition to the existing channel
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - asset: The asset symbol to acknowledge (e.g., "usdc")
+//
+// Returns:
+//   - Error if the operation fails
+//
+// Requirements:
+//   - Home blockchain must be set for the asset (use SetHomeBlockchain) when no channel exists
+//
+// Example:
+//
+//	err := client.Acknowledge(ctx, "usdc")
+func (c *Client) Acknowledge(ctx context.Context, asset string) error {
+	userWallet := c.GetUserAddress()
+
+	// Try to get latest state to determine if channel exists
+	state, err := c.GetLatestState(ctx, userWallet, asset, false)
+
+	// No channel path - create channel with acknowledgement
+	if err != nil || state.HomeChannelID == nil {
+		channelDef := core.ChannelDefinition{
+			Nonce:     generateNonce(),
+			Challenge: DefaultChallengePeriod,
+		}
+
+		if state == nil {
+			state = core.NewVoidState(asset, userWallet)
+		}
+		newState := state.NextState()
+
+		blockchainID, ok := c.homeBlockchains[asset]
+		if !ok {
+			return fmt.Errorf("home blockchain not set for asset %s", asset)
+		}
+
+		nodeAddress, err := c.getNodeAddress(ctx)
+		if err != nil {
+			return err
+		}
+
+		tokenAddress, err := c.getTokenAddress(ctx, blockchainID, asset)
+		if err != nil {
+			return err
+		}
+
+		_, err = newState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
+		if err != nil {
+			return fmt.Errorf("failed to apply channel creation: %w", err)
+		}
+
+		_, err = newState.ApplyAcknowledgementTransition()
+		if err != nil {
+			return fmt.Errorf("failed to apply acknowledgement transition: %w", err)
+		}
+
+		sig, err := c.SignState(newState)
+		if err != nil {
+			return fmt.Errorf("failed to sign state: %w", err)
+		}
+		newState.UserSig = &sig
+
+		_, err = c.requestChannelCreation(ctx, *newState, channelDef)
+		if err != nil {
+			return fmt.Errorf("failed to request channel creation: %w", err)
+		}
+
+		return nil
+	}
+
+	if state.UserSig != nil {
+		return fmt.Errorf("state already acknowledged by user")
+	}
+
+	// Has channel path - submit acknowledgement
+	nextState := state.NextState()
+
+	_, err = nextState.ApplyAcknowledgementTransition()
+	if err != nil {
+		return fmt.Errorf("failed to apply acknowledgement transition: %w", err)
+	}
+
+	_, err = c.signAndSubmitState(ctx, nextState)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ============================================================================

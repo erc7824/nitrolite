@@ -27,12 +27,9 @@ Decimal.set({ precision: 50 });
  * @returns Intent value (uint8)
  * @throws Error if transition is null or has unexpected type
  */
-export function transitionToIntent(transition: Transition | null | undefined): number {
-  if (!transition) {
-    throw new Error('at least one transition is expected');
-  }
-
+export function transitionToIntent(transition: Transition): number {
   switch (transition.type) {
+    case TransitionType.Void:
     case TransitionType.TransferSend:
     case TransitionType.TransferReceive:
     case TransitionType.Commit:
@@ -54,9 +51,8 @@ export function transitionToIntent(transition: Transition | null | undefined): n
       return INTENT_FINALIZE_ESCROW_WITHDRAWAL;
     case TransitionType.Migrate:
       return INTENT_INITIATE_MIGRATION;
-    // TODO: Add FINALIZE_MIGRATION
     default:
-      throw new Error(`unexpected transition type: ${transition.type}`);
+      return INTENT_OPERATE;
   }
 }
 
@@ -210,22 +206,22 @@ export function getStateId(
 }
 
 /**
- * GetStateTransitionsHash hashes a list of transitions into metadata
- * @param transitions - Array of transitions
+ * GetStateTransitionHash hashes a single transition into metadata
+ * @param transition - The transition to hash
  * @returns Hash as bytes32 (hex string)
  */
-export function getStateTransitionsHash(transitions: Transition[]): string {
-  const contractTransitions = transitions.map((t) => ({
-    type: t.type,
-    txId: hexToBytes32(t.txId),
-    accountId: parseAccountIdToBytes32(t.accountId),
-    amount: t.amount.toString(),
-  }));
+export function getStateTransitionHash(transition: Transition): string {
+  const contractTransition = {
+    type: transition.type,
+    txId: hexToBytes32(transition.txId),
+    accountId: parseAccountIdToBytes32(transition.accountId),
+    amount: transition.amount.toString(),
+  };
 
   const packed = encodeAbiParameters(
     [
       {
-        type: 'tuple[]',
+        type: 'tuple',
         components: [
           { name: 'type', type: 'uint8' },
           { name: 'txId', type: 'bytes32' },
@@ -234,7 +230,7 @@ export function getStateTransitionsHash(transitions: Transition[]): string {
         ],
       },
     ],
-    [contractTransitions]
+    [contractTransition]
   );
 
   return keccak256(packed);

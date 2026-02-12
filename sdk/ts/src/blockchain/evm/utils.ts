@@ -5,7 +5,7 @@
 import { Address, Hex, hexToBytes } from 'viem';
 import Decimal from 'decimal.js';
 import * as core from '../../core/types';
-import { decimalToBigInt, generateChannelMetadata, getStateTransitionsHash } from '../../core/utils';
+import { decimalToBigInt, generateChannelMetadata, getStateTransitionHash } from '../../core/utils';
 import { ChannelDefinition, Ledger, State } from './types';
 
 /**
@@ -70,10 +70,9 @@ export async function coreStateToContractState(
     };
   }
 
-  const lastTransition = state.transitions[state.transitions.length - 1];
-  const intent = lastTransition ? transitionTypeToIntent(lastTransition.type) : 0;
+  const intent = transitionTypeToIntent(state.transition.type);
 
-  const metadata = getStateTransitionsHash(state.transitions) as `0x${string}`;
+  const metadata = getStateTransitionHash(state.transition) as `0x${string}`;
 
   const userSig = state.userSig ? (state.userSig as `0x${string}`) : '0x' as `0x${string}`;
   const nodeSig = state.nodeSig ? (state.nodeSig as `0x${string}`) : '0x' as `0x${string}`;
@@ -139,7 +138,7 @@ export function contractStateToCoreState(
 
   return {
     id: '',
-    transitions: [],
+    transition: { type: core.TransitionType.Void, txId: '', amount: new Decimal(0) },
     asset: '',
     userWallet: '0x0000000000000000000000000000000000000000' as Address,
     epoch: 0n,

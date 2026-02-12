@@ -11,22 +11,17 @@ import (
 )
 
 func toCoreState(state rpc.StateV1) (core.State, error) {
-	coreTransitions := make([]core.Transition, len(state.Transitions))
-	for i, transition := range state.Transitions {
-		decimalTxAmount, err := decimal.NewFromString(transition.Amount)
-		if err != nil {
-			return core.State{}, fmt.Errorf("failed to parse amount: %w", err)
-		}
-
-		coreTransition := core.Transition{
-			Type:      transition.Type,
-			TxID:      transition.TxID,
-			AccountID: transition.AccountID,
-			Amount:    decimalTxAmount,
-		}
-		coreTransitions[i] = coreTransition
+	decimalTxAmount, err := decimal.NewFromString(state.Transition.Amount)
+	if err != nil {
+		return core.State{}, fmt.Errorf("failed to parse amount: %w", err)
 	}
 
+	coreTransition := core.Transition{
+		Type:      state.Transition.Type,
+		TxID:      state.Transition.TxID,
+		AccountID: state.Transition.AccountID,
+		Amount:    decimalTxAmount,
+	}
 	epoch, err := strconv.ParseUint(state.Epoch, 10, 64)
 	if err != nil {
 		return core.State{}, fmt.Errorf("failed to parse epoch: %w", err)
@@ -49,7 +44,7 @@ func toCoreState(state rpc.StateV1) (core.State, error) {
 
 	return core.State{
 		ID:              state.ID,
-		Transitions:     coreTransitions,
+		Transition:      coreTransition,
 		Asset:           state.Asset,
 		UserWallet:      state.UserWallet,
 		Epoch:           epoch,
@@ -162,14 +157,11 @@ func coreChannelToRPC(channel core.Channel) rpc.ChannelV1 {
 
 // coreStateToRPC converts a core.State to rpc.StateV1
 func coreStateToRPC(state core.State) rpc.StateV1 {
-	transitions := make([]rpc.TransitionV1, len(state.Transitions))
-	for i, t := range state.Transitions {
-		transitions[i] = rpc.TransitionV1{
-			Type:      t.Type,
-			TxID:      t.TxID,
-			AccountID: t.AccountID,
-			Amount:    t.Amount.String(),
-		}
+	transition := rpc.TransitionV1{
+		Type:      state.Transition.Type,
+		TxID:      state.Transition.TxID,
+		AccountID: state.Transition.AccountID,
+		Amount:    state.Transition.Amount.String(),
 	}
 
 	homeLedger := rpc.LedgerV1{
@@ -195,7 +187,7 @@ func coreStateToRPC(state core.State) rpc.StateV1 {
 
 	return rpc.StateV1{
 		ID:              state.ID,
-		Transitions:     transitions,
+		Transition:      transition,
 		Asset:           state.Asset,
 		UserWallet:      state.UserWallet,
 		Epoch:           strconv.FormatUint(state.Epoch, 10),

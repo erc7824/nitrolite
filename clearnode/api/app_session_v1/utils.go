@@ -36,20 +36,16 @@ func unmapAppDefinitionV1(def rpc.AppDefinitionV1) (app.AppDefinitionV1, error) 
 
 // unmapStateV1 converts an RPC StateV1 to a core.State.
 func unmapStateV1(state rpc.StateV1) (core.State, error) {
-	coreTransitions := make([]core.Transition, len(state.Transitions))
-	for i, transition := range state.Transitions {
-		decimalTxAmount, err := decimal.NewFromString(transition.Amount)
-		if err != nil {
-			return core.State{}, fmt.Errorf("failed to parse amount: %w", err)
-		}
+	decimalTxAmount, err := decimal.NewFromString(state.Transition.Amount)
+	if err != nil {
+		return core.State{}, fmt.Errorf("failed to parse amount: %w", err)
+	}
 
-		coreTransition := core.Transition{
-			Type:      transition.Type,
-			TxID:      transition.TxID,
-			AccountID: transition.AccountID,
-			Amount:    decimalTxAmount,
-		}
-		coreTransitions[i] = coreTransition
+	coreTransition := core.Transition{
+		Type:      state.Transition.Type,
+		TxID:      state.Transition.TxID,
+		AccountID: state.Transition.AccountID,
+		Amount:    decimalTxAmount,
 	}
 
 	epoch, err := strconv.ParseUint(state.Epoch, 10, 64)
@@ -74,7 +70,7 @@ func unmapStateV1(state rpc.StateV1) (core.State, error) {
 
 	return core.State{
 		ID:              state.ID,
-		Transitions:     coreTransitions,
+		Transition:      coreTransition,
 		Asset:           state.Asset,
 		UserWallet:      state.UserWallet,
 		Epoch:           epoch,
@@ -242,19 +238,16 @@ func mapPaginationMetadataV1(meta core.PaginationMetadata) rpc.PaginationMetadat
 
 // toRPCState converts a core.State to rpc.StateV1 for testing
 func toRPCState(state core.State) rpc.StateV1 {
-	transitions := make([]rpc.TransitionV1, len(state.Transitions))
-	for i, t := range state.Transitions {
-		transitions[i] = rpc.TransitionV1{
-			Type:      t.Type,
-			TxID:      t.TxID,
-			AccountID: t.AccountID,
-			Amount:    t.Amount.String(),
-		}
+	transition := rpc.TransitionV1{
+		Type:      state.Transition.Type,
+		TxID:      state.Transition.TxID,
+		AccountID: state.Transition.AccountID,
+		Amount:    state.Transition.Amount.String(),
 	}
 
 	rpcState := rpc.StateV1{
 		ID:              state.ID,
-		Transitions:     transitions,
+		Transition:      transition,
 		Asset:           state.Asset,
 		UserWallet:      state.UserWallet,
 		Epoch:           strconv.FormatUint(state.Epoch, 10),

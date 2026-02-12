@@ -89,10 +89,11 @@ func (s *DBStore) GetUserBalances(wallet string) ([]core.BalanceEntry, error) {
 //     AND next transition must be escrow_withdraw or migrate
 //   - escrow_withdraw: Verify last_state.version == escrow_channel.state_version
 //   - migrate: Verify last_state.version == home_channel.state_version
-func (s *DBStore) EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error {
+func (s *DBStore) EnsureNoOngoingStateTransitions(wallet, asset string) error {
 	wallet = strings.ToLower(wallet)
 
 	type versionCheck struct {
+		TransitionType       core.TransitionType
 		StateVersion         uint64
 		HomeChannelVersion   *uint64
 		EscrowChannelVersion *uint64
@@ -101,6 +102,7 @@ func (s *DBStore) EnsureNoOngoingStateTransitions(wallet, asset string, prevTran
 	var result versionCheck
 	err := s.db.Raw(`
 		SELECT
+			s.transition_type as transition_type,
 			s.version as state_version,
 			hc.state_version as home_channel_version,
 			ec.state_version as escrow_channel_version
@@ -128,7 +130,7 @@ func (s *DBStore) EnsureNoOngoingStateTransitions(wallet, asset string, prevTran
 	}
 
 	// Validation logic by transition type
-	switch prevTransitionType {
+	switch result.TransitionType {
 	case core.TransitionTypeHomeDeposit:
 		// Verify last_state.version == home_channel.state_version
 		if result.HomeChannelVersion != nil && result.StateVersion != *result.HomeChannelVersion {

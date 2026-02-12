@@ -49,6 +49,7 @@ export function transformAssets(assets: AssetV1[]): core.Asset[] {
     name: asset.name,
     symbol: asset.symbol,
     decimals: asset.decimals,
+    suggestedBlockchainId: BigInt(asset.suggested_blockchain_id),
     tokens: asset.tokens.map((token) => ({
       name: token.name,
       symbol: token.symbol,
@@ -176,7 +177,7 @@ export function transformTransition(transition: TransitionV1): core.Transition {
 export function transformState(state: StateV1): core.State {
   const result: core.State = {
     id: state.id,
-    transitions: state.transitions.map(transformTransition),
+    transition: transformTransition(state.transition),
     asset: state.asset,
     userWallet: state.user_wallet as Address,
     epoch: BigInt(state.epoch),

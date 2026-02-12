@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -18,38 +17,34 @@ var (
 	uint256Type, _ = abi.NewType("uint256", "", nil)
 )
 
-func TransitionToIntent(transition *Transition) (uint8, error) {
-	if transition == nil {
-		return 0, errors.New("at least one transition is expected")
-	}
-
+func TransitionToIntent(transition Transition) uint8 {
 	switch transition.Type {
 	case TransitionTypeTransferSend,
 		TransitionTypeTransferReceive,
 		TransitionTypeCommit,
 		TransitionTypeRelease:
-		return INTENT_OPERATE, nil
+		return INTENT_OPERATE
 	case TransitionTypeFinalize:
-		return INTENT_CLOSE, nil
+		return INTENT_CLOSE
 	case TransitionTypeHomeDeposit:
-		return INTENT_DEPOSIT, nil
+		return INTENT_DEPOSIT
 	case TransitionTypeHomeWithdrawal:
-		return INTENT_WITHDRAW, nil
+		return INTENT_WITHDRAW
 	case TransitionTypeMutualLock:
-		return INTENT_INITIATE_ESCROW_DEPOSIT, nil
+		return INTENT_INITIATE_ESCROW_DEPOSIT
 	case TransitionTypeEscrowDeposit:
-		return INTENT_FINALIZE_ESCROW_DEPOSIT, nil
+		return INTENT_FINALIZE_ESCROW_DEPOSIT
 	case TransitionTypeEscrowLock:
-		return INTENT_INITIATE_ESCROW_WITHDRAWAL, nil
+		return INTENT_INITIATE_ESCROW_WITHDRAWAL
 	case TransitionTypeEscrowWithdraw:
-		return INTENT_FINALIZE_ESCROW_WITHDRAWAL, nil
+		return INTENT_FINALIZE_ESCROW_WITHDRAWAL
 	case TransitionTypeMigrate:
-		return INTENT_INITIATE_MIGRATION, nil
+		return INTENT_INITIATE_MIGRATION
+	default:
+		return INTENT_OPERATE
+	}
 	// TODO: Add:
 	// FINALIZE_MIGRATION.
-	default:
-		return 0, errors.New("unexpected transition type: " + transition.Type.String())
-	}
 }
 
 // ValidateDecimalPrecision validates that an amount doesn't exceed the maximum allowed decimal places.
@@ -167,15 +162,16 @@ func GetStateID(userWallet, asset string, epoch, version uint64) string {
 	return crypto.Keccak256Hash(packed).Hex()
 }
 
-func GetStateTransitionsHash(transitions []Transition) ([32]byte, error) {
-
+func GetStateTransitionHash(transition Transition) ([32]byte, error) {
 	hash := [32]byte{}
+
 	type contractTransition struct {
 		Type      uint8
 		TxId      [32]byte
 		AccountId [32]byte
 		Amount    string
 	}
+
 	transitionType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{Name: "type", Type: "uint8"},
 		{Name: "txId", Type: "bytes32"},
@@ -187,35 +183,29 @@ func GetStateTransitionsHash(transitions []Transition) ([32]byte, error) {
 	}
 
 	args := abi.Arguments{
-		{Type: abi.Type{T: abi.SliceTy, Elem: &transitionType}},
+		{Type: transitionType},
 	}
 
-	contractsTransitions := make([]contractTransition, len(transitions))
-
-	for i, t := range transitions {
-		txIdBytes, err := hexToBytes32(t.TxID)
-		if err != nil {
-			return hash, fmt.Errorf("invalid txId at transition %d: %w", i, err)
-		}
-
-		accountIdBytes, err := parseAccountIdToBytes32(t.AccountID)
-		if err != nil {
-			return hash, fmt.Errorf("invalid accountId at transition %d: %w", i, err)
-		}
-
-		contractsTransitions[i] = contractTransition{
-			Type:      uint8(t.Type),
-			TxId:      txIdBytes,
-			AccountId: accountIdBytes,
-			Amount:    t.Amount.String(),
-		}
-	}
-
-	packed, err := args.Pack(
-		contractsTransitions,
-	)
+	txIdBytes, err := hexToBytes32(transition.TxID)
 	if err != nil {
-		return hash, fmt.Errorf("failed to pack app state update: %w", err)
+		return hash, fmt.Errorf("invalid txId: %w", err)
+	}
+
+	accountIdBytes, err := parseAccountIdToBytes32(transition.AccountID)
+	if err != nil {
+		return hash, fmt.Errorf("invalid accountId: %w", err)
+	}
+
+	payload := contractTransition{
+		Type:      uint8(transition.Type),
+		TxId:      txIdBytes,
+		AccountId: accountIdBytes,
+		Amount:    transition.Amount.String(),
+	}
+
+	packed, err := args.Pack(payload)
+	if err != nil {
+		return hash, fmt.Errorf("failed to pack transition: %w", err)
 	}
 
 	hash = crypto.Keccak256Hash(packed)

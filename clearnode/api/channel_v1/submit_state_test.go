@@ -56,7 +56,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	// Create sender's current state (before transfer)
 	currentSenderState := core.State{
 		ID:            core.GetStateID(senderWallet, asset, 1, 1),
-		Transitions:   []core.Transition{},
+		Transition:    core.Transition{},
 		Asset:         asset,
 		UserWallet:    senderWallet,
 		Epoch:         1,
@@ -93,7 +93,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	// Create receiver's current state
 	currentReceiverState := core.State{
 		ID:            core.GetStateID(receiverWallet, asset, 1, 1),
-		Transitions:   []core.Transition{},
+		Transition:    core.Transition{},
 		Asset:         asset,
 		UserWallet:    receiverWallet,
 		Epoch:         1,
@@ -122,6 +122,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil)
 	mockTxStore.On("CheckOpenChannel", senderWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", senderWallet, asset, false).Return(currentSenderState, nil)
+	mockTxStore.On("EnsureNoOngoingStateTransitions", senderWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", senderWallet, mock.Anything, userSigBytes).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedSenderState, nil).Maybe()
 
@@ -132,8 +133,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 		// Verify receiver state
 		return state.UserWallet == receiverWallet &&
 			state.Version == expectedReceiverState.Version &&
-			len(state.Transitions) == 1 &&
-			state.Transitions[0].Type == core.TransitionTypeTransferReceive &&
+			state.Transition.Type == core.TransitionTypeTransferReceive &&
 			state.NodeSig != nil
 	})).Return(nil)
 
@@ -150,8 +150,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 		// Verify sender state
 		return state.UserWallet == senderWallet &&
 			state.Version == incomingSenderState.Version &&
-			len(state.Transitions) == 1 &&
-			state.Transitions[0].Type == core.TransitionTypeTransferSend &&
+			state.Transition.Type == core.TransitionTypeTransferSend &&
 			state.NodeSig != nil
 	})).Return(nil)
 
@@ -232,7 +231,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	// Create user's current state (with existing home channel)
 	currentState := core.State{
 		ID:            core.GetStateID(userWallet, asset, 1, 1),
-		Transitions:   []core.Transition{},
+		Transition:    core.Transition{},
 		Asset:         asset,
 		UserWallet:    userWallet,
 		Epoch:         1,
@@ -307,8 +306,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
 		return state.UserWallet == userWallet &&
 			state.Version == incomingState.Version &&
-			len(state.Transitions) == 1 &&
-			state.Transitions[0].Type == core.TransitionTypeEscrowLock &&
+			state.Transition.Type == core.TransitionTypeEscrowLock &&
 			state.NodeSig != nil
 	})).Return(nil)
 
@@ -389,13 +387,11 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	// The last transition must be an EscrowLock for the EscrowWithdraw to be valid
 	currentSignedState := core.State{
 		ID: core.GetStateID(userWallet, asset, 1, 2),
-		Transitions: []core.Transition{
-			{
-				Type:      core.TransitionTypeEscrowLock,
-				TxID:      "0xPreviousEscrowLockTx",
-				AccountID: "",
-				Amount:    withdrawAmount,
-			},
+		Transition: core.Transition{
+			Type:      core.TransitionTypeEscrowLock,
+			TxID:      "0xPreviousEscrowLockTx",
+			AccountID: "",
+			Amount:    withdrawAmount,
 		},
 		Asset:           asset,
 		UserWallet:      userWallet,
@@ -450,7 +446,7 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentUnsignedState, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, true).Return(currentSignedState, nil)
-	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset, core.TransitionTypeEscrowLock).Return(nil)
+	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 
@@ -465,8 +461,7 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
 		return state.UserWallet == userWallet &&
 			state.Version == incomingState.Version &&
-			len(state.Transitions) == 1 &&
-			state.Transitions[0].Type == core.TransitionTypeEscrowWithdraw &&
+			state.Transition.Type == core.TransitionTypeEscrowWithdraw &&
 			state.NodeSig != nil
 	})).Return(nil)
 
@@ -544,7 +539,7 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 	// Create user's current state (with existing home channel)
 	currentState := core.State{
 		ID:            core.GetStateID(userWallet, asset, 1, 1),
-		Transitions:   []core.Transition{},
+		Transition:    core.Transition{},
 		Asset:         asset,
 		UserWallet:    userWallet,
 		Epoch:         1,
@@ -585,6 +580,7 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil)
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
+	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
@@ -596,8 +592,7 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
 		return state.UserWallet == userWallet &&
 			state.Version == incomingState.Version &&
-			len(state.Transitions) == 1 &&
-			state.Transitions[0].Type == core.TransitionTypeHomeDeposit &&
+			state.Transition.Type == core.TransitionTypeHomeDeposit &&
 			state.NodeSig != nil
 	})).Return(nil)
 
@@ -675,7 +670,7 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 	// Create user's current state (with existing home channel)
 	currentState := core.State{
 		ID:            core.GetStateID(userWallet, asset, 1, 1),
-		Transitions:   []core.Transition{},
+		Transition:    core.Transition{},
 		Asset:         asset,
 		UserWallet:    userWallet,
 		Epoch:         1,
@@ -716,6 +711,7 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil)
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
+	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
@@ -727,8 +723,8 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
 		return state.UserWallet == userWallet &&
 			state.Version == incomingState.Version &&
-			len(state.Transitions) == 1 &&
-			state.Transitions[0].Type == core.TransitionTypeHomeWithdrawal &&
+
+			state.Transition.Type == core.TransitionTypeHomeWithdrawal &&
 			state.NodeSig != nil
 	})).Return(nil)
 
@@ -809,7 +805,7 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	// Create user's current state (with existing home channel)
 	currentState := core.State{
 		ID:            core.GetStateID(userWallet, asset, 1, 1),
-		Transitions:   []core.Transition{},
+		Transition:    core.Transition{},
 		Asset:         asset,
 		UserWallet:    userWallet,
 		Epoch:         1,
@@ -883,8 +879,8 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
 		return state.UserWallet == userWallet &&
 			state.Version == incomingState.Version &&
-			len(state.Transitions) == 1 &&
-			state.Transitions[0].Type == core.TransitionTypeMutualLock &&
+
+			state.Transition.Type == core.TransitionTypeMutualLock &&
 			state.NodeSig != nil
 	})).Return(nil)
 
@@ -965,13 +961,12 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	// The last transition must be a MutualLock for the EscrowDeposit to be valid
 	currentSignedState := core.State{
 		ID: core.GetStateID(userWallet, asset, 1, 2),
-		Transitions: []core.Transition{
-			{
-				Type:      core.TransitionTypeMutualLock,
-				TxID:      "0xPreviousMutualLockTx",
-				AccountID: "",
-				Amount:    depositAmount,
-			},
+		Transition: core.Transition{
+
+			Type:      core.TransitionTypeMutualLock,
+			TxID:      "0xPreviousMutualLockTx",
+			AccountID: "",
+			Amount:    depositAmount,
 		},
 		Asset:           asset,
 		UserWallet:      userWallet,
@@ -1026,7 +1021,7 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentUnsignedState, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, true).Return(currentSignedState, nil)
-	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset, core.TransitionTypeMutualLock).Return(nil)
+	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 
@@ -1041,8 +1036,8 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
 		return state.UserWallet == userWallet &&
 			state.Version == incomingState.Version &&
-			len(state.Transitions) == 1 &&
-			state.Transitions[0].Type == core.TransitionTypeEscrowDeposit &&
+
+			state.Transition.Type == core.TransitionTypeEscrowDeposit &&
 			state.NodeSig != nil
 	})).Return(nil)
 
@@ -1120,7 +1115,7 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 	// Create user's current state (with existing home channel and balance)
 	currentState := core.State{
 		ID:            core.GetStateID(userWallet, asset, 1, 1),
-		Transitions:   []core.Transition{},
+		Transition:    core.Transition{},
 		Asset:         asset,
 		UserWallet:    userWallet,
 		Epoch:         1,
@@ -1161,6 +1156,7 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil)
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
+	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
@@ -1172,9 +1168,9 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
 		return state.UserWallet == userWallet &&
 			state.Version == incomingState.Version &&
-			len(state.Transitions) == 1 &&
-			state.Transitions[0].Type == core.TransitionTypeFinalize &&
-			state.Transitions[0].Amount.Equal(userBalance) &&
+
+			state.Transition.Type == core.TransitionTypeFinalize &&
+			state.Transition.Amount.Equal(userBalance) &&
 			state.HomeLedger.UserBalance.IsZero() &&
 			state.NodeSig != nil
 	})).Return(nil)
@@ -1219,6 +1215,128 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 	assert.Equal(t, userBalance, finalizeTransition.Amount, "Finalize amount should equal the original user balance")
 }
 
+func TestSubmitState_Acknowledgement_Success(t *testing.T) {
+	// Setup
+	mockTxStore := new(MockStore)
+	mockMemoryStore := new(MockMemoryStore)
+	mockAssetStore := new(MockAssetStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+	minChallenge := uint32(3600)
+	mockStatePacker := new(MockStatePacker)
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
+		useStoreInTx: func(handler StoreTxHandler) error {
+			err := handler(mockTxStore)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		memoryStore:  mockMemoryStore,
+		signer:       mockSigner,
+		nodeAddress:  nodeAddress,
+		minChallenge: minChallenge,
+		sigValidators: map[SigValidatorType]SigValidator{
+			EcdsaSigValidatorType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	userWallet := "0x1234567890123456789012345678901234567890"
+	asset := "USDC"
+	homeChannelID := "0xHomeChannel123"
+
+	// Create user's current state (with existing home channel)
+	currentState := core.State{
+		ID:            core.GetStateID(userWallet, asset, 1, 1),
+		Transition:    core.Transition{},
+		Asset:         asset,
+		UserWallet:    userWallet,
+		Epoch:         1,
+		Version:       1,
+		HomeChannelID: &homeChannelID,
+		HomeLedger: core.Ledger{
+			TokenAddress: "0xTokenAddress",
+			BlockchainID: 1,
+			UserBalance:  decimal.NewFromInt(500),
+			UserNetFlow:  decimal.NewFromInt(500),
+			NodeBalance:  decimal.NewFromInt(0),
+			NodeNetFlow:  decimal.NewFromInt(0),
+		},
+		EscrowLedger: nil,
+		UserSig:      nil,
+		NodeSig:      nil,
+	}
+
+	// Create incoming state with acknowledgement transition
+	incomingState := currentState.NextState()
+	_, err := incomingState.ApplyAcknowledgementTransition()
+	require.NoError(t, err)
+
+	// Sign the incoming state with user's signature
+	userKey, _ := crypto.GenerateKey()
+	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil).Maybe()
+	packedState, _ := core.PackState(*incomingState, mockAssetStore)
+	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
+	userSigHex := hexutil.Encode(userSigBytes)
+	incomingState.UserSig = &userSigHex
+
+	// Mock expectations
+	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
+	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
+	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
+	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
+	mockSigValidator.On("Verify", userWallet, mock.Anything, userSigBytes).Return(nil)
+	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil).Maybe()
+
+	// For acknowledgement: no RecordTransaction call expected, only StoreUserState
+	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
+		return state.UserWallet == userWallet &&
+			state.Version == incomingState.Version &&
+			state.Transition.Type == core.TransitionTypeAcknowledgement &&
+			state.NodeSig != nil
+	})).Return(nil)
+
+	// Create RPC request
+	rpcState := toRPCState(*incomingState)
+	reqPayload := rpc.ChannelsV1SubmitStateRequest{
+		State: rpcState,
+	}
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	rpcRequest := rpc.Message{
+		Method:  "channels.v1.submit_state",
+		Payload: payload,
+	}
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpcRequest,
+	}
+
+	// Execute
+	handler.SubmitState(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response.Payload)
+
+	var response rpc.ChannelsV1SubmitStateResponse
+	err = ctx.Response.Payload.Translate(&response)
+	require.NoError(t, err)
+	assert.Nil(t, ctx.Response.Error())
+	assert.NotEmpty(t, response.Signature, "Node signature should be present")
+
+	// Verify all mock expectations - notably RecordTransaction should NOT have been called
+	mockTxStore.AssertExpectations(t)
+	mockTxStore.AssertNotCalled(t, "RecordTransaction", mock.Anything)
+	mockSigValidator.AssertExpectations(t)
+}
+
 // Helper function to create a string pointer
 func stringPtr(s string) *string {
 	return &s
@@ -1226,19 +1344,16 @@ func stringPtr(s string) *string {
 
 // Helper function to convert core.State to rpc.StateV1
 func toRPCState(state core.State) rpc.StateV1 {
-	transitions := make([]rpc.TransitionV1, len(state.Transitions))
-	for i, t := range state.Transitions {
-		transitions[i] = rpc.TransitionV1{
-			Type:      t.Type,
-			TxID:      t.TxID,
-			AccountID: t.AccountID,
-			Amount:    t.Amount.String(),
-		}
+	transition := rpc.TransitionV1{
+		Type:      state.Transition.Type,
+		TxID:      state.Transition.TxID,
+		AccountID: state.Transition.AccountID,
+		Amount:    state.Transition.Amount.String(),
 	}
 
 	rpcState := rpc.StateV1{
 		ID:              state.ID,
-		Transitions:     transitions,
+		Transition:      transition,
 		Asset:           state.Asset,
 		UserWallet:      state.UserWallet,
 		Epoch:           strconv.FormatUint(state.Epoch, 10),

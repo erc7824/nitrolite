@@ -163,6 +163,150 @@ func TestRequestCreation_Success(t *testing.T) {
 	mockSigValidator.AssertExpectations(t)
 }
 
+func TestRequestCreation_Acknowledgement_Success(t *testing.T) {
+	// Setup
+	mockTxStore := new(MockStore)
+	mockMemoryStore := new(MockMemoryStore)
+	mockAssetStore := new(MockAssetStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+	minChallenge := uint32(3600) // 1 hour
+	mockStatePacker := new(MockStatePacker)
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
+		useStoreInTx: func(handler StoreTxHandler) error {
+			err := handler(mockTxStore)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		memoryStore:  mockMemoryStore,
+		signer:       mockSigner,
+		nodeAddress:  nodeAddress,
+		minChallenge: minChallenge,
+		sigValidators: map[SigValidatorType]SigValidator{
+			EcdsaSigValidatorType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	userWallet := "0x1234567890123456789012345678901234567890"
+	asset := "USDC"
+	tokenAddress := "0xTokenAddress"
+	blockchainID := uint64(1)
+	nonce := uint64(12345)
+	challenge := uint32(86400)
+
+	// Create void state (starting point)
+	voidState := core.NewVoidState(asset, userWallet)
+
+	// Create next state from void
+	initialState := voidState.NextState()
+
+	channelDef := core.ChannelDefinition{
+		Nonce:     nonce,
+		Challenge: challenge,
+	}
+	_, err := initialState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
+	require.NoError(t, err)
+
+	// Apply acknowledgement transition (channel creation with no deposit)
+	_, err = initialState.ApplyAcknowledgementTransition()
+	require.NoError(t, err)
+
+	// Set up mock for PackState (called during signing)
+	mockAssetStore.On("GetTokenDecimals", blockchainID, tokenAddress).Return(uint8(6), nil)
+
+	// Sign the initial state
+	packedState, err := core.PackState(*initialState, mockAssetStore)
+	require.NoError(t, err)
+	stateHash := crypto.Keccak256Hash(packedState).Bytes()
+	userSig, err := mockSigner.Sign(stateHash)
+	require.NoError(t, err)
+	userSigStr := userSig.String()
+	initialState.UserSig = &userSigStr
+
+	// Mock expectations for handler
+	mockMemoryStore.On("IsAssetSupported", asset, tokenAddress, blockchainID).Return(true, nil).Once()
+	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil).Once()
+	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil).Once()
+	mockSigValidator.On("Verify", userWallet, packedState, mock.Anything).Return(nil).Once()
+	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
+	mockTxStore.On("CreateChannel", mock.MatchedBy(func(channel core.Channel) bool {
+		return channel.UserWallet == userWallet &&
+			channel.Type == core.ChannelTypeHome &&
+			channel.BlockchainID == blockchainID &&
+			channel.TokenAddress == tokenAddress &&
+			channel.Nonce == nonce &&
+			channel.ChallengeDuration == challenge &&
+			channel.Status == core.ChannelStatusVoid &&
+			channel.StateVersion == 0
+	})).Return(nil).Once()
+	// For acknowledgement: no RecordTransaction call expected, only StoreUserState
+	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
+		return state.UserWallet == userWallet &&
+			state.Asset == asset &&
+			state.Version == 1 &&
+			state.Epoch == 0 &&
+			state.NodeSig != nil &&
+			state.HomeChannelID != nil &&
+			state.Transition.Type == core.TransitionTypeAcknowledgement
+	})).Return(nil).Once()
+
+	// Create RPC request
+	rpcState := toRPCState(*initialState)
+	reqPayload := rpc.ChannelsV1RequestCreationRequest{
+		State: rpcState,
+		ChannelDefinition: rpc.ChannelDefinitionV1{
+			Nonce:     strconv.FormatUint(nonce, 10),
+			Challenge: challenge,
+		},
+	}
+
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpc.Message{
+			RequestID: 1,
+			Method:    rpc.ChannelsV1RequestCreationMethod.String(),
+			Payload:   payload,
+		},
+	}
+
+	// Execute
+	handler.RequestCreation(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response)
+
+	// Check for errors first
+	if respErr := ctx.Response.Error(); respErr != nil {
+		t.Fatalf("Unexpected error response: %v", respErr)
+	}
+
+	assert.Equal(t, rpc.ChannelsV1RequestCreationMethod.String(), ctx.Response.Method)
+	assert.NotNil(t, ctx.Response.Payload)
+
+	// Verify response contains signature
+	var response rpc.ChannelsV1RequestCreationResponse
+	err = ctx.Response.Payload.Translate(&response)
+	require.NoError(t, err)
+	assert.NotEmpty(t, response.Signature)
+
+	// Verify all mocks were called - notably RecordTransaction should NOT have been called
+	mockMemoryStore.AssertExpectations(t)
+	mockAssetStore.AssertExpectations(t)
+	mockTxStore.AssertExpectations(t)
+	mockTxStore.AssertNotCalled(t, "RecordTransaction", mock.Anything)
+	mockSigValidator.AssertExpectations(t)
+}
+
 func TestRequestCreation_InvalidChallenge(t *testing.T) {
 	// Setup
 	mockTxStore := new(MockStore)
@@ -218,6 +362,9 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 			Epoch:         "1",
 			Version:       "1",
 			HomeChannelID: &homeChannelID,
+			Transition: rpc.TransitionV1{
+				Amount: "0",
+			},
 			HomeLedger: rpc.LedgerV1{
 				TokenAddress: tokenAddress,
 				BlockchainID: "1",

@@ -61,7 +61,7 @@ type DatabaseStore interface {
 	StoreUserState(state core.State) error
 
 	// EnsureNoOngoingStateTransitions validates that no conflicting blockchain operations are pending.
-	EnsureNoOngoingStateTransitions(wallet, asset string, prevTransitionType core.TransitionType) error
+	EnsureNoOngoingStateTransitions(wallet, asset string) error
 
 	// --- Blockchain Action Operations ---
 

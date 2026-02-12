@@ -1,8 +1,7 @@
 import { Address, encodeAbiParameters } from 'viem';
 import { State } from './types';
 import { AssetStore, StatePacker } from './interface';
-import { getStateTransitionsHash, transitionToIntent, decimalToBigInt } from './utils';
-import { getLastTransition } from './state';
+import { getStateTransitionHash, transitionToIntent, decimalToBigInt } from './utils';
 
 /**
  * ContractLedger matches Solidity's Ledger struct for ABI encoding
@@ -42,8 +41,8 @@ export class StatePackerV1 implements StatePacker {
     // Convert HomeChannelID to bytes32
     const channelId = state.homeChannelId as `0x${string}`;
 
-    // Generate metadata from state transitions
-    const metadata = getStateTransitionsHash(state.transitions);
+    // Generate metadata from state transition
+    const metadata = getStateTransitionHash(state.transition);
 
     // Get home ledger decimals
     const homeDecimals = await this.assetStore.getTokenDecimals(
@@ -102,12 +101,8 @@ export class StatePackerV1 implements StatePacker {
       };
     }
 
-    // Determine intent based on last transition
-    let intent = 0;
-    const lastTransition = getLastTransition(state);
-    if (lastTransition) {
-      intent = transitionToIntent(lastTransition);
-    }
+    // Determine intent based on transition
+    const intent = transitionToIntent(state.transition);
 
     // Define the Ledger tuple type matching Solidity
     const ledgerComponents = [

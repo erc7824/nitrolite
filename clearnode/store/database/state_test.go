@@ -32,12 +32,10 @@ func TestDBStore_StoreUserState(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions: []core.Transition{
-				{
-					Type:      core.TransitionTypeHomeDeposit,
-					AccountID: homeChannelID,
-					Amount:    decimal.NewFromInt(1000),
-				},
+			Transition: core.Transition{
+				Type:      core.TransitionTypeHomeDeposit,
+				AccountID: homeChannelID,
+				Amount:    decimal.NewFromInt(1000),
 			},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
@@ -88,12 +86,10 @@ func TestDBStore_StoreUserState(t *testing.T) {
 			Version:         2,
 			HomeChannelID:   &homeChannelID,
 			EscrowChannelID: &escrowChannelID,
-			Transitions: []core.Transition{
-				{
-					Type:      core.TransitionTypeEscrowDeposit,
-					AccountID: escrowChannelID,
-					Amount:    decimal.NewFromInt(500),
-				},
+			Transition: core.Transition{
+				Type:      core.TransitionTypeEscrowDeposit,
+				AccountID: escrowChannelID,
+				Amount:    decimal.NewFromInt(500),
 			},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(500),
@@ -139,7 +135,7 @@ func TestDBStore_StoreUserState(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -185,7 +181,7 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -201,7 +197,7 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 			Epoch:         1,
 			Version:       2,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(2000),
 				UserNetFlow: decimal.Zero,
@@ -252,7 +248,7 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 			Epoch:         1,
 			Version:       3,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(3000),
 				UserNetFlow: decimal.Zero,
@@ -269,7 +265,7 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 			Epoch:         1,
 			Version:       2,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(2000),
 				UserNetFlow: decimal.Zero,
@@ -331,7 +327,7 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 			Epoch:         1,
 			Version:       5,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -347,7 +343,7 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 			Epoch:         2,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(2000),
 				UserNetFlow: decimal.Zero,
@@ -398,7 +394,7 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -457,7 +453,7 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 			Version:         2,
 			HomeChannelID:   &homeChannelID,
 			EscrowChannelID: &escrowChannelID,
-			Transitions:     []core.Transition{},
+			Transition:      core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(500),
 				UserNetFlow: decimal.Zero,
@@ -514,7 +510,7 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 			Epoch:         1,
 			Version:       2,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -531,7 +527,7 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(500),
 				UserNetFlow: decimal.Zero,
@@ -594,7 +590,7 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,
@@ -610,7 +606,7 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 			Epoch:         1,
 			Version:       2,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(2000),
 				UserNetFlow: decimal.Zero,
@@ -680,7 +676,7 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 			Version:         5,
 			HomeChannelID:   &homeChannelID,
 			EscrowChannelID: &escrowChannelID,
-			Transitions:     []core.Transition{},
+			Transition:      core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(500),
 				UserNetFlow: decimal.Zero,
@@ -734,7 +730,7 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 			Epoch:         1,
 			Version:       1,
 			HomeChannelID: &homeChannelID,
-			Transitions:   []core.Transition{},
+			Transition:    core.Transition{},
 			HomeLedger: core.Ledger{
 				UserBalance: decimal.NewFromInt(1000),
 				UserNetFlow: decimal.Zero,

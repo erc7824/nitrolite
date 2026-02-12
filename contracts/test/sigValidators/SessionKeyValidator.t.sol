@@ -5,7 +5,11 @@ import {Test} from "lib/forge-std/src/Test.sol";
 
 import {TestUtils} from "../TestUtils.sol";
 
-import {SessionKeyValidator, SessionKeyAuthorization, toSigningData} from "../../src/sigValidators/SessionKeyValidator.sol";
+import {
+    SessionKeyValidator,
+    SessionKeyAuthorization,
+    toSigningData
+} from "../../src/sigValidators/SessionKeyValidator.sol";
 import {ValidationResult, VALIDATION_SUCCESS, VALIDATION_FAILURE} from "../../src/interfaces/ISignatureValidator.sol";
 import {Utils} from "../../src/Utils.sol";
 
@@ -46,7 +50,9 @@ contract SessionKeyValidatorTest_Base is Test {
         pure
         returns (SessionKeyAuthorization memory)
     {
-        bytes memory authMessage = toSigningData(SessionKeyAuthorization({sessionKey: sessionKey, metadataHash: metadataHash, authSignature: ""}));
+        bytes memory authMessage = toSigningData(
+            SessionKeyAuthorization({sessionKey: sessionKey, metadataHash: metadataHash, authSignature: ""})
+        );
         bytes memory authSignature;
 
         if (useEip191) {

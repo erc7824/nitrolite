@@ -50,17 +50,18 @@ library TestUtils {
         pure
         returns (SessionKeyAuthorization memory)
     {
-        bytes memory authMessage = toSigningData(SessionKeyAuthorization({sessionKey: sessionKey, metadataHash: metadataHash, authSignature: ""}));
+        bytes memory authMessage = toSigningData(
+            SessionKeyAuthorization({sessionKey: sessionKey, metadataHash: metadataHash, authSignature: ""})
+        );
         bytes memory signature = TestUtils.signEip191(vm, authorizerPk, authMessage);
         return SessionKeyAuthorization({sessionKey: sessionKey, metadataHash: metadataHash, authSignature: signature});
     }
 
-    function buildAndSignValidatorRegistration(
-        Vm vm,
-        uint8 validatorId,
-        address validatorAddress,
-        uint256 nodePk
-    ) internal view returns (bytes memory) {
+    function buildAndSignValidatorRegistration(Vm vm, uint8 validatorId, address validatorAddress, uint256 nodePk)
+        internal
+        view
+        returns (bytes memory)
+    {
         bytes memory message = abi.encode(validatorId, validatorAddress, block.chainid);
         return signEip191(vm, nodePk, message);
     }

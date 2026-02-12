@@ -45,8 +45,8 @@ library Utils {
             ccs.version,
             ccs.intent,
             ccs.metadata,
-            ccs.homeState,
-            ccs.nonHomeState
+            ccs.homeLedger,
+            ccs.nonHomeLedger
             // omit signatures
         );
     }

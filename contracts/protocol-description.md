@@ -67,7 +67,7 @@ The off-chain protocol is responsible for:
    * Both User and Node sign the full state:
 
      ```text
-     (channelId, version, intent, homeState, nonHomeState)
+     (channelId, version, intent, homeLedger, nonHomeLedger)
      ```
 
    * A party **never signs two different states with the same version**.
@@ -388,7 +388,7 @@ The preparation phase establishes the channel on the target (non-home) chain:
 * Effect:
   * creates a channel on the non-home chain with status `MIGRATING_IN`,
   * locks Node's funds on the non-home chain.
-* Implementation note: States are swapped before storing to maintain the invariant that `homeState` represents the current chain.
+* Implementation note: States are swapped before storing to maintain the invariant that `homeLedger` represents the current chain.
 
 **On the home chain:**
 
@@ -410,7 +410,7 @@ The preparation phase establishes the channel on the target (non-home) chain:
 The execution phase completes the migration by swapping home and non-home roles:
 
 * An execution state is constructed that:
-  * swaps the `homeState` and `nonHomeState` from the preparation phase,
+  * swaps the `homeLedger` and `nonHomeLedger` from the preparation phase,
   * swaps allocations between User and Node in each state,
   * intent = FINALIZE_MIGRATION.
 
@@ -420,7 +420,7 @@ The execution phase completes the migration by swapping home and non-home roles:
   * releases Node liquidity on the old home chain,
   * moves the channel to `MIGRATED_OUT` status,
   * can clear a challenge (moving from `DISPUTED` to `MIGRATED_OUT`).
-* Implementation note: States are swapped before validation to maintain the invariant that `homeState` represents the current chain.
+* Implementation note: States are swapped before validation to maintain the invariant that `homeLedger` represents the current chain.
 
 **On the new home chain** (old non-home chain):
 
@@ -451,17 +451,17 @@ Migration presents a unique challenge for on-chain implementation: **which state
 
 #### The Problem
 
-The protocol describes migration as swapping `homeState` and `nonHomeState` roles, but this creates semantic ambiguity for on-chain validation:
+The protocol describes migration as swapping `homeLedger` and `nonHomeLedger` roles, but this creates semantic ambiguity for on-chain validation:
 
-1. **Preparation phase on non-home chain**: Actions (node deposits liquidity) are encoded in `nonHomeState`, but after the channel is created, subsequent operations must calculate deltas from this state—even though validation logic assumes `homeState` represents the current chain.
+1. **Preparation phase on non-home chain**: Actions (node deposits liquidity) are encoded in `nonHomeLedger`, but after the channel is created, subsequent operations must calculate deltas from this state—even though validation logic assumes `homeLedger` represents the current chain.
 
-2. **Execution phase on old home chain**: After the user swaps states in the execution phase state, `nonHomeState` represents the old home (current chain), but validation logic expects `homeState` to represent the current chain.
+2. **Execution phase on old home chain**: After the user swaps states in the execution phase state, `nonHomeLedger` represents the old home (current chain), but validation logic expects `homeLedger` to represent the current chain.
 
-3. **Delta calculation inconsistency**: After `INITIATE_MIGRATION` on the non-home chain creates a `MIGRATING_IN` channel, the next operation (e.g., deposit) cannot correctly calculate deltas because the previous state's allocations are in `nonHomeState`, not `homeState`.
+3. **Delta calculation inconsistency**: After `INITIATE_MIGRATION` on the non-home chain creates a `MIGRATING_IN` channel, the next operation (e.g., deposit) cannot correctly calculate deltas because the previous state's allocations are in `nonHomeLedger`, not `homeLedger`.
 
 #### The Solution: Context-Based Validation + Selective State Swapping
 
-To maintain the invariant that **homeState always represents the chain where execution happens**, the implementation uses:
+To maintain the invariant that **homeLedger always represents the chain where execution happens**, the implementation uses:
 
 **1. Two Migration Intents with Context-Based Behavior:**
 
@@ -486,24 +486,24 @@ All functions accept the same intents (INITIATE_MIGRATION or FINALIZE_MIGRATION)
 
 **2. Selective State Swapping (only where needed):**
 
-* **`INITIATE_MIGRATION` (on new home chain)**: Swap `homeState` ↔ `nonHomeState` before storing
-  * Incoming state has actions in `nonHomeState` (new home = current chain)
-  * After swap, stored state has actions in `homeState` (current chain)
-  * Result: Next operation calculates deltas correctly from `homeState`
+* **`INITIATE_MIGRATION` (on new home chain)**: Swap `homeLedger` ↔ `nonHomeLedger` before storing
+  * Incoming state has actions in `nonHomeLedger` (new home = current chain)
+  * After swap, stored state has actions in `homeLedger` (current chain)
+  * Result: Next operation calculates deltas correctly from `homeLedger`
 
-* **`FINALIZE_MIGRATION` (on old home chain)**: Swap `homeState` ↔ `nonHomeState` before validation
-  * Incoming state (after user swaps) has old home actions in `nonHomeState` (current chain)
-  * After swap, validation sees actions in `homeState` (current chain)
+* **`FINALIZE_MIGRATION` (on old home chain)**: Swap `homeLedger` ↔ `nonHomeLedger` before validation
+  * Incoming state (after user swaps) has old home actions in `nonHomeLedger` (current chain)
+  * After swap, validation sees actions in `homeLedger` (current chain)
   * Result: Validation and fund release logic work correctly
 
-* **No swap needed** for `INITIATE_MIGRATION` (on old home chain) and `FINALIZE_MIGRATION` (on new home chain) (homeState already represents current chain)
+* **No swap needed** for `INITIATE_MIGRATION` (on old home chain) and `FINALIZE_MIGRATION` (on new home chain) (homeLedger already represents current chain)
 
 **3. Special Delta Calculation for `FINALIZE_MIGRATION` (on new home chain):**
 
-When finalizing migration on the new home chain, the previous state (from `INITIATE_MIGRATION`) has allocations in `nonHomeState` (before swap) but was swapped when stored. Delta calculation must account for this:
+When finalizing migration on the new home chain, the previous state (from `INITIATE_MIGRATION`) has allocations in `nonHomeLedger` (before swap) but was swapped when stored. Delta calculation must account for this:
 
 ```solidity
-delta = candidate.homeState.netFlow - prevStoredState.homeState.netFlow
+delta = candidate.homeLedger.netFlow - prevStoredState.homeLedger.netFlow
 ```
 
 This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
@@ -514,7 +514,7 @@ This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
 * After swapping, signatures are invalidated (`userSig = ""`, `nodeSig = ""`) to prevent misuse
 * The swapped state is only used internally for storage and validation
 * Events emit the original signed state (before swap) for off-chain observability
-* This approach maintains the critical invariant: **ChannelEngine always sees homeState as the current chain**
+* This approach maintains the critical invariant: **ChannelEngine always sees homeLedger as the current chain**
 
 ---
 

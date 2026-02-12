@@ -78,16 +78,16 @@ contract ChannelHubTest_Base is Test {
             version: state.version + 1,
             intent: intent,
             metadata: state.metadata,
-            homeState: Ledger({
-                chainId: state.homeState.chainId,
-                token: state.homeState.token,
-                decimals: state.homeState.decimals,
+            homeLedger: Ledger({
+                chainId: state.homeLedger.chainId,
+                token: state.homeLedger.token,
+                decimals: state.homeLedger.decimals,
                 userAllocation: allocations[0],
                 userNetFlow: netFlows[0],
                 nodeAllocation: allocations[1],
                 nodeNetFlow: netFlows[1]
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: 0,
                 token: address(0),
                 decimals: 0,
@@ -115,16 +115,16 @@ contract ChannelHubTest_Base is Test {
             version: state.version + 1,
             intent: intent,
             metadata: state.metadata,
-            homeState: Ledger({
-                chainId: state.homeState.chainId,
-                token: state.homeState.token,
-                decimals: state.homeState.decimals,
+            homeLedger: Ledger({
+                chainId: state.homeLedger.chainId,
+                token: state.homeLedger.token,
+                decimals: state.homeLedger.decimals,
                 userAllocation: allocations[0],
                 userNetFlow: netFlows[0],
                 nodeAllocation: allocations[1],
                 nodeNetFlow: netFlows[1]
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: nonHomeChainId,
                 token: nonHomeChainToken,
                 decimals: 18,
@@ -153,16 +153,16 @@ contract ChannelHubTest_Base is Test {
             version: state.version + 1,
             intent: intent,
             metadata: state.metadata,
-            homeState: Ledger({
-                chainId: state.homeState.chainId,
-                token: state.homeState.token,
-                decimals: state.homeState.decimals,
+            homeLedger: Ledger({
+                chainId: state.homeLedger.chainId,
+                token: state.homeLedger.token,
+                decimals: state.homeLedger.decimals,
                 userAllocation: allocations[0],
                 userNetFlow: netFlows[0],
                 nodeAllocation: allocations[1],
                 nodeNetFlow: netFlows[1]
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: nonHomeChainId,
                 token: nonHomeChainToken,
                 decimals: nonHomeDecimals,
@@ -207,13 +207,17 @@ contract ChannelHubTest_Base is Test {
     ) internal view {
         (,, State memory latestState,,) = cHub.getChannelData(channelId);
         assertEq(
-            latestState.homeState.userAllocation, expectedUserAllocation, string.concat("User allocation ", description)
+            latestState.homeLedger.userAllocation,
+            expectedUserAllocation,
+            string.concat("User allocation ", description)
         );
-        assertEq(latestState.homeState.userNetFlow, expectedUserNetFlow, string.concat("User net flow ", description));
+        assertEq(latestState.homeLedger.userNetFlow, expectedUserNetFlow, string.concat("User net flow ", description));
         assertEq(
-            latestState.homeState.nodeAllocation, expectedNodeAllocation, string.concat("Node allocation ", description)
+            latestState.homeLedger.nodeAllocation,
+            expectedNodeAllocation,
+            string.concat("Node allocation ", description)
         );
-        assertEq(latestState.homeState.nodeNetFlow, expectedNodeNetFlow, string.concat("Node net flow ", description));
+        assertEq(latestState.homeLedger.nodeNetFlow, expectedNodeNetFlow, string.concat("Node net flow ", description));
 
         uint256 nodeBalance = cHub.getAccountBalance(node, address(token));
         uint256 expectedNodeBalance = expectedNodeNetFlow < 0

@@ -37,7 +37,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             version: 0,
             intent: StateIntent.DEPOSIT,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token),
                 decimals: 18,
@@ -46,7 +46,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: 0
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: 0,
                 token: address(0),
                 decimals: 0,
@@ -232,7 +232,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             version: 16,
             intent: StateIntent.OPERATE,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token),
                 decimals: 18,
@@ -241,7 +241,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: 1000
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: 0,
                 token: address(0),
                 decimals: 0,
@@ -297,7 +297,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             version: 42,
             intent: StateIntent.DEPOSIT,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token),
                 decimals: 18,
@@ -306,7 +306,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: 1000
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: 0,
                 token: address(0),
                 decimals: 0,
@@ -362,7 +362,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             version: 24,
             intent: StateIntent.WITHDRAW,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token),
                 decimals: 18,
@@ -371,7 +371,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: 1000
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: 0,
                 token: address(0),
                 decimals: 0,

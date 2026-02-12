@@ -56,8 +56,8 @@ struct State {
     // to be added for fees logic:
     // bytes data;
 
-    Ledger homeState;
-    Ledger nonHomeState;
+    Ledger homeLedger;
+    Ledger nonHomeLedger;
 
     bytes userSig;
     bytes nodeSig;

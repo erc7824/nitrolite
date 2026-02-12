@@ -1,7 +1,8 @@
 # Clearnode Go SDK
 
 Go SDK for Clearnode payment channels providing both high-level and low-level operations in a unified client:
-- **High-Level Operations**: `Deposit`, `Withdraw`, `Transfer`, `CloseHomeChannel` with automatic state management
+- **State Operations**: `Deposit`, `Withdraw`, `Transfer`, `CloseHomeChannel`, `Acknowledge` - build and co-sign states off-chain
+- **Blockchain Settlement**: `Checkpoint` - the single entry point for all on-chain transactions
 - **Low-Level Operations**: Direct RPC access for custom flows and advanced use cases
 
 ## Method Cheat Sheet

@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import {Test} from "lib/forge-std/src/Test.sol";
 
 import {MockERC20} from "./mocks/MockERC20.sol";
-import {TestUtils} from "./TestUtils.sol";
+import {TestUtils, SESSION_KEY_VALIDATOR_ID} from "./TestUtils.sol";
 
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {ECDSAValidator} from "../src/sigValidators/ECDSAValidator.sol";
@@ -56,6 +56,12 @@ contract ChannelHubTest_Base is Test {
         cHub.depositToVault(node, address(token), INITIAL_BALANCE);
         vm.stopPrank();
 
+        // Register SessionKeyValidator for the node
+        bytes memory skValidatorSig = TestUtils.buildAndSignValidatorRegistration(
+            vm, SESSION_KEY_VALIDATOR_ID, address(SK_SIG_VALIDATOR), NODE_PK
+        );
+        cHub.registerNodeValidator(node, SESSION_KEY_VALIDATOR_ID, SK_SIG_VALIDATOR, skValidatorSig);
+
         vm.prank(alice);
         token.approve(address(cHub), INITIAL_BALANCE);
 
@@ -72,16 +78,16 @@ contract ChannelHubTest_Base is Test {
             version: state.version + 1,
             intent: intent,
             metadata: state.metadata,
-            homeState: Ledger({
-                chainId: state.homeState.chainId,
-                token: state.homeState.token,
-                decimals: state.homeState.decimals,
+            homeLedger: Ledger({
+                chainId: state.homeLedger.chainId,
+                token: state.homeLedger.token,
+                decimals: state.homeLedger.decimals,
                 userAllocation: allocations[0],
                 userNetFlow: netFlows[0],
                 nodeAllocation: allocations[1],
                 nodeNetFlow: netFlows[1]
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: 0,
                 token: address(0),
                 decimals: 0,
@@ -109,16 +115,16 @@ contract ChannelHubTest_Base is Test {
             version: state.version + 1,
             intent: intent,
             metadata: state.metadata,
-            homeState: Ledger({
-                chainId: state.homeState.chainId,
-                token: state.homeState.token,
-                decimals: state.homeState.decimals,
+            homeLedger: Ledger({
+                chainId: state.homeLedger.chainId,
+                token: state.homeLedger.token,
+                decimals: state.homeLedger.decimals,
                 userAllocation: allocations[0],
                 userNetFlow: netFlows[0],
                 nodeAllocation: allocations[1],
                 nodeNetFlow: netFlows[1]
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: nonHomeChainId,
                 token: nonHomeChainToken,
                 decimals: 18,
@@ -147,16 +153,16 @@ contract ChannelHubTest_Base is Test {
             version: state.version + 1,
             intent: intent,
             metadata: state.metadata,
-            homeState: Ledger({
-                chainId: state.homeState.chainId,
-                token: state.homeState.token,
-                decimals: state.homeState.decimals,
+            homeLedger: Ledger({
+                chainId: state.homeLedger.chainId,
+                token: state.homeLedger.token,
+                decimals: state.homeLedger.decimals,
                 userAllocation: allocations[0],
                 userNetFlow: netFlows[0],
                 nodeAllocation: allocations[1],
                 nodeNetFlow: netFlows[1]
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: nonHomeChainId,
                 token: nonHomeChainToken,
                 decimals: nonHomeDecimals,
@@ -201,13 +207,17 @@ contract ChannelHubTest_Base is Test {
     ) internal view {
         (,, State memory latestState,,) = cHub.getChannelData(channelId);
         assertEq(
-            latestState.homeState.userAllocation, expectedUserAllocation, string.concat("User allocation ", description)
+            latestState.homeLedger.userAllocation,
+            expectedUserAllocation,
+            string.concat("User allocation ", description)
         );
-        assertEq(latestState.homeState.userNetFlow, expectedUserNetFlow, string.concat("User net flow ", description));
+        assertEq(latestState.homeLedger.userNetFlow, expectedUserNetFlow, string.concat("User net flow ", description));
         assertEq(
-            latestState.homeState.nodeAllocation, expectedNodeAllocation, string.concat("Node allocation ", description)
+            latestState.homeLedger.nodeAllocation,
+            expectedNodeAllocation,
+            string.concat("Node allocation ", description)
         );
-        assertEq(latestState.homeState.nodeNetFlow, expectedNodeNetFlow, string.concat("Node net flow ", description));
+        assertEq(latestState.homeLedger.nodeNetFlow, expectedNodeNetFlow, string.concat("Node net flow ", description));
 
         uint256 nodeBalance = cHub.getAccountBalance(node, address(token));
         uint256 expectedNodeBalance = expectedNodeNetFlow < 0

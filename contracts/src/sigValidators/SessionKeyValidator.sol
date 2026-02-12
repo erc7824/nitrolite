@@ -7,7 +7,7 @@ import {
     VALIDATION_SUCCESS,
     VALIDATION_FAILURE
 } from "../interfaces/ISignatureValidator.sol";
-import {BaseValidator} from "./BaseValidator.sol";
+import {EcdsaSignatureUtils} from "./EcdsaSignatureUtils.sol";
 import {Utils} from "../Utils.sol";
 
 /**
@@ -52,7 +52,7 @@ function toSigningData(SessionKeyAuthorization memory skAuth) pure returns (byte
  * - On-chain validation only checks cryptographic validity
  * - Participants are responsible for session key management
  */
-contract SessionKeyValidator is BaseValidator, ISignatureValidator {
+contract SessionKeyValidator is ISignatureValidator {
     /**
      * @notice Validates a signature using a delegated session key
      * @dev Validates:
@@ -76,7 +76,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
 
         // Step 1: Verify participant authorized this session key
         bytes memory authMessage = toSigningData(skAuth);
-        bool authResult = validateEcdsaSigner(authMessage, skAuth.authSignature, participant);
+        bool authResult = EcdsaSignatureUtils.validateEcdsaSigner(authMessage, skAuth.authSignature, participant);
 
         if (!authResult) {
             return VALIDATION_FAILURE;
@@ -84,45 +84,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
 
         // Step 2: Verify session key signed the full state message
         bytes memory stateMessage = Utils.pack(channelId, signingData);
-        if (validateEcdsaSigner(stateMessage, skSignature, skAuth.sessionKey)) {
-            return VALIDATION_SUCCESS;
-        } else {
-            return VALIDATION_FAILURE;
-        }
-    }
-
-    /**
-     * @notice Validates a challenger's signature using a delegated session key
-     * @dev Validates the same as validateSignature but with "challenge" suffix in state message.
-     *      The challenger must be either the user or node.
-     * @param channelId The channel identifier to include in state messages
-     * @param signingData The encoded state data (without channelId or signatures)
-     * @param signature Encoded as abi.encode(SessionKeyAuthorization, bytes signature)
-     * @param user The user's address
-     * @param node The node's address
-     * @return result VALIDATION_SUCCESS if challenger is user or node, VALIDATION_FAILURE otherwise
-     */
-    function validateChallengerSignature(
-        bytes32 channelId,
-        bytes calldata signingData,
-        bytes calldata signature,
-        address user,
-        address node
-    ) external pure returns (ValidationResult) {
-        (SessionKeyAuthorization memory skAuth, bytes memory skSignature) =
-            abi.decode(signature, (SessionKeyAuthorization, bytes));
-
-        // Step 1: Verify participant authorized this session key
-        bytes memory authMessage = toSigningData(skAuth);
-        bool authResult = validateEcdsaSignerIsEither(authMessage, skAuth.authSignature, user, node);
-
-        if (!authResult) {
-            return VALIDATION_FAILURE;
-        }
-
-        // Step 2: Verify session key signed the full challenge message
-        bytes memory challengeMessage = abi.encodePacked(Utils.pack(channelId, signingData), "challenge");
-        if (validateEcdsaSigner(challengeMessage, skSignature, skAuth.sessionKey)) {
+        if (EcdsaSignatureUtils.validateEcdsaSigner(stateMessage, skSignature, skAuth.sessionKey)) {
             return VALIDATION_SUCCESS;
         } else {
             return VALIDATION_FAILURE;

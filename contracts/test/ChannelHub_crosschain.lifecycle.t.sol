@@ -20,7 +20,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             user: bob,
             node: node,
             nonce: NONCE,
-            signatureValidator: EMPTY_SIG_VALIDATOR,
+            approvedSignatureValidators: 0,
             metadata: bytes32(0)
         });
 
@@ -33,7 +33,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             user: alice,
             node: node,
             nonce: NONCE,
-            signatureValidator: EMPTY_SIG_VALIDATOR,
+            approvedSignatureValidators: 0,
             metadata: bytes32(0)
         });
 
@@ -52,7 +52,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             version: 0,
             intent: StateIntent.DEPOSIT,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token),
                 decimals: 18,
@@ -61,7 +61,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: 0
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: 0,
                 token: address(0),
                 decimals: 0,
@@ -249,9 +249,9 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [int256(0), int256(469)]
         );
         // home state and non-home state are swapped
-        Ledger memory temp = state.homeState;
-        state.homeState = state.nonHomeState;
-        state.nonHomeState = temp;
+        Ledger memory temp = state.homeLedger;
+        state.homeLedger = state.nonHomeLedger;
+        state.nonHomeLedger = temp;
         state = mutualSignStateBothWithEcdsaValidator(state, channelId, ALICE_PK);
 
         vm.prank(node);
@@ -283,7 +283,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             version: 42,
             intent: StateIntent.INITIATE_ESCROW_DEPOSIT,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: 42,
                 token: address(42),
                 decimals: 18,
@@ -292,7 +292,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 500,
                 nodeNetFlow: 458
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token),
                 decimals: 18,
@@ -397,7 +397,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             version: 42,
             intent: StateIntent.INITIATE_ESCROW_DEPOSIT,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: 42,
                 token: address(0x42), // USDC token on home chain
                 decimals: 6,
@@ -406,7 +406,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 10 * 1e6, // Node locks 10 USDC for cross-chain deposit
                 nodeNetFlow: int256(10 * 1e6)
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token14dec),
                 decimals: 14,
@@ -500,7 +500,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             version: 42,
             intent: StateIntent.INITIATE_ESCROW_WITHDRAWAL,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: 42,
                 token: address(42),
                 decimals: 18,
@@ -509,7 +509,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: 467
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token),
                 decimals: 18,
@@ -597,7 +597,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             version: 42,
             intent: StateIntent.INITIATE_ESCROW_WITHDRAWAL,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: 42,
                 token: address(0x42), // Some token on home chain
                 decimals: 2,
@@ -606,7 +606,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: 0
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token8dec),
                 decimals: 8,
@@ -687,7 +687,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             version: 42,
             intent: StateIntent.INITIATE_MIGRATION,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: 42,
                 token: address(42),
                 decimals: 18,
@@ -696,7 +696,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: -281
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token),
                 decimals: 18,
@@ -725,12 +725,12 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         (status,,,,) = cHub.getChannelData(bobChannelId);
         assertEq(uint8(status), uint8(ChannelStatus.MIGRATING_IN), "Channel should be MIGRATING_IN after migration");
 
-        // sign finalize migration state by swapping homeState and nonHomeState, and swapping allocations
+        // sign finalize migration state by swapping homeLedger and nonHomeLedger, and swapping allocations
         state = State({
             version: 43,
             intent: StateIntent.FINALIZE_MIGRATION,
             metadata: bytes32(0),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: 42,
                 token: address(42),
                 decimals: 18,
@@ -739,7 +739,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: -750
             }),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token),
                 decimals: 18,
@@ -803,7 +803,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             version: 0,
             intent: StateIntent.DEPOSIT,
             metadata: bytes32(0),
-            homeState: Ledger({
+            homeLedger: Ledger({
                 chainId: uint64(block.chainid),
                 token: address(token10dec),
                 decimals: 10,
@@ -812,7 +812,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
                 nodeAllocation: 0,
                 nodeNetFlow: 0
             }),
-            nonHomeState: Ledger({
+            nonHomeLedger: Ledger({
                 chainId: 0,
                 token: address(0),
                 decimals: 0,
@@ -874,8 +874,8 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         // Verify state is updated correctly on old home chain
         (,, State memory latestState,,) = cHub.getChannelData(bobChannelId);
         assertEq(latestState.version, 2, "State version should be 2");
-        assertEq(latestState.homeState.userAllocation, 45 * 1e10, "User allocation unchanged on old home");
-        assertEq(latestState.nonHomeState.nodeAllocation, 45 * 1e14, "Node locked 45e14 on new home");
+        assertEq(latestState.homeLedger.userAllocation, 45 * 1e10, "User allocation unchanged on old home");
+        assertEq(latestState.nonHomeLedger.nodeAllocation, 45 * 1e14, "Node locked 45e14 on new home");
 
         // 4. Finalize Migration on Old Home Chain
         // After migration completes, allocations zero out on old home
@@ -891,9 +891,9 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             [int256(0), int256(45 * 1e14)]
         );
         // Swap home and non-home states as per migration protocol
-        Ledger memory temp = state.homeState;
-        state.homeState = state.nonHomeState;
-        state.nonHomeState = temp;
+        Ledger memory temp = state.homeLedger;
+        state.homeLedger = state.nonHomeLedger;
+        state.nonHomeLedger = temp;
         state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         // Submit finalization on old home chain
@@ -907,7 +907,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         // Verify final state on old home chain
         (,, latestState,,) = cHub.getChannelData(bobChannelId);
         assertEq(latestState.version, 3, "State version should be 3");
-        assertEq(latestState.homeState.userAllocation, 0, "User allocation should be 0 on old home");
-        assertEq(latestState.homeState.nodeAllocation, 0, "Node allocation should be 0 on old home");
+        assertEq(latestState.homeLedger.userAllocation, 0, "User allocation should be 0 on old home");
+        assertEq(latestState.homeLedger.nodeAllocation, 0, "Node allocation should be 0 on old home");
     }
 }

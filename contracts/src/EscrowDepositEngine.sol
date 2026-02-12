@@ -88,16 +88,16 @@ library EscrowDepositEngine {
     function _validateUniversal(TransitionContext memory ctx, State memory candidate) internal view {
         require(ctx.status != EscrowStatus.FINALIZED, "escrow already finalized");
         uint64 blockchainId = uint64(block.chainid);
-        require(candidate.homeState.chainId != blockchainId, "must not be on home chain");
-        require(candidate.nonHomeState.chainId == blockchainId, "must be on non-home chain");
+        require(candidate.homeLedger.chainId != blockchainId, "must not be on home chain");
+        require(candidate.nonHomeLedger.chainId == blockchainId, "must be on non-home chain");
         require(candidate.version > 0, "invalid version");
 
-        // Validate token decimals for nonHomeState (current chain)
-        Utils.validateTokenDecimals(candidate.nonHomeState);
+        // Validate token decimals for nonHomeLedger (current chain)
+        Utils.validateTokenDecimals(candidate.nonHomeLedger);
 
         // Validate allocations equal net flows
-        uint256 allocsSum = candidate.nonHomeState.userAllocation + candidate.nonHomeState.nodeAllocation;
-        int256 netFlowsSum = candidate.nonHomeState.userNetFlow + candidate.nonHomeState.nodeNetFlow;
+        uint256 allocsSum = candidate.nonHomeLedger.userAllocation + candidate.nonHomeLedger.nodeAllocation;
+        int256 netFlowsSum = candidate.nonHomeLedger.userNetFlow + candidate.nonHomeLedger.nodeNetFlow;
 
         require(netFlowsSum >= 0, "negative net flow sum");
         require(allocsSum == netFlowsSum.toUint256(), "invalid allocation sum");
@@ -130,15 +130,15 @@ library EscrowDepositEngine {
     {
         // INITIATE: User deposits on non-home, node locks on home
         require(ctx.status == EscrowStatus.VOID, "escrow already exists");
-        uint256 depositAmount = candidate.nonHomeState.userAllocation;
-        require(candidate.nonHomeState.userNetFlow == depositAmount.toInt256(), "invalid user net flow");
-        require(candidate.nonHomeState.nodeAllocation == 0, "node allocation must be zero on non-home");
-        require(candidate.nonHomeState.nodeNetFlow == 0, "node net flow must be zero on non-home");
+        uint256 depositAmount = candidate.nonHomeLedger.userAllocation;
+        require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), "invalid user net flow");
+        require(candidate.nonHomeLedger.nodeAllocation == 0, "node allocation must be zero on non-home");
+        require(candidate.nonHomeLedger.nodeNetFlow == 0, "node net flow must be zero on non-home");
 
         // Validate that home state shows node locking equal amount
         require(
-            candidate.homeState.nodeAllocation.toWad(candidate.homeState.decimals)
-                == depositAmount.toWad(candidate.nonHomeState.decimals),
+            candidate.homeLedger.nodeAllocation.toWad(candidate.homeLedger.decimals)
+                == depositAmount.toWad(candidate.nonHomeLedger.decimals),
             "home node alloc must match non-home user deposit"
         );
 
@@ -165,21 +165,21 @@ library EscrowDepositEngine {
         require(candidate.version == ctx.initState.version + 1, "candidate must be immediate successor");
         require(ctx.initState.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, "initial intent must be initiate");
 
-        uint256 depositAmount = ctx.initState.nonHomeState.userAllocation;
-        require(candidate.nonHomeState.userNetFlow == depositAmount.toInt256(), "invalid user net flow");
-        require(candidate.nonHomeState.nodeNetFlow == -(depositAmount).toInt256(), "invalid node net flow");
-        require(candidate.nonHomeState.userAllocation == 0, "user allocation must be zero on non-home");
-        require(candidate.nonHomeState.nodeAllocation == 0, "node allocation must be zero on non-home");
+        uint256 depositAmount = ctx.initState.nonHomeLedger.userAllocation;
+        require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), "invalid user net flow");
+        require(candidate.nonHomeLedger.nodeNetFlow == -(depositAmount).toInt256(), "invalid node net flow");
+        require(candidate.nonHomeLedger.userAllocation == 0, "user allocation must be zero on non-home");
+        require(candidate.nonHomeLedger.nodeAllocation == 0, "node allocation must be zero on non-home");
 
         // Check home - non-home state consistency
-        uint256 userHomeAllocDelta = candidate.homeState.userAllocation - ctx.initState.homeState.userAllocation;
+        uint256 userHomeAllocDelta = candidate.homeLedger.userAllocation - ctx.initState.homeLedger.userAllocation;
         require(
-            userHomeAllocDelta.toWad(candidate.homeState.decimals)
-                == depositAmount.toWad(ctx.initState.nonHomeState.decimals),
+            userHomeAllocDelta.toWad(candidate.homeLedger.decimals)
+                == depositAmount.toWad(ctx.initState.nonHomeLedger.decimals),
             "home user allocation must increase by deposit amount"
         );
-        require(candidate.homeState.nodeAllocation == 0, "home node allocation must be zero");
-        int256 userHomeNfDelta = candidate.homeState.userNetFlow - ctx.initState.homeState.userNetFlow;
+        require(candidate.homeLedger.nodeAllocation == 0, "home node allocation must be zero");
+        int256 userHomeNfDelta = candidate.homeLedger.userNetFlow - ctx.initState.homeLedger.userNetFlow;
         require(userHomeNfDelta == 0, "home user net flow must not change");
 
         // Calculate effects

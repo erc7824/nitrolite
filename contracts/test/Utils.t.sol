@@ -3,11 +3,10 @@ pragma solidity 0.8.30;
 
 import {Test, console} from "lib/forge-std/src/Test.sol";
 
-import {TestUtils} from "./TestUtils.sol";
+import {TestUtils, SESSION_KEY_VALIDATOR_ID} from "./TestUtils.sol";
 
 import {Utils} from "../src/Utils.sol";
-import {ChannelDefinition, State, Ledger, StateIntent, SigValidatorType} from "../src/interfaces/Types.sol";
-import {ISignatureValidator} from "../src/interfaces/ISignatureValidator.sol";
+import {ChannelDefinition, State, Ledger, StateIntent} from "../src/interfaces/Types.sol";
 import {SessionKeyAuthorization, toSigningData} from "../src/sigValidators/SessionKeyValidator.sol";
 
 contract UtilsTest is Test {
@@ -17,7 +16,7 @@ contract UtilsTest is Test {
             user: 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045,
             node: 0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a,
             nonce: 42,
-            signatureValidator: ISignatureValidator(address(123)),
+            approvedSignatureValidators: 0,
             metadata: 0x13730b0d8e1bdbdc000000000000000000000000000000000000000000000000
         });
 
@@ -68,8 +67,8 @@ contract UtilsTest is Test {
             version: 24,
             intent: StateIntent.FINALIZE_ESCROW_WITHDRAWAL,
             metadata: hex"dbf80153432e3e0c221112f69a7d20e80980ee5bc48b5684d3b47a6cb75192bd",
-            homeState: homeLedger,
-            nonHomeState: nonHomeLedger,
+            homeLedger: homeLedger,
+            nonHomeLedger: nonHomeLedger,
             userSig: hex"36954bf8e670eba9044f0f9eccd3c36871b12ca209f033190bbf378747906d697a521dd4a05faa0ddf3183900df6191ee276055d6d8bf39d8eb8a27e71d2b8b11b",
             nodeSig: hex"2c0648f47bbf3d580dd56acf74662d7d984b6f4abefa1a02ffbd561e0e463761462984ac6dbedac5f679ee29ef58bc9db7f0ac7792d9992832af99a9950039a21b"
         });
@@ -108,8 +107,8 @@ contract UtilsTest is Test {
             version: 24,
             intent: StateIntent.DEPOSIT,
             metadata: hex"6d621872dd3d14fe6f6ddb415d586e62fb584ffda861ac379bf0d0a0e6410bd6",
-            homeState: homeLedger,
-            nonHomeState: nonHomeLedger,
+            homeLedger: homeLedger,
+            nonHomeLedger: nonHomeLedger,
             userSig: hex"36954bf8e670eba9044f0f9eccd3c36871b12ca209f033190bbf378747906d697a521dd4a05faa0ddf3183900df6191ee276055d6d8bf39d8eb8a27e71d2b8b11b",
             nodeSig: hex"2c0648f47bbf3d580dd56acf74662d7d984b6f4abefa1a02ffbd561e0e463761462984ac6dbedac5f679ee29ef58bc9db7f0ac7792d9992832af99a9950039a21b"
         });
@@ -131,8 +130,11 @@ contract UtilsTest is Test {
             metadata := shl(192, shr(192, assetHash))
         }
 
+        console.log("asset hash:");
         // 0x13730b0d8e1bdbdc293b62ba010b1eede56b412ea2980defabe3d0b6c7844c3a
         console.logBytes32(assetHash);
+
+        console.log("metadata:");
         // 0x13730b0d8e1bdbdc000000000000000000000000000000000000000000000000
         console.logBytes32(metadata);
 
@@ -141,13 +143,14 @@ contract UtilsTest is Test {
             user: 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045,
             node: 0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a,
             nonce: 42,
-            signatureValidator: ISignatureValidator(0xA33882C770F3D56b9a8E56Bc02d6C7068624F384),
+            approvedSignatureValidators: 24042,
             metadata: metadata
         });
 
         bytes32 channelId = Utils.getChannelId(def, 1);
 
-        // 0x017a9135c6c7a3862792298e38fca222a1e64686a983663fce4c9afbc78bdb54
+        console.log("channel id:");
+        // 0x01f7d8fd998edc15e7f76b914bb9b99a11e56faa5f292a56b42288d4deb168b0
         console.logBytes32(channelId);
     }
 
@@ -185,15 +188,35 @@ contract UtilsTest is Test {
         console.logBytes(authSignature);
 
         auth.authSignature = authSignature;
-        bytes memory signingData = hex"3e9dd25a843e3a234c278c6f3fab3983949e2404b276cacb3c47ada06e00f74b0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000022000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000007dbf80153432e3e0c221112f69a7d20e80980ee5bc48b5684d3b47a6cb75192bd000000000000000000000000000000000000000000000000000000000000002a00000000000000000000000090b7e285ab6cf4e3a2487669dba3e339db8a332000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000011e1a300000000000000000000000000000000000000000000000000000000000bebc2010000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffa0a1f010000000000000000000000000000000000000000000000000000000000001092000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000110d9316ec0000000000000000000000000000000000000000000000000000000b5e62103c2400000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffa50cef950240";
+        bytes memory signingData =
+            hex"3e9dd25a843e3a234c278c6f3fab3983949e2404b276cacb3c47ada06e00f74b0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000022000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000007dbf80153432e3e0c221112f69a7d20e80980ee5bc48b5684d3b47a6cb75192bd000000000000000000000000000000000000000000000000000000000000002a00000000000000000000000090b7e285ab6cf4e3a2487669dba3e339db8a332000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000011e1a300000000000000000000000000000000000000000000000000000000000bebc2010000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffa0a1f010000000000000000000000000000000000000000000000000000000000001092000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000110d9316ec0000000000000000000000000000000000000000000000000000000b5e62103c2400000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffa50cef950240";
         bytes memory skStateSignature = TestUtils.signEip191(vm, skPk, signingData);
         console.log("Session key signature on state:");
         // 0xf8fa3bf9f0660ff737a123d33f19d7939c8662e84d6819259b1543aec89d52720c88a40fa4b99197b8258cf19655e49d957149c6c7acec7007a2b3722b8024b31b
         console.logBytes(skStateSignature);
 
-        bytes memory skModuleSig = abi.encodePacked(uint8(SigValidatorType.CHANNEL), skStateSignature);
+        bytes memory skModuleSig = abi.encodePacked(SESSION_KEY_VALIDATOR_ID, skStateSignature);
         console.log("Encoded signature for channel validator:");
         // 0x01f8fa3bf9f0660ff737a123d33f19d7939c8662e84d6819259b1543aec89d52720c88a40fa4b99197b8258cf19655e49d957149c6c7acec7007a2b3722b8024b31b
         console.logBytes(skModuleSig);
+    }
+
+    function test_log_validatorRegistration() public pure {
+        uint256 nodePk = 0xfa35c49dc36191b998cc651d95699f9d63959d2112e14cc1d241f522bec2fe62;
+        uint8 validatorId = SESSION_KEY_VALIDATOR_ID;
+        address validatorAddress = 0xA33882C770F3D56b9a8E56Bc02d6C7068624F384;
+        uint64 chainId = 420042;
+
+        // Build the registration message
+        bytes memory message = abi.encode(validatorId, validatorAddress, chainId);
+        console.log("Registration message (abi.encode(validatorId, validatorAddress, chainId)):");
+        // 0x0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000a33882c770f3d56b9a8e56bc02d6c7068624f38400000000000000000000000000000000000000000000000000000000000668ca
+        console.logBytes(message);
+
+        // Sign the registration message
+        bytes memory signature = TestUtils.signEip191(vm, nodePk, message);
+        console.log("EIP-191 signature:");
+        // 0xfbee5bdc27ba3abb6d2bf5bb403b4bb79b96ffacfd89caca022e2abe391b42827135297986b6471ab343a57fb6af66608f5e0c749cd1b6b8f19a6ca1eeab50141c
+        console.logBytes(signature);
     }
 }

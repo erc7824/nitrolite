@@ -59,8 +59,9 @@ func TestRequestCreation_Success(t *testing.T) {
 	initialState := voidState.NextState()
 
 	channelDef := core.ChannelDefinition{
-		Nonce:     nonce,
-		Challenge: challenge,
+		Nonce:                 nonce,
+		Challenge:             challenge,
+		ApprovedSigValidators: "0x03",
 	}
 	_, err := initialState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
 	require.NoError(t, err)
@@ -115,8 +116,9 @@ func TestRequestCreation_Success(t *testing.T) {
 	reqPayload := rpc.ChannelsV1RequestCreationRequest{
 		State: rpcState,
 		ChannelDefinition: rpc.ChannelDefinitionV1{
-			Nonce:     strconv.FormatUint(nonce, 10),
-			Challenge: challenge,
+			Nonce:                 strconv.FormatUint(nonce, 10),
+			Challenge:             challenge,
+			ApprovedSigValidators: "0x03",
 		},
 	}
 
@@ -202,8 +204,9 @@ func TestRequestCreation_Acknowledgement_Success(t *testing.T) {
 	initialState := voidState.NextState()
 
 	channelDef := core.ChannelDefinition{
-		Nonce:     nonce,
-		Challenge: challenge,
+		Nonce:                 nonce,
+		Challenge:             challenge,
+		ApprovedSigValidators: "0x03",
 	}
 	_, err := initialState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
 	require.NoError(t, err)
@@ -254,8 +257,9 @@ func TestRequestCreation_Acknowledgement_Success(t *testing.T) {
 	reqPayload := rpc.ChannelsV1RequestCreationRequest{
 		State: rpcState,
 		ChannelDefinition: rpc.ChannelDefinitionV1{
-			Nonce:     strconv.FormatUint(nonce, 10),
-			Challenge: challenge,
+			Nonce:                 strconv.FormatUint(nonce, 10),
+			Challenge:             challenge,
+			ApprovedSigValidators: "0x03",
 		},
 	}
 
@@ -335,6 +339,7 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 		asset,
 		nonce,
 		lowChallenge,
+		"0x03",
 	)
 	require.NoError(t, err)
 
@@ -363,8 +368,9 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 			},
 		},
 		ChannelDefinition: rpc.ChannelDefinitionV1{
-			Nonce:     strconv.FormatUint(nonce, 10),
-			Challenge: lowChallenge,
+			Nonce:                 strconv.FormatUint(nonce, 10),
+			Challenge:             lowChallenge,
+			ApprovedSigValidators: "0x03",
 		},
 	}
 

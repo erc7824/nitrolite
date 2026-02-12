@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -21,6 +22,51 @@ var (
 		ChannelSignerType_SessionKey,
 	}
 )
+
+// hexToBitmask parses a hex string (with optional 0x prefix) into a [32]byte big-endian bitmask.
+func hexToBitmask(s string) ([32]byte, bool) {
+	var val [32]byte
+	s = strings.TrimPrefix(s, "0x")
+	b, err := hex.DecodeString(s)
+	if err != nil || len(b) == 0 || len(b) > 32 {
+		return val, false
+	}
+	copy(val[32-len(b):], b)
+	return val, true
+}
+
+func IsChannelSignerSupported(approvedSigValidators string, signerType ChannelSignerType) bool {
+	// Mirrors Solidity: (approvedSigValidators >> signerType) & 1 == 1
+	val, ok := hexToBitmask(approvedSigValidators)
+	if !ok {
+		return false
+	}
+	bitIndex := uint8(signerType)
+	byteIndex := 31 - bitIndex/8
+	bitOffset := bitIndex % 8
+	return (val[byteIndex]>>bitOffset)&1 == 1
+}
+
+// SignerValidatorsSupported checks that every bit in channelValidators is
+// covered by the node's supported ChannelSignerTypes.
+func SignerValidatorsSupported(channelValidators string) bool {
+	inc, ok := hexToBitmask(channelValidators)
+	if !ok {
+		return false
+	}
+	// Build node bitmask from supported signer types
+	var node [32]byte
+	for _, t := range ChannelSignerTypes {
+		idx := uint8(t)
+		node[31-idx/8] |= 1 << (idx % 8)
+	}
+	for i := 0; i < 32; i++ {
+		if node[i]&inc[i] != inc[i] {
+			return false
+		}
+	}
+	return true
+}
 
 type ChannelDefaultSigner struct {
 	sign.Signer
@@ -56,6 +102,13 @@ func NewChannelSigValidator(permissionsVerifier VerifyChannelSessionKePermission
 		recoverer:         recoverer,
 		verifyPermissions: permissionsVerifier,
 	}
+}
+
+func GetSignerType(sig []byte) (ChannelSignerType, error) {
+	if len(sig) < 1 {
+		return 0, fmt.Errorf("invalid signature: too short")
+	}
+	return ChannelSignerType(sig[0]), nil
 }
 
 func (s *ChannelSigValidator) Recover(data, sig []byte) (string, error) {

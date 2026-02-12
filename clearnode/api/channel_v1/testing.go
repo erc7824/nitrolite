@@ -28,9 +28,9 @@ func (m *MockStore) GetLastUserState(wallet, asset string, signed bool) (*core.S
 	return &state, args.Error(1)
 }
 
-func (m *MockStore) CheckOpenChannel(wallet, asset string) (bool, error) {
+func (m *MockStore) CheckOpenChannel(wallet, asset string) (string, bool, error) {
 	args := m.Called(wallet, asset)
-	return args.Bool(0), args.Error(1)
+	return args.String(0), args.Bool(1), args.Error(2)
 }
 
 func (m *MockStore) StoreUserState(state core.State) error {

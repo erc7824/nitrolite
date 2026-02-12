@@ -44,7 +44,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("user state transition must have 'commit' type, got '%s'", lastTransition.Type.String())
 		}
 
-		userHasOpenChannel, err := tx.CheckOpenChannel(userState.UserWallet, userState.Asset)
+		approvedSigValidators, userHasOpenChannel, err := tx.CheckOpenChannel(userState.UserWallet, userState.Asset)
 		if err != nil {
 			return rpc.Errorf("failed to check open channel: %v", err)
 		}
@@ -88,6 +88,13 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("failed to decode user signature: %v", err)
 		}
 
+		sigType, err := core.GetSignerType(userSigBytes)
+		if err != nil {
+			return rpc.Errorf("failed to get user signature type: %v", err)
+		}
+		if !core.IsChannelSignerSupported(approvedSigValidators, sigType) {
+			return rpc.Errorf("user signature type '%d' is not supported by channel", sigType)
+		}
 		sigValidator := core.NewChannelSigValidator(func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error) {
 			return tx.ValidateChannelSessionKeyForAsset(walletAddr, sessionKeyAddr, userState.Asset, metadataHash)
 		})

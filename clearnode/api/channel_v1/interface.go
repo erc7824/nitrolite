@@ -21,8 +21,9 @@ type Store interface {
 	// Returns nil state if no matching state exists.
 	GetLastUserState(wallet, asset string, signed bool) (*core.State, error)
 
-	// CheckOpenChannel verifies if a user has an active channel for the given asset.
-	CheckOpenChannel(wallet, asset string) (bool, error)
+	// CheckOpenChannel verifies if a user has an active channel for the given asset
+	// and returns the approved signature validators if such a channel exists.
+	CheckOpenChannel(wallet, asset string) (string, bool, error)
 
 	// StoreUserState persists a new user state to the database.
 	StoreUserState(state core.State) error

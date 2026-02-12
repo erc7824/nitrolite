@@ -48,6 +48,8 @@ type ChannelDefinitionV1 struct {
 	Nonce string `json:"nonce"`
 	// Challenge is the challenge period for the channel in seconds
 	Challenge uint32 `json:"challenge"`
+	// ApprovedSigValidators is a hex string bitmap representing the approved signature validators for the channel
+	ApprovedSigValidators string `json:"approved_sig_validators"`
 }
 
 // ChannelSessionKeyStateV1 represents the state of a session key.

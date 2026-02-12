@@ -108,8 +108,9 @@ func toCoreChannelDefinition(def rpc.ChannelDefinitionV1) (core.ChannelDefinitio
 	}
 
 	return core.ChannelDefinition{
-		Nonce:     nonce,
-		Challenge: def.Challenge,
+		Nonce:                 nonce,
+		Challenge:             def.Challenge,
+		ApprovedSigValidators: def.ApprovedSigValidators,
 	}, nil
 }
 

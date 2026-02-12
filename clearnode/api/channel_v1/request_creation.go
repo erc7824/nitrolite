@@ -53,6 +53,12 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		return
 	}
 
+	ok = core.SignerValidatorsSupported(reqPayload.ChannelDefinition.ApprovedSigValidators)
+	if !ok {
+		c.Fail(nil, "one or more of the provided approved signature validators are not supported")
+		return
+	}
+
 	var nodeSig string
 	err = h.useStoreInTx(func(tx Store) error {
 		// Check if channel already exists
@@ -73,6 +79,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 			incomingState.Asset,
 			channelDef.Nonce,
 			channelDef.Challenge,
+			channelDef.ApprovedSigValidators,
 		)
 		if err != nil {
 			return rpc.Errorf("failed to calculate channel ID: %v", err)
@@ -119,6 +126,15 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 			return rpc.Errorf("failed to decode user signature: %v", err)
 		}
 
+		sigType, err := core.GetSignerType(userSigBytes)
+		if err != nil {
+			return rpc.Errorf("failed to get user signature type: %v", err)
+		}
+
+		if !core.IsChannelSignerSupported(channelDef.ApprovedSigValidators, sigType) {
+			return rpc.Errorf("user signature type '%d' is not supported by channel", sigType)
+		}
+
 		sigValidator := h.getChannelSigValidator(tx, incomingState.Asset)
 		if err := sigValidator.Verify(incomingState.UserWallet, packedState, userSigBytes); err != nil {
 			return rpc.Errorf("invalid incoming state user signature: %v", err)
@@ -132,6 +148,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 			incomingState.HomeLedger.TokenAddress,
 			channelDef.Nonce,
 			channelDef.Challenge,
+			channelDef.ApprovedSigValidators,
 		)
 
 		// Create the home channel entity

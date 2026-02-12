@@ -38,8 +38,9 @@ type DatabaseStore interface {
 	// GetActiveHomeChannel retrieves the active home channel for a user's wallet and asset.
 	GetActiveHomeChannel(wallet, asset string) (*core.Channel, error)
 
-	// CheckOpenChannel verifies if a user has an active channel for the given asset.
-	CheckOpenChannel(wallet, asset string) (bool, error)
+	// CheckOpenChannel verifies if a user has an active channel for the given asset
+	// and returns the approved signature validators if such a channel exists.
+	CheckOpenChannel(wallet, asset string) (string, bool, error)
 
 	// UpdateChannel persists changes to a channel's metadata (status, version, etc).
 	UpdateChannel(channel core.Channel) error

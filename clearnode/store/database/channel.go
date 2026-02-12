@@ -11,18 +11,19 @@ import (
 
 // Channel represents a state channel between participants
 type Channel struct {
-	ChannelID          string             `gorm:"column:channel_id;primaryKey;"`
-	UserWallet         string             `gorm:"column:user_wallet;not null"`
-	Type               core.ChannelType   `gorm:"column:type;not null"`
-	BlockchainID       uint64             `gorm:"column:blockchain_id;not null"`
-	Token              string             `gorm:"column:token;not null"`
-	ChallengeDuration  uint32             `gorm:"column:challenge_duration;not null"`
-	ChallengeExpiresAt *time.Time         `gorm:"column:challenge_expires_at;default:null"`
-	Nonce              uint64             `gorm:"column:nonce;not null;"`
-	Status             core.ChannelStatus `gorm:"column:status;not null;"`
-	StateVersion       uint64             `gorm:"column:state_version;not null;"`
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ChannelID             string             `gorm:"column:channel_id;primaryKey;"`
+	UserWallet            string             `gorm:"column:user_wallet;not null"`
+	Type                  core.ChannelType   `gorm:"column:type;not null"`
+	BlockchainID          uint64             `gorm:"column:blockchain_id;not null"`
+	Token                 string             `gorm:"column:token;not null"`
+	ChallengeDuration     uint32             `gorm:"column:challenge_duration;not null"`
+	ChallengeExpiresAt    *time.Time         `gorm:"column:challenge_expires_at;default:null"`
+	Nonce                 uint64             `gorm:"column:nonce;not null;"`
+	ApprovedSigValidators string             `gorm:"column:approved_sig_validators;not null;"`
+	Status                core.ChannelStatus `gorm:"column:status;not null;"`
+	StateVersion          uint64             `gorm:"column:state_version;not null;"`
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 // TableName specifies the table name for the Channel model
@@ -33,18 +34,19 @@ func (Channel) TableName() string {
 // CreateChannel creates a new channel entity in the database.
 func (s *DBStore) CreateChannel(channel core.Channel) error {
 	dbChannel := Channel{
-		ChannelID:          strings.ToLower(channel.ChannelID),
-		UserWallet:         strings.ToLower(channel.UserWallet),
-		Type:               channel.Type,
-		BlockchainID:       channel.BlockchainID,
-		Token:              strings.ToLower(channel.TokenAddress),
-		ChallengeDuration:  channel.ChallengeDuration,
-		ChallengeExpiresAt: channel.ChallengeExpiresAt,
-		Nonce:              channel.Nonce,
-		Status:             channel.Status,
-		StateVersion:       channel.StateVersion,
-		CreatedAt:          time.Now(),
-		UpdatedAt:          time.Now(),
+		ChannelID:             strings.ToLower(channel.ChannelID),
+		UserWallet:            strings.ToLower(channel.UserWallet),
+		Type:                  channel.Type,
+		BlockchainID:          channel.BlockchainID,
+		Token:                 strings.ToLower(channel.TokenAddress),
+		ChallengeDuration:     channel.ChallengeDuration,
+		ChallengeExpiresAt:    channel.ChallengeExpiresAt,
+		Nonce:                 channel.Nonce,
+		ApprovedSigValidators: channel.ApprovedSigValidators,
+		Status:                channel.Status,
+		StateVersion:          channel.StateVersion,
+		CreatedAt:             time.Now(),
+		UpdatedAt:             time.Now(),
 	}
 
 	if err := s.db.Create(&dbChannel).Error; err != nil {
@@ -93,11 +95,12 @@ func (s *DBStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, err
 	return databaseChannelToCore(&dbChannel), nil
 }
 
-// CheckOpenChannel verifies if a user has an active channel for the given asset.
-func (s *DBStore) CheckOpenChannel(wallet, asset string) (bool, error) {
-	var count int64
-	err := s.db.Raw(`
-		SELECT COUNT(s.id)
+// CheckOpenChannel verifies if a user has an active channel for the given asset
+// and returns the approved signature validators if such a channel exists.
+func (s *DBStore) CheckOpenChannel(wallet, asset string) (string, bool, error) {
+	var approvedSigValidators string
+	result := s.db.Raw(`
+		SELECT c.approved_sig_validators
 		FROM channel_states s
 		INNER JOIN channels c ON c.channel_id = s.home_channel_id
 		WHERE s.user_wallet = ?
@@ -105,13 +108,15 @@ func (s *DBStore) CheckOpenChannel(wallet, asset string) (bool, error) {
 			AND c.status <= ?
 			AND c.type = ?
 		LIMIT 1
-	`, strings.ToLower(wallet), asset, core.ChannelStatusOpen, core.ChannelTypeHome).Scan(&count).Error
-
-	if err != nil {
-		return false, fmt.Errorf("failed to check open channel: %w", err)
+	`, strings.ToLower(wallet), asset, core.ChannelStatusOpen, core.ChannelTypeHome).Scan(&approvedSigValidators)
+	if result.Error != nil {
+		return "", false, fmt.Errorf("failed to check open channel: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return "", false, nil
 	}
 
-	return count > 0, nil
+	return approvedSigValidators, true, nil
 }
 
 // UpdateChannel persists changes to a channel's metadata (status, version, etc).

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -11,6 +12,17 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 )
+
+// ChannelSessionKeyStateV1 represents the state of a session key.
+type ChannelSessionKeyStateV1 struct {
+	// ID Hash(user_address + session_key + version)
+	UserAddress string    `json:"user_address"` // UserAddress is the user wallet address
+	SessionKey  string    `json:"session_key"`  // SessionKey is the session key address for delegation
+	Version     uint64    `json:"version"`      // Version is the version of the session key format
+	Assets      []string  `json:"assets"`       // Assets associated with this session key
+	ExpiresAt   time.Time `json:"expires_at"`   // Expiration time as unix timestamp of this session key
+	UserSig     string    `json:"user_sig"`     // UserSig is the user's signature over the session key metadata to authorize the registration/update of the session key
+}
 
 type VerifyChannelSessionKePermissionsV1 func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error)
 

@@ -368,8 +368,9 @@ func transformLedgerToRPC(ledger core.Ledger) rpc.LedgerV1 {
 // transformChannelDefinitionToRPC converts core.ChannelDefinition to RPC ChannelDefinitionV1.
 func transformChannelDefinitionToRPC(def core.ChannelDefinition) rpc.ChannelDefinitionV1 {
 	return rpc.ChannelDefinitionV1{
-		Nonce:     strconv.FormatUint(def.Nonce, 10),
-		Challenge: def.Challenge,
+		Nonce:                 strconv.FormatUint(def.Nonce, 10),
+		Challenge:             def.Challenge,
+		ApprovedSigValidators: def.ApprovedSigValidators,
 	}
 }
 

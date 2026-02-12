@@ -30,7 +30,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 	var nodeSig string
 	incomingTransition := incomingState.Transition
 	err = h.useStoreInTx(func(tx Store) error {
-		userHasOpenChannel, err := tx.CheckOpenChannel(incomingState.UserWallet, incomingState.Asset)
+		approvedSigValidators, userHasOpenChannel, err := tx.CheckOpenChannel(incomingState.UserWallet, incomingState.Asset)
 		if err != nil {
 			return rpc.Errorf("failed to check open channel: %v", err)
 		}
@@ -100,6 +100,13 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 			return rpc.Errorf("failed to decode incoming state user signature: %v", err)
 		}
 
+		sigType, err := core.GetSignerType(userSigBytes)
+		if err != nil {
+			return rpc.Errorf("failed to get user signature type: %v", err)
+		}
+		if !core.IsChannelSignerSupported(approvedSigValidators, sigType) {
+			return rpc.Errorf("user signature type '%d' is not supported by channel", sigType)
+		}
 		sigValidator := h.getChannelSigValidator(tx, incomingState.Asset)
 		if err := sigValidator.Verify(incomingState.UserWallet, packedState, userSigBytes); err != nil {
 			return rpc.Errorf("invalid incoming state user signature: %v", err)
@@ -276,6 +283,7 @@ func (h *Handler) createEscrowChannel(tx Store, incomingState core.State) error 
 		incomingState.EscrowLedger.TokenAddress,
 		homeChannel.Nonce,
 		homeChannel.ChallengeDuration,
+		homeChannel.ApprovedSigValidators,
 	)
 
 	// Create the escrow channel entity

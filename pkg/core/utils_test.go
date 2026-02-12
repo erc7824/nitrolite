@@ -396,11 +396,11 @@ func TestGetHomeChannelID(t *testing.T) {
 		nonce := uint64(42)
 		challengeDuration := uint32(86400)
 
-		channelID, err := GetHomeChannelID(node, user, asset, nonce, challengeDuration)
+		channelID, err := GetHomeChannelID(node, user, asset, nonce, challengeDuration, "0x0")
 		assert.NoError(t, err)
 
-		// Expected value from Solidity test (with version byte 0x01)
-		expected := "0x01827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee"
+		// Expected value from Solidity test (with version byte 0x01, approvedSignatureValidators: 0)
+		expected := "0x011d32827760cd3fa7dfb3934eb4ddb4a05f47e327581d4fd1585f4dc9a8c490"
 		assert.Equal(t, expected, channelID, "Channel ID should match Solidity implementation")
 	})
 
@@ -412,13 +412,13 @@ func TestGetHomeChannelID(t *testing.T) {
 		nonce := uint64(42)
 		challengeDuration := uint32(86400)
 
-		channelIDV1, err := getHomeChannelID(node, user, asset, nonce, challengeDuration, 1)
+		channelIDV1, err := getHomeChannelID(node, user, asset, nonce, challengeDuration, "0x0", 1)
 		assert.NoError(t, err)
 
-		channelIDV2, err := getHomeChannelID(node, user, asset, nonce, challengeDuration, 2)
+		channelIDV2, err := getHomeChannelID(node, user, asset, nonce, challengeDuration, "0x0", 2)
 		assert.NoError(t, err)
 
-		channelIDV255, err := getHomeChannelID(node, user, asset, nonce, challengeDuration, 255)
+		channelIDV255, err := getHomeChannelID(node, user, asset, nonce, challengeDuration, "0x0", 255)
 		assert.NoError(t, err)
 
 		// Channel IDs must differ for different versions
@@ -426,10 +426,10 @@ func TestGetHomeChannelID(t *testing.T) {
 		assert.NotEqual(t, channelIDV1, channelIDV255, "channelIdV1 should differ from channelIdV255")
 		assert.NotEqual(t, channelIDV2, channelIDV255, "channelIdV2 should differ from channelIdV255")
 
-		// Expected values from Solidity test
-		expectedV1 := "0x01827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee"
-		expectedV2 := "0x02827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee"
-		expectedV255 := "0xff827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee"
+		// Expected values (with approvedSignatureValidators: 0)
+		expectedV1 := "0x011d32827760cd3fa7dfb3934eb4ddb4a05f47e327581d4fd1585f4dc9a8c490"
+		expectedV2 := "0x021d32827760cd3fa7dfb3934eb4ddb4a05f47e327581d4fd1585f4dc9a8c490"
+		expectedV255 := "0xff1d32827760cd3fa7dfb3934eb4ddb4a05f47e327581d4fd1585f4dc9a8c490"
 
 		assert.Equal(t, expectedV1, channelIDV1, "Version 1 channel ID should match Solidity")
 		assert.Equal(t, expectedV2, channelIDV2, "Version 2 channel ID should match Solidity")
@@ -455,10 +455,10 @@ func TestGetHomeChannelID(t *testing.T) {
 		nonce := uint64(42)
 		challengeDuration := uint32(86400)
 
-		channelID1, err := GetHomeChannelID(node, user, "ether", nonce, challengeDuration)
+		channelID1, err := GetHomeChannelID(node, user, "ether", nonce, challengeDuration, "0x0")
 		assert.NoError(t, err)
 
-		channelID2, err := GetHomeChannelID(node, user, "usdc", nonce, challengeDuration)
+		channelID2, err := GetHomeChannelID(node, user, "usdc", nonce, challengeDuration, "0x0")
 		assert.NoError(t, err)
 
 		assert.NotEqual(t, channelID1, channelID2, "Different assets should produce different channel IDs")
@@ -470,10 +470,10 @@ func TestGetHomeChannelID(t *testing.T) {
 		asset := "ether"
 		challengeDuration := uint32(86400)
 
-		channelID1, err := GetHomeChannelID(node, user, asset, 1, challengeDuration)
+		channelID1, err := GetHomeChannelID(node, user, asset, 1, challengeDuration, "0x0")
 		assert.NoError(t, err)
 
-		channelID2, err := GetHomeChannelID(node, user, asset, 2, challengeDuration)
+		channelID2, err := GetHomeChannelID(node, user, asset, 2, challengeDuration, "0x0")
 		assert.NoError(t, err)
 
 		assert.NotEqual(t, channelID1, channelID2, "Different nonces should produce different channel IDs")

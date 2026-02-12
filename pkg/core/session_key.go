@@ -157,26 +157,26 @@ func (s *ChannelSessionKeySignerV1) Sign(data []byte) (sign.Signature, error) {
 	return append([]byte{byte(ChannelSessionSignerTypeV1_SessionKey)}, fullSig...), nil
 }
 
-type ChannelSigValidatorV1 struct {
+type ChannelSigValidator struct {
 	recoverer         sign.AddressRecoverer
 	verifyPermissions VerifyChannelSessionKePermissionsV1
 }
 
 type VerifyChannelSessionKePermissionsV1 func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error)
 
-func NewChannelSigValidatorV1(permissionsVerifier VerifyChannelSessionKePermissionsV1) *ChannelSigValidatorV1 {
+func NewChannelSigValidator(permissionsVerifier VerifyChannelSessionKePermissionsV1) *ChannelSigValidator {
 	recoverer, err := sign.NewAddressRecoverer(sign.TypeEthereumMsg)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create address recoverer: %v", err))
 	}
 
-	return &ChannelSigValidatorV1{
+	return &ChannelSigValidator{
 		recoverer:         recoverer,
 		verifyPermissions: permissionsVerifier,
 	}
 }
 
-func (s *ChannelSigValidatorV1) Recover(data, sig []byte) (string, error) {
+func (s *ChannelSigValidator) Recover(data, sig []byte) (string, error) {
 	if len(sig) < 1 {
 		return "", fmt.Errorf("invalid signature: too short")
 	}
@@ -254,7 +254,7 @@ func GenerateSessionKeyStateIDV1(userAddress, sessionKey string, version uint64)
 
 	return crypto.Keccak256Hash(packed).Hex(), nil
 }
-func (s *ChannelSigValidatorV1) Verify(wallet string, data, sig []byte) error {
+func (s *ChannelSigValidator) Verify(wallet string, data, sig []byte) error {
 	address, err := s.Recover(data, sig)
 	if err != nil {
 		return err

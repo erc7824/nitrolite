@@ -88,7 +88,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("failed to decode user signature: %v", err)
 		}
 
-		sigValidator := core.NewChannelSigValidatorV1(func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error) {
+		sigValidator := core.NewChannelSigValidator(func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error) {
 			return tx.ValidateChannelSessionKeyForAsset(walletAddr, sessionKeyAddr, userState.Asset, metadataHash)
 		})
 		err = sigValidator.Verify(userState.UserWallet, packedUserState, userSigBytes)

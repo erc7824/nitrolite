@@ -60,7 +60,7 @@ func (c *Client) GetConfig(ctx context.Context) (*core.NodeConfig, error) {
 //
 //	blockchains, err := client.GetBlockchains(ctx)
 //	for _, bc := range blockchains {
-//	    fmt.Printf("%s: %s\n", bc.Name, bc.ContractAddress)
+//	    fmt.Printf("%s: %s\n", bc.Name, bc.ChannelHubAddress)
 //	}
 func (c *Client) GetBlockchains(ctx context.Context) ([]core.Blockchain, error) {
 	config, err := c.GetConfig(ctx)

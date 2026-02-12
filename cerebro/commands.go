@@ -409,7 +409,7 @@ func (o *Operator) nodeInfo(ctx context.Context) {
 	fmt.Println("\nSupported Blockchains:")
 	for _, bc := range config.Blockchains {
 		fmt.Printf("  - %s (ID: %d)\n", bc.Name, bc.ID)
-		fmt.Printf("    Contract: %s\n", bc.ContractAddress)
+		fmt.Printf("    Contract: %s\n", bc.ChannelHubAddress)
 	}
 }
 
@@ -425,7 +425,7 @@ func (o *Operator) listChains(ctx context.Context) {
 	for _, chain := range chains {
 		fmt.Printf("- %s\n", chain.Name)
 		fmt.Printf("  Chain ID:  %d\n", chain.ID)
-		fmt.Printf("  Contract:  %s\n", chain.ContractAddress)
+		fmt.Printf("  Contract:  %s\n", chain.ChannelHubAddress)
 
 		// Check if RPC is configured
 		_, err := o.store.GetRPC(chain.ID)

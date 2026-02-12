@@ -862,10 +862,10 @@ func (t1 Transition) Equal(t2 Transition) error {
 
 // Blockchain represents information about a supported blockchain network
 type Blockchain struct {
-	Name            string `json:"name"`             // Blockchain name
-	ID              uint64 `json:"id"`               // Blockchain network ID
-	ContractAddress string `json:"contract_address"` // Address of the main contract on this blockchain
-	BlockStep       uint64 `json:"block_step"`       // Number of blocks between each channel update
+	Name              string `json:"name"`                // Blockchain name
+	ID                uint64 `json:"id"`                  // Blockchain network ID
+	ChannelHubAddress string `json:"channel_hub_address"` // Address of the ChannelHub contract on this blockchain
+	BlockStep         uint64 `json:"block_step"`          // Number of blocks between each channel update
 }
 
 // Asset represents information about a supported asset

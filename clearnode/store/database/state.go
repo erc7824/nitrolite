@@ -10,12 +10,6 @@ import (
 	"gorm.io/gorm"
 )
 
-type Allocation struct {
-	Participant  string          `json:"destination"`
-	TokenAddress string          `json:"token"`
-	RawAmount    decimal.Decimal `json:"amount"`
-}
-
 // State represents an immutable state in the system
 // ID is deterministic: Hash(UserWallet, Asset, CycleIndex, Version)
 type State struct {

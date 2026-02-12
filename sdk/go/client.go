@@ -370,7 +370,7 @@ func (c *Client) getTokenAddress(ctx context.Context, blockchainID uint64, asset
 	return "", fmt.Errorf("asset %s not found", asset)
 }
 
-// getContractAddress retrieves the contract address for a specific blockchain from node config.
+// getContractAddress retrieves the channel hub contract address for a specific blockchain from node config.
 func (c *Client) getContractAddress(ctx context.Context, blockchainID uint64) (string, error) {
 	nodeConfig, err := c.GetConfig(ctx)
 	if err != nil {
@@ -379,7 +379,7 @@ func (c *Client) getContractAddress(ctx context.Context, blockchainID uint64) (s
 
 	for _, bc := range nodeConfig.Blockchains {
 		if bc.ID == blockchainID {
-			return bc.ContractAddress, nil
+			return bc.ChannelHubAddress, nil
 		}
 	}
 

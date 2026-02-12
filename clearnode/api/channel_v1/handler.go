@@ -40,8 +40,8 @@ func NewHandler(
 	}
 }
 
-func (h *Handler) getChannelSigValidator(tx Store, asset string) *core.ChannelSigValidatorV1 {
-	return core.NewChannelSigValidatorV1(func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error) {
+func (h *Handler) getChannelSigValidator(tx Store, asset string) *core.ChannelSigValidator {
+	return core.NewChannelSigValidator(func(walletAddr, sessionKeyAddr, metadataHash string) (bool, error) {
 		return tx.ValidateChannelSessionKeyForAsset(walletAddr, sessionKeyAddr, asset, metadataHash)
 	})
 }

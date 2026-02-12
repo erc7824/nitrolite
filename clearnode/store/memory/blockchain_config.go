@@ -23,8 +23,12 @@ var (
 // It contains default contract addresses that apply to all blockchains unless overridden,
 // and a list of individual blockchain configurations.
 type BlockchainsConfig struct {
-	DefaultContractAddress string             `yaml:"default_contract_address"`
-	Blockchains            []BlockchainConfig `yaml:"blockchains"`
+	DefaultContractAddresses DefaultContractAddresses `yaml:"default_contract_addresses"`
+	Blockchains              []BlockchainConfig       `yaml:"blockchains"`
+}
+
+type DefaultContractAddresses struct {
+	ChannelHub string `yaml:"channel_hub,omitempty"`
 }
 
 // BlockchainConfig represents configuration for a single blockchain.
@@ -39,8 +43,8 @@ type BlockchainConfig struct {
 	Disabled bool `yaml:"disabled"`
 	// BlockStep defines the block range for scanning (default: 10000)
 	BlockStep uint64 `yaml:"block_step"`
-	// ContractAddress can override the default addresses
-	ContractAddress string `yaml:"contract_address"`
+	// ChannelHubAddress is the address of the ChannelHub contract on this blockchain
+	ChannelHubAddress string `yaml:"channel_hub_address"`
 }
 
 // LoadEnabledBlockchains loads and validates blockchain configurations from a YAML file.
@@ -73,8 +77,8 @@ func LoadEnabledBlockchains(configDirPath string) (map[uint64]BlockchainConfig, 
 }
 
 func verifyBlockchainsConfig(cfg *BlockchainsConfig) error {
-	if !contractAddressRegex.MatchString(cfg.DefaultContractAddress) && cfg.DefaultContractAddress != "" {
-		return fmt.Errorf("invalid default contract address '%s'", cfg.DefaultContractAddress)
+	if addr := cfg.DefaultContractAddresses.ChannelHub; !contractAddressRegex.MatchString(addr) && addr != "" {
+		return fmt.Errorf("invalid default channel hub address '%s'", addr)
 	}
 
 	for i, bc := range cfg.Blockchains {
@@ -86,14 +90,14 @@ func verifyBlockchainsConfig(cfg *BlockchainsConfig) error {
 			return fmt.Errorf("invalid blockchain name '%s', should match snake_case format", bc.Name)
 		}
 
-		if bc.ContractAddress == "" {
-			if cfg.DefaultContractAddress == "" {
-				return fmt.Errorf("missing default and blockchain-specific contract address for blockchain '%s'", bc.Name)
+		if bc.ChannelHubAddress == "" {
+			if cfg.DefaultContractAddresses.ChannelHub == "" {
+				return fmt.Errorf("missing default and blockchain-specific channel hub address for blockchain '%s'", bc.Name)
 			} else {
-				cfg.Blockchains[i].ContractAddress = cfg.DefaultContractAddress
+				cfg.Blockchains[i].ChannelHubAddress = cfg.DefaultContractAddresses.ChannelHub
 			}
-		} else if !contractAddressRegex.MatchString(bc.ContractAddress) {
-			return fmt.Errorf("invalid contract address '%s' for blockchain '%s'", bc.ContractAddress, bc.Name)
+		} else if !contractAddressRegex.MatchString(bc.ChannelHubAddress) {
+			return fmt.Errorf("invalid channel hub address '%s' for blockchain '%s'", bc.ChannelHubAddress, bc.Name)
 		}
 
 		if bc.BlockStep == 0 {

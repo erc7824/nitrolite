@@ -17,13 +17,16 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 		{
 			name: "valid config",
 			cfg: BlockchainsConfig{
-				DefaultContractAddress: "0x0000000000000000000000000000000000000001",
+				DefaultContractAddresses: DefaultContractAddresses{
+					ChannelHub: "0x0000000000000000000000000000000000000001",
+				},
+
 				Blockchains: []BlockchainConfig{
 					{
-						ID:              1,
-						Name:            "ethereum",
-						ContractAddress: "0x1111111111111111111111111111111111111111",
-						BlockStep:       10,
+						ID:                1,
+						Name:              "ethereum",
+						ChannelHubAddress: "0x1111111111111111111111111111111111111111",
+						BlockStep:         10,
 					},
 					{
 						ID:   11155111,
@@ -38,14 +41,14 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 				ethCfg := blockchains[0]
 				assert.Equal(t, "ethereum", ethCfg.Name)
 				assert.Equal(t, uint64(1), ethCfg.ID)
-				assert.Equal(t, "0x1111111111111111111111111111111111111111", ethCfg.ContractAddress)
+				assert.Equal(t, "0x1111111111111111111111111111111111111111", ethCfg.ChannelHubAddress)
 				assert.False(t, ethCfg.Disabled)
 				assert.Equal(t, uint64(10), ethCfg.BlockStep)
 
 				sepoliaCfg := blockchains[1]
 				assert.Equal(t, "ethereum_sepolia", sepoliaCfg.Name)
 				assert.Equal(t, uint64(11155111), sepoliaCfg.ID)
-				assert.Equal(t, "0x0000000000000000000000000000000000000001", sepoliaCfg.ContractAddress)
+				assert.Equal(t, "0x0000000000000000000000000000000000000001", sepoliaCfg.ChannelHubAddress)
 				assert.False(t, sepoliaCfg.Disabled)
 				assert.Equal(t, defaultBlockStep, sepoliaCfg.BlockStep)
 			},
@@ -77,7 +80,9 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 		{
 			name: "disabled blockchain",
 			cfg: BlockchainsConfig{
-				DefaultContractAddress: "0x0000000000000000000000000000000000000001",
+				DefaultContractAddresses: DefaultContractAddresses{
+					ChannelHub: "0x0000000000000000000000000000000000000001",
+				},
 				Blockchains: []BlockchainConfig{
 					{
 						ID:       1,
@@ -105,37 +110,39 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid default custody address",
+			name: "invalid default channel hub address",
 			cfg: BlockchainsConfig{
-				DefaultContractAddress: "0x0000s00000000000000000000000000000000001",
+				DefaultContractAddresses: DefaultContractAddresses{
+					ChannelHub: "0x0000s00000000000000000000000000000000001",
+				},
 			},
-			expectedErrorStr: "invalid default contract address '0x0000s00000000000000000000000000000000001'",
+			expectedErrorStr: "invalid default channel hub address '0x0000s00000000000000000000000000000000001'",
 		},
 		{
-			name: "missing custody address",
+			name: "missing channel hub address",
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:              1,
-						Name:            "ethereum",
-						ContractAddress: "",
+						ID:                1,
+						Name:              "ethereum",
+						ChannelHubAddress: "",
 					},
 				},
 			},
-			expectedErrorStr: "missing default and blockchain-specific contract address for blockchain 'ethereum'",
+			expectedErrorStr: "missing default and blockchain-specific channel hub address for blockchain 'ethereum'",
 		},
 		{
-			name: "invalid custody address",
+			name: "invalid channel hub address",
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:              1,
-						Name:            "ethereum",
-						ContractAddress: "0x0000s00000000000000000000000000000000001",
+						ID:                1,
+						Name:              "ethereum",
+						ChannelHubAddress: "0x0000s00000000000000000000000000000000001",
 					},
 				},
 			},
-			expectedErrorStr: "invalid contract address '0x0000s00000000000000000000000000000000001' for blockchain 'ethereum'",
+			expectedErrorStr: "invalid channel hub address '0x0000s00000000000000000000000000000000001' for blockchain 'ethereum'",
 		},
 	}
 

@@ -73,7 +73,7 @@ func TestClientV1_NodeV1GetConfig(t *testing.T) {
 	config := rpc.NodeV1GetConfigResponse{
 		NodeAddress: testWalletV1,
 		Blockchains: []rpc.BlockchainInfoV1{
-			{BlockchainID: testChainIDV1, ContractAddress: "0xContract"},
+			{BlockchainID: testChainIDV1, ChannelHubAddress: "0xContract"},
 		},
 	}
 

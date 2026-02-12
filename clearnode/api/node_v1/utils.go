@@ -10,9 +10,9 @@ import (
 
 func mapBlockchainV1(blockchain core.Blockchain) rpc.BlockchainInfoV1 {
 	return rpc.BlockchainInfoV1{
-		Name:            blockchain.Name,
-		BlockchainID:    strconv.FormatUint(blockchain.ID, 10),
-		ContractAddress: blockchain.ContractAddress,
+		Name:              blockchain.Name,
+		BlockchainID:      strconv.FormatUint(blockchain.ID, 10),
+		ChannelHubAddress: blockchain.ChannelHubAddress,
 	}
 }
 

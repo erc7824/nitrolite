@@ -296,7 +296,7 @@ func (o *Operator) deposit(ctx context.Context, chainIDStr, asset, amountStr str
 		return
 	}
 
-	fmt.Printf("SUCCESS: Deposit completed\n")
+	fmt.Printf("SUCCESS: Deposit state prepared. Run 'checkpoint %s' to submit to the blockchain.\n", asset)
 }
 
 func (o *Operator) withdraw(ctx context.Context, chainIDStr, asset, amountStr string) {
@@ -320,7 +320,7 @@ func (o *Operator) withdraw(ctx context.Context, chainIDStr, asset, amountStr st
 		return
 	}
 
-	fmt.Printf("SUCCESS: Withdrawal completed\n")
+	fmt.Printf("SUCCESS: Withdrawal state prepared. Run 'checkpoint %s' to submit to the blockchain.\n", asset)
 }
 
 func (o *Operator) transfer(ctx context.Context, recipient, asset, amountStr string) {
@@ -351,7 +351,7 @@ func (o *Operator) closeChannel(ctx context.Context, asset string) {
 		return
 	}
 
-	fmt.Printf("SUCCESS: Channel closed successfully.\n")
+	fmt.Printf("SUCCESS: Channel close state prepared. Run 'checkpoint %s' to submit to the blockchain.\n", asset)
 }
 
 func (o *Operator) acknowledge(ctx context.Context, asset string) {

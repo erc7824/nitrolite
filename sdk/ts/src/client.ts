@@ -732,7 +732,10 @@ export class Client {
       case core.TransitionType.HomeDeposit:
       case core.TransitionType.HomeWithdrawal:
       case core.TransitionType.TransferSend:
-      case core.TransitionType.Commit: {
+      case core.TransitionType.TransferReceive:
+      case core.TransitionType.Commit:
+      case core.TransitionType.Release:  
+      {
         if (channel.status === core.ChannelStatus.Void) {
           // Channel not yet created on-chain, reconstruct definition and call Create
           const channelDef: core.ChannelDefinition = {

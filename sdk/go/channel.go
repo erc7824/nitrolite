@@ -107,11 +107,10 @@ func (c *Client) Deposit(ctx context.Context, blockchainID uint64, asset string,
 	}
 
 	// Sign and submit state to node
-	nodeSig, err := c.signAndSubmitState(ctx, nextState)
+	_, err = c.signAndSubmitState(ctx, nextState)
 	if err != nil {
 		return nextState, err
 	}
-	nextState.NodeSig = &nodeSig
 
 	return nextState, nil
 }
@@ -210,12 +209,10 @@ func (c *Client) Withdraw(ctx context.Context, blockchainID uint64, asset string
 	}
 
 	// Sign and submit state to node
-	nodeSig, err := c.signAndSubmitState(ctx, nextState)
+	_, err = c.signAndSubmitState(ctx, nextState)
 	if err != nil {
 		return nil, err
 	}
-
-	nextState.NodeSig = &nodeSig
 
 	return nextState, nil
 }
@@ -320,14 +317,11 @@ func (c *Client) Transfer(ctx context.Context, recipientWallet string, asset str
 	}
 
 	// Sign and submit state
-	nodeSig, err := c.signAndSubmitState(ctx, nextState)
+	_, err = c.signAndSubmitState(ctx, nextState)
 	if err != nil {
 		return nil, err
 	}
 
-	nextState.NodeSig = &nodeSig
-
-	// Return transaction ID from the transition
 	return nextState, nil
 }
 
@@ -377,11 +371,10 @@ func (c *Client) CloseHomeChannel(ctx context.Context, asset string) (*core.Stat
 	}
 
 	// Sign and submit state
-	nodeSig, err := c.signAndSubmitState(ctx, nextState)
+	_, err = c.signAndSubmitState(ctx, nextState)
 	if err != nil {
 		return nil, err
 	}
-	nextState.NodeSig = &nodeSig
 
 	return nextState, nil
 }
@@ -480,11 +473,10 @@ func (c *Client) Acknowledge(ctx context.Context, asset string) (*core.State, er
 		return nil, fmt.Errorf("failed to apply acknowledgement transition: %w", err)
 	}
 
-	nodeSig, err := c.signAndSubmitState(ctx, nextState)
+	_, err = c.signAndSubmitState(ctx, nextState)
 	if err != nil {
 		return nil, err
 	}
-	nextState.NodeSig = &nodeSig
 
 	return nextState, nil
 }
@@ -554,7 +546,9 @@ func (c *Client) Checkpoint(ctx context.Context, asset string) (string, error) {
 		core.TransitionTypeHomeDeposit,
 		core.TransitionTypeHomeWithdrawal,
 		core.TransitionTypeTransferSend,
-		core.TransitionTypeCommit:
+		core.TransitionTypeTransferReceive,
+		core.TransitionTypeCommit,
+		core.TransitionTypeRelease:
 		if channel.Status == core.ChannelStatusVoid {
 			// Channel not yet created on-chain, reconstruct definition and call Create
 			channelDef := core.ChannelDefinition{

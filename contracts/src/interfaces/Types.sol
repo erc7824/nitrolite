@@ -3,11 +3,17 @@ pragma solidity 0.8.30;
 
 // ========= Channel Types ==========
 
+enum ParticipantIndex {
+    USER,
+    NODE
+}
+
 struct ChannelDefinition {
     uint32 challengeDuration;
     address user;
     address node;
     uint64 nonce;
+    uint256 approvedSignatureValidators; // Bitmask of approved validator IDs for user signatures (bit N = validator ID N)
     bytes32 metadata;
 }
 

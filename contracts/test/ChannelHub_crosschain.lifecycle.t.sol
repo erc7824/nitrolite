@@ -20,6 +20,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             user: bob,
             node: node,
             nonce: NONCE,
+            approvedSignatureValidators: 0,
             metadata: bytes32(0)
         });
 
@@ -32,6 +33,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
             user: alice,
             node: node,
             nonce: NONCE,
+            approvedSignatureValidators: 0,
             metadata: bytes32(0)
         });
 

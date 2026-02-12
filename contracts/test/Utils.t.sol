@@ -16,6 +16,7 @@ contract UtilsTest is Test {
             user: 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045,
             node: 0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a,
             nonce: 42,
+            approvedSignatureValidators: 0,
             metadata: 0x13730b0d8e1bdbdc000000000000000000000000000000000000000000000000
         });
 
@@ -129,8 +130,11 @@ contract UtilsTest is Test {
             metadata := shl(192, shr(192, assetHash))
         }
 
+        console.log("asset hash:");
         // 0x13730b0d8e1bdbdc293b62ba010b1eede56b412ea2980defabe3d0b6c7844c3a
         console.logBytes32(assetHash);
+
+        console.log("metadata:");
         // 0x13730b0d8e1bdbdc000000000000000000000000000000000000000000000000
         console.logBytes32(metadata);
 
@@ -139,12 +143,14 @@ contract UtilsTest is Test {
             user: 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045,
             node: 0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a,
             nonce: 42,
+            approvedSignatureValidators: 24042,
             metadata: metadata
         });
 
         bytes32 channelId = Utils.getChannelId(def, 1);
 
-        // 0x017a9135c6c7a3862792298e38fca222a1e64686a983663fce4c9afbc78bdb54
+        console.log("channel id:");
+        // 0x01f7d8fd998edc15e7f76b914bb9b99a11e56faa5f292a56b42288d4deb168b0
         console.logBytes32(channelId);
     }
 

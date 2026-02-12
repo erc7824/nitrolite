@@ -6,15 +6,19 @@ import {ChannelHubTest_Base} from "./ChannelHub_Base.t.sol";
 import {Utils} from "../src/Utils.sol";
 import {State, ChannelDefinition, StateIntent, Ledger, ChannelStatus} from "../src/interfaces/Types.sol";
 import {SessionKeyAuthorization} from "../src/sigValidators/SessionKeyValidator.sol";
-import {TestUtils} from "./TestUtils.sol";
+import {TestUtils, SESSION_KEY_VALIDATOR_ID} from "./TestUtils.sol";
 
 contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
     function test_happyPath() public {
+        // Approve SessionKeyValidator (ID 1) for user signatures by setting bit 1
+        uint256 approvedValidators = 1 << SESSION_KEY_VALIDATOR_ID; // Bit 1 = 1
+
         ChannelDefinition memory def = ChannelDefinition({
             challengeDuration: CHALLENGE_DURATION,
             user: alice,
             node: node,
             nonce: NONCE,
+            approvedSignatureValidators: approvedValidators,
             metadata: bytes32(0)
         });
 
@@ -210,6 +214,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             user: alice,
             node: node,
             nonce: NONCE,
+            approvedSignatureValidators: 0,
             metadata: bytes32(0)
         });
 
@@ -274,6 +279,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             user: alice,
             node: node,
             nonce: NONCE,
+            approvedSignatureValidators: 0,
             metadata: bytes32(0)
         });
 
@@ -338,6 +344,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             user: alice,
             node: node,
             nonce: NONCE,
+            approvedSignatureValidators: 0,
             metadata: bytes32(0)
         });
 

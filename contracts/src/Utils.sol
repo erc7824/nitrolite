@@ -12,8 +12,17 @@ library Utils {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
 
-    function getChannelId(ChannelDefinition memory def) internal pure returns (bytes32) {
-        return keccak256(abi.encode(def));
+    function getChannelId(ChannelDefinition memory def, uint8 version) internal pure returns (bytes32 channelId) {
+        bytes32 baseId = keccak256(abi.encode(def));
+
+        assembly ("memory-safe") {
+            // Store the version in the first byte (most significant byte) of the channelId
+            // Clear the first byte of baseId, then set it to version
+            channelId := or(
+                and(baseId, 0x00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                shl(248, version)
+            )
+        }
     }
 
     function getEscrowId(bytes32 channelId, uint64 version) internal pure returns (bytes32) {
@@ -24,41 +33,22 @@ library Utils {
     // ========== Cross-Chain State ==========
 
     function pack(State memory ccs, bytes32 channelId) internal pure returns (bytes memory) {
+        return abi.encode(channelId, toSigningData(ccs));
+    }
+
+    function pack(bytes32 channelId, bytes memory signingData) internal pure returns (bytes memory) {
+        return abi.encode(channelId, signingData);
+    }
+
+    function toSigningData(State memory ccs) internal pure returns (bytes memory) {
         return abi.encode(
-            channelId,
             ccs.version,
             ccs.intent,
             ccs.metadata,
-            ccs.homeState,
-            ccs.nonHomeState
+            ccs.homeLedger,
+            ccs.nonHomeLedger
             // omit signatures
         );
-    }
-
-    // supports only EIP-191 signatures for now
-    function validateSignatures(State memory ccs, bytes32 channelId, address user, address node) internal pure {
-        bytes32 ethSignedHash = pack(ccs, channelId).toEthSignedMessageHash();
-
-        address recoveredUser = ethSignedHash.recover(ccs.userSig);
-        address recoveredNode = ethSignedHash.recover(ccs.nodeSig);
-
-        require(recoveredUser == user, "invalid user signature");
-        require(recoveredNode == node, "invalid node signature");
-    }
-
-    function validateChallengerSignature(
-        State memory ccs,
-        bytes32 channelId,
-        bytes memory challengerSig,
-        address user,
-        address node
-    ) internal pure {
-        bytes memory packedChallengeState = abi.encodePacked(pack(ccs, channelId), "challenge");
-        bytes32 ethSignedHash = packedChallengeState.toEthSignedMessageHash();
-
-        address recoveredChallenger = ethSignedHash.recover(challengerSig);
-
-        require(recoveredChallenger == user || recoveredChallenger == node, "challenger must be node or user");
     }
 
     // ========== Ledger ==========

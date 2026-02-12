@@ -66,9 +66,10 @@ The off-chain protocol is responsible for:
 
    * Both User and Node sign the full state:
 
+     ```text
+     (channelId, version, intent, homeLedger, nonHomeLedger)
      ```
-     (channelId, version, intent, homeState, nonHomeState)
-     ```
+
    * A party **never signs two different states with the same version**.
 
 3. **Liquidity enforcement (Node responsibility)**
@@ -353,13 +354,13 @@ If enforcement stalls:
 
 If an escrow process is challenged (status becomes `DISPUTED`) and the challenge period expires (`challengeExpireAt` passed) without a resolution:
 
-*   The `finalize` function handles this case explicitly.
-*   If called when `DISPUTED` and expired:
-    1.  Do **not** invoke the channel engine.
-    2.  Manually **unlock the locked funds to the Node**.
-    3.  Zero out `lockedFunds` and `challengeExpireAt`.
-    4.  Set status to `FINALIZED`.
-    5.  Emit a finalization event.
+* The `finalize` function handles this case explicitly.
+* If called when `DISPUTED` and expired:
+    1. Do **not** invoke the channel engine.
+    2. Manually **unlock the locked funds to the Node**.
+    3. Zero out `lockedFunds` and `challengeExpireAt`.
+    4. Set status to `FINALIZED`.
+    5. Emit a finalization event.
 
 This logic mirrors the channel closure mechanism: if a challenge is not substantiated by a newer state within the timeout, the system defaults to a finalized state that releases locked resources.
 
@@ -387,7 +388,7 @@ The preparation phase establishes the channel on the target (non-home) chain:
 * Effect:
   * creates a channel on the non-home chain with status `MIGRATING_IN`,
   * locks Node's funds on the non-home chain.
-* Implementation note: States are swapped before storing to maintain the invariant that `homeState` represents the current chain.
+* Implementation note: States are swapped before storing to maintain the invariant that `homeLedger` represents the current chain.
 
 **On the home chain:**
 
@@ -409,7 +410,7 @@ The preparation phase establishes the channel on the target (non-home) chain:
 The execution phase completes the migration by swapping home and non-home roles:
 
 * An execution state is constructed that:
-  * swaps the `homeState` and `nonHomeState` from the preparation phase,
+  * swaps the `homeLedger` and `nonHomeLedger` from the preparation phase,
   * swaps allocations between User and Node in each state,
   * intent = FINALIZE_MIGRATION.
 
@@ -419,7 +420,7 @@ The execution phase completes the migration by swapping home and non-home roles:
   * releases Node liquidity on the old home chain,
   * moves the channel to `MIGRATED_OUT` status,
   * can clear a challenge (moving from `DISPUTED` to `MIGRATED_OUT`).
-* Implementation note: States are swapped before validation to maintain the invariant that `homeState` represents the current chain.
+* Implementation note: States are swapped before validation to maintain the invariant that `homeLedger` represents the current chain.
 
 **On the new home chain** (old non-home chain):
 
@@ -450,17 +451,17 @@ Migration presents a unique challenge for on-chain implementation: **which state
 
 #### The Problem
 
-The protocol describes migration as swapping `homeState` and `nonHomeState` roles, but this creates semantic ambiguity for on-chain validation:
+The protocol describes migration as swapping `homeLedger` and `nonHomeLedger` roles, but this creates semantic ambiguity for on-chain validation:
 
-1. **Preparation phase on non-home chain**: Actions (node deposits liquidity) are encoded in `nonHomeState`, but after the channel is created, subsequent operations must calculate deltas from this state—even though validation logic assumes `homeState` represents the current chain.
+1. **Preparation phase on non-home chain**: Actions (node deposits liquidity) are encoded in `nonHomeLedger`, but after the channel is created, subsequent operations must calculate deltas from this state—even though validation logic assumes `homeLedger` represents the current chain.
 
-2. **Execution phase on old home chain**: After the user swaps states in the execution phase state, `nonHomeState` represents the old home (current chain), but validation logic expects `homeState` to represent the current chain.
+2. **Execution phase on old home chain**: After the user swaps states in the execution phase state, `nonHomeLedger` represents the old home (current chain), but validation logic expects `homeLedger` to represent the current chain.
 
-3. **Delta calculation inconsistency**: After `INITIATE_MIGRATION` on the non-home chain creates a `MIGRATING_IN` channel, the next operation (e.g., deposit) cannot correctly calculate deltas because the previous state's allocations are in `nonHomeState`, not `homeState`.
+3. **Delta calculation inconsistency**: After `INITIATE_MIGRATION` on the non-home chain creates a `MIGRATING_IN` channel, the next operation (e.g., deposit) cannot correctly calculate deltas because the previous state's allocations are in `nonHomeLedger`, not `homeLedger`.
 
 #### The Solution: Context-Based Validation + Selective State Swapping
 
-To maintain the invariant that **homeState always represents the chain where execution happens**, the implementation uses:
+To maintain the invariant that **homeLedger always represents the chain where execution happens**, the implementation uses:
 
 **1. Two Migration Intents with Context-Based Behavior:**
 
@@ -468,6 +469,7 @@ To maintain the invariant that **homeState always represents the chain where exe
 * `FINALIZE_MIGRATION`: Single intent used on both old home and new home chains
 
 The same signed state can be submitted on both chains. The contract determines the correct behavior based on the channel status:
+
 * INITIATE_MIGRATION + status VOID/MIGRATED_OUT → non-home chain behavior (create MIGRATING_IN)
 * INITIATE_MIGRATION + status OPERATING/DISPUTED → home chain behavior (update state)
 * FINALIZE_MIGRATION + status MIGRATING_IN → new home chain behavior (move to OPERATING)
@@ -484,24 +486,24 @@ All functions accept the same intents (INITIATE_MIGRATION or FINALIZE_MIGRATION)
 
 **2. Selective State Swapping (only where needed):**
 
-* **`INITIATE_MIGRATION` (on new home chain)**: Swap `homeState` ↔ `nonHomeState` before storing
-  * Incoming state has actions in `nonHomeState` (new home = current chain)
-  * After swap, stored state has actions in `homeState` (current chain)
-  * Result: Next operation calculates deltas correctly from `homeState`
+* **`INITIATE_MIGRATION` (on new home chain)**: Swap `homeLedger` ↔ `nonHomeLedger` before storing
+  * Incoming state has actions in `nonHomeLedger` (new home = current chain)
+  * After swap, stored state has actions in `homeLedger` (current chain)
+  * Result: Next operation calculates deltas correctly from `homeLedger`
 
-* **`FINALIZE_MIGRATION` (on old home chain)**: Swap `homeState` ↔ `nonHomeState` before validation
-  * Incoming state (after user swaps) has old home actions in `nonHomeState` (current chain)
-  * After swap, validation sees actions in `homeState` (current chain)
+* **`FINALIZE_MIGRATION` (on old home chain)**: Swap `homeLedger` ↔ `nonHomeLedger` before validation
+  * Incoming state (after user swaps) has old home actions in `nonHomeLedger` (current chain)
+  * After swap, validation sees actions in `homeLedger` (current chain)
   * Result: Validation and fund release logic work correctly
 
-* **No swap needed** for `INITIATE_MIGRATION` (on old home chain) and `FINALIZE_MIGRATION` (on new home chain) (homeState already represents current chain)
+* **No swap needed** for `INITIATE_MIGRATION` (on old home chain) and `FINALIZE_MIGRATION` (on new home chain) (homeLedger already represents current chain)
 
 **3. Special Delta Calculation for `FINALIZE_MIGRATION` (on new home chain):**
 
-When finalizing migration on the new home chain, the previous state (from `INITIATE_MIGRATION`) has allocations in `nonHomeState` (before swap) but was swapped when stored. Delta calculation must account for this:
+When finalizing migration on the new home chain, the previous state (from `INITIATE_MIGRATION`) has allocations in `nonHomeLedger` (before swap) but was swapped when stored. Delta calculation must account for this:
 
 ```solidity
-delta = candidate.homeState.netFlow - prevStoredState.homeState.netFlow
+delta = candidate.homeLedger.netFlow - prevStoredState.homeLedger.netFlow
 ```
 
 This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
@@ -512,7 +514,7 @@ This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
 * After swapping, signatures are invalidated (`userSig = ""`, `nodeSig = ""`) to prevent misuse
 * The swapped state is only used internally for storage and validation
 * Events emit the original signed state (before swap) for off-chain observability
-* This approach maintains the critical invariant: **ChannelEngine always sees homeState as the current chain**
+* This approach maintains the critical invariant: **ChannelEngine always sees homeLedger as the current chain**
 
 ---
 
@@ -521,11 +523,89 @@ This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
 * **Authorization**: all state changes require valid signatures.
 * **Monotonicity**: `version` strictly increases.
 * **Replay resistance**: no two states with the same version can coexist.
+* **Cross-deployment replay protection**: Each ChannelHub deployment has a `VERSION` constant. The version is encoded as the first byte of `channelId`, ensuring that signatures are bound to a specific ChannelHub version. This prevents replay attacks across different ChannelHub deployments on the same chain. The `escrowId` inherits this protection as it is derived from `channelId`.
 * **Liquidity safety**: absolute allocations must be collateral-backed.
 * **Optimistic safety**:
 
   * challenges always resolve by enforcing the newest valid state,
   * stalled cross-chain operations can always be completed or reverted.
+
+---
+
+## Signature validation
+
+The protocol supports flexible signature validation through two complementary systems: a per-node validator registry and a bitmask for agreed validators. This design prevents signature forgery attacks while enabling custom signature schemes and maintaining cross-chain compatibility.
+
+### Validator selection via approved validators bitmask
+
+Agreed validators are specified in the `ChannelDefinition.approvedSignatureValidators` field (uint256 bitmask). The default ECDSA validator (0x00) is **always** available, regardless of the bitmask value. The bitmask specifies which additional validators from the node's registry are agreed validators. For example, if bit 42 is set to 1, then validator ID 42 from the node's registry is approved.
+
+Since `approvedSignatureValidators` is part of the `channelId` computation, agreed validators cannot be changed during cross-chain operations without invalidating signatures. This prevents malicious nodes from forging user signatures by registering fake validators.
+
+**Security properties:**
+
+* Users control which validators (beyond the always-available default) can be used
+* Cross-chain compatible (approvedSignatureValidators is in channelId, which is in all signatures)
+* Zero transaction overhead (no separate validator registration needed)
+* Prevents node-controlled validator forgery attacks
+* Default ECDSA validator always available as fallback
+
+### Node validator registry
+
+The protocol uses a per-node validator registry where nodes register signature validators and assign them 1-byte identifiers (0x01-0xFF).
+
+**Design rationale:** This allows nodes to use flexible signature schemes (SessionKey, multi-sig, etc.) for their own signatures while preventing them from controlling user signature validation. Benefits:
+
+* Nodes can enforce their security requirements for node signatures
+* Nodes benefit from flexible validator implementations
+* Cross-chain compatibility (validator addresses don't affect channelId or signature verification)
+* User signatures remain protected via approved validators bitmask
+
+### Validator registration
+
+Nodes register validators by providing a signature over the validator configuration. This allows node operators to use cold storage or hardware wallets without exposing private keys to send transactions.
+
+**Registration message:**
+
+```solidity
+bytes memory message = abi.encode(validatorId, validatorAddress, block.chainid);
+```
+
+The signature is verified using ECDSA recovery:
+
+1. Try EIP-191 recovery first (standard for wallet software)
+2. Fall back to raw ECDSA if needed
+3. Verify recovered address matches the node address
+
+The registration signature includes `block.chainid` for cross-chain replay protection, ensuring validator registrations are chain-specific and cannot be replayed across chains.
+
+### Signature format
+
+All signatures in the protocol follow this structure:
+
+```text
+[validator_id: 1 byte][signature_data: variable length]
+```
+
+**For user signatures:**
+
+* `0x00` = Use ChannelHub's default ECDSA validator (always available)
+* `0x01-0xFF` = Look up validator in node's registry, only if corresponding bit is set in `approvedSignatureValidators` (e.g., ID 42 allowed if bit 42 is 1)
+
+**For node signatures:**
+
+* `0x00` = Use ChannelHub's default ECDSA validator
+* `0x01-0xFF` = Look up validator in node's registry (always available for nodes)
+
+The first byte determines which validator verifies the signature. The remaining bytes are passed to the selected validator for verification.
+
+### Cross-chain compatibility
+
+The dual validator selection system solves critical cross-chain problems:
+
+**User validators (approved validators bitmask):** Since the allowed validator bitmask is in `ChannelDefinition.approvedSignatureValidators`, which is part of `channelId`, it travels with every signature across all chains. No cross-chain synchronization is needed.
+
+**Node validators (per-node registry):** Validator contracts may not be deployed to the same address on all chains. The registry uses 1-byte IDs instead of addresses, allowing the same validator ID to map to different addresses on different chains. Nodes register their validators independently on each chain.
 
 ---
 

@@ -84,16 +84,16 @@ library EscrowWithdrawalEngine {
     function _validateUniversal(TransitionContext memory ctx, State memory candidate) internal view {
         require(ctx.status != EscrowStatus.FINALIZED, "escrow already finalized");
         uint64 blockchainId = uint64(block.chainid);
-        require(candidate.homeState.chainId != blockchainId, "must not be on home chain");
-        require(candidate.nonHomeState.chainId == blockchainId, "must be on non-home chain");
+        require(candidate.homeLedger.chainId != blockchainId, "must not be on home chain");
+        require(candidate.nonHomeLedger.chainId == blockchainId, "must be on non-home chain");
         require(candidate.version > 0, "invalid version");
 
-        // Validate token decimals for nonHomeState (current chain)
-        Utils.validateTokenDecimals(candidate.nonHomeState);
+        // Validate token decimals for nonHomeLedger (current chain)
+        Utils.validateTokenDecimals(candidate.nonHomeLedger);
 
         // Validate allocations equal net flows
-        uint256 allocsSum = candidate.nonHomeState.userAllocation + candidate.nonHomeState.nodeAllocation;
-        int256 netFlowsSum = candidate.nonHomeState.userNetFlow + candidate.nonHomeState.nodeNetFlow;
+        uint256 allocsSum = candidate.nonHomeLedger.userAllocation + candidate.nonHomeLedger.nodeAllocation;
+        int256 netFlowsSum = candidate.nonHomeLedger.userNetFlow + candidate.nonHomeLedger.nodeNetFlow;
 
         require(netFlowsSum >= 0, "negative net flow sum");
         require(allocsSum == netFlowsSum.toUint256(), "invalid allocation sum");
@@ -126,24 +126,24 @@ library EscrowWithdrawalEngine {
     {
         // INITIATE: Node locks funds for user withdrawal
         require(ctx.status == EscrowStatus.VOID, "escrow already exists");
-        require(candidate.nonHomeState.userAllocation == 0, "user allocation must be zero on non-home");
-        require(candidate.nonHomeState.userNetFlow == 0, "user net flow must be zero on non-home");
-        uint256 withdrawalAmount = candidate.nonHomeState.nodeAllocation;
+        require(candidate.nonHomeLedger.userAllocation == 0, "user allocation must be zero on non-home");
+        require(candidate.nonHomeLedger.userNetFlow == 0, "user net flow must be zero on non-home");
+        uint256 withdrawalAmount = candidate.nonHomeLedger.nodeAllocation;
         require(
-            candidate.nonHomeState.nodeAllocation == withdrawalAmount, "node allocation must equal withdrawal amount"
+            candidate.nonHomeLedger.nodeAllocation == withdrawalAmount, "node allocation must equal withdrawal amount"
         );
         require(
-            candidate.nonHomeState.nodeNetFlow == withdrawalAmount.toInt256(),
+            candidate.nonHomeLedger.nodeNetFlow == withdrawalAmount.toInt256(),
             "node net flow must equal withdrawal amount"
         );
 
         // Validate that home state shows user has allocation to withdraw
         require(
-            candidate.homeState.userAllocation.toWad(candidate.homeState.decimals)
-                >= withdrawalAmount.toWad(candidate.nonHomeState.decimals),
+            candidate.homeLedger.userAllocation.toWad(candidate.homeLedger.decimals)
+                >= withdrawalAmount.toWad(candidate.nonHomeLedger.decimals),
             "home user allocation must be sufficient"
         );
-        require(candidate.homeState.nodeAllocation == 0, "home node allocation must be zero");
+        require(candidate.homeLedger.nodeAllocation == 0, "home node allocation must be zero");
 
         // Calculate effects
         effects.nodeFundsDelta = withdrawalAmount.toInt256(); // Pull from node vault
@@ -167,30 +167,30 @@ library EscrowWithdrawalEngine {
         require(candidate.version == ctx.initState.version + 1, "candidate must be immediate successor");
         require(ctx.initState.intent == StateIntent.INITIATE_ESCROW_WITHDRAWAL, "intent must be initiate");
 
-        uint256 withdrawalAmount = ctx.initState.nonHomeState.nodeAllocation;
-        require(candidate.nonHomeState.userAllocation == 0, "user allocation must be zero");
-        require(candidate.nonHomeState.userNetFlow == -withdrawalAmount.toInt256(), "invalid user net flow");
-        require(candidate.nonHomeState.nodeAllocation == 0, "node allocation must be zero");
-        require(candidate.nonHomeState.nodeNetFlow == withdrawalAmount.toInt256(), "invalid node net flow");
+        uint256 withdrawalAmount = ctx.initState.nonHomeLedger.nodeAllocation;
+        require(candidate.nonHomeLedger.userAllocation == 0, "user allocation must be zero");
+        require(candidate.nonHomeLedger.userNetFlow == -withdrawalAmount.toInt256(), "invalid user net flow");
+        require(candidate.nonHomeLedger.nodeAllocation == 0, "node allocation must be zero");
+        require(candidate.nonHomeLedger.nodeNetFlow == withdrawalAmount.toInt256(), "invalid node net flow");
 
-        // Validate homeState shows user allocation decreased
+        // Validate homeLedger shows user allocation decreased
         require(
-            candidate.homeState.userAllocation < ctx.initState.homeState.userAllocation,
+            candidate.homeLedger.userAllocation < ctx.initState.homeLedger.userAllocation,
             "home user allocation must decrease"
         );
-        uint256 homeUserAllocDelta = ctx.initState.homeState.userAllocation - candidate.homeState.userAllocation;
+        uint256 homeUserAllocDelta = ctx.initState.homeLedger.userAllocation - candidate.homeLedger.userAllocation;
         require(
-            homeUserAllocDelta.toWad(candidate.homeState.decimals)
-                == withdrawalAmount.toWad(ctx.initState.nonHomeState.decimals),
+            homeUserAllocDelta.toWad(candidate.homeLedger.decimals)
+                == withdrawalAmount.toWad(ctx.initState.nonHomeLedger.decimals),
             "home user alloc delta must equal withdrawal amount"
         );
 
         // Node net flow decreases (becomes more negative) by withdrawal amount
-        int256 homeNodeNfDelta = candidate.homeState.nodeNetFlow - ctx.initState.homeState.nodeNetFlow;
+        int256 homeNodeNfDelta = candidate.homeLedger.nodeNetFlow - ctx.initState.homeLedger.nodeNetFlow;
         require(homeNodeNfDelta < 0, "home node net flow must decrease");
         require(
-            (-homeNodeNfDelta).toWad(candidate.homeState.decimals)
-                == withdrawalAmount.toInt256().toWad(ctx.initState.nonHomeState.decimals),
+            (-homeNodeNfDelta).toWad(candidate.homeLedger.decimals)
+                == withdrawalAmount.toInt256().toWad(ctx.initState.nonHomeLedger.decimals),
             "home node net flow delta must equal withdrawal amount"
         );
 

@@ -3,15 +3,18 @@ pragma solidity 0.8.30;
 
 // ========= Channel Types ==========
 
+enum ParticipantIndex {
+    USER,
+    NODE
+}
+
 struct ChannelDefinition {
     uint32 challengeDuration;
     address user;
     address node;
     uint64 nonce;
+    uint256 approvedSignatureValidators; // Bitmask of approved validator IDs for user signatures (bit N = validator ID N)
     bytes32 metadata;
-    // to be added later:
-    // address executionModule;
-    // address signatureValidator;
 }
 
 enum ChannelStatus {
@@ -43,6 +46,8 @@ enum StateIntent {
     FINALIZE_MIGRATION
 }
 
+uint8 constant DEFAULT_SIG_VALIDATOR_ID = 0;
+
 struct State {
     uint64 version;
     StateIntent intent;
@@ -51,8 +56,8 @@ struct State {
     // to be added for fees logic:
     // bytes data;
 
-    Ledger homeState;
-    Ledger nonHomeState;
+    Ledger homeLedger;
+    Ledger nonHomeLedger;
 
     bytes userSig;
     bytes nodeSig;

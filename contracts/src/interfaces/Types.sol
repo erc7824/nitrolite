@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ISignatureValidator} from "./ISignatureValidator.sol";
-
 // ========= Channel Types ==========
 
 struct ChannelDefinition {
@@ -10,7 +8,6 @@ struct ChannelDefinition {
     address user;
     address node;
     uint64 nonce;
-    ISignatureValidator signatureValidator;
     bytes32 metadata;
 }
 
@@ -43,23 +40,7 @@ enum StateIntent {
     FINALIZE_MIGRATION
 }
 
-/**
- * @notice Signature validator type selector for pluggable signature validation
- * @dev Signature encoding format:
- *      bytes signature = abi.encodePacked(uint8(SigValidatorType), bytes sigBody)
- *
- *      The first byte indicates which validator to use:
- *      - 0x00 (DEFAULT) -> routes to defaultSigValidator
- *      - 0x01 (CHANNEL) -> routes to channel's signatureValidator from definition
- *
- *      ChannelHub logic reads the first byte to determine routing.
- *      The remainder (sigBody) is passed to the selected validator's validateSignature
- *      or validateChallengerSignature method.
- */
-enum SigValidatorType {
-    DEFAULT,
-    CHANNEL
-}
+uint8 constant DEFAULT_VALIDATOR_ID = 0;
 
 struct State {
     uint64 version;

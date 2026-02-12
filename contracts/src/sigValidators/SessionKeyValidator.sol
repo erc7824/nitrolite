@@ -7,7 +7,7 @@ import {
     VALIDATION_SUCCESS,
     VALIDATION_FAILURE
 } from "../interfaces/ISignatureValidator.sol";
-import {BaseValidator} from "./BaseValidator.sol";
+import {EcdsaSignatureUtils} from "./EcdsaSignatureUtils.sol";
 import {Utils} from "../Utils.sol";
 
 /**
@@ -52,7 +52,7 @@ function toSigningData(SessionKeyAuthorization memory skAuth) pure returns (byte
  * - On-chain validation only checks cryptographic validity
  * - Participants are responsible for session key management
  */
-contract SessionKeyValidator is BaseValidator, ISignatureValidator {
+contract SessionKeyValidator is ISignatureValidator {
     /**
      * @notice Validates a signature using a delegated session key
      * @dev Validates:
@@ -76,7 +76,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
 
         // Step 1: Verify participant authorized this session key
         bytes memory authMessage = toSigningData(skAuth);
-        bool authResult = validateEcdsaSigner(authMessage, skAuth.authSignature, participant);
+        bool authResult = EcdsaSignatureUtils.validateEcdsaSigner(authMessage, skAuth.authSignature, participant);
 
         if (!authResult) {
             return VALIDATION_FAILURE;
@@ -84,7 +84,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
 
         // Step 2: Verify session key signed the full state message
         bytes memory stateMessage = Utils.pack(channelId, signingData);
-        if (validateEcdsaSigner(stateMessage, skSignature, skAuth.sessionKey)) {
+        if (EcdsaSignatureUtils.validateEcdsaSigner(stateMessage, skSignature, skAuth.sessionKey)) {
             return VALIDATION_SUCCESS;
         } else {
             return VALIDATION_FAILURE;
@@ -114,7 +114,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
 
         // Step 1: Verify participant authorized this session key
         bytes memory authMessage = toSigningData(skAuth);
-        bool authResult = validateEcdsaSignerIsEither(authMessage, skAuth.authSignature, user, node);
+        bool authResult = EcdsaSignatureUtils.validateEcdsaSignerIsEither(authMessage, skAuth.authSignature, user, node);
 
         if (!authResult) {
             return VALIDATION_FAILURE;
@@ -122,7 +122,7 @@ contract SessionKeyValidator is BaseValidator, ISignatureValidator {
 
         // Step 2: Verify session key signed the full challenge message
         bytes memory challengeMessage = abi.encodePacked(Utils.pack(channelId, signingData), "challenge");
-        if (validateEcdsaSigner(challengeMessage, skSignature, skAuth.sessionKey)) {
+        if (EcdsaSignatureUtils.validateEcdsaSigner(challengeMessage, skSignature, skAuth.sessionKey)) {
             return VALIDATION_SUCCESS;
         } else {
             return VALIDATION_FAILURE;

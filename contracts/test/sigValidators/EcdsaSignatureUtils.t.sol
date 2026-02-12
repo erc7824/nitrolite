@@ -5,37 +5,13 @@ import {Test} from "lib/forge-std/src/Test.sol";
 
 import {TestUtils} from "../TestUtils.sol";
 
-import {BaseValidator} from "../../src/sigValidators/BaseValidator.sol";
+import {EcdsaSignatureUtils} from "../../src/sigValidators/EcdsaSignatureUtils.sol";
 
 /**
- * @notice Test harness that exposes internal BaseValidator functions for testing
+ * @title EcdsaSignatureUtilsTest_Base
+ * @notice Base contract for EcdsaSignatureUtils tests with common setup and utilities
  */
-contract TestBaseValidator is BaseValidator {
-    function exposed_validateEcdsaSigner(bytes memory message, bytes memory signature, address expectedSigner)
-        external
-        pure
-        returns (bool)
-    {
-        return validateEcdsaSigner(message, signature, expectedSigner);
-    }
-
-    function exposed_validateEcdsaSignerIsEither(
-        bytes memory message,
-        bytes memory signature,
-        address addr1,
-        address addr2
-    ) external pure returns (bool) {
-        return validateEcdsaSignerIsEither(message, signature, addr1, addr2);
-    }
-}
-
-/**
- * @title BaseValidatorTest_Base
- * @notice Base contract for BaseValidator tests with common setup and utilities
- */
-contract BaseValidatorTest_Base is Test {
-    TestBaseValidator public validator;
-
+contract EcdsaSignatureUtilsTest_Base is Test {
     uint256 constant SIGNER1_PK = 1;
     uint256 constant SIGNER2_PK = 2;
     uint256 constant OTHER_SIGNER_PK = 3;
@@ -47,8 +23,6 @@ contract BaseValidatorTest_Base is Test {
     bytes constant TEST_MESSAGE = "Test message for signature validation";
 
     function setUp() public virtual {
-        validator = new TestBaseValidator();
-
         signer1 = vm.addr(SIGNER1_PK);
         signer2 = vm.addr(SIGNER2_PK);
         otherSigner = vm.addr(OTHER_SIGNER_PK);
@@ -68,21 +42,21 @@ contract BaseValidatorTest_Base is Test {
 }
 
 /**
- * @title BaseValidatorTest_validateEcdsaSigner
+ * @title EcdsaSignatureUtilsTest_validateEcdsaSigner
  * @notice Tests for the validateEcdsaSigner function
  */
-contract BaseValidatorTest_validateEcdsaSigner is BaseValidatorTest_Base {
+contract EcdsaSignatureUtilsTest_validateEcdsaSigner is EcdsaSignatureUtilsTest_Base {
     function test_success_withCorrectEip191Sig() public view {
         bytes memory signature = TestUtils.signEip191(vm, SIGNER1_PK, TEST_MESSAGE);
 
-        bool result = validator.exposed_validateEcdsaSigner(TEST_MESSAGE, signature, signer1);
+        bool result = EcdsaSignatureUtils.validateEcdsaSigner(TEST_MESSAGE, signature, signer1);
         assertTrue(result, "Should validate correct EIP-191 signature");
     }
 
     function test_success_withCorrectRawEcdsaSig() public view {
         bytes memory signature = TestUtils.signRaw(vm, SIGNER1_PK, TEST_MESSAGE);
 
-        bool result = validator.exposed_validateEcdsaSigner(TEST_MESSAGE, signature, signer1);
+        bool result = EcdsaSignatureUtils.validateEcdsaSigner(TEST_MESSAGE, signature, signer1);
         assertTrue(result, "Should validate correct raw ECDSA signature");
     }
 
@@ -90,7 +64,7 @@ contract BaseValidatorTest_validateEcdsaSigner is BaseValidatorTest_Base {
         bytes memory validSignature = TestUtils.signEip191(vm, SIGNER1_PK, TEST_MESSAGE);
         bytes memory faultySignature = createFaultySignature(validSignature);
 
-        bool result = validator.exposed_validateEcdsaSigner(TEST_MESSAGE, faultySignature, signer1);
+        bool result = EcdsaSignatureUtils.validateEcdsaSigner(TEST_MESSAGE, faultySignature, signer1);
         assertFalse(result, "Should reject faulty EIP-191 signature");
     }
 
@@ -98,63 +72,63 @@ contract BaseValidatorTest_validateEcdsaSigner is BaseValidatorTest_Base {
         bytes memory validSignature = TestUtils.signRaw(vm, SIGNER1_PK, TEST_MESSAGE);
         bytes memory faultySignature = createFaultySignature(validSignature);
 
-        bool result = validator.exposed_validateEcdsaSigner(TEST_MESSAGE, faultySignature, signer1);
+        bool result = EcdsaSignatureUtils.validateEcdsaSigner(TEST_MESSAGE, faultySignature, signer1);
         assertFalse(result, "Should reject faulty raw ECDSA signature");
     }
 
     function test_failure_withIncorrectEip191Sig() public view {
         bytes memory signature = TestUtils.signEip191(vm, OTHER_SIGNER_PK, TEST_MESSAGE);
-        bool result = validator.exposed_validateEcdsaSigner(TEST_MESSAGE, signature, signer1);
+        bool result = EcdsaSignatureUtils.validateEcdsaSigner(TEST_MESSAGE, signature, signer1);
         assertFalse(result, "Should reject EIP-191 signature from wrong signer");
     }
 
     function test_failure_withIncorrectRawEcdsaSig() public view {
         bytes memory signature = TestUtils.signRaw(vm, OTHER_SIGNER_PK, TEST_MESSAGE);
-        bool result = validator.exposed_validateEcdsaSigner(TEST_MESSAGE, signature, signer1);
+        bool result = EcdsaSignatureUtils.validateEcdsaSigner(TEST_MESSAGE, signature, signer1);
         assertFalse(result, "Should reject raw ECDSA signature from wrong signer");
     }
 }
 
 /**
- * @title BaseValidatorTest_validateEcdsaSignerIsEither
+ * @title EcdsaSignatureUtilsTest_validateEcdsaSignerIsEither
  * @notice Tests for the validateEcdsaSignerIsEither function
  */
-contract BaseValidatorTest_validateEcdsaSignerIsEither is BaseValidatorTest_Base {
+contract EcdsaSignatureUtilsTest_validateEcdsaSignerIsEither is EcdsaSignatureUtilsTest_Base {
     function test_success_withEip191SigFromFirstAddress() public view {
         bytes memory signature = TestUtils.signEip191(vm, SIGNER1_PK, TEST_MESSAGE);
-        bool result = validator.exposed_validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
+        bool result = EcdsaSignatureUtils.validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
         assertTrue(result, "Should validate EIP-191 signature from first address");
     }
 
     function test_success_withEip191SigFromSecondAddress() public view {
         bytes memory signature = TestUtils.signEip191(vm, SIGNER2_PK, TEST_MESSAGE);
-        bool result = validator.exposed_validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
+        bool result = EcdsaSignatureUtils.validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
         assertTrue(result, "Should validate EIP-191 signature from second address");
     }
 
     function test_success_withRawEcdsaSigFromFirstAddress() public view {
         bytes memory signature = TestUtils.signRaw(vm, SIGNER1_PK, TEST_MESSAGE);
-        bool result = validator.exposed_validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
+        bool result = EcdsaSignatureUtils.validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
         assertTrue(result, "Should validate raw ECDSA signature from first address");
     }
 
     function test_success_withRawEcdsaSigFromSecondAddress() public view {
         bytes memory signature = TestUtils.signRaw(vm, SIGNER2_PK, TEST_MESSAGE);
-        bool result = validator.exposed_validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
+        bool result = EcdsaSignatureUtils.validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
         assertTrue(result, "Should validate raw ECDSA signature from second address");
     }
 
     function test_failure_withEip191SigFromOtherSigner() public view {
         bytes memory signature = TestUtils.signEip191(vm, OTHER_SIGNER_PK, TEST_MESSAGE);
 
-        bool result = validator.exposed_validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
+        bool result = EcdsaSignatureUtils.validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
 
         assertFalse(result, "Should reject EIP-191 signature from other signer");
     }
 
     function test_failure_withRawEcdsaSigFromOtherSigner() public view {
         bytes memory signature = TestUtils.signRaw(vm, OTHER_SIGNER_PK, TEST_MESSAGE);
-        bool result = validator.exposed_validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
+        bool result = EcdsaSignatureUtils.validateEcdsaSignerIsEither(TEST_MESSAGE, signature, signer1, signer2);
         assertFalse(result, "Should reject raw ECDSA signature from other signer");
     }
 
@@ -162,7 +136,7 @@ contract BaseValidatorTest_validateEcdsaSignerIsEither is BaseValidatorTest_Base
         bytes memory validSignature = TestUtils.signEip191(vm, SIGNER1_PK, TEST_MESSAGE);
         bytes memory faultySignature = createFaultySignature(validSignature);
 
-        bool result = validator.exposed_validateEcdsaSignerIsEither(TEST_MESSAGE, faultySignature, signer1, signer2);
+        bool result = EcdsaSignatureUtils.validateEcdsaSignerIsEither(TEST_MESSAGE, faultySignature, signer1, signer2);
         assertFalse(result, "Should reject faulty EIP-191 signature from first signer");
     }
 
@@ -170,7 +144,7 @@ contract BaseValidatorTest_validateEcdsaSignerIsEither is BaseValidatorTest_Base
         bytes memory validSignature = TestUtils.signRaw(vm, SIGNER2_PK, TEST_MESSAGE);
         bytes memory faultySignature = createFaultySignature(validSignature);
 
-        bool result = validator.exposed_validateEcdsaSignerIsEither(TEST_MESSAGE, faultySignature, signer1, signer2);
+        bool result = EcdsaSignatureUtils.validateEcdsaSignerIsEither(TEST_MESSAGE, faultySignature, signer1, signer2);
         assertFalse(result, "Should reject faulty raw ECDSA signature from second signer");
     }
 }

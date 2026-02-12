@@ -5,11 +5,12 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /**
- * @title BaseValidator
- * @notice Abstract base contract providing common signature validation logic
- * @dev Implements flexible ECDSA signature recovery that tries both EIP-191 and raw ECDSA formats
+ * @title EcdsaSignatureUtils
+ * @notice Utility library for ECDSA signature validation
+ * @dev Provides flexible ECDSA signature recovery that tries both EIP-191 and raw ECDSA formats.
+ *      Used by validators and ChannelHub for signature verification.
  */
-abstract contract BaseValidator {
+library EcdsaSignatureUtils {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
 
@@ -20,7 +21,7 @@ abstract contract BaseValidator {
      * @param message The message that was signed (will be hashed internally)
      * @param signature The signature to validate (65 bytes ECDSA: r, s, v)
      * @param expectedSigner The address that should have signed the message
-     * @return result VALIDATION_SUCCESS if signature is from expectedSigner, VALIDATION_FAILURE otherwise
+     * @return bool True if signature is valid and from expectedSigner, false otherwise
      */
     function validateEcdsaSigner(bytes memory message, bytes memory signature, address expectedSigner)
         internal
@@ -52,7 +53,7 @@ abstract contract BaseValidator {
      * @param signature The signature to validate (65 bytes ECDSA: r, s, v)
      * @param addr1 First possible signer address
      * @param addr2 Second possible signer address
-     * @return result VALIDATION_SUCCESS if signature is from addr1 or addr2, VALIDATION_FAILURE otherwise
+     * @return bool True if signature is from addr1 or addr2, false otherwise
      */
     function validateEcdsaSignerIsEither(bytes memory message, bytes memory signature, address addr1, address addr2)
         internal

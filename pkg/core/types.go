@@ -39,36 +39,39 @@ const (
 
 // Channel represents an on-chain channel
 type Channel struct {
-	ChannelID          string        `json:"channel_id"`                     // Unique identifier for the channel
-	UserWallet         string        `json:"user_wallet"`                    // User wallet address
-	Type               ChannelType   `json:"type"`                           // Type of the channel (home, escrow)
-	BlockchainID       uint64        `json:"blockchain_id"`                  // Unique identifier for the blockchain
-	TokenAddress       string        `json:"token_address"`                  // Address of the token used in the channel
-	ChallengeDuration  uint32        `json:"challenge_duration"`             // Challenge period for the channel in seconds
-	ChallengeExpiresAt *time.Time    `json:"challenge_expires_at,omitempty"` // Timestamp when the challenge period elapses
-	Nonce              uint64        `json:"nonce"`                          // Nonce for the channel
-	Status             ChannelStatus `json:"status"`                         // Current status of the channel (void, open, challenged, closed)
-	StateVersion       uint64        `json:"state_version"`                  // On-chain state version of the channel
+	ChannelID             string        `json:"channel_id"`                     // Unique identifier for the channel
+	UserWallet            string        `json:"user_wallet"`                    // User wallet address
+	Type                  ChannelType   `json:"type"`                           // Type of the channel (home, escrow)
+	BlockchainID          uint64        `json:"blockchain_id"`                  // Unique identifier for the blockchain
+	TokenAddress          string        `json:"token_address"`                  // Address of the token used in the channel
+	ChallengeDuration     uint32        `json:"challenge_duration"`             // Challenge period for the channel in seconds
+	ChallengeExpiresAt    *time.Time    `json:"challenge_expires_at,omitempty"` // Timestamp when the challenge period elapses
+	Nonce                 uint64        `json:"nonce"`                          // Nonce for the channel
+	ApprovedSigValidators string        `json:"approved_sig_validators"`        // Bitmask representing approved signature validators for the channel
+	Status                ChannelStatus `json:"status"`                         // Current status of the channel (void, open, challenged, closed)
+	StateVersion          uint64        `json:"state_version"`                  // On-chain state version of the channel
 }
 
-func NewChannel(channelID, userWallet string, ChType ChannelType, blockchainID uint64, tokenAddress string, nonce uint64, challenge uint32) *Channel {
+func NewChannel(channelID, userWallet string, ChType ChannelType, blockchainID uint64, tokenAddress string, nonce uint64, challenge uint32, approvedSigValidators string) *Channel {
 	return &Channel{
-		ChannelID:         channelID,
-		UserWallet:        userWallet,
-		Type:              ChType,
-		BlockchainID:      blockchainID,
-		TokenAddress:      tokenAddress,
-		Nonce:             nonce,
-		ChallengeDuration: challenge,
-		Status:            ChannelStatusVoid,
-		StateVersion:      0,
+		ChannelID:             channelID,
+		UserWallet:            userWallet,
+		Type:                  ChType,
+		BlockchainID:          blockchainID,
+		TokenAddress:          tokenAddress,
+		Nonce:                 nonce,
+		ChallengeDuration:     challenge,
+		ApprovedSigValidators: approvedSigValidators,
+		Status:                ChannelStatusVoid,
+		StateVersion:          0,
 	}
 }
 
 // ChannelDefinition represents configuration for creating a channel
 type ChannelDefinition struct {
-	Nonce     uint64 `json:"nonce"`     // A unique number to prevent replay attacks
-	Challenge uint32 `json:"challenge"` // Challenge period for the channel in seconds
+	Nonce                 uint64 `json:"nonce"`                   // A unique number to prevent replay attacks
+	Challenge             uint32 `json:"challenge"`               // Challenge period for the channel in seconds
+	ApprovedSigValidators string `json:"approved_sig_validators"` // Bitmask representing approved signature validators for the channel
 }
 
 // State represents the current state of the user stored on Node
@@ -164,6 +167,7 @@ func (state *State) ApplyChannelCreation(channelDef ChannelDefinition, blockchai
 		state.Asset,
 		channelDef.Nonce,
 		channelDef.Challenge,
+		channelDef.ApprovedSigValidators,
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate home channel ID: %w", err)
@@ -851,10 +855,10 @@ func (t1 Transition) Equal(t2 Transition) error {
 
 // Blockchain represents information about a supported blockchain network
 type Blockchain struct {
-	Name            string `json:"name"`             // Blockchain name
-	ID              uint64 `json:"id"`               // Blockchain network ID
-	ContractAddress string `json:"contract_address"` // Address of the main contract on this blockchain
-	BlockStep       uint64 `json:"block_step"`       // Number of blocks between each channel update
+	Name              string `json:"name"`                // Blockchain name
+	ID                uint64 `json:"id"`                  // Blockchain network ID
+	ChannelHubAddress string `json:"channel_hub_address"` // Address of the ChannelHub contract on this blockchain
+	BlockStep         uint64 `json:"block_step"`          // Number of blocks between each channel update
 }
 
 // Asset represents information about a supported asset
@@ -967,6 +971,9 @@ type NodeConfig struct {
 
 	// NodeVersion is the software version of the clearnode instance
 	NodeVersion string
+
+	// SupportedSigValidators is the list of supported signature validator types
+	SupportedSigValidators []ChannelSignerType
 
 	// Blockchains is the list of supported blockchain networks
 	Blockchains []Blockchain

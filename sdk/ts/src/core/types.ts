@@ -71,6 +71,7 @@ export const INTENT_FINALIZE_MIGRATION = 9;
 export interface ChannelDefinition {
   nonce: bigint; // uint64 - A unique number to prevent replay attacks
   challenge: number; // uint32 - Challenge period for the channel in seconds
+  approvedSigValidators: string; // Hex string bitmap of approved signature validators
 }
 
 /**
@@ -85,6 +86,7 @@ export interface Channel {
   challengeDuration: number; // uint32 - Challenge period for the channel in seconds
   challengeExpiresAt?: Date; // Timestamp when the challenge period elapses
   nonce: bigint; // uint64 - Nonce for the channel
+  approvedSigValidators: string; // Hex string bitmap of approved signature validators
   status: ChannelStatus; // Current status of the channel (void, open, challenged, closed)
   stateVersion: bigint; // uint64 - On-chain state version of the channel
 }
@@ -151,7 +153,7 @@ export interface Transaction {
 export interface Blockchain {
   name: string;
   id: bigint; // uint64
-  contractAddress: Address;
+  channelHubAddress: Address;
   blockStep: bigint; // uint64
 }
 
@@ -220,6 +222,7 @@ export interface PaginationMetadata {
 export interface NodeConfig {
   nodeAddress: Address;
   nodeVersion: string;
+  supportedSigValidators: number[];
   blockchains: Blockchain[];
 }
 
@@ -263,7 +266,8 @@ export function newChannel(
   blockchainId: bigint,
   tokenAddress: Address,
   nonce: bigint,
-  challenge: number
+  challenge: number,
+  approvedSigValidators: string = '0x00'
 ): Channel {
   return {
     channelId,
@@ -273,6 +277,7 @@ export function newChannel(
     tokenAddress,
     nonce,
     challengeDuration: challenge,
+    approvedSigValidators,
     status: ChannelStatus.Void,
     stateVersion: 0n,
   };

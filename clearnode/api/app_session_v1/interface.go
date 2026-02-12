@@ -23,17 +23,21 @@ type Store interface {
 
 	// Channel state operations
 
-	// CheckOpenChannel verifies if a user has an active channel for the given asset.
-	CheckOpenChannel(wallet, asset string) (bool, error)
+	// CheckOpenChannel verifies if a user has an active channel for the given asset
+	// and returns the approved signature validators if such a channel exists.
+	CheckOpenChannel(wallet, asset string) (string, bool, error)
 	GetLastUserState(wallet, asset string, signed bool) (*core.State, error)
 	StoreUserState(state core.State) error
 	EnsureNoOngoingStateTransitions(wallet, asset string) error
 
-	// TODO: add session keys support
-	// Session key operations
-	// GetActiveSessionKey(sessionKeyAddress string) (*app.SessionKeyV1, error)
-	// ValidateSessionKeyApplication(sessionKey *app.SessionKeyV1, application string) error
-	// ValidateSessionKeySpending(sessionKey *app.SessionKeyV1, asset string, amount decimal.Decimal) error
+	// App Session key state operations
+	StoreAppSessionKeyState(state app.AppSessionKeyStateV1) error
+	GetLastAppSessionKeyVersion(wallet, sessionKey string) (uint64, error)
+	GetLastAppSessionKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error)
+	GetAppSessionKeyOwner(sessionKey, appSessionId string) (string, error)
+
+	// Channel Session key state operations
+	ValidateChannelSessionKeyForAsset(wallet, sessionKey, asset, metadataHash string) (bool, error)
 }
 
 // StoreTxHandler is a function that executes Store operations within a transaction.

@@ -123,6 +123,24 @@ func (c *Client) ChannelsV1SubmitState(ctx context.Context, req ChannelsV1Submit
 	return resp, nil
 }
 
+// ChannelsV1SubmitSessionKeyState submits a channel session key state for registration or update.
+func (c *Client) ChannelsV1SubmitSessionKeyState(ctx context.Context, req ChannelsV1SubmitSessionKeyStateRequest) (ChannelsV1SubmitSessionKeyStateResponse, error) {
+	var resp ChannelsV1SubmitSessionKeyStateResponse
+	if err := c.call(ctx, ChannelsV1SubmitSessionKeyStateMethod, req, &resp); err != nil {
+		return resp, err
+	}
+	return resp, nil
+}
+
+// ChannelsV1GetLastKeyStates retrieves the latest channel session key states for a user.
+func (c *Client) ChannelsV1GetLastKeyStates(ctx context.Context, req ChannelsV1GetLastKeyStatesRequest) (ChannelsV1GetLastKeyStatesResponse, error) {
+	var resp ChannelsV1GetLastKeyStatesResponse
+	if err := c.call(ctx, ChannelsV1GetLastKeyStatesMethod, req, &resp); err != nil {
+		return resp, err
+	}
+	return resp, nil
+}
+
 // ============================================================================
 // App Sessions Group - V1 API Methods
 // ============================================================================
@@ -181,32 +199,19 @@ func (c *Client) AppSessionsV1RebalanceAppSessions(ctx context.Context, req AppS
 	return resp, nil
 }
 
-// ============================================================================
-// Session Keys Group - V1 API Methods
-// ============================================================================
-
-// SessionKeysV1Register initiates session key registration.
-func (c *Client) SessionKeysV1Register(ctx context.Context, req SessionKeysV1RegisterRequest) (SessionKeysV1RegisterResponse, error) {
-	var resp SessionKeysV1RegisterResponse
-	if err := c.call(ctx, SessionKeysV1RegisterMethod, req, &resp); err != nil {
+// AppSessionsV1Register initiates session key registration.
+func (c *Client) AppSessionsV1SubmitSessionKeyState(ctx context.Context, req AppSessionsV1SubmitSessionKeyStateRequest) (AppSessionsV1SubmitSessionKeyStateRequest, error) {
+	var resp AppSessionsV1SubmitSessionKeyStateRequest
+	if err := c.call(ctx, AppSessionsV1SubmitSessionKeyStateMethod, req, &resp); err != nil {
 		return resp, err
 	}
 	return resp, nil
 }
 
-// SessionKeysV1RevokeSessionKey revokes a session key by immediately invalidating it.
-func (c *Client) SessionKeysV1RevokeSessionKey(ctx context.Context, req SessionKeysV1RevokeSessionKeyRequest) (SessionKeysV1RevokeSessionKeyResponse, error) {
-	var resp SessionKeysV1RevokeSessionKeyResponse
-	if err := c.call(ctx, SessionKeysV1RevokeSessionKeyMethod, req, &resp); err != nil {
-		return resp, err
-	}
-	return resp, nil
-}
-
-// SessionKeysV1GetSessionKeys retrieves all active session keys for the authenticated user.
-func (c *Client) SessionKeysV1GetSessionKeys(ctx context.Context, req SessionKeysV1GetSessionKeysRequest) (SessionKeysV1GetSessionKeysResponse, error) {
-	var resp SessionKeysV1GetSessionKeysResponse
-	if err := c.call(ctx, SessionKeysV1GetSessionKeysMethod, req, &resp); err != nil {
+// AppSessionsV1GetSessionKeys retrieves all active session keys for the authenticated user.
+func (c *Client) AppSessionsV1GetLastKeyStates(ctx context.Context, req AppSessionsV1GetLastKeyStatesRequest) (AppSessionsV1GetLastKeyStatesResponse, error) {
+	var resp AppSessionsV1GetLastKeyStatesResponse
+	if err := c.call(ctx, AppSessionsV1GetLastKeyStatesMethod, req, &resp); err != nil {
 		return resp, err
 	}
 	return resp, nil

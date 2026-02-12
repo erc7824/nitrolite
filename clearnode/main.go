@@ -61,7 +61,7 @@ func main() {
 			logger.Fatal("failed to connect to EVM Node")
 		}
 		reactor := evm.NewReactor(b.ID, eventHandlerService, bb.DbStore.StoreContractEvent)
-		l := evm.NewListener(common.HexToAddress(b.ContractAddress), client, b.ID, b.BlockStep, logger, reactor.HandleEvent, bb.DbStore.GetLatestEvent)
+		l := evm.NewListener(common.HexToAddress(b.ChannelHubAddress), client, b.ID, b.BlockStep, logger, reactor.HandleEvent, bb.DbStore.GetLatestEvent)
 		if err := l.Listen(ctx); err != nil {
 			logger.Fatal("failed to start EVM listener")
 		}
@@ -74,7 +74,7 @@ func main() {
 			evm.ClientAllowanceCheck{RequireAllowanceCheck: false},
 		}
 
-		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ContractAddress), client, bb.TxSigner, b.ID, nodeAddress, bb.MemoryStore, clientOpts...)
+		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ChannelHubAddress), client, bb.TxSigner, b.ID, nodeAddress, bb.MemoryStore, clientOpts...)
 		if err != nil {
 			logger.Fatal("failed to create EVM client")
 		}

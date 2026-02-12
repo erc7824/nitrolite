@@ -3,6 +3,8 @@ package channel_v1
 import (
 	"fmt"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/shopspring/decimal"
 
@@ -106,8 +108,9 @@ func toCoreChannelDefinition(def rpc.ChannelDefinitionV1) (core.ChannelDefinitio
 	}
 
 	return core.ChannelDefinition{
-		Nonce:     nonce,
-		Challenge: def.Challenge,
+		Nonce:                 nonce,
+		Challenge:             def.Challenge,
+		ApprovedSigValidators: def.ApprovedSigValidators,
 	}, nil
 }
 
@@ -198,5 +201,44 @@ func coreStateToRPC(state core.State) rpc.StateV1 {
 		EscrowLedger:    escrowLedger,
 		UserSig:         state.UserSig,
 		NodeSig:         state.NodeSig,
+	}
+}
+
+// unmapChannelSessionKeyStateV1 converts an RPC ChannelSessionKeyStateV1 to a core.ChannelSessionKeyStateV1.
+func unmapChannelSessionKeyStateV1(state *rpc.ChannelSessionKeyStateV1) (core.ChannelSessionKeyStateV1, error) {
+	version, err := strconv.ParseUint(state.Version, 10, 64)
+	if err != nil {
+		return core.ChannelSessionKeyStateV1{}, fmt.Errorf("invalid version: %w", err)
+	}
+
+	expiresAtUnix, err := strconv.ParseInt(state.ExpiresAt, 10, 64)
+	if err != nil {
+		return core.ChannelSessionKeyStateV1{}, fmt.Errorf("invalid expires_at: %w", err)
+	}
+
+	assets := state.Assets
+	if assets == nil {
+		assets = []string{}
+	}
+
+	return core.ChannelSessionKeyStateV1{
+		UserAddress: strings.ToLower(state.UserAddress),
+		SessionKey:  strings.ToLower(state.SessionKey),
+		Version:     version,
+		Assets:      assets,
+		ExpiresAt:   time.Unix(expiresAtUnix, 0),
+		UserSig:     state.UserSig,
+	}, nil
+}
+
+// mapChannelSessionKeyStateV1 converts a core.ChannelSessionKeyStateV1 to an RPC ChannelSessionKeyStateV1.
+func mapChannelSessionKeyStateV1(state *core.ChannelSessionKeyStateV1) rpc.ChannelSessionKeyStateV1 {
+	return rpc.ChannelSessionKeyStateV1{
+		UserAddress: state.UserAddress,
+		SessionKey:  state.SessionKey,
+		Version:     strconv.FormatUint(state.Version, 10),
+		Assets:      state.Assets,
+		ExpiresAt:   strconv.FormatInt(state.ExpiresAt.Unix(), 10),
+		UserSig:     state.UserSig,
 	}
 }

@@ -146,9 +146,9 @@ func InitBackbone() *Backbone {
 		}
 
 		// Verify ChannelHub version
-		channelHubAddress := common.HexToAddress(bc.ContractAddress)
+		channelHubAddress := common.HexToAddress(bc.ChannelHubAddress)
 		if err := checkChannelHubVersion(rpcURL, channelHubAddress, core.ChannelHubVersion); err != nil {
-			logger.Fatal("failed to verify ChannelHub version", "blockchainID", bc.ID, "address", bc.ContractAddress, "error", err)
+			logger.Fatal("failed to verify ChannelHub version", "blockchainID", bc.ID, "address", bc.ChannelHubAddress, "error", err)
 		}
 
 		blockchainRPCs[bc.ID] = rpcURL

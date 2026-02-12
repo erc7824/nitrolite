@@ -1,6 +1,6 @@
 # App Session V1 API Implementation
 
-This directory contains the V1 API handlers for app session management, implementing the `create_app_session`, `submit_deposit_state`, `submit_app_state`, `rebalance_app_sessions`, `get_app_sessions`, and `get_app_definition` endpoints.
+This directory contains the V1 API handlers for app session management, implementing the `create_app_session`, `submit_deposit_state`, `submit_app_state`, `rebalance_app_sessions`, `get_app_sessions`, `get_app_definition`, `submit_session_key_state`, and `get_last_key_states` endpoints.
 
 
 ## Architecture
@@ -17,6 +17,8 @@ This directory contains the V1 API handlers for app session management, implemen
   - `rebalance_app_sessions.go` - Rebalance app sessions endpoint
   - `get_app_sessions.go` - Get app sessions endpoint (with filtering)
   - `get_app_definition.go` - Get app definition endpoint
+  - `submit_session_key_state.go` - Submit session key state endpoint
+  - `get_last_key_states.go` - Get last session key states endpoint
   - `app_session.go` - Package documentation
 
 ### Business Logic Layer (`pkg/app`)
@@ -668,6 +670,86 @@ ORDER BY created_at DESC;
 - Does not include dynamic state like version, status, or allocations
 - Nonce is from the session definition (not current version)
 
+### 7. `app_sessions.v1.submit_session_key_state`
+
+**Purpose**: Submits a session key state for registration or update. Session keys allow delegated signing for app sessions, enabling applications to sign on behalf of a user's wallet.
+
+**Key Features**:
+- Versioned session key states (each update increments the version)
+- ABI-encoded signature verification ensures only the wallet owner can register session keys
+- Supports scoping session keys to specific applications and app sessions
+- Expiration enforcement
+
+**Request**:
+```json
+{
+  "state": {
+    "user_address": "0x1234...",
+    "session_key": "0xabcd...",
+    "version": "1",
+    "application_id": ["app1", "app2"],
+    "app_session_id": ["0xSession1..."],
+    "expires_at": "1762417328",
+    "user_sig": "0x..."
+  }
+}
+```
+
+**Response**:
+```json
+{}
+```
+
+**Validation**:
+- `user_address` must be a valid hex address
+- `session_key` must be a valid hex address
+- `version` must be greater than 0
+- `expires_at` must be in the future
+- `user_sig` is required
+- Version must be sequential (latest_version + 1)
+- Signature must recover to `user_address`
+
+**Signature Verification**:
+- Uses ABI encoding via `PackAppSessionKeyStateV1` to create a deterministic hash
+- Encodes: user_address (address), session_key (address), version (uint64), application_ids (bytes32[]), app_session_ids (bytes32[]), expires_at (uint64)
+- The `user_sig` field is excluded from packing (it is the signature itself)
+- Recovers signer address from ECDSA signature
+- Validates that recovered address matches `user_address`
+
+### 8. `app_sessions.v1.get_last_key_states`
+
+**Purpose**: Retrieves the latest non-expired session key states for a user, with optional filtering by session key address.
+
+**Request**:
+```json
+{
+  "user_address": "0x1234...",
+  "session_key": "0xabcd..."  // Optional filter
+}
+```
+
+**Response**:
+```json
+{
+  "states": [
+    {
+      "user_address": "0x1234...",
+      "session_key": "0xabcd...",
+      "version": "3",
+      "application_id": ["app1"],
+      "app_session_id": [],
+      "expires_at": "1762417328",
+      "user_sig": "0x..."
+    }
+  ]
+}
+```
+
+**Validation**:
+- `user_address` is required
+- Returns only the latest version per session key
+- Excludes expired session key states
+
 ## Implementation Details
 
 ### Files
@@ -680,6 +762,8 @@ ORDER BY created_at DESC;
 - `rebalance_app_sessions.go` - Rebalance app sessions endpoint handler
 - `get_app_sessions.go` - Get app sessions endpoint handler (with filtering and pagination)
 - `get_app_definition.go` - Get app definition endpoint handler
+- `submit_session_key_state.go` - Submit session key state endpoint handler
+- `get_last_key_states.go` - Get last session key states endpoint handler
 - `interface.go` - Store and signature validator interfaces
 - `utils.go` - Mapping functions between RPC and core types
 - `rebalance_app_sessions_test.go` - Comprehensive tests for rebalancing
@@ -727,6 +811,19 @@ The implementation uses Ethereum ABI encoding for deterministic hashing and sign
 - Returns Keccak256 hash as hex string
 - Used in `rebalance_app_sessions` to create unique transaction IDs
 - Ensures each session-asset combination has a unique transaction ID within the batch
+
+#### `GenerateSessionKeyStateIDV1(userAddress, sessionKey string, version uint64) (string, error)`
+- Generates a deterministic ID from user_address, session_key, and version
+- Encodes: user_address (address), session_key (address), version (uint64)
+- Returns Keccak256 hash as hex string
+- Used as the primary key for session key state records
+
+#### `PackAppSessionKeyStateV1(state AppSessionKeyStateV1) ([]byte, error)`
+- Packs session key state for signature verification using ABI encoding
+- Encodes: user_address (address), session_key (address), version (uint64), application_ids (bytes32[]), app_session_ids (bytes32[]), expires_at (uint64)
+- Excludes the `user_sig` field (it is the signature itself)
+- Returns Keccak256 hash of ABI-encoded data
+- Used in `submit_session_key_state` to verify the user's signature
 
 ### Dependencies
 
@@ -778,6 +875,12 @@ type Store interface {
     GetLastUserState(wallet, asset string, signed bool) (*core.State, error)
     StoreUserState(state core.State) error
     EnsureNoOngoingStateTransitions(wallet, asset string) error
+
+    // Session key state operations
+    StoreAppSessionKeyState(state app.AppSessionKeyStateV1) error
+    GetLastAppSessionKeyVersion(wallet, sessionKey string) (uint64, error)
+    GetLastAppSessionKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error)
+    GetAppSessionKeyOwner(sessionKey, appSessionId string) (string, error)
 }
 ```
 
@@ -816,6 +919,8 @@ router.Register(rpc.AppSessionsV1SubmitAppStateMethod, handler.SubmitAppState)
 router.Register(rpc.AppSessionsV1RebalanceAppSessionsMethod, handler.RebalanceAppSessions)
 router.Register(rpc.AppSessionsV1GetAppSessionsMethod, handler.GetAppSessions)
 router.Register(rpc.AppSessionsV1GetAppDefinitionMethod, handler.GetAppDefinition)
+router.Register(rpc.AppSessionsV1SubmitSessionKeyStateMethod, handler.SubmitSessionKeyState)
+router.Register(rpc.AppSessionsV1GetLastKeyStatesMethod, handler.GetLastKeyStates)
 ```
 
 ## Key Implementation Decisions

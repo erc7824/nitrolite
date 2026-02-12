@@ -17,8 +17,6 @@ import (
 func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -33,14 +31,12 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	participant1 := "0x1111111111111111111111111111111111111111"
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
@@ -69,6 +65,19 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 		"USDC": decimal.NewFromInt(150),
 	}
 
+	// Build the core app state update for signing (with lowercased participant addresses)
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentOperate,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{Participant: participant1, Asset: "USDC", Amount: decimal.NewFromInt(100)},
+			{Participant: participant2, Asset: "USDC", Amount: decimal.NewFromInt(50)},
+		},
+		SessionData: `{"state":"updated"}`,
+	}
+	sig1 := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
@@ -80,14 +89,13 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 			},
 			SessionData: `{"state":"updated"}`,
 		},
-		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{sig1},
 	}
 
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
 		return session.Version == 2 && session.SessionData == `{"state":"updated"}` && session.Status == app.AppSessionStatusOpen
@@ -113,14 +121,11 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 	assert.Equal(t, rpc.MsgTypeResp, ctx.Response.Type)
 
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -135,14 +140,12 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	participant1 := "0x1111111111111111111111111111111111111111"
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
@@ -172,6 +175,19 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 		"USDC": decimal.NewFromInt(150),
 	}
 
+	// Build the core app state update for signing
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentOperate,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{Participant: participant1, Asset: "USDC", Amount: decimal.NewFromInt(75)},
+			{Participant: participant2, Asset: "USDC", Amount: decimal.NewFromInt(75)},
+		},
+		SessionData: "",
+	}
+	sig1 := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+
 	// New allocations: p1=75, p2=75 (total=150) - redistribution!
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
@@ -184,14 +200,13 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 			},
 			SessionData: "",
 		},
-		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{sig1},
 	}
 
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	// Expect ledger entries for the redistribution
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
 	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", decimal.NewFromInt(-25)).Return(nil).Once()
@@ -220,13 +235,11 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 	assert.Equal(t, rpc.MsgTypeResp, ctx.Response.Type)
 
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 	mockSigner := NewMockSigner()
 
 	storeTxProvider := func(fn StoreTxHandler) error {
@@ -242,14 +255,12 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	participant1 := "0x1111111111111111111111111111111111111111"
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 
 	existingSession := &app.AppSessionV1{
 		SessionID:   appSessionID,
@@ -269,6 +280,18 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 		},
 	}
 
+	// Build the core app state update for signing
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentWithdraw,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{Participant: participant1, Asset: "USDC", Amount: decimal.NewFromInt(60)},
+		},
+		SessionData: "",
+	}
+	sig1 := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
@@ -279,13 +302,12 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 			},
 			SessionData: "",
 		},
-		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{sig1},
 	}
 
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
 	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", decimal.NewFromInt(-40)).Return(nil)
 
@@ -320,13 +342,11 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	assert.Equal(t, rpc.MsgTypeResp, ctx.Response.Type)
 
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 	mockSigner := NewMockSigner()
 
 	storeTxProvider := func(fn StoreTxHandler) error {
@@ -342,14 +362,12 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	participant1 := "0x1111111111111111111111111111111111111111"
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
@@ -374,6 +392,19 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 		},
 	}
 
+	// Build the core app state update for signing
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentClose,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{Participant: participant1, Asset: "USDC", Amount: decimal.NewFromInt(100)},
+			{Participant: participant2, Asset: "USDC", Amount: decimal.NewFromInt(50)},
+		},
+		SessionData: "",
+	}
+	sig1 := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
@@ -385,13 +416,12 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 			},
 			SessionData: "",
 		},
-		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{sig1},
 	}
 
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
 
 	// Mock expectations for fund release and channel state issuance on close
@@ -433,14 +463,11 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	assert.Equal(t, rpc.MsgTypeResp, ctx.Response.Type)
 
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -455,14 +482,12 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	participant1 := "0x1111111111111111111111111111111111111111"
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 
 	existingSession := &app.AppSessionV1{
 		SessionID:   appSessionID,
@@ -482,6 +507,18 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 		},
 	}
 
+	// Build the core app state update for signing (with mismatched amount)
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentClose,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{Participant: participant1, Asset: "USDC", Amount: decimal.NewFromInt(50)},
+		},
+		SessionData: "",
+	}
+	sig1 := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
@@ -492,13 +529,12 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 			},
 			SessionData: "",
 		},
-		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{sig1},
 	}
 
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil).Maybe()
 
 	// Create RPC context
@@ -520,14 +556,11 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 	assert.Contains(t, respErr.Error(), "close intent requires allocations to match current state")
 
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -542,14 +575,12 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	participant1 := "0x1111111111111111111111111111111111111111"
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
@@ -578,6 +609,18 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 		"USDC": decimal.NewFromInt(150),
 	}
 
+	// Build the core app state update for signing (only participant1 allocation - missing participant2)
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentOperate,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{Participant: participant1, Asset: "USDC", Amount: decimal.NewFromInt(150)},
+		},
+		SessionData: "",
+	}
+	sig1 := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
@@ -588,14 +631,13 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 			},
 			SessionData: "",
 		},
-		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{sig1},
 	}
 
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil).Maybe()
 
 	// Map iteration order is non-deterministic, so participant1 might be processed before the participant2 missing error
@@ -620,13 +662,11 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 	assert.Contains(t, respErr.Error(), "operate intent missing allocation")
 
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 	mockSigner := NewMockSigner()
 
 	storeTxProvider := func(fn StoreTxHandler) error {
@@ -642,14 +682,12 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	participant1 := "0x1111111111111111111111111111111111111111"
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 
 	existingSession := &app.AppSessionV1{
 		SessionID:   appSessionID,
@@ -670,6 +708,18 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 		},
 	}
 
+	// Build the core app state update for signing (missing DAI allocation)
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentWithdraw,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{Participant: participant1, Asset: "USDC", Amount: decimal.NewFromInt(60)},
+		},
+		SessionData: "",
+	}
+	sig1 := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
@@ -680,13 +730,12 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 			},
 			SessionData: "",
 		},
-		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{sig1},
 	}
 
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil).Maybe()
 	mockAssetStore.On("GetAssetDecimals", "DAI").Return(uint8(18), nil).Maybe()
 	mockStatePacker.On("PackState", mock.Anything).Return([]byte("packed"), nil).Maybe()
@@ -717,7 +766,6 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 	assert.Contains(t, respErr.Error(), "withdraw intent missing allocation")
 
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitAppState_DepositIntent_Rejected(t *testing.T) {
@@ -738,7 +786,6 @@ func TestSubmitAppState_DepositIntent_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{},
 		"0xNode",
 	)
 
@@ -777,8 +824,6 @@ func TestSubmitAppState_DepositIntent_Rejected(t *testing.T) {
 func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -793,9 +838,6 @@ func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
@@ -860,7 +902,6 @@ func TestSubmitAppState_InvalidVersion_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{},
 		"0xNode",
 	)
 
@@ -925,7 +966,6 @@ func TestSubmitAppState_SessionNotFound_Rejected(t *testing.T) {
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{},
 		"0xNode",
 	)
 
@@ -969,8 +1009,6 @@ func TestSubmitAppState_SessionNotFound_Rejected(t *testing.T) {
 func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -985,14 +1023,12 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	participant1 := "0x1111111111111111111111111111111111111111"
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 
 	existingSession := &app.AppSessionV1{
 		SessionID:   appSessionID,
@@ -1016,6 +1052,19 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 		"USDC": decimal.NewFromInt(100),
 	}
 
+	// Build the core app state update for signing (with invalid precision amount)
+	invalidAmount, _ := decimal.NewFromString("100.1234567")
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentOperate,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{Participant: participant1, Asset: "USDC", Amount: invalidAmount},
+		},
+		SessionData: "",
+	}
+	sig1 := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+
 	// Create amount with too many decimal places (7 decimals for USDC which has 6)
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
@@ -1027,14 +1076,13 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 			},
 			SessionData: "",
 		},
-		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{sig1},
 	}
 
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
 
 	// Create RPC context
@@ -1057,13 +1105,11 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 	assert.Contains(t, respErr.Error(), "amount exceeds maximum decimal precision")
 
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testing.T) {
 	// Setup
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
 	mockSigner := NewMockSigner()
 
 	storeTxProvider := func(fn StoreTxHandler) error {
@@ -1079,14 +1125,12 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	participant1 := "0x1111111111111111111111111111111111111111"
+	wallet1 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
 
 	existingSession := &app.AppSessionV1{
 		SessionID:   appSessionID,
@@ -1106,6 +1150,19 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 		},
 	}
 
+	// Build the core app state update for signing (with invalid precision amount)
+	invalidAmount, _ := decimal.NewFromString("60.1234567")
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentWithdraw,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{Participant: participant1, Asset: "USDC", Amount: invalidAmount},
+		},
+		SessionData: "",
+	}
+	sig1 := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+
 	// Create amount with too many decimal places (7 decimals for USDC which has 6)
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
@@ -1117,13 +1174,12 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 			},
 			SessionData: "",
 		},
-		QuorumSigs: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+		QuorumSigs: []string{sig1},
 	}
 
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
 	// RecordLedgerEntry will be called before validation, but then validation will fail
 	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", mock.Anything).Return(nil).Maybe()
@@ -1148,14 +1204,11 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 	assert.Contains(t, respErr.Error(), "amount exceeds maximum decimal precision")
 
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 }
 
 func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *testing.T) {
 	// Test redistributing funds to a participant who didn't have any allocation before
 	mockStore := new(MockStore)
-	mockSigValidator := new(MockSigValidator)
-
 	storeTxProvider := func(fn StoreTxHandler) error {
 		return fn(mockStore)
 	}
@@ -1170,15 +1223,14 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
-		map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
 		"0xNode",
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	participant1 := "0x1111111111111111111111111111111111111111"
-	participant2 := "0x2222222222222222222222222222222222222222"
+	wallet1 := NewTestAppSessionWallet(t)
+	wallet2 := NewTestAppSessionWallet(t)
+	participant1 := wallet1.Address
+	participant2 := wallet2.Address
 
 	existingSession := &app.AppSessionV1{
 		SessionID:   appSessionID,
@@ -1203,6 +1255,20 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 		"WETH": decimal.NewFromFloat(0.015),
 	}
 
+	// Build the core app state update for signing
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentOperate,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{Participant: participant1, Asset: "WETH", Amount: decimal.NewFromFloat(0.01)},
+			{Participant: participant2, Asset: "WETH", Amount: decimal.NewFromFloat(0.005)},
+		},
+		SessionData: "",
+	}
+	sig1 := wallet1.SignAppStateUpdate(t, appStateUpdateCore)
+	sig2 := wallet2.SignAppStateUpdate(t, appStateUpdateCore)
+
 	// New state: redistribute 0.015 WETH to participant1=0.01, participant2=0.005
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
@@ -1215,18 +1281,13 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 			},
 			SessionData: "",
 		},
-		QuorumSigs: []string{
-			"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00",
-			"0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef123456789000",
-		},
+		QuorumSigs: []string{sig1, sig2},
 	}
 
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant2, nil).Once()
 	mockAssetStore.On("GetAssetDecimals", "WETH").Return(uint8(18), nil)
 
 	// Expect ledger entries:
@@ -1256,6 +1317,5 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 	require.Nil(t, ctx.Response.Error(), "Expected no error for valid redistribution to new participant")
 
 	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
 	mockAssetStore.AssertExpectations(t)
 }

@@ -259,3 +259,120 @@ func (c *Client) RebalanceAppSessions(ctx context.Context, signedUpdates []app.S
 
 	return resp.BatchID, nil
 }
+
+// ============================================================================
+// Session Key Methods
+// ============================================================================
+
+// SubmitSessionKeyState submits a session key state for registration or update.
+// The state must be signed by the user's wallet to authorize the session key delegation.
+//
+// Parameters:
+//   - state: The session key state containing delegation information
+//
+// Returns:
+//   - Error if the request fails
+//
+// Example:
+//
+//	state := app.AppSessionKeyStateV1{
+//	    UserAddress:    "0x1234...",
+//	    SessionKey:     "0xabcd...",
+//	    Version:        1,
+//	    ApplicationIDs: []string{"app1"},
+//	    AppSessionIDs:  []string{},
+//	    ExpiresAt:      time.Now().Add(24 * time.Hour),
+//	    UserSig:        "0x...",
+//	}
+//	err := client.SubmitSessionKeyState(ctx, state)
+func (c *Client) SubmitSessionKeyState(ctx context.Context, state app.AppSessionKeyStateV1) error {
+	req := rpc.AppSessionsV1SubmitSessionKeyStateRequest{
+		State: transformSessionKeyStateToRPC(state),
+	}
+	_, err := c.rpcClient.AppSessionsV1SubmitSessionKeyState(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to submit session key state: %w", err)
+	}
+	return nil
+}
+
+// GetLastKeyStatesOptions contains optional filters for GetLastKeyStates.
+type GetLastKeyStatesOptions struct {
+	// SessionKey filters by a specific session key address
+	SessionKey *string
+}
+
+// GetLastKeyStates retrieves the latest session key states for a user.
+//
+// Parameters:
+//   - userAddress: The user's wallet address
+//   - opts: Optional filters (pass nil for no filters)
+//
+// Returns:
+//   - Slice of AppSessionKeyStateV1 with the latest non-expired session key states
+//   - Error if the request fails
+//
+// Example:
+//
+//	states, err := client.GetLastKeyStates(ctx, "0x1234...", nil)
+//	for _, state := range states {
+//	    fmt.Printf("Session key %s expires at %s\n", state.SessionKey, state.ExpiresAt)
+//	}
+func (c *Client) GetLastKeyStates(ctx context.Context, userAddress string, opts *GetLastKeyStatesOptions) ([]app.AppSessionKeyStateV1, error) {
+	req := rpc.AppSessionsV1GetLastKeyStatesRequest{
+		UserAddress: userAddress,
+	}
+	if opts != nil {
+		req.SessionKey = opts.SessionKey
+	}
+
+	resp, err := c.rpcClient.AppSessionsV1GetLastKeyStates(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last key states: %w", err)
+	}
+
+	states, err := transformSessionKeyStates(resp.States)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform session key states: %w", err)
+	}
+
+	return states, nil
+}
+
+// SignSessionKeyState signs a session key state using the client's state signer.
+// This creates a properly formatted signature that can be set on the state's UserSig field
+// before submitting via SubmitSessionKeyState.
+//
+// Parameters:
+//   - state: The session key state to sign (UserSig field is excluded from signing)
+//
+// Returns:
+//   - The hex-encoded signature string
+//   - Error if signing fails
+//
+// Example:
+//
+//	state := app.AppSessionKeyStateV1{
+//	    UserAddress:    client.GetUserAddress(),
+//	    SessionKey:     "0xabcd...",
+//	    Version:        1,
+//	    ApplicationIDs: []string{},
+//	    AppSessionIDs:  []string{},
+//	    ExpiresAt:      time.Now().Add(24 * time.Hour),
+//	}
+//	sig, err := client.SignSessionKeyState(state)
+//	state.UserSig = sig
+//	err = client.SubmitSessionKeyState(ctx, state)
+func (c *Client) SignSessionKeyState(state app.AppSessionKeyStateV1) (string, error) {
+	packed, err := app.PackAppSessionKeyStateV1(state)
+	if err != nil {
+		return "", fmt.Errorf("failed to pack session key state: %w", err)
+	}
+
+	sig, err := c.stateSigner.Sign(packed)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign session key state: %w", err)
+	}
+
+	return fmt.Sprintf("0x%x", sig), nil
+}

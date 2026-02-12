@@ -11,6 +11,7 @@ CREATE TABLE channels (
     challenge_duration BIGINT NOT NULL DEFAULT 0,
     challenge_expires_at TIMESTAMPTZ,
     nonce NUMERIC(20,0) NOT NULL DEFAULT 0,
+    approved_sig_validators VARCHAR(66) NOT NULL DEFAULT 0,
     status SMALLINT NOT NULL, -- ChannelStatus enum: 0=void, 1=open, 2=challenged, 3=closed
     state_version NUMERIC(20,0) NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -157,26 +158,83 @@ CREATE TABLE blockchain_actions (
 CREATE INDEX idx_blockchain_actions_pending ON blockchain_actions(status, created_at) WHERE status = 0;
 CREATE INDEX idx_blockchain_actions_state_id ON blockchain_actions(state_id);
 
--- Session keys table (LEGACY): Session keys with spending caps
-CREATE TABLE session_keys (
-    id SERIAL PRIMARY KEY,
-    address VARCHAR NOT NULL UNIQUE,
-    wallet_address VARCHAR NOT NULL,
-    application VARCHAR NOT NULL,
-    allowance JSONB,
-    scope VARCHAR NOT NULL,
+-- Session key states: Stores session key delegation metadata signed by the user
+-- ID is Hash(user_address + session_key + version)
+CREATE TABLE app_session_key_states_v1 (
+    id CHAR(66) PRIMARY KEY,
+    user_address CHAR(42) NOT NULL,
+    session_key CHAR(42) NOT NULL,
+    version NUMERIC(20,0) NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
+    user_sig TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_address, session_key, version)
 );
 
-CREATE INDEX idx_session_keys_wallet_address ON session_keys(wallet_address);
-CREATE UNIQUE INDEX idx_session_keys_unique_wallet_app ON session_keys(wallet_address, application);
+CREATE INDEX idx_app_session_key_states_v1_user ON app_session_key_states_v1(user_address);
+CREATE INDEX idx_app_session_key_states_v1_expires ON app_session_key_states_v1(expires_at);
+
+-- Session key application IDs: Links session keys to application IDs
+CREATE TABLE app_session_key_applications_v1 (
+    session_key_state_id CHAR(66) NOT NULL,
+    application_id VARCHAR(66) NOT NULL,
+    PRIMARY KEY (session_key_state_id, application_id),
+    FOREIGN KEY (session_key_state_id) REFERENCES app_session_key_states_v1(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_app_session_key_applications_v1_app_id ON app_session_key_applications_v1(application_id);
+
+-- Session key app session IDs: Links session keys to app session IDs
+CREATE TABLE app_session_key_app_sessions_v1 (
+    session_key_state_id CHAR(66) NOT NULL,
+    app_session_id CHAR(66) NOT NULL,
+    PRIMARY KEY (session_key_state_id, app_session_id),
+    FOREIGN KEY (session_key_state_id) REFERENCES app_session_key_states_v1(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_app_session_key_app_sessions_v1_session_id ON app_session_key_app_sessions_v1(app_session_id);
+
+-- Channel session key states: Stores channel session key delegation metadata signed by the user
+-- ID is Hash(user_address + session_key + version)
+CREATE TABLE channel_session_key_states_v1 (
+    id CHAR(66) PRIMARY KEY,
+    user_address CHAR(42) NOT NULL,
+    session_key CHAR(42) NOT NULL,
+    version NUMERIC(20,0) NOT NULL,
+    metadata_hash CHAR(66) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    user_sig TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_address, session_key, version)
+);
+
+CREATE INDEX idx_channel_session_key_states_v1_user ON channel_session_key_states_v1(user_address);
+CREATE INDEX idx_channel_session_key_states_v1_expires ON channel_session_key_states_v1(expires_at);
+
+-- Channel session key assets: Links channel session keys to permitted assets
+CREATE TABLE channel_session_key_assets_v1 (
+    session_key_state_id CHAR(66) NOT NULL,
+    asset VARCHAR(20) NOT NULL,
+    PRIMARY KEY (session_key_state_id, asset),
+    FOREIGN KEY (session_key_state_id) REFERENCES channel_session_key_states_v1(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_channel_session_key_assets_v1_asset ON channel_session_key_assets_v1(asset);
 
 -- +goose Down
-DROP INDEX IF EXISTS idx_session_keys_unique_wallet_app;
-DROP INDEX IF EXISTS idx_session_keys_wallet_address;
-DROP TABLE IF EXISTS session_keys;
+DROP INDEX IF EXISTS idx_channel_session_key_assets_v1_asset;
+DROP TABLE IF EXISTS channel_session_key_assets_v1;
+DROP INDEX IF EXISTS idx_channel_session_key_states_v1_expires;
+DROP INDEX IF EXISTS idx_channel_session_key_states_v1_user;
+DROP TABLE IF EXISTS channel_session_key_states_v1;
+DROP INDEX IF EXISTS idx_app_session_key_app_sessions_v1_session_id;
+DROP TABLE IF EXISTS app_session_key_app_sessions_v1;
+DROP INDEX IF EXISTS idx_app_session_key_applications_v1_app_id;
+DROP TABLE IF EXISTS app_session_key_applications_v1;
+DROP INDEX IF EXISTS idx_app_session_key_states_v1_expires;
+DROP INDEX IF EXISTS idx_app_session_key_states_v1_user;
+DROP TABLE IF EXISTS app_session_key_states_v1;
 DROP INDEX IF EXISTS idx_blockchain_actions_state_id;
 DROP INDEX IF EXISTS idx_blockchain_actions_pending;
 DROP TABLE IF EXISTS blockchain_actions;

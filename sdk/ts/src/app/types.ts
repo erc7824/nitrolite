@@ -161,6 +161,26 @@ export interface SessionKeyV1 {
 }
 
 /**
+ * AppSessionKeyStateV1 represents the state of a session key delegation.
+ */
+export interface AppSessionKeyStateV1 {
+  /** User wallet address */
+  user_address: string;
+  /** Session key address for delegation */
+  session_key: string;
+  /** Version of the session key state */
+  version: string;
+  /** Application IDs associated with this session key */
+  application_ids: string[];
+  /** App session IDs associated with this session key */
+  app_session_ids: string[];
+  /** Unix timestamp in seconds indicating when the session key expires */
+  expires_at: string;
+  /** User's signature over the session key metadata */
+  user_sig: string;
+}
+
+/**
  * AssetAllowanceV1 represents an asset allowance with usage tracking
  */
 export interface AssetAllowanceV1 {

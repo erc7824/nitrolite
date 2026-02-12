@@ -5,7 +5,9 @@
 // convention: {Group}{Version}{Name}{Request|Response}.
 package rpc
 
-import "github.com/erc7824/nitrolite/pkg/core"
+import (
+	"github.com/erc7824/nitrolite/pkg/core"
+)
 
 // ============================================================================
 // Channels Group - V1 API
@@ -131,6 +133,29 @@ type ChannelsV1HomeChannelCreatedEvent struct {
 	InitialState StateV1 `json:"initial_state"`
 }
 
+// ChannelsV1SubmitSessionKeyStateRequest submits the session key state for registration and updates.
+type ChannelsV1SubmitSessionKeyStateRequest struct {
+	// State contains the session key metadata and delegation information
+	State ChannelSessionKeyStateV1 `json:"state"`
+}
+
+// ChannelsV1SubmitSessionKeyStateResponse returns the result of session key state submission.
+type ChannelsV1SubmitSessionKeyStateResponse struct {
+}
+
+// ChannelsV1GetLastKeyStatesRequest retrieves the latest session key states for a user with optional filtering by session key.
+type ChannelsV1GetLastKeyStatesRequest struct {
+	// UserAddress is the user's wallet address
+	UserAddress string  `json:"user_address"`
+	SessionKey  *string `json:"session_key,omitempty"` // Optionally filter by SessionKey
+}
+
+// ChannelsV1GetSessionKeysResponse returns the list of active session keys.
+type ChannelsV1GetLastKeyStatesResponse struct {
+	// States is the list of active session key states for the user
+	States []ChannelSessionKeyStateV1 `json:"states"`
+}
+
 // ============================================================================
 // App Sessions Group - V1 API
 // ============================================================================
@@ -234,52 +259,27 @@ type AppSessionsV1CreateAppSessionResponse struct {
 	Status string `json:"status"`
 }
 
-// ============================================================================
-// Session Keys Group - V1 API
-// ============================================================================
-
-// SessionKeysV1RegisterRequest initiates session key registration.
-type SessionKeysV1RegisterRequest struct {
-	// Address is the user wallet address
-	Address string `json:"address"`
-	// SessionKey is the session key address for delegation
-	SessionKey *string `json:"session_key,omitempty"`
-	// Application is the application name for analytics
-	Application *string `json:"application,omitempty"`
-	// Allowances contains asset allowances for the session
-	Allowances []AssetAllowanceV1 `json:"allowances,omitempty"`
-	// Scope is the permission scope
-	Scope *string `json:"scope,omitempty"`
-	// ExpiresAt is the session expiration timestamp
-	ExpiresAt *uint64 `json:"expires_at,omitempty"`
+// AppSessionsV1SubmitSessionKeyStateRequest submits the session key state for registration and updates.
+type AppSessionsV1SubmitSessionKeyStateRequest struct {
+	// State contains the session key metadata and delegation information
+	State AppSessionKeyStateV1 `json:"state"`
 }
 
-// SessionKeysV1RegisterResponse.
-type SessionKeysV1RegisterResponse struct {
+// AppSessionsV1SubmitSessionKeyStateResponse returns the result of session key state submission.
+type AppSessionsV1SubmitSessionKeyStateResponse struct {
 }
 
-// SessionKeysV1RevokeSessionKeyRequest revokes a session key by immediately invalidating it.
-type SessionKeysV1RevokeSessionKeyRequest struct {
-	// SessionKey is the address of the session key to revoke
-	SessionKey string `json:"session_key"`
-}
-
-// SessionKeysV1RevokeSessionKeyResponse returns the address of the revoked session key.
-type SessionKeysV1RevokeSessionKeyResponse struct {
-	// SessionKey is the address of the revoked session key
-	SessionKey string `json:"session_key"`
-}
-
-// SessionKeysV1GetSessionKeysRequest retrieves all active session keys for the authenticated user.
-type SessionKeysV1GetSessionKeysRequest struct {
-	// Wallet is the user's wallet address
-	Wallet string `json:"wallet"`
+// AppSessionsV1GetLastKeyStatesRequest retrieves the latest session key states for a user with optional filtering by session key.
+type AppSessionsV1GetLastKeyStatesRequest struct {
+	// UserAddress is the user's wallet address
+	UserAddress string  `json:"user_address"`
+	SessionKey  *string `json:"session_key,omitempty"` // Optionally filter by SessionKey
 }
 
 // SessionKeysV1GetSessionKeysResponse returns the list of active session keys.
-type SessionKeysV1GetSessionKeysResponse struct {
-	// SessionKeys is the list of active session keys
-	SessionKeys []SessionKeyV1 `json:"session_keys"`
+type AppSessionsV1GetLastKeyStatesResponse struct {
+	// States is the list of active session key states for the user
+	States []AppSessionKeyStateV1 `json:"states"`
 }
 
 // ============================================================================
@@ -341,6 +341,8 @@ type NodeV1GetConfigResponse struct {
 	NodeAddress string `json:"node_address"`
 	// NodeVersion is the node software version
 	NodeVersion string `json:"node_version"`
+	// SupportedSigValidators is the list of supported signature validators identifiers for state sig verification
+	SupportedSigValidators []core.ChannelSignerType `json:"supported_sig_validators"`
 	// Blockchains is the list of supported networks
 	Blockchains []BlockchainInfoV1 `json:"blockchains"`
 }

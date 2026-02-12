@@ -16,7 +16,7 @@ func TestGetEscrowChannel_Success(t *testing.T) {
 	mockTxStore := new(MockStore)
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
+	nodeSigner, _ := core.NewChannelDefaultSigner(mockSigner)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint32(3600)
 	mockStatePacker := new(MockStatePacker)
@@ -31,12 +31,9 @@ func TestGetEscrowChannel_Success(t *testing.T) {
 			}
 			return nil
 		},
-		signer:       mockSigner,
+		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
-		sigValidators: map[SigValidatorType]SigValidator{
-			EcdsaSigValidatorType: mockSigValidator,
-		},
 	}
 
 	// Test data

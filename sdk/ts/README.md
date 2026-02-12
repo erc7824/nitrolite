@@ -50,6 +50,12 @@ client.submitAppState(update, sigs)                             // Update sessio
 client.rebalanceAppSessions(signedUpdates)                      // Atomic rebalance
 ```
 
+### Session Keys
+```typescript
+client.submitSessionKeyState(state)                             // Register/update session key
+client.getLastKeyStates(userAddress, sessionKey?)               // Get active session key states
+```
+
 ### Shared Utilities
 ```typescript
 client.close()                              // Close connection
@@ -338,6 +344,25 @@ const nodeSig = await client.submitAppSessionDeposit(
 await client.submitAppState(appUpdate, quorumSigs);
 
 const batchId = await client.rebalanceAppSessions(signedUpdates);
+```
+
+### Session Keys
+
+```typescript
+// Submit a session key state for registration or update
+await client.submitSessionKeyState({
+  user_address: '0x1234...',
+  session_key: '0xabcd...',
+  version: '1',
+  application_id: ['app1'],
+  app_session_id: [],
+  expires_at: String(Math.floor(Date.now() / 1000) + 86400),
+  user_sig: '0x...',
+});
+
+// Query active session key states
+const states = await client.getLastKeyStates('0x1234...');
+const filtered = await client.getLastKeyStates('0x1234...', '0xSessionKey...');
 ```
 
 ## Key Concepts
@@ -703,6 +728,7 @@ import type {
   Blockchain,
   AppSessionInfoV1,
   AppDefinitionV1,
+  AppSessionKeyStateV1,
   PaginationMetadata,
 } from '@erc7824/nitrolite';
 ```

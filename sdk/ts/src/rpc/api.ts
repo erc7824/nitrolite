@@ -8,6 +8,7 @@ import { Address } from 'viem';
 import {
   ChannelV1,
   ChannelDefinitionV1,
+  ChannelSessionKeyStateV1,
   StateV1,
   BalanceEntryV1,
   TransactionV1,
@@ -21,8 +22,7 @@ import {
   AppStateUpdateV1,
   AppSessionInfoV1,
   AppAllocationV1,
-  AssetAllowanceV1,
-  SessionKeyV1,
+  AppSessionKeyStateV1,
   SignedAppStateUpdateV1,
 } from '../app/types';
 import { TransactionType } from '../core/types';
@@ -137,6 +137,29 @@ export interface ChannelsV1HomeChannelCreatedEvent {
 }
 
 // ============================================================================
+// Channel Session Key State Group - V1 API
+// ============================================================================
+
+export interface ChannelsV1SubmitSessionKeyStateRequest {
+  /** Session key state containing delegation information */
+  state: ChannelSessionKeyStateV1;
+}
+
+export interface ChannelsV1SubmitSessionKeyStateResponse {}
+
+export interface ChannelsV1GetLastKeyStatesRequest {
+  /** User's wallet address */
+  user_address: string;
+  /** Optionally filter by session key address */
+  session_key?: string;
+}
+
+export interface ChannelsV1GetLastKeyStatesResponse {
+  /** List of active channel session key states for the user */
+  states: ChannelSessionKeyStateV1[];
+}
+
+// ============================================================================
 // App Sessions Group - V1 API
 // ============================================================================
 
@@ -238,44 +261,26 @@ export interface AppSessionsV1CloseAppSessionResponse {
 }
 
 // ============================================================================
-// Session Keys Group - V1 API
+// App Session Key State Group - V1 API
 // ============================================================================
 
-export interface SessionKeysV1RegisterRequest {
-  /** User wallet address */
-  address: Address;
-  /** Session key address for delegation */
-  session_key?: string;
-  /** Application name for analytics */
-  application?: string;
-  /** Asset allowances for the session */
-  allowances?: AssetAllowanceV1[];
-  /** Permission scope */
-  scope?: string;
-  /** Session expiration timestamp */
-  expires_at?: bigint; // uint64
+export interface AppSessionsV1SubmitSessionKeyStateRequest {
+  /** Session key state containing delegation information */
+  state: AppSessionKeyStateV1;
 }
 
-export interface SessionKeysV1RegisterResponse {}
+export interface AppSessionsV1SubmitSessionKeyStateResponse {}
 
-export interface SessionKeysV1RevokeSessionKeyRequest {
-  /** Address of the session key to revoke */
-  session_key: string;
-}
-
-export interface SessionKeysV1RevokeSessionKeyResponse {
-  /** Address of the revoked session key */
-  session_key: string;
-}
-
-export interface SessionKeysV1GetSessionKeysRequest {
+export interface AppSessionsV1GetLastKeyStatesRequest {
   /** User's wallet address */
-  wallet: Address;
+  user_address: string;
+  /** Optionally filter by session key address */
+  session_key?: string;
 }
 
-export interface SessionKeysV1GetSessionKeysResponse {
-  /** List of active session keys */
-  session_keys: SessionKeyV1[];
+export interface AppSessionsV1GetLastKeyStatesResponse {
+  /** List of active session key states for the user */
+  states: AppSessionKeyStateV1[];
 }
 
 // ============================================================================
@@ -329,6 +334,8 @@ export interface NodeV1GetConfigResponse {
   node_address: Address;
   /** Node software version */
   node_version: string;
+  /** List of supported signature validators identifiers for state sig verification */
+  supported_sig_validators: number[];
   /** List of supported networks */
   blockchains: BlockchainInfoV1[];
 }

@@ -22,6 +22,10 @@ export const ChannelsV1GetStatesMethod: Method = 'channels.v1.get_states';
 export const ChannelsV1RequestCreationMethod: Method = 'channels.v1.request_creation';
 export const ChannelsV1SubmitStateMethod: Method = 'channels.v1.submit_state';
 
+// Channel Session Key Methods - V1
+export const ChannelsV1SubmitSessionKeyStateMethod: Method = 'channels.v1.submit_session_key_state';
+export const ChannelsV1GetLastKeyStatesMethod: Method = 'channels.v1.get_last_key_states';
+
 // App Sessions Group - V1 Methods
 export const AppSessionsV1Group: Group = 'app_sessions.v1';
 export const AppSessionsV1SubmitDepositStateMethod: Method = 'app_sessions.v1.submit_deposit_state';
@@ -32,11 +36,9 @@ export const AppSessionsV1GetAppSessionsMethod: Method = 'app_sessions.v1.get_ap
 export const AppSessionsV1CreateAppSessionMethod: Method = 'app_sessions.v1.create_app_session';
 export const AppSessionsV1CloseAppSessionMethod: Method = 'app_sessions.v1.close_app_session';
 
-// Session Keys Group - V1 Methods
-export const SessionKeysV1Group: Group = 'session_keys.v1';
-export const SessionKeysV1RegisterMethod: Method = 'session_keys.v1.register';
-export const SessionKeysV1RevokeSessionKeyMethod: Method = 'session_keys.v1.revoke_session_key';
-export const SessionKeysV1GetSessionKeysMethod: Method = 'session_keys.v1.get_session_keys';
+// App Session Key Methods - V1
+export const AppSessionsV1SubmitSessionKeyStateMethod: Method = 'app_sessions.v1.submit_session_key_state';
+export const AppSessionsV1GetLastKeyStatesMethod: Method = 'app_sessions.v1.get_last_key_states';
 
 // User Group - V1 Methods
 export const UserV1Group: Group = 'user.v1';

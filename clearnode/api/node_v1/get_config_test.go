@@ -26,14 +26,14 @@ func TestGetConfig_Success(t *testing.T) {
 	// Test data
 	blockchains := []core.Blockchain{
 		{
-			Name:            "Ethereum",
-			ID:              1,
-			ContractAddress: "0xContract1",
+			Name:              "Ethereum",
+			ID:                1,
+			ChannelHubAddress: "0xContract1",
 		},
 		{
-			Name:            "Polygon",
-			ID:              137,
-			ContractAddress: "0xContract137",
+			Name:              "Polygon",
+			ID:                137,
+			ChannelHubAddress: "0xContract137",
 		},
 	}
 
@@ -71,10 +71,10 @@ func TestGetConfig_Success(t *testing.T) {
 	assert.Len(t, response.Blockchains, 2)
 	assert.Equal(t, "Ethereum", response.Blockchains[0].Name)
 	assert.Equal(t, "1", response.Blockchains[0].BlockchainID)
-	assert.Equal(t, "0xContract1", response.Blockchains[0].ContractAddress)
+	assert.Equal(t, "0xContract1", response.Blockchains[0].ChannelHubAddress)
 	assert.Equal(t, "Polygon", response.Blockchains[1].Name)
 	assert.Equal(t, "137", response.Blockchains[1].BlockchainID)
-	assert.Equal(t, "0xContract137", response.Blockchains[1].ContractAddress)
+	assert.Equal(t, "0xContract137", response.Blockchains[1].ChannelHubAddress)
 
 	// Verify all mock expectations
 	mockMemoryStore.AssertExpectations(t)

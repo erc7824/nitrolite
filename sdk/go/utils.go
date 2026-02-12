@@ -3,6 +3,7 @@ package sdk
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/app"
@@ -25,17 +26,18 @@ func transformNodeConfig(resp rpc.NodeV1GetConfigResponse) (*core.NodeConfig, er
 		}
 
 		blockchains = append(blockchains, core.Blockchain{
-			Name:            info.Name,
-			ID:              blockchainID,
-			ContractAddress: info.ContractAddress,
-			BlockStep:       0, // Not provided in RPC response
+			Name:              info.Name,
+			ID:                blockchainID,
+			ChannelHubAddress: info.ChannelHubAddress,
+			BlockStep:         0, // Not provided in RPC response
 		})
 	}
 
 	return &core.NodeConfig{
-		NodeAddress: resp.NodeAddress,
-		NodeVersion: resp.NodeVersion,
-		Blockchains: blockchains,
+		NodeAddress:            resp.NodeAddress,
+		NodeVersion:            resp.NodeVersion,
+		SupportedSigValidators: resp.SupportedSigValidators,
+		Blockchains:            blockchains,
 	}, nil
 }
 
@@ -146,15 +148,16 @@ func transformChannel(channel rpc.ChannelV1) (core.Channel, error) {
 	}
 
 	return core.Channel{
-		ChannelID:         channel.ChannelID,
-		UserWallet:        channel.UserWallet,
-		Type:              channelType,
-		BlockchainID:      blockchainID,
-		TokenAddress:      channel.TokenAddress,
-		ChallengeDuration: channel.ChallengeDuration,
-		Nonce:             nonce,
-		Status:            channelStatus,
-		StateVersion:      stateVersion,
+		ChannelID:             channel.ChannelID,
+		UserWallet:            channel.UserWallet,
+		Type:                  channelType,
+		BlockchainID:          blockchainID,
+		TokenAddress:          channel.TokenAddress,
+		ChallengeDuration:     channel.ChallengeDuration,
+		Nonce:                 nonce,
+		ApprovedSigValidators: channel.ApprovedSigValidators,
+		Status:                channelStatus,
+		StateVersion:          stateVersion,
 	}, nil
 }
 
@@ -367,8 +370,9 @@ func transformLedgerToRPC(ledger core.Ledger) rpc.LedgerV1 {
 // transformChannelDefinitionToRPC converts core.ChannelDefinition to RPC ChannelDefinitionV1.
 func transformChannelDefinitionToRPC(def core.ChannelDefinition) rpc.ChannelDefinitionV1 {
 	return rpc.ChannelDefinitionV1{
-		Nonce:     strconv.FormatUint(def.Nonce, 10),
-		Challenge: def.Challenge,
+		Nonce:                 strconv.FormatUint(def.Nonce, 10),
+		Challenge:             def.Challenge,
+		ApprovedSigValidators: def.ApprovedSigValidators,
 	}
 }
 
@@ -504,4 +508,123 @@ func transformSignedAppStateUpdateToRPC(signed app.SignedAppStateUpdateV1) rpc.S
 		AppStateUpdate: transformAppStateUpdateToRPC(signed.AppStateUpdate),
 		QuorumSigs:     signed.QuorumSigs,
 	}
+}
+
+// ============================================================================
+// Channel Session Key State Transformations
+// ============================================================================
+
+// transformChannelSessionKeyStateToRPC converts core.ChannelSessionKeyStateV1 to RPC ChannelSessionKeyStateV1.
+func transformChannelSessionKeyStateToRPC(state core.ChannelSessionKeyStateV1) rpc.ChannelSessionKeyStateV1 {
+	return rpc.ChannelSessionKeyStateV1{
+		UserAddress: state.UserAddress,
+		SessionKey:  state.SessionKey,
+		Version:     strconv.FormatUint(state.Version, 10),
+		Assets:      state.Assets,
+		ExpiresAt:   strconv.FormatInt(state.ExpiresAt.Unix(), 10),
+		UserSig:     state.UserSig,
+	}
+}
+
+// transformChannelSessionKeyState converts RPC ChannelSessionKeyStateV1 to core.ChannelSessionKeyStateV1.
+func transformChannelSessionKeyState(state rpc.ChannelSessionKeyStateV1) (core.ChannelSessionKeyStateV1, error) {
+	version, err := strconv.ParseUint(state.Version, 10, 64)
+	if err != nil {
+		return core.ChannelSessionKeyStateV1{}, fmt.Errorf("failed to parse version: %w", err)
+	}
+
+	expiresAtUnix, err := strconv.ParseInt(state.ExpiresAt, 10, 64)
+	if err != nil {
+		return core.ChannelSessionKeyStateV1{}, fmt.Errorf("failed to parse expires_at: %w", err)
+	}
+
+	assets := state.Assets
+	if assets == nil {
+		assets = []string{}
+	}
+
+	return core.ChannelSessionKeyStateV1{
+		UserAddress: strings.ToLower(state.UserAddress),
+		SessionKey:  strings.ToLower(state.SessionKey),
+		Version:     version,
+		Assets:      assets,
+		ExpiresAt:   time.Unix(expiresAtUnix, 0),
+		UserSig:     state.UserSig,
+	}, nil
+}
+
+// transformChannelSessionKeyStates converts a slice of RPC ChannelSessionKeyStateV1 to core.ChannelSessionKeyStateV1.
+func transformChannelSessionKeyStates(states []rpc.ChannelSessionKeyStateV1) ([]core.ChannelSessionKeyStateV1, error) {
+	result := make([]core.ChannelSessionKeyStateV1, 0, len(states))
+	for _, s := range states {
+		state, err := transformChannelSessionKeyState(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to transform channel session key state: %w", err)
+		}
+		result = append(result, state)
+	}
+	return result, nil
+}
+
+// ============================================================================
+// App Session Key State Transformations
+// ============================================================================
+
+// transformSessionKeyStateToRPC converts app.AppSessionKeyStateV1 to RPC AppSessionKeyStateV1.
+func transformSessionKeyStateToRPC(state app.AppSessionKeyStateV1) rpc.AppSessionKeyStateV1 {
+	return rpc.AppSessionKeyStateV1{
+		UserAddress:    state.UserAddress,
+		SessionKey:     state.SessionKey,
+		Version:        strconv.FormatUint(state.Version, 10),
+		ApplicationIDs: state.ApplicationIDs,
+		AppSessionIDs:  state.AppSessionIDs,
+		ExpiresAt:      strconv.FormatInt(state.ExpiresAt.Unix(), 10),
+		UserSig:        state.UserSig,
+	}
+}
+
+// transformSessionKeyState converts RPC AppSessionKeyStateV1 to app.AppSessionKeyStateV1.
+func transformSessionKeyState(state rpc.AppSessionKeyStateV1) (app.AppSessionKeyStateV1, error) {
+	version, err := strconv.ParseUint(state.Version, 10, 64)
+	if err != nil {
+		return app.AppSessionKeyStateV1{}, fmt.Errorf("failed to parse version: %w", err)
+	}
+
+	expiresAtUnix, err := strconv.ParseInt(state.ExpiresAt, 10, 64)
+	if err != nil {
+		return app.AppSessionKeyStateV1{}, fmt.Errorf("failed to parse expires_at: %w", err)
+	}
+
+	applicationIDs := state.ApplicationIDs
+	if applicationIDs == nil {
+		applicationIDs = []string{}
+	}
+
+	appSessionIDs := state.AppSessionIDs
+	if appSessionIDs == nil {
+		appSessionIDs = []string{}
+	}
+
+	return app.AppSessionKeyStateV1{
+		UserAddress:    strings.ToLower(state.UserAddress),
+		SessionKey:     strings.ToLower(state.SessionKey),
+		Version:        version,
+		ApplicationIDs: applicationIDs,
+		AppSessionIDs:  appSessionIDs,
+		ExpiresAt:      time.Unix(expiresAtUnix, 0),
+		UserSig:        state.UserSig,
+	}, nil
+}
+
+// transformSessionKeyStates converts a slice of RPC AppSessionKeyStateV1 to app.AppSessionKeyStateV1.
+func transformSessionKeyStates(states []rpc.AppSessionKeyStateV1) ([]app.AppSessionKeyStateV1, error) {
+	result := make([]app.AppSessionKeyStateV1, 0, len(states))
+	for _, s := range states {
+		state, err := transformSessionKeyState(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to transform session key state: %w", err)
+		}
+		result = append(result, state)
+	}
+	return result, nil
 }

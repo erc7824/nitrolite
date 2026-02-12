@@ -26,13 +26,14 @@ export function transformNodeConfig(resp: API.NodeV1GetConfigResponse): core.Nod
   const blockchains: core.Blockchain[] = resp.blockchains.map((info) => ({
     name: info.name,
     id: BigInt(info.blockchain_id),
-    contractAddress: info.contract_address as Address,
+    channelHubAddress: info.channel_hub_address as Address,
     blockStep: 0n, // Not provided in RPC response
   }));
 
   return {
     nodeAddress: resp.node_address as Address,
     nodeVersion: resp.node_version,
+    supportedSigValidators: resp.supported_sig_validators || [],
     blockchains,
   };
 }
@@ -122,6 +123,7 @@ export function transformChannel(channel: ChannelV1): core.Channel {
     tokenAddress: channel.token_address as Address,
     challengeDuration: channel.challenge_duration,
     nonce: BigInt(channel.nonce),
+    approvedSigValidators: channel.approved_sig_validators,
     status: parseChannelStatus(channel.status),
     stateVersion: BigInt(channel.state_version),
   };

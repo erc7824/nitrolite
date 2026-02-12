@@ -2,7 +2,9 @@ package rpc_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,7 +73,7 @@ func TestClientV1_NodeV1GetConfig(t *testing.T) {
 	config := rpc.NodeV1GetConfigResponse{
 		NodeAddress: testWalletV1,
 		Blockchains: []rpc.BlockchainInfoV1{
-			{BlockchainID: testChainIDV1, ContractAddress: "0xContract"},
+			{BlockchainID: testChainIDV1, ChannelHubAddress: "0xContract"},
 		},
 	}
 
@@ -455,76 +457,57 @@ func TestClientV1_AppSessionsV1SubmitAppState(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// ============================================================================
-// Session Keys Group Tests
-// ============================================================================
-
-func TestClientV1_SessionKeysV1Register(t *testing.T) {
+func TestClientV1_AppSessionsV1SubmitSessionKeyState(t *testing.T) {
 	t.Parallel()
 
 	client, dialer := setupClient()
 
-	response := rpc.SessionKeysV1RegisterResponse{}
+	response := rpc.AppSessionsV1SubmitSessionKeyStateResponse{}
 
-	registerSimpleHandlerV1(dialer, "session_keys.v1.register", response)
+	registerSimpleHandlerV1(dialer, rpc.AppSessionsV1SubmitSessionKeyStateMethod.String(), response)
 
-	_, err := client.SessionKeysV1Register(testCtxV1, rpc.SessionKeysV1RegisterRequest{
-		Address: testWalletV1,
+	_, err := client.AppSessionsV1SubmitSessionKeyState(testCtxV1, rpc.AppSessionsV1SubmitSessionKeyStateRequest{
+		State: rpc.AppSessionKeyStateV1{
+			UserAddress:    testWalletV1,
+			SessionKey:     "0xsession_key_1",
+			ApplicationIDs: []string{"0xapp_1"},
+			AppSessionIDs:  []string{"0xapp_session_2"},
+			Version:        "1",
+			ExpiresAt:      fmt.Sprintf("%d", time.Now().Add(24*time.Hour).UTC().Unix()),
+		},
 	})
 	require.NoError(t, err)
 }
 
-func TestClientV1_SessionKeysV1GetSessionKeys(t *testing.T) {
+func TestClientV1_AppSessionsV1GetLastKeyStates(t *testing.T) {
 	t.Parallel()
 
 	client, dialer := setupClient()
 
-	response := rpc.SessionKeysV1GetSessionKeysResponse{
-		SessionKeys: []rpc.SessionKeyV1{
+	response := rpc.AppSessionsV1GetLastKeyStatesResponse{
+		States: []rpc.AppSessionKeyStateV1{
 			{
-				ID:          1,
-				SessionKey:  "0xkey123",
-				Application: "test-app",
-				Allowances: []rpc.AssetAllowanceV1{
-					{Asset: testAssetV1, Allowance: "1000", Used: "100"},
-				},
-				ExpiresAt: "2025-12-31T23:59:59Z",
-				CreatedAt: "2025-01-01T00:00:00Z",
+				UserAddress:    testWalletV1,
+				SessionKey:     "0xsession_key_1",
+				ApplicationIDs: []string{"0xapp_1"},
+				AppSessionIDs:  []string{"0xapp_session_2"},
+				Version:        "1",
+				ExpiresAt:      fmt.Sprintf("%d", time.Now().Add(24*time.Hour).UTC().Unix()),
 			},
 		},
 	}
 
-	registerSimpleHandlerV1(dialer, "session_keys.v1.get_session_keys", response)
+	registerSimpleHandlerV1(dialer, rpc.AppSessionsV1GetLastKeyStatesMethod.String(), response)
 
-	resp, err := client.SessionKeysV1GetSessionKeys(testCtxV1, rpc.SessionKeysV1GetSessionKeysRequest{
-		Wallet: testWalletV1,
+	res, err := client.AppSessionsV1GetLastKeyStates(testCtxV1, rpc.AppSessionsV1GetLastKeyStatesRequest{
+		UserAddress: testWalletV1,
+		SessionKey:  nil,
 	})
 	require.NoError(t, err)
-	assert.Len(t, resp.SessionKeys, 1)
-	assert.Equal(t, "0xkey123", resp.SessionKeys[0].SessionKey)
+
+	assert.Len(t, res.States, 1)
+	assert.Equal(t, "0xsession_key_1", res.States[0].SessionKey)
 }
-
-func TestClientV1_SessionKeysV1RevokeSessionKey(t *testing.T) {
-	t.Parallel()
-
-	client, dialer := setupClient()
-
-	response := rpc.SessionKeysV1RevokeSessionKeyResponse{
-		SessionKey: "0xkey123",
-	}
-
-	registerSimpleHandlerV1(dialer, "session_keys.v1.revoke_session_key", response)
-
-	resp, err := client.SessionKeysV1RevokeSessionKey(testCtxV1, rpc.SessionKeysV1RevokeSessionKeyRequest{
-		SessionKey: "0xkey123",
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "0xkey123", resp.SessionKey)
-}
-
-// ============================================================================
-// User Group Tests
-// ============================================================================
 
 func TestClientV1_UserV1GetBalances(t *testing.T) {
 	t.Parallel()

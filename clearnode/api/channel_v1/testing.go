@@ -28,9 +28,9 @@ func (m *MockStore) GetLastUserState(wallet, asset string, signed bool) (*core.S
 	return &state, args.Error(1)
 }
 
-func (m *MockStore) CheckOpenChannel(wallet, asset string) (bool, error) {
+func (m *MockStore) CheckOpenChannel(wallet, asset string) (string, bool, error) {
 	args := m.Called(wallet, asset)
-	return args.Bool(0), args.Error(1)
+	return args.String(0), args.Bool(1), args.Error(2)
 }
 
 func (m *MockStore) StoreUserState(state core.State) error {
@@ -72,6 +72,29 @@ func (m *MockStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, e
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*core.Channel), args.Error(1)
+}
+
+func (m *MockStore) StoreChannelSessionKeyState(state core.ChannelSessionKeyStateV1) error {
+	args := m.Called(state)
+	return args.Error(0)
+}
+
+func (m *MockStore) GetLastChannelSessionKeyVersion(wallet, sessionKey string) (uint64, error) {
+	args := m.Called(wallet, sessionKey)
+	return args.Get(0).(uint64), args.Error(1)
+}
+
+func (m *MockStore) GetLastChannelSessionKeyStates(wallet string, sessionKey *string) ([]core.ChannelSessionKeyStateV1, error) {
+	args := m.Called(wallet, sessionKey)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]core.ChannelSessionKeyStateV1), args.Error(1)
+}
+
+func (m *MockStore) ValidateChannelSessionKeyForAsset(wallet, sessionKey, asset, metadataHash string) (bool, error) {
+	args := m.Called(wallet, sessionKey, asset, metadataHash)
+	return args.Bool(0), args.Error(1)
 }
 
 func NewMockSigner() sign.Signer {

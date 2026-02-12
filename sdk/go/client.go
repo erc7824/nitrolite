@@ -370,7 +370,7 @@ func (c *Client) getTokenAddress(ctx context.Context, blockchainID uint64, asset
 	return "", fmt.Errorf("asset %s not found", asset)
 }
 
-// getContractAddress retrieves the contract address for a specific blockchain from node config.
+// getContractAddress retrieves the channel hub contract address for a specific blockchain from node config.
 func (c *Client) getContractAddress(ctx context.Context, blockchainID uint64) (string, error) {
 	nodeConfig, err := c.GetConfig(ctx)
 	if err != nil {
@@ -379,7 +379,7 @@ func (c *Client) getContractAddress(ctx context.Context, blockchainID uint64) (s
 
 	for _, bc := range nodeConfig.Blockchains {
 		if bc.ID == blockchainID {
-			return bc.ContractAddress, nil
+			return bc.ChannelHubAddress, nil
 		}
 	}
 
@@ -393,4 +393,14 @@ func (c *Client) getNodeAddress(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to get node config: %w", err)
 	}
 	return nodeConfig.NodeAddress, nil
+}
+
+// getSupportedSigValidatorsBitmap fetches the node config and builds a hex bitmap
+// from the supported signature validators. This bitmap is used in ChannelDefinition.
+func (c *Client) getSupportedSigValidatorsBitmap(ctx context.Context) (string, error) {
+	nodeConfig, err := c.GetConfig(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get node config: %w", err)
+	}
+	return core.BuildSigValidatorsBitmap(nodeConfig.SupportedSigValidators), nil
 }

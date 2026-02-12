@@ -38,8 +38,9 @@ type DatabaseStore interface {
 	// GetActiveHomeChannel retrieves the active home channel for a user's wallet and asset.
 	GetActiveHomeChannel(wallet, asset string) (*core.Channel, error)
 
-	// CheckOpenChannel verifies if a user has an active channel for the given asset.
-	CheckOpenChannel(wallet, asset string) (bool, error)
+	// CheckOpenChannel verifies if a user has an active channel for the given asset
+	// and returns the approved signature validators if such a channel exists.
+	CheckOpenChannel(wallet, asset string) (string, bool, error)
 
 	// UpdateChannel persists changes to a channel's metadata (status, version, etc).
 	UpdateChannel(channel core.Channel) error
@@ -125,6 +126,42 @@ type DatabaseStore interface {
 
 	// RecordLedgerEntry logs a movement of funds within the internal ledger.
 	RecordLedgerEntry(userWallet, accountID, asset string, amount decimal.Decimal) error
+
+	// --- App Session Key State Operations ---
+
+	// StoreAppSessionKeyState stores or updates a session key state.
+	StoreAppSessionKeyState(state app.AppSessionKeyStateV1) error
+
+	GetAppSessionKeyOwner(sessionKey, appSessionId string) (string, error)
+
+	// SessionKeyStateExists returns the latest version of a non-expired session key state for a user.
+	// Returns 0 if no state exists.
+	GetLastAppSessionKeyVersion(wallet, sessionKey string) (uint64, error)
+
+	// GetLatestSessionKeyState retrieves the latest version of a specific session key for a user.
+	// Returns nil if no state exists.
+	GetLastAppSessionKeyState(wallet, sessionKey string) (*app.AppSessionKeyStateV1, error)
+
+	// GetLastKeyStates retrieves the latest session key states for a user with optional filtering.
+	GetLastAppSessionKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error)
+
+	// --- Channel Session Key State Operations ---
+
+	// StoreChannelSessionKeyState stores or updates a channel session key state.
+	StoreChannelSessionKeyState(state core.ChannelSessionKeyStateV1) error
+
+	// GetLastChannelSessionKeyVersion returns the latest version for a (wallet, sessionKey) pair.
+	// Returns 0 if no state exists.
+	GetLastChannelSessionKeyVersion(wallet, sessionKey string) (uint64, error)
+
+	// GetLastChannelSessionKeyStates retrieves the latest channel session key states for a user,
+	// optionally filtered by session key.
+	GetLastChannelSessionKeyStates(wallet string, sessionKey *string) ([]core.ChannelSessionKeyStateV1, error)
+
+	// ValidateChannelSessionKeyForAsset checks that a valid, non-expired session key state
+	// exists at its latest version for the (wallet, sessionKey) pair, includes the given asset,
+	// and matches the metadata hash.
+	ValidateChannelSessionKeyForAsset(wallet, sessionKey, asset, metadataHash string) (bool, error)
 
 	// --- Contract Event Operations ---
 

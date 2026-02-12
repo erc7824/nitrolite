@@ -122,10 +122,14 @@ export function getHomeChannelId(
   user: Address,
   asset: string,
   nonce: bigint,
-  challengeDuration: number
+  challengeDuration: number,
+  approvedSigValidators: string = '0x00'
 ): string {
   // Generate metadata from asset
   const metadata = generateChannelMetadata(asset);
+
+  // Convert hex bitmap to bigint for ABI encoding
+  const validatorsBigInt = BigInt(approvedSigValidators || '0x00');
 
   // Define the channel definition struct matching Solidity
   // struct ChannelDefinition {
@@ -133,6 +137,7 @@ export function getHomeChannelId(
   //   address user;
   //   address node;
   //   uint64 nonce;
+  //   uint256 approvedSignatureValidators;
   //   bytes32 metadata;
   // }
   const packed = encodeAbiParameters(
@@ -145,6 +150,7 @@ export function getHomeChannelId(
           { name: 'user', type: 'address' },
           { name: 'node', type: 'address' },
           { name: 'nonce', type: 'uint64' },
+          { name: 'approvedSignatureValidators', type: 'uint256' },
           { name: 'metadata', type: 'bytes32' },
         ],
       },
@@ -155,6 +161,7 @@ export function getHomeChannelId(
         user: user,
         node: node,
         nonce: nonce,
+        approvedSignatureValidators: validatorsBigInt,
         metadata: metadata,
       },
     ]

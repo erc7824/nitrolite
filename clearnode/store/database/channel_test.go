@@ -379,15 +379,16 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 
 		// Create open home channel
 		channel := core.Channel{
-			ChannelID:         homeChannelID,
-			UserWallet:        "0xuser123",
-			Type:              core.ChannelTypeHome,
-			BlockchainID:      1,
-			TokenAddress:      "0xtoken123",
-			ChallengeDuration: 86400,
-			Nonce:             1,
-			Status:            core.ChannelStatusOpen,
-			StateVersion:      0,
+			ChannelID:             homeChannelID,
+			UserWallet:            "0xuser123",
+			Type:                  core.ChannelTypeHome,
+			BlockchainID:          1,
+			TokenAddress:          "0xtoken123",
+			ChallengeDuration:     86400,
+			Nonce:                 1,
+			ApprovedSigValidators: "0x2",
+			Status:                core.ChannelStatusOpen,
+			StateVersion:          0,
 		}
 		require.NoError(t, store.CreateChannel(channel))
 
@@ -409,9 +410,10 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		hasOpenChannel, err := store.CheckOpenChannel("0xuser123", "USDC")
+		approvedSigValidators, hasOpenChannel, err := store.CheckOpenChannel("0xuser123", "USDC")
 		require.NoError(t, err)
 		assert.True(t, hasOpenChannel)
+		assert.Equal(t, "0x2", approvedSigValidators)
 	})
 
 	t.Run("No open channel - user not found", func(t *testing.T) {
@@ -420,9 +422,10 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 
 		store := NewDBStore(db)
 
-		hasOpenChannel, err := store.CheckOpenChannel("0xnonexistent", "USDC")
+		approvedSigValidators, hasOpenChannel, err := store.CheckOpenChannel("0xnonexistent", "USDC")
 		require.NoError(t, err)
 		assert.False(t, hasOpenChannel)
+		assert.Equal(t, "", approvedSigValidators)
 	})
 
 	t.Run("No open channel - channel is closed", func(t *testing.T) {
@@ -465,9 +468,10 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 		}
 		require.NoError(t, store.StoreUserState(state))
 
-		hasOpenChannel, err := store.CheckOpenChannel("0xuser123", "USDC")
+		approvedSigValidators, hasOpenChannel, err := store.CheckOpenChannel("0xuser123", "USDC")
 		require.NoError(t, err)
 		assert.False(t, hasOpenChannel)
+		assert.Equal(t, "", approvedSigValidators)
 	})
 
 	t.Run("No open channel - wrong asset", func(t *testing.T) {
@@ -511,9 +515,10 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 		require.NoError(t, store.StoreUserState(state))
 
 		// Check for different asset
-		hasOpenChannel, err := store.CheckOpenChannel("0xuser123", "ETH")
+		approvedSigValidators, hasOpenChannel, err := store.CheckOpenChannel("0xuser123", "ETH")
 		require.NoError(t, err)
 		assert.False(t, hasOpenChannel)
+		assert.Equal(t, "", approvedSigValidators)
 	})
 }
 

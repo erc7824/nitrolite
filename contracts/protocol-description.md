@@ -534,17 +534,32 @@ This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
 
 ## Signature validation
 
-The protocol supports flexible signature validation through a **per-node validator registry** system. This enables channels to use custom signature schemes while maintaining cross-chain compatibility.
+The protocol supports flexible signature validation through two complementary systems: a per-node validator registry and a bitmask for agreed validators. This design prevents signature forgery attacks while enabling custom signature schemes and maintaining cross-chain compatibility.
+
+### Validator selection via approved validators bitmask
+
+Agreed validators are specified in the `ChannelDefinition.approvedSignatureValidators` field (uint256 bitmask). The default ECDSA validator (0x00) is **always** available, regardless of the bitmask value. The bitmask specifies which additional validators from the node's registry are agreed validators. For example, if bit 42 is set to 1, then validator ID 42 from the node's registry is approved.
+
+Since `approvedSignatureValidators` is part of the `channelId` computation, agreed validators cannot be changed during cross-chain operations without invalidating signatures. This prevents malicious nodes from forging user signatures by registering fake validators.
+
+**Security properties:**
+
+* Users control which validators (beyond the always-available default) can be used
+* Cross-chain compatible (approvedSignatureValidators is in channelId, which is in all signatures)
+* Zero transaction overhead (no separate validator registration needed)
+* Prevents node-controlled validator forgery attacks
+* Default ECDSA validator always available as fallback
 
 ### Node validator registry
 
-The protocol uses a per-node validator registry where each node registers signature validators and assigns them 1-byte identifiers (0x01-0xFF). Both users and nodes select validators from the node's registry when signing channel states.
+The protocol uses a per-node validator registry where nodes register signature validators and assign them 1-byte identifiers (0x01-0xFF).
 
-**Design rationale:** In the Nitrolite off-chain protocol, the node acts as the orchestrator and decides which signature validators are supported. Users select from the node-approved validators. This ensures:
+**Design rationale:** This allows nodes to use flexible signature schemes (SessionKey, multi-sig, etc.) for their own signatures while preventing them from controlling user signature validation. Benefits:
 
-* Nodes can enforce their security requirements
-* Users benefit from node-vetted validator implementations
+* Nodes can enforce their security requirements for node signatures
+* Nodes benefit from flexible validator implementations
 * Cross-chain compatibility (validator addresses don't affect channelId or signature verification)
+* User signatures remain protected via approved validators bitmask
 
 ### Validator registration
 
@@ -572,14 +587,25 @@ All signatures in the protocol follow this structure:
 [validator_id: 1 byte][signature_data: variable length]
 ```
 
-* `0x00` = Use ChannelHub's default validator
-* `0x01-0xFF` = Look up validator in node's registry
+**For user signatures:**
+
+* `0x00` = Use ChannelHub's default ECDSA validator (always available)
+* `0x01-0xFF` = Look up validator in node's registry, only if corresponding bit is set in `approvedSignatureValidators` (e.g., ID 42 allowed if bit 42 is 1)
+
+**For node signatures:**
+
+* `0x00` = Use ChannelHub's default ECDSA validator
+* `0x01-0xFF` = Look up validator in node's registry (always available for nodes)
 
 The first byte determines which validator verifies the signature. The remaining bytes are passed to the selected validator for verification.
 
 ### Cross-chain compatibility
 
-The node validator registry design solves a critical cross-chain problem: validator contracts may not deploy to the same address on all chains.
+The dual validator selection system solves critical cross-chain problems:
+
+**User validators (approved validators bitmask):** Since the allowed validator bitmask is in `ChannelDefinition.approvedSignatureValidators`, which is part of `channelId`, it travels with every signature across all chains. No cross-chain synchronization is needed.
+
+**Node validators (per-node registry):** Validator contracts may not be deployed to the same address on all chains. The registry uses 1-byte IDs instead of addresses, allowing the same validator ID to map to different addresses on different chains. Nodes register their validators independently on each chain.
 
 ---
 

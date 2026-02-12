@@ -133,12 +133,26 @@ The Nitrolite protocol uses a pluggable signature validation system to support f
 
 ### Validator Architecture
 
-The protocol uses a **per-node validator registry** system where nodes register signature validators and assign them 1-byte identifiers (0x01-0xFF). Both users and nodes select validators from the node's registry when signing channel states.
+The protocol uses two mechanisms for validator selection to prevent signature forgery attacks:
+
+**Validator selection (via approved validators bitmask):**
+
+- Agreed validators are specified in the `ChannelDefinition.approvedSignatureValidators` field (uint256 bitmask)
+- The default ECDSA validator (0x00) is **always** available, regardless of the bitmask value
+- The bitmask specifies additional validators from the node's registry that are agreed validators (e.g., if bit 42 is 1, validator ID 42 is approved)
+- Since `approvedSignatureValidators` is part of `channelId` computation, agreed validators cannot be changed during cross-chain operations without invalidating signatures
+- This prevents malicious nodes from forging user signatures by controlling validator selection
+
+**Node validator registry:**
+
+- Nodes register signature validators and assign them 1-byte identifiers (0x01-0xFF)
+- Both users and nodes can only use agreed validators (from the bitmask) or the default validator
+- The first byte of each signature determines which validator is used for verification
 
 **Validator selection:**
 
-- **Default validator** (0x00): The ChannelHub is initialized with a `defaultSigValidator` address that implements `ISignatureValidator`. This validator is used when the signature's first byte is `0x00`.
-- **Node-registered validators** (0x01-0xFF): Nodes register validators on-chain with unique IDs. The first byte of each signature determines which validator from the node's registry is used for verification.
+- **Default validator** (0x00): The ChannelHub is initialized with a `defaultSigValidator` address that implements `ISignatureValidator`. This validator is used when the signature's first byte is `0x00`. **Always available**, regardless of `approvedSignatureValidators` bitmask.
+- **Node-registered validators** (0x01-0xFF): Nodes register validators on-chain with unique IDs. Only available if the corresponding bit is set in `ChannelDefinition.approvedSignatureValidators` (e.g., bit 42 set = validator ID 42 approved).
 
 **Registration security:**
 
@@ -175,7 +189,8 @@ See `signature-validators.md` for detailed documentation on each validator.
 ### Trust Model
 
 - **Default validator trust**: All participants using the default validator (0x00) trust the ChannelHub deployer's choice of default validator.
-- **Node validator trust**: Both users and nodes select validators from the node's registry. Users trust the node's choice of supported validators. In the Nitrolite off-chain protocol, the node acts as the orchestrator and decides which signature validators are supported. Users select from node-approved validators.
+- **User validator control**: Users control which additional validators (beyond the always-available default) can verify signatures via the `approvedSignatureValidators` bitmask in `ChannelDefinition`. This prevents nodes from forging user signatures by registering malicious validators. Users can approve specific validators from the node's registry by setting the corresponding bits.
+- **Validator agreement**: Both users and nodes can only use agreed validators specified in the bitmask (plus the always-available default validator). This ensures that validators are mutually agreed upon and prevents unilateral changes to signature validation schemes.
 - **Registration immutability**: Once a node registers a validator at a specific ID, it cannot be changed. This ensures that signatures created with a given validator ID remain valid for the lifetime of the ChannelHub deployment.
 - **Cross-chain consistency**: The same validator ID may map to different validator addresses on different chains, but the security properties must remain equivalent. Nodes are responsible for registering compatible validators across chains.
 

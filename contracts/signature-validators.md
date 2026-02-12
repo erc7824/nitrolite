@@ -19,13 +19,41 @@ Validators receive the core state data (`signingData`) and `channelId` separatel
 
 ### Node Validator Registry
 
-The protocol uses a **per-node validator registry** system. Each node can register signature validators and assign them 1-byte identifiers (0x01-0xFF). Both users and nodes select validators from the node's registry when signing channel states.
+The protocol uses a **per-node validator registry** system. Each node can register signature validators and assign them 1-byte identifiers (0x01-0xFF).
 
-**Design rationale:** In the Nitrolite off-chain protocol, the node acts as the orchestrator and decides which signature validators are supported. Users select from the node-approved validators. This ensures:
+**Design rationale:** In the Nitrolite off-chain protocol, the node acts as the orchestrator and decides which signature validators are supported for **node signatures**. This ensures:
 
-- Nodes can enforce their security requirements
-- Users benefit from node-vetted validator implementations
+- Nodes can enforce their security requirements for their own signatures
+- Nodes benefit from flexible validator implementations (SessionKey, multi-sig, etc.)
 - Cross-chain compatibility (validator addresses don't affect channelId or signature verification)
+
+### Security Consideration: Preventing Signature Forgery
+
+**Identified Vulnerability:** If both user and node signatures use validators from a node-controlled registry, a malicious node can register a custom validator that always returns `VALIDATION_SUCCESS`, allowing it to forge user signatures and unilaterally execute state transitions (withdrawals, closures, etc.).
+
+**Solution Approaches:**
+
+Three approaches were considered to prevent this attack while maintaining cross-chain compatibility and minimal transaction overhead:
+
+1. **Approved Validators Bitmask (Current Implementation):** Store allowed validator IDs in the `ChannelDefinition.approvedSignatureValidators` field (uint256 bitmask). Since this field is part of `channelId` computation, it cannot be changed during cross-chain operations without invalidating signatures. The default ECDSA validator (0x00) is always available. Additional validators from the node's registry can be approved by setting corresponding bits (e.g., bit 42 set = validator ID 42 approved).
+
+2. **Per-Signature Authorization:** Users include an ECDSA authorization signature alongside each state signature when using non-default validators. The authorization proves the user consents to using that specific validator for that specific channel. This adds ~65 bytes overhead per signature but provides maximum flexibility without requiring additional transactions.
+
+3. **Hybrid Approach (Planned):** Combine approaches 1 and 2. Users can pre-approve validators in the `approvedSignatureValidators` bitmask (zero overhead), or use per-signature authorization for validators not in the bitmask (+65 bytes overhead). This provides both efficiency for common cases and flexibility for advanced use cases. Will be implemented in a future version.
+
+### User Validator Selection via Approved Validators Bitmask
+
+To prevent nodes from forging user signatures, validator selection is controlled via the `ChannelDefinition.approvedSignatureValidators` field (uint256 bitmask). This mitigates the signature forgery vulnerability by ensuring users control which validators can verify signatures.
+
+**How it works:**
+
+- The `approvedSignatureValidators` field in `ChannelDefinition` is part of the `channelId` computation
+- The default ECDSA validator (0x00) is **always** available, regardless of the bitmask value
+- The bitmask specifies which additional validators from the node's registry are agreed validators
+- Each bit corresponds to a validator ID: if bit N is set to 1, validator ID N is approved (e.g., bit 42 = 1 means validator ID 42 is approved)
+- Since `channelId` is included in all signatures, the agreed validators cannot be changed during cross-chain operations without invalidating signatures
+
+This approach provides security (users control the agreed validators), cross-chain compatibility (approvedSignatureValidators is in channelId), zero transaction overhead (no separate validator registration needed), and guaranteed access to the default ECDSA validator.
 
 ### Validator Registration
 
@@ -174,6 +202,10 @@ Application-defined data encoding expiration, allowed channels, and permissions.
 
 ### Users: Safe ✅
 
+**Note:** SessionKeyValidator can be enabled by setting the corresponding bit in `ChannelDefinition.approvedSignatureValidators` (e.g., if SessionKeyValidator has ID 1, set bit 1 to approve it).
+
+It is safe for users because:
+
 - Clearnode validates metadata (expiration, scope, permissions)
 - Node must countersign (provides protection)
 - Limited damage if compromised (Clearnode rejects invalid requests)
@@ -181,33 +213,9 @@ Application-defined data encoding expiration, allowed channels, and permissions.
 
 ### Nodes: Unsafe ⚠️
 
+**Not recommended for node usage:**
+
 - User has no off-chain validation mechanism
 - User cannot verify metadata constraints (only hash is checked on-chain)
 - If node's session key is compromised: unlimited, irrevocable authority
 - User must blindly trust node's session key
-
----
-
-## Validator Comparison
-
-| Feature | ECDSAValidator | SessionKeyValidator |
-| --------- | --------------- | --------------------- |
-| **Signature Size** | 65 bytes | ~200+ bytes |
-| **Gas Cost** | Low | Medium-High |
-| **Hot Wallet Safe** | No | Yes |
-| **Time-Limited** | No | Yes |
-| **User Usage** | ✅ Recommended | ✅ Recommended |
-| **Node Usage** | ✅ Recommended | ⚠️ Not recommended |
-
----
-
-## Key Points
-
-- Validators are registered per-node with 1-byte IDs
-- Both users and nodes select from the node's validator registry
-- Validator ID 0x00 is reserved for ChannelHub's default validator
-- Registration uses signature-based authorization (node key signs, anyone can relay)
-- Registration is immutable (255 validators per node, cannot change once set)
-- Validator addresses don't affect channelId (enables cross-chain compatibility)
-- SessionKeyValidator metadata is enforced off-chain by Clearnode
-- Nodes should only use ECDSAValidator until a node-specific session key validator exists

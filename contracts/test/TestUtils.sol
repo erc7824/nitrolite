@@ -4,7 +4,7 @@ pragma solidity ^0.8.30;
 import {Vm} from "lib/forge-std/src/Vm.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
-import {DEFAULT_VALIDATOR_ID, State} from "../src/interfaces/Types.sol";
+import {DEFAULT_SIG_VALIDATOR_ID, State} from "../src/interfaces/Types.sol";
 import {SessionKeyAuthorization, toSigningData} from "../src/sigValidators/SessionKeyValidator.sol";
 import {Utils} from "../src/Utils.sol";
 
@@ -29,7 +29,7 @@ library TestUtils {
     {
         bytes memory packedState = Utils.pack(state, channelId);
         bytes memory signature = TestUtils.signEip191(vm, privateKey, packedState);
-        return abi.encodePacked(DEFAULT_VALIDATOR_ID, signature);
+        return abi.encodePacked(DEFAULT_SIG_VALIDATOR_ID, signature);
     }
 
     function signStateEip191WithSkValidator(

@@ -11,7 +11,7 @@ import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/crypt
 
 import {IVault} from "./interfaces/IVault.sol";
 import {ISignatureValidator, ValidationResult, VALIDATION_FAILURE} from "./interfaces/ISignatureValidator.sol";
-import {ChannelDefinition, ChannelStatus, DEFAULT_VALIDATOR_ID, EscrowStatus, State, Ledger, StateIntent, ParticipantIndex} from "./interfaces/Types.sol";
+import {ChannelDefinition, ChannelStatus, DEFAULT_SIG_VALIDATOR_ID, EscrowStatus, State, Ledger, StateIntent, ParticipantIndex} from "./interfaces/Types.sol";
 
 import {Utils} from "./Utils.sol";
 import {ChannelEngine} from "./ChannelEngine.sol";
@@ -292,7 +292,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     function registerNodeValidator(address node, uint8 validatorId, ISignatureValidator validator, bytes calldata signature)
         external
     {
-        require(validatorId != DEFAULT_VALIDATOR_ID, InvalidValidatorId());
+        require(validatorId != DEFAULT_SIG_VALIDATOR_ID, InvalidValidatorId());
         require(address(validator) != address(0), InvalidAddress());
         require(address(_nodeValidatorRegistry[node][validatorId]) == address(0), ValidatorAlreadyRegistered(node, validatorId));
 
@@ -883,7 +883,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         uint8 validatorId = uint8(signature[0]);
 
-        if (validatorId == DEFAULT_VALIDATOR_ID) {
+        if (validatorId == DEFAULT_SIG_VALIDATOR_ID) {
             // Default validator (0x00) is always available for both users and nodes
             validator = DEFAULT_SIG_VALIDATOR;
         } else {

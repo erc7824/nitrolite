@@ -46,7 +46,7 @@ enum StateIntent {
     FINALIZE_MIGRATION
 }
 
-uint8 constant DEFAULT_VALIDATOR_ID = 0;
+uint8 constant DEFAULT_SIG_VALIDATOR_ID = 0;
 
 struct State {
     uint64 version;

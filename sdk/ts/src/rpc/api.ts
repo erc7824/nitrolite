@@ -334,6 +334,8 @@ export interface NodeV1GetConfigResponse {
   node_address: Address;
   /** Node software version */
   node_version: string;
+  /** List of supported signature validators identifiers for state sig verification */
+  supported_sig_validators: number[];
   /** List of supported networks */
   blockchains: BlockchainInfoV1[];
 }

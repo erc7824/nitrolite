@@ -189,6 +189,7 @@ export class Client {
       definition: {
         nonce: data.definition.nonce,
         challenge: data.definition.challengeDuration,
+        approvedSigValidators: '0x' + (data.definition.approvedSignatureValidators ?? 0n).toString(16),
       },
       node: data.definition.node,
       lastState,

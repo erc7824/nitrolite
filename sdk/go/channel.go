@@ -57,10 +57,17 @@ func (c *Client) Deposit(ctx context.Context, blockchainID uint64, asset string,
 
 	// Scenario A: Channel doesn't exist - create it
 	if err != nil || state.HomeChannelID == nil {
+		// Get supported sig validators bitmap from node config
+		bitmap, err := c.getSupportedSigValidatorsBitmap(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sig validators bitmap: %w", err)
+		}
+
 		// Create channel definition
 		channelDef := core.ChannelDefinition{
-			Nonce:     generateNonce(),
-			Challenge: DefaultChallengePeriod,
+			Nonce:                 generateNonce(),
+			Challenge:             DefaultChallengePeriod,
+			ApprovedSigValidators: bitmap,
 		}
 
 		if state == nil {
@@ -68,7 +75,7 @@ func (c *Client) Deposit(ctx context.Context, blockchainID uint64, asset string,
 		}
 		newState := state.NextState()
 
-		_, err := newState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
+		_, err = newState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply channel creation: %w", err)
 		}
@@ -158,10 +165,17 @@ func (c *Client) Withdraw(ctx context.Context, blockchainID uint64, asset string
 
 	// Channel doesn't exist - create it and withdraw
 	if err != nil || state.HomeChannelID == nil {
+		// Get supported sig validators bitmap from node config
+		bitmap, err := c.getSupportedSigValidatorsBitmap(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sig validators bitmap: %w", err)
+		}
+
 		// Create channel definition
 		channelDef := core.ChannelDefinition{
-			Nonce:     generateNonce(),
-			Challenge: DefaultChallengePeriod,
+			Nonce:                 generateNonce(),
+			Challenge:             DefaultChallengePeriod,
+			ApprovedSigValidators: bitmap,
 		}
 
 		if state == nil {
@@ -169,7 +183,7 @@ func (c *Client) Withdraw(ctx context.Context, blockchainID uint64, asset string
 		}
 		newState := state.NextState()
 
-		_, err := newState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
+		_, err = newState.ApplyChannelCreation(channelDef, blockchainID, tokenAddress, nodeAddress)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply channel creation: %w", err)
 		}
@@ -245,10 +259,17 @@ func (c *Client) Transfer(ctx context.Context, recipientWallet string, asset str
 	senderWallet := c.GetUserAddress()
 	state, err := c.GetLatestState(ctx, senderWallet, asset, false)
 	if err != nil || state.HomeChannelID == nil {
+		// Get supported sig validators bitmap from node config
+		bitmap, err := c.getSupportedSigValidatorsBitmap(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sig validators bitmap: %w", err)
+		}
+
 		// Create channel definition
 		channelDef := core.ChannelDefinition{
-			Nonce:     generateNonce(),
-			Challenge: DefaultChallengePeriod,
+			Nonce:                 generateNonce(),
+			Challenge:             DefaultChallengePeriod,
+			ApprovedSigValidators: bitmap,
 		}
 
 		if state == nil {
@@ -411,9 +432,16 @@ func (c *Client) Acknowledge(ctx context.Context, asset string) (*core.State, er
 
 	// No channel path - create channel with acknowledgement
 	if err != nil || state.HomeChannelID == nil {
+		// Get supported sig validators bitmap from node config
+		bitmap, err := c.getSupportedSigValidatorsBitmap(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get sig validators bitmap: %w", err)
+		}
+
 		channelDef := core.ChannelDefinition{
-			Nonce:     generateNonce(),
-			Challenge: DefaultChallengePeriod,
+			Nonce:                 generateNonce(),
+			Challenge:             DefaultChallengePeriod,
+			ApprovedSigValidators: bitmap,
 		}
 
 		if state == nil {
@@ -552,8 +580,9 @@ func (c *Client) Checkpoint(ctx context.Context, asset string) (string, error) {
 		if channel.Status == core.ChannelStatusVoid {
 			// Channel not yet created on-chain, reconstruct definition and call Create
 			channelDef := core.ChannelDefinition{
-				Nonce:     channel.Nonce,
-				Challenge: channel.ChallengeDuration,
+				Nonce:                 channel.Nonce,
+				Challenge:             channel.ChallengeDuration,
+				ApprovedSigValidators: channel.ApprovedSigValidators,
 			}
 			txHash, err := blockchainClient.Create(channelDef, *state)
 			if err != nil {

@@ -972,6 +972,9 @@ type NodeConfig struct {
 	// NodeVersion is the software version of the clearnode instance
 	NodeVersion string
 
+	// SupportedSigValidators is the list of supported signature validator types
+	SupportedSigValidators []ChannelSignerType
+
 	// Blockchains is the list of supported blockchain networks
 	Blockchains []Blockchain
 }

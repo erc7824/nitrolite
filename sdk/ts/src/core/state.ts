@@ -150,7 +150,8 @@ export function applyChannelCreation(
     state.userWallet,
     state.asset,
     channelDef.nonce,
-    channelDef.challenge
+    channelDef.challenge,
+    channelDef.approvedSigValidators
   );
 
   state.homeChannelId = homeChannelId;

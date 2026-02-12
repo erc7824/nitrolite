@@ -171,9 +171,9 @@ export interface AppSessionKeyStateV1 {
   /** Version of the session key state */
   version: string;
   /** Application IDs associated with this session key */
-  application_id: string[];
+  application_ids: string[];
   /** App session IDs associated with this session key */
-  app_session_id: string[];
+  app_session_ids: string[];
   /** Unix timestamp in seconds indicating when the session key expires */
   expires_at: string;
   /** User's signature over the session key metadata */

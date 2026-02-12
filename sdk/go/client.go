@@ -394,3 +394,13 @@ func (c *Client) getNodeAddress(ctx context.Context) (string, error) {
 	}
 	return nodeConfig.NodeAddress, nil
 }
+
+// getSupportedSigValidatorsBitmap fetches the node config and builds a hex bitmap
+// from the supported signature validators. This bitmap is used in ChannelDefinition.
+func (c *Client) getSupportedSigValidatorsBitmap(ctx context.Context) (string, error) {
+	nodeConfig, err := c.GetConfig(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get node config: %w", err)
+	}
+	return core.BuildSigValidatorsBitmap(nodeConfig.SupportedSigValidators), nil
+}

@@ -1,12 +1,12 @@
 package core
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strings"
 
 	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 type ChannelSignerType uint8
@@ -26,13 +26,32 @@ var (
 // hexToBitmask parses a hex string (with optional 0x prefix) into a [32]byte big-endian bitmask.
 func hexToBitmask(s string) ([32]byte, bool) {
 	var val [32]byte
-	s = strings.TrimPrefix(s, "0x")
-	b, err := hex.DecodeString(s)
+	b, err := hexutil.Decode(s)
 	if err != nil || len(b) == 0 || len(b) > 32 {
 		return val, false
 	}
 	copy(val[32-len(b):], b)
 	return val, true
+}
+
+// signerTypesToBitmask builds a [32]byte big-endian bitmask from a slice of ChannelSignerType.
+func signerTypesToBitmask(types []ChannelSignerType) [32]byte {
+	var mask [32]byte
+	for _, t := range types {
+		idx := uint8(t)
+		mask[31-idx/8] |= 1 << (idx % 8)
+	}
+	return mask
+}
+
+// bitmaskToHex converts a [32]byte bitmask to a compact hex string with 0x prefix.
+func bitmaskToHex(mask [32]byte) string {
+	for i := 0; i < 32; i++ {
+		if mask[i] != 0 {
+			return hexutil.Encode(mask[i:])
+		}
+	}
+	return "0x00"
 }
 
 func IsChannelSignerSupported(approvedSigValidators string, signerType ChannelSignerType) bool {
@@ -54,18 +73,19 @@ func SignerValidatorsSupported(channelValidators string) bool {
 	if !ok {
 		return false
 	}
-	// Build node bitmask from supported signer types
-	var node [32]byte
-	for _, t := range ChannelSignerTypes {
-		idx := uint8(t)
-		node[31-idx/8] |= 1 << (idx % 8)
-	}
+	node := signerTypesToBitmask(ChannelSignerTypes)
 	for i := 0; i < 32; i++ {
 		if node[i]&inc[i] != inc[i] {
 			return false
 		}
 	}
 	return true
+}
+
+// BuildSigValidatorsBitmap constructs a hex string bitmap from a slice of ChannelSignerType.
+// Each signer type sets a bit at its corresponding position in a 256-bit value.
+func BuildSigValidatorsBitmap(signerTypes []ChannelSignerType) string {
+	return bitmaskToHex(signerTypesToBitmask(signerTypes))
 }
 
 type ChannelDefaultSigner struct {

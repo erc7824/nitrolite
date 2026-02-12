@@ -32,6 +32,8 @@ export interface ChannelV1 {
   challenge_expires_at?: string;
   /** Nonce for the channel */
   nonce: string; // uint64 as string
+  /** Hex string bitmap of approved signature validators */
+  approved_sig_validators: string;
   /** Current status of the channel (void, open, challenged, closed) */
   status: string;
   /** On-chain state version of the channel */
@@ -46,6 +48,8 @@ export interface ChannelDefinitionV1 {
   nonce: string; // uint64 as string to preserve precision
   /** Challenge period for the channel in seconds */
   challenge: number; // uint32
+  /** Hex string bitmap representing the approved signature validators for the channel */
+  approved_sig_validators: string;
 }
 
 // ============================================================================
@@ -185,8 +189,8 @@ export interface BlockchainInfoV1 {
   name: string;
   /** Blockchain network ID */
   blockchain_id: string; // uint64 as string
-  /** Contract address on this network */
-  contract_address: Address;
+  /** Channel hub contract address on this network */
+  channel_hub_address: Address;
 }
 
 // ============================================================================

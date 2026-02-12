@@ -36,6 +36,8 @@ type ChannelV1 struct {
 	ChallengeExpiresAt *time.Time `json:"challenge_expires_at"`
 	// Nonce is the nonce for the channel
 	Nonce string `json:"nonce"`
+	// ApprovedSigValidators is a hex string bitmap of approved signature validators
+	ApprovedSigValidators string `json:"approved_sig_validators"`
 	// Status is the current status of the channel (void, open, challenged, closed)
 	Status string `json:"status"`
 	// StateVersion is the on-chain state version of the channel
@@ -207,9 +209,9 @@ type AppSessionKeyStateV1 struct {
 	// Version is the version of the session key format
 	Version string `json:"version"`
 	// ApplicationID is the application IDs associated with this session key
-	ApplicationIDs []string `json:"application_id"`
+	ApplicationIDs []string `json:"application_ids"`
 	// AppSessionID is the application session IDs associated with this session key
-	AppSessionIDs []string `json:"app_session_id"`
+	AppSessionIDs []string `json:"app_session_ids"`
 	// ExpiresAt is Unix timestamp in seconds indicating when the session key expires
 	ExpiresAt string `json:"expires_at"`
 	// UserSig is the user's signature over the session key metadata to authorize the registration/update of the session key

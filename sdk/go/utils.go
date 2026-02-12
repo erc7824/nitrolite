@@ -34,9 +34,10 @@ func transformNodeConfig(resp rpc.NodeV1GetConfigResponse) (*core.NodeConfig, er
 	}
 
 	return &core.NodeConfig{
-		NodeAddress: resp.NodeAddress,
-		NodeVersion: resp.NodeVersion,
-		Blockchains: blockchains,
+		NodeAddress:            resp.NodeAddress,
+		NodeVersion:            resp.NodeVersion,
+		SupportedSigValidators: resp.SupportedSigValidators,
+		Blockchains:            blockchains,
 	}, nil
 }
 
@@ -147,15 +148,16 @@ func transformChannel(channel rpc.ChannelV1) (core.Channel, error) {
 	}
 
 	return core.Channel{
-		ChannelID:         channel.ChannelID,
-		UserWallet:        channel.UserWallet,
-		Type:              channelType,
-		BlockchainID:      blockchainID,
-		TokenAddress:      channel.TokenAddress,
-		ChallengeDuration: channel.ChallengeDuration,
-		Nonce:             nonce,
-		Status:            channelStatus,
-		StateVersion:      stateVersion,
+		ChannelID:             channel.ChannelID,
+		UserWallet:            channel.UserWallet,
+		Type:                  channelType,
+		BlockchainID:          blockchainID,
+		TokenAddress:          channel.TokenAddress,
+		ChallengeDuration:     channel.ChallengeDuration,
+		Nonce:                 nonce,
+		ApprovedSigValidators: channel.ApprovedSigValidators,
+		Status:                channelStatus,
+		StateVersion:          stateVersion,
 	}, nil
 }
 

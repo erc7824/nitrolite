@@ -202,7 +202,7 @@ export default function NodeInfoSection({ client, showStatus }: NodeInfoSectionP
                             ID: {(bc.id || bc.blockchain_id)?.toString()}
                           </div>
                           <div className="text-xs text-muted-foreground font-mono truncate">
-                            Contract: {bc.contractAddress || bc.contract_address}
+                            Contract: {bc.channelHubAddress || bc.channel_hub_address}
                           </div>
                         </div>
                       ))}
@@ -221,7 +221,7 @@ export default function NodeInfoSection({ client, showStatus }: NodeInfoSectionP
                       Chain ID: {(chain.id || chain.blockchain_id)?.toString()}
                     </div>
                     <div className="text-xs text-muted-foreground font-mono truncate">
-                      Contract: {chain.contractAddress || chain.contract_address}
+                      Contract: {chain.channelHubAddress || chain.channel_hub_address}
                     </div>
                   </div>
                 ))}

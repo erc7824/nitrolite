@@ -1,17 +1,24 @@
 # Clearnode Go SDK
 
 Go SDK for Clearnode payment channels providing both high-level and low-level operations in a unified client:
-- **High-Level Operations**: `Deposit`, `Withdraw`, `Transfer`, `CloseHomeChannel` with automatic state management
+- **State Operations**: `Deposit`, `Withdraw`, `Transfer`, `CloseHomeChannel`, `Acknowledge` - build and co-sign states off-chain
+- **Blockchain Settlement**: `Checkpoint` - the single entry point for all on-chain transactions
 - **Low-Level Operations**: Direct RPC access for custom flows and advanced use cases
 
 ## Method Cheat Sheet
 
-### High-Level Operations (Blockchain Interaction)
+### State Operations (Off-Chain)
 ```go
-client.Deposit(ctx, blockchainID, asset, amount)      // Deposit to channel
-client.Withdraw(ctx, blockchainID, asset, amount)     // Withdraw from channel
-client.Transfer(ctx, recipientWallet, asset, amount)  // Off-chain transfer
-client.CloseHomeChannel(ctx, asset)                   // Close and finalize channel
+client.Deposit(ctx, blockchainID, asset, amount)      // Prepare deposit state
+client.Withdraw(ctx, blockchainID, asset, amount)     // Prepare withdrawal state
+client.Transfer(ctx, recipientWallet, asset, amount)  // Prepare transfer state
+client.CloseHomeChannel(ctx, asset)                   // Prepare finalize state
+client.Acknowledge(ctx, asset)                        // Acknowledge received state
+```
+
+### Blockchain Settlement
+```go
+client.Checkpoint(ctx, asset)                         // Settle latest state on-chain
 ```
 
 ### Node Information
@@ -90,15 +97,20 @@ func main() {
 
     ctx := context.Background()
 
-    // High-level operations - SDK handles everything
-    txHash, _ := client.Deposit(ctx, 80002, "usdc", decimal.NewFromInt(100))
-    txID, _ := client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
-    txHash, _ = client.Withdraw(ctx, 80002, "usdc", decimal.NewFromInt(25))
+    // Step 1: Build and co-sign states off-chain
+    state, _ := client.Deposit(ctx, 80002, "usdc", decimal.NewFromInt(100))
+    fmt.Printf("Deposit state version: %d\n", state.Version)
+
+    // Step 2: Settle on-chain via Checkpoint
+    txHash, _ := client.Checkpoint(ctx, "usdc")
+    fmt.Printf("On-chain tx: %s\n", txHash)
+
+    // Transfer (off-chain only, no Checkpoint needed for existing channels)
+    state, _ = client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
 
     // Low-level operations - same client
     config, _ := client.GetConfig(ctx)
     balances, _ := client.GetBalances(ctx, walletAddress)
-    state, _ := client.GetLatestState(ctx, wallet, asset, false)
 }
 ```
 
@@ -136,7 +148,7 @@ client, err := sdk.NewClient(
     wsURL,
     stateSigner,  // For signing channel states
     txSigner,     // For signing blockchain transactions
-    sdk.WithBlockchainRPC(chainID, rpcURL), // Required for Deposit/Withdraw
+    sdk.WithBlockchainRPC(chainID, rpcURL), // Required for Checkpoint
     sdk.WithHandshakeTimeout(10*time.Second),
     sdk.WithPingInterval(5*time.Second),
 )
@@ -167,62 +179,87 @@ if err != nil {
 - The asset must be supported on the specified blockchain
 - Required before calling `Transfer()` on a new channel
 
-### High-Level Operations
+### State Operations
 
-#### `Deposit(ctx, blockchainID, asset, amount) (txHash, error)`
+All state operations build and co-sign a state off-chain. They return `(*core.State, error)`. Use `Checkpoint` to settle the state on-chain.
 
-Deposits funds into channel. Automatically handles:
-- Channel creation if needed
-- Checkpointing to existing channel
-- State building and signing
-- Blockchain transaction
+#### `Deposit(ctx, blockchainID, asset, amount) (*core.State, error)`
+
+Prepares a deposit state. Creates a new channel if none exists, otherwise advances the existing state.
 
 ```go
-txHash, err := client.Deposit(ctx, 80002, "usdc", decimal.NewFromInt(100))
+state, err := client.Deposit(ctx, 80002, "usdc", decimal.NewFromInt(100))
+txHash, err := client.Checkpoint(ctx, "usdc") // settle on-chain
 ```
 
 **Requirements:**
-- Blockchain RPC configured via `WithBlockchainRPC`
-- Token approval for contract address
-- Sufficient token balance and gas
+- Sufficient token balance (checked on-chain during Checkpoint)
 
-#### `Transfer(ctx, recipientWallet, asset, amount) (txID, error)`
+#### `Withdraw(ctx, blockchainID, asset, amount) (*core.State, error)`
 
-Off-chain transfer to another wallet. Instant, no gas required.
+Prepares a withdrawal state to remove funds from the channel.
 
 ```go
-txID, err := client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
+state, err := client.Withdraw(ctx, 80002, "usdc", decimal.NewFromInt(25))
+txHash, err := client.Checkpoint(ctx, "usdc") // settle on-chain
+```
+
+**Requirements:**
+- Existing channel with sufficient balance
+
+#### `Transfer(ctx, recipientWallet, asset, amount) (*core.State, error)`
+
+Prepares an off-chain transfer to another wallet. For existing channels, no Checkpoint is needed.
+
+```go
+state, err := client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
 ```
 
 **Requirements:**
 - Existing channel with sufficient balance OR
 - Home blockchain configured via `SetHomeBlockchain()` (for new channels)
 
-#### `Withdraw(ctx, blockchainID, asset, amount) (txHash, error)`
+#### `CloseHomeChannel(ctx, asset) (*core.State, error)`
 
-Withdraws funds from channel to blockchain wallet.
-
-```go
-txHash, err := client.Withdraw(ctx, 80002, "usdc", decimal.NewFromInt(25))
-```
-
-**Requirements:**
-- Existing channel with sufficient balance
-- Blockchain RPC configured
-- Sufficient gas for transaction
-
-#### `CloseHomeChannel(ctx, asset) (txHash, error)`
-
-Finalizes and closes the user's channel for a specific asset.
+Prepares a finalize state to close the user's channel.
 
 ```go
-txHash, err := client.CloseHomeChannel(ctx, "usdc")
+state, err := client.CloseHomeChannel(ctx, "usdc")
+txHash, err := client.Checkpoint(ctx, "usdc") // close on-chain
 ```
 
 **Requirements:**
 - Existing channel (user must have deposited first)
-- Blockchain RPC configured
-- Sufficient gas for transaction
+
+#### `Acknowledge(ctx, asset) (*core.State, error)`
+
+Acknowledges a received state (e.g., after receiving a transfer).
+
+```go
+state, err := client.Acknowledge(ctx, "usdc")
+```
+
+**Requirements:**
+- Home blockchain configured via `SetHomeBlockchain()` when no channel exists
+
+### Blockchain Settlement
+
+#### `Checkpoint(ctx, asset) (txHash, error)`
+
+Settles the latest co-signed state on-chain. This is the single entry point for all blockchain transactions. Based on the transition type and on-chain channel status, it calls the appropriate blockchain method:
+
+- **Channel not on-chain** (status Void): Creates the channel
+- **Deposit/Withdrawal on existing channel**: Checkpoints the state
+- **Finalize**: Closes the channel
+
+```go
+txHash, err := client.Checkpoint(ctx, "usdc")
+```
+
+**Requirements:**
+- Blockchain RPC configured via `WithBlockchainRPC`
+- A co-signed state must exist (call Deposit, Withdraw, etc. first)
+- Sufficient gas for the blockchain transaction
 
 ## Low-Level API
 
@@ -252,7 +289,7 @@ channel, err := client.GetEscrowChannel(ctx, escrowChannelID)
 state, err := client.GetLatestState(ctx, wallet, asset, onlySigned)
 ```
 
-**Note:** State submission and channel creation are handled internally by high-level operations (Deposit, Withdraw, Transfer).
+**Note:** State submission and channel creation are handled internally by state operations (Deposit, Withdraw, Transfer). On-chain settlement is handled by Checkpoint.
 
 ### App Sessions (Low-Level)
 
@@ -269,24 +306,27 @@ batchID, err := client.RebalanceAppSessions(ctx, signedUpdates)
 
 ### State Management
 
-Payment channels use versioned states signed by both user and node:
+Payment channels use versioned states signed by both user and node. The SDK uses a two-step pattern:
 
 ```go
-// High-level operations handle state management automatically
-client.Deposit(...)   // Creates/updates state, signs, submits
-client.Withdraw(...)  // Updates state, signs, submits
-client.Transfer(...)  // Updates state, signs, submits
+// Step 1: Build and co-sign state off-chain
+state, _ := client.Deposit(...)   // Returns *core.State
+state, _ = client.Withdraw(...)   // Returns *core.State
+state, _ = client.Transfer(...)   // Returns *core.State
+
+// Step 2: Settle on-chain (when needed)
+txHash, _ := client.Checkpoint(ctx, "usdc")
 ```
 
 **State Flow (Internal):**
 1. Get latest state with `GetLatestState()`
 2. Create next state with `state.NextState()`
 3. Apply transition (deposit, withdraw, transfer, etc.)
-4. Calculate state ID with `core.GetStateID()`
-5. Sign state with `SignState()`
-6. Submit to node (internal method)
+4. Sign state with `SignState()`
+5. Submit to node for co-signing
+6. Return co-signed state
 
-State submission and channel creation are handled automatically by high-level operations.
+On-chain settlement is handled separately by `Checkpoint`.
 
 ### Signing
 
@@ -319,12 +359,12 @@ address := txSigner.PublicKey().Address().String()
 4. **Challenged**: Dispute initiated (advanced)
 5. **Closed**: Channel finalized (advanced)
 
-## When to Use High-Level vs Low-Level Operations
+## When to Use State Operations vs Low-Level Operations
 
-### Use High-Level Operations When:
+### Use State Operations When:
 - Building user-facing applications
 - Need simple deposit/withdraw/transfer
-- Want automatic state management
+- Want automatic state management with two-step pattern
 - Don't need custom flows
 
 ### Use Low-Level Operations When:
@@ -338,24 +378,30 @@ address := txSigner.PublicKey().Address().String()
 All errors include context:
 
 ```go
-txHash, err := client.Deposit(ctx, 80002, "usdc", amount)
+state, err := client.Deposit(ctx, 80002, "usdc", amount)
+if err != nil {
+    log.Printf("State error: %v", err)
+}
+
+txHash, err := client.Checkpoint(ctx, "usdc")
 if err != nil {
     // Error: "failed to create channel on blockchain: insufficient balance"
-    log.Printf("Error: %v", err)
+    log.Printf("Checkpoint error: %v", err)
 }
 ```
 
 Common errors:
-- `"channel not created, deposit first"` - Transfer before deposit
 - `"home blockchain not set for asset"` - Missing `SetHomeBlockchain` for new channel creation
-- `"blockchain client not configured"` - Missing `WithBlockchainRPC`
+- `"blockchain RPC not configured for chain"` - Missing `WithBlockchainRPC` (for Checkpoint)
+- `"no channel exists for asset"` - Checkpoint called without a co-signed state
 - `"insufficient balance"` - Not enough funds in channel/wallet
 - `"failed to sign state"` - Invalid private key or state
+- `"transition type ... does not require a blockchain operation"` - Checkpoint called on unsupported transition
 
 ## Configuration Options
 
 ```go
-sdk.WithBlockchainRPC(chainID, rpcURL)    // Configure blockchain RPC
+sdk.WithBlockchainRPC(chainID, rpcURL)    // Configure blockchain RPC (required for Checkpoint)
 sdk.WithHandshakeTimeout(duration)         // Connection timeout (default: 5s)
 sdk.WithPingInterval(duration)             // Keepalive interval (default: 5s)
 sdk.WithErrorHandler(func(error))          // Connection error handler
@@ -404,47 +450,42 @@ app.AppDefinitionV1       // Session definition
 app.AppStateUpdateV1      // Session update
 ```
 
-## High-Level Operation Internals
+## Operation Internals
 
-For understanding how high-level operations work:
-
-### Transfer Flow
-1. Get latest state
-2. Create next state
-3. Apply transfer transition
-4. Calculate state ID
-5. Sign state
-6. Submit to node
-7. Return transaction ID
+For understanding how operations work under the hood:
 
 ### Deposit Flow (New Channel)
 1. Create channel definition
 2. Create void state
 3. Set home ledger (token, chain)
-4. Calculate channel ID
-5. Apply deposit transition
-6. Sign state
-7. Request channel creation from node
-8. Create channel on blockchain
-9. Return transaction hash
+4. Apply deposit transition
+5. Sign state
+6. Request channel creation from node (co-sign)
+7. Return co-signed state
 
 ### Deposit Flow (Existing Channel)
 1. Get latest state
 2. Create next state
 3. Apply deposit transition
 4. Sign state
-5. Submit to node
-6. Checkpoint on blockchain
-7. Return transaction hash
+5. Submit to node (co-sign)
+6. Return co-signed state
 
 ### Withdraw Flow
 1. Get latest state
 2. Create next state
 3. Apply withdrawal transition
 4. Sign state
-5. Submit to node
-6. Checkpoint on blockchain
-7. Return transaction hash
+5. Submit to node (co-sign)
+6. Return co-signed state
+
+### Transfer Flow
+1. Get latest state
+2. Create next state
+3. Apply transfer transition
+4. Sign state
+5. Submit to node (co-sign)
+6. Return co-signed state
 
 ### CloseHomeChannel Flow
 1. Get latest state
@@ -452,15 +493,24 @@ For understanding how high-level operations work:
 3. Create next state
 4. Apply finalize transition
 5. Sign state
-6. Submit to node
-7. Close channel on blockchain
-8. Return transaction hash
+6. Submit to node (co-sign)
+7. Return co-signed state
+
+### Checkpoint Flow
+1. Get latest signed state (both signatures)
+2. Determine blockchain ID from state's home ledger
+3. Get on-chain channel status
+4. Route based on transition type + status:
+   - Void channel → `blockchainClient.Create()`
+   - Existing channel → `blockchainClient.Checkpoint()`
+   - Finalize → `blockchainClient.Close()`
+5. Return transaction hash
 
 ## Requirements
 
 - Go 1.21+
 - Running Clearnode instance
-- Blockchain RPC endpoint (for Smart Client deposits/withdrawals)
+- Blockchain RPC endpoint (for Checkpoint settlement)
 
 ## License
 

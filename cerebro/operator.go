@@ -104,6 +104,8 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "withdraw", Description: "Withdraw funds from channel"},
 			{Text: "transfer", Description: "Transfer funds to another wallet"},
 			{Text: "close-channel", Description: "Close home channel on-chain"},
+			{Text: "acknowledge", Description: "Acknowledge transfer or channel creation"},
+			{Text: "checkpoint", Description: "Submit latest state on-chain"},
 
 			// Node information
 			{Text: "ping", Description: "Test node connection"},
@@ -135,7 +137,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 				{Text: "wallet", Description: "Import private key for signing"},
 				{Text: "rpc", Description: "Import blockchain RPC URL"},
 			}
-		case "set-home-blockchain", "close-channel":
+		case "set-home-blockchain", "close-channel", "acknowledge", "checkpoint":
 			return o.getAssetSuggestions()
 		case "node":
 			return []prompt.Suggest{
@@ -264,6 +266,18 @@ func (o *Operator) Execute(s string) {
 			return
 		}
 		o.closeChannel(ctx, args[1])
+	case "acknowledge":
+		if len(args) < 2 {
+			fmt.Println("ERROR: Usage: acknowledge <asset>")
+			return
+		}
+		o.acknowledge(ctx, args[1])
+	case "checkpoint":
+		if len(args) < 2 {
+			fmt.Println("ERROR: Usage: checkpoint <asset>")
+			return
+		}
+		o.checkpoint(ctx, args[1])
 
 	// Node information
 	case "ping":

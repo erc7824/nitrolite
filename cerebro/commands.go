@@ -34,6 +34,9 @@ HIGH-LEVEL OPERATIONS (Smart Client)
   deposit <chain_id> <asset> <amount>          Deposit to channel (auto-create if needed)
   withdraw <chain_id> <asset> <amount>         Withdraw from channel
   transfer <recipient> <asset> <amount>        Transfer to another wallet
+  acknowledge <asset>                          Acknowledge transfer or channel creation
+  close-channel <asset>                        Close home channel on-chain
+  checkpoint <asset>                           Submit latest state on-chain
 
 NODE INFORMATION (Base Client)
   ping                          Test node connection
@@ -287,14 +290,13 @@ func (o *Operator) deposit(ctx context.Context, chainIDStr, asset, amountStr str
 
 	fmt.Printf("Depositing %s %s on chain %d...\n", amount.String(), asset, chainID)
 
-	txHash, err := o.client.Deposit(ctx, chainID, asset, amount)
+	_, err = o.client.Deposit(ctx, chainID, asset, amount)
 	if err != nil {
 		fmt.Printf("ERROR: Deposit failed: %v\n", err)
 		return
 	}
 
-	fmt.Printf("SUCCESS: Deposit completed\n")
-	fmt.Printf("Transaction: %s\n", txHash)
+	fmt.Printf("SUCCESS: Deposit state prepared. Run 'checkpoint %s' to submit to the blockchain.\n", asset)
 }
 
 func (o *Operator) withdraw(ctx context.Context, chainIDStr, asset, amountStr string) {
@@ -312,14 +314,13 @@ func (o *Operator) withdraw(ctx context.Context, chainIDStr, asset, amountStr st
 
 	fmt.Printf("Withdrawing %s %s from chain %d...\n", amount.String(), asset, chainID)
 
-	txHash, err := o.client.Withdraw(ctx, chainID, asset, amount)
+	_, err = o.client.Withdraw(ctx, chainID, asset, amount)
 	if err != nil {
 		fmt.Printf("ERROR: Withdrawal failed: %v\n", err)
 		return
 	}
 
-	fmt.Printf("SUCCESS: Withdrawal completed\n")
-	fmt.Printf("Transaction: %s\n", txHash)
+	fmt.Printf("SUCCESS: Withdrawal state prepared. Run 'checkpoint %s' to submit to the blockchain.\n", asset)
 }
 
 func (o *Operator) transfer(ctx context.Context, recipient, asset, amountStr string) {
@@ -331,28 +332,52 @@ func (o *Operator) transfer(ctx context.Context, recipient, asset, amountStr str
 
 	fmt.Printf("Transferring %s %s to %s...\n", amount.String(), asset, recipient)
 
-	txID, err := o.client.Transfer(ctx, recipient, asset, amount)
+	_, err = o.client.Transfer(ctx, recipient, asset, amount)
 	if err != nil {
 		fmt.Printf("ERROR: Transfer failed: %v\n", err)
 		return
 	}
 
 	fmt.Printf("SUCCESS: Transfer completed\n")
-	fmt.Printf("Transaction ID: %s\n", txID)
 }
 
 func (o *Operator) closeChannel(ctx context.Context, asset string) {
 	fmt.Printf("Initiating channel closure for asset: %s...\n", asset)
 	fmt.Println("INFO: This involves signing a final state and submitting a transaction to the blockchain.")
 
-	txID, err := o.client.CloseHomeChannel(ctx, asset)
+	_, err := o.client.CloseHomeChannel(ctx, asset)
 	if err != nil {
 		fmt.Printf("ERROR: Failed to close channel: %v\n", err)
 		return
 	}
 
-	fmt.Printf("SUCCESS: Channel closed successfully.\n")
-	fmt.Printf("Transaction Hash: %s\n", txID)
+	fmt.Printf("SUCCESS: Channel close state prepared. Run 'checkpoint %s' to submit to the blockchain.\n", asset)
+}
+
+func (o *Operator) acknowledge(ctx context.Context, asset string) {
+	fmt.Printf("Acknowledging state for asset: %s...\n", asset)
+
+	_, err := o.client.Acknowledge(ctx, asset)
+	if err != nil {
+		fmt.Printf("ERROR: Acknowledgement failed: %v\n", err)
+		return
+	}
+
+	fmt.Printf("SUCCESS: Acknowledgement completed\n")
+}
+
+func (o *Operator) checkpoint(ctx context.Context, asset string) {
+	fmt.Printf("Submitting checkpoint for asset: %s...\n", asset)
+	fmt.Println("INFO: This submits the latest co-signed state to the blockchain.")
+
+	txHash, err := o.client.Checkpoint(ctx, asset)
+	if err != nil {
+		fmt.Printf("ERROR: Checkpoint failed: %v\n", err)
+		return
+	}
+
+	fmt.Printf("SUCCESS: Checkpoint completed\n")
+	fmt.Printf("Transaction Hash: %s\n", txHash)
 }
 
 // ============================================================================

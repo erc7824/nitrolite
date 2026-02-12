@@ -65,8 +65,9 @@ export type { StateSigner, TransactionSigner };
  * );
  *
  * // High-level operations
- * const txHash = await client.deposit(80002n, 'usdc', new Decimal(100));
- * const txId = await client.transfer('0xRecipient...', 'usdc', new Decimal(50));
+ * const state = await client.deposit(80002n, 'usdc', new Decimal(100));
+ * const txHash = await client.checkpoint('usdc');
+ * const transferState = await client.transfer('0xRecipient...', 'usdc', new Decimal(50));
  *
  * // Low-level operations
  * const config = await client.getConfig();
@@ -296,28 +297,28 @@ export class Client {
   // ============================================================================
 
   /**
-   * Deposit adds funds to the user's channel by depositing from the blockchain.
+   * Deposit prepares a deposit state for the user's channel.
    * This method handles two scenarios automatically:
    * 1. If no channel exists: Creates a new channel with the initial deposit
-   * 2. If channel exists: Checkpoints the deposit to the existing channel
+   * 2. If channel exists: Advances the state with a deposit transition
+   *
+   * The returned state is signed by both the user and the node, but has not yet been
+   * submitted to the blockchain. Use {@link checkpoint} to execute the on-chain transaction.
    *
    * @param blockchainId - The blockchain network ID (e.g., 80002n for Polygon Amoy)
    * @param asset - The asset symbol to deposit (e.g., "usdc")
    * @param amount - The amount to deposit
-   * @returns Transaction hash of the blockchain transaction
+   * @returns The co-signed state ready for on-chain checkpoint
    *
    * @example
    * ```typescript
-   * const txHash = await client.deposit(80002n, 'usdc', new Decimal(100));
+   * const state = await client.deposit(80002n, 'usdc', new Decimal(100));
+   * const txHash = await client.checkpoint('usdc');
    * console.log('Deposit transaction:', txHash);
    * ```
    */
-  async deposit(blockchainId: bigint, asset: string, amount: Decimal): Promise<string> {
+  async deposit(blockchainId: bigint, asset: string, amount: Decimal): Promise<core.State> {
     const userWallet = this.getUserAddress();
-
-    // Initialize blockchain client if needed
-    await this.initializeBlockchainClient(blockchainId);
-    const blockchainClient = this.blockchainClients.get(blockchainId)!;
 
     // Get node address
     const nodeAddress = await this.getNodeAddress();
@@ -372,48 +373,42 @@ export class Client {
       const nodeSig = await this.requestChannelCreation(newState, channelDef);
       newState.nodeSig = nodeSig as Hex;
 
-      // Create channel on blockchain
-      const txHash = await blockchainClient.create(channelDef, newState);
-
-      return txHash;
+      return newState;
     }
 
-    // Scenario B: Channel exists and is open - checkpoint deposit
+    // Scenario B: Channel exists and is open - advance state with deposit
     const newState = nextState(state);
     applyHomeDepositTransition(newState, amount);
 
     // Sign and submit state to node
     await this.signAndSubmitState(newState);
 
-    // Checkpoint on blockchain
-    const txHash = await blockchainClient.checkpoint(newState);
-
-    return txHash;
+    return newState;
   }
 
   /**
-   * Withdraw removes funds from the user's channel and returns them to the blockchain wallet.
+   * Withdraw prepares a withdrawal state to remove funds from the user's channel.
    * This operation handles two scenarios automatically:
-   * 1. If no channel exists: Creates a new channel and executes the withdrawal in one transaction
-   * 2. If channel exists: Checkpoints the withdrawal to the existing channel
+   * 1. If no channel exists: Creates a new channel with the withdrawal transition
+   * 2. If channel exists: Advances the state with a withdrawal transition
+   *
+   * The returned state is signed by both the user and the node, but has not yet been
+   * submitted to the blockchain. Use {@link checkpoint} to execute the on-chain transaction.
    *
    * @param blockchainId - The blockchain network ID (e.g., 80002n for Polygon Amoy)
    * @param asset - The asset symbol to withdraw (e.g., "usdc")
    * @param amount - The amount to withdraw
-   * @returns Transaction hash of the blockchain transaction
+   * @returns The co-signed state ready for on-chain checkpoint
    *
    * @example
    * ```typescript
-   * const txHash = await client.withdraw(80002n, 'usdc', new Decimal(25));
+   * const state = await client.withdraw(80002n, 'usdc', new Decimal(25));
+   * const txHash = await client.checkpoint('usdc');
    * console.log('Withdrawal transaction:', txHash);
    * ```
    */
-  async withdraw(blockchainId: bigint, asset: string, amount: Decimal): Promise<string> {
+  async withdraw(blockchainId: bigint, asset: string, amount: Decimal): Promise<core.State> {
     const userWallet = this.getUserAddress();
-
-    // Initialize blockchain client if needed
-    await this.initializeBlockchainClient(blockchainId);
-    const blockchainClient = this.blockchainClients.get(blockchainId)!;
 
     // Get node address
     const nodeAddress = await this.getNodeAddress();
@@ -468,10 +463,7 @@ export class Client {
       const nodeSig = await this.requestChannelCreation(newState, channelDef);
       newState.nodeSig = nodeSig as Hex;
 
-      // Create channel on blockchain (Smart Contract handles Creation + Withdrawal)
-      const txHash = await blockchainClient.create(channelDef, newState);
-
-      return txHash;
+      return newState;
     }
 
     // Create next state
@@ -481,51 +473,42 @@ export class Client {
     // Sign and submit state to node
     await this.signAndSubmitState(newState);
 
-    // Checkpoint on blockchain
-    const txHash = await blockchainClient.checkpoint(newState);
-
-    return txHash;
+    return newState;
   }
 
   /**
-   * Transfer sends funds from the user to another wallet address.
-   * This is an off-chain operation that doesn't require blockchain interaction.
+   * Transfer prepares a transfer state to send funds to another wallet address.
+   * This method handles two scenarios automatically:
+   * 1. If no channel exists: Creates a new channel with the transfer transition
+   * 2. If channel exists: Advances the state with a transfer send transition
+   *
+   * The returned state is signed by both the user and the node. For existing channels,
+   * no blockchain interaction is needed. For new channels, use {@link checkpoint} to create
+   * the channel on-chain.
    *
    * @param recipientWallet - The recipient's wallet address (e.g., "0x1234...")
    * @param asset - The asset symbol to transfer (e.g., "usdc")
    * @param amount - The amount to transfer
-   * @returns Transaction ID for tracking
+   * @returns The co-signed state with the transfer transition applied
    *
    * @example
    * ```typescript
-   * const txId = await client.transfer('0xRecipient...', 'usdc', new Decimal(50));
-   * console.log('Transfer successful:', txId);
+   * const state = await client.transfer('0xRecipient...', 'usdc', new Decimal(50));
+   * console.log('Transfer tx ID:', state.transition.txId);
    * ```
    */
-  async transfer(recipientWallet: string, asset: string, amount: Decimal): Promise<string> {
+  async transfer(recipientWallet: string, asset: string, amount: Decimal): Promise<core.State> {
     const senderWallet = this.getUserAddress();
 
     // Get sender's latest state
     let state: core.State | null = null;
-    let channelIsOpen = false;
     try {
       state = await this.getLatestState(senderWallet, asset, false);
-
-      // If state has a home channel ID, check if the channel is actually open
-      if (state && state.homeChannelId) {
-        try {
-          const channelInfo = await this.getHomeChannel(senderWallet, asset);
-          channelIsOpen = channelInfo.status === core.ChannelStatus.Open;
-        } catch (err) {
-          // Channel doesn't exist or error fetching - will create new one
-          channelIsOpen = false;
-        }
-      }
     } catch (err) {
       // Channel doesn't exist
     }
 
-    if (!state || !state.homeChannelId || !channelIsOpen) {
+    if (!state || !state.homeChannelId) {
       // Create channel definition
       const channelDef: core.ChannelDefinition = {
         nonce: generateNonce(),
@@ -558,12 +541,8 @@ export class Client {
         throw new Error(`token address not found for asset ${asset} on blockchain ${blockchainId}`);
       }
 
-      // Initialize blockchain client if needed
-      await this.initializeBlockchainClient(blockchainId);
-      const blockchainClient = this.blockchainClients.get(blockchainId)!;
-
       applyChannelCreation(newState, channelDef, blockchainId, tokenAddress as Address, nodeAddress);
-      const transition = applyTransferSendTransition(newState, recipientWallet, amount);
+      applyTransferSendTransition(newState, recipientWallet, amount);
 
       const sig = await this.signState(newState);
       newState.userSig = sig;
@@ -572,41 +551,39 @@ export class Client {
       const nodeSig = await this.requestChannelCreation(newState, channelDef);
       newState.nodeSig = nodeSig as Hex;
 
-      // Create channel on blockchain
-      const txHash = await blockchainClient.create(channelDef, newState);
-
-      return txHash;
+      return newState;
     }
 
     // Create next state
     const newState = nextState(state);
-    const transition = applyTransferSendTransition(newState, recipientWallet, amount);
+    applyTransferSendTransition(newState, recipientWallet, amount);
 
     // Sign and submit state
     await this.signAndSubmitState(newState);
 
-    // Return transaction ID from the transition
-    return transition.txId;
+    return newState;
   }
 
   /**
-   * Acknowledge sends an acknowledgement transition for the given asset.
+   * Acknowledge prepares an acknowledgement state for the given asset.
    * This is used when a user receives a transfer but hasn't yet acknowledged the state,
    * or to acknowledge channel creation without a deposit.
    *
    * This method handles two scenarios automatically:
    * 1. If no channel exists: Creates a new channel with the acknowledgement transition
-   * 2. If channel exists: Submits the acknowledgement transition to the existing channel
+   * 2. If channel exists: Advances the state with an acknowledgement transition
+   *
+   * The returned state is signed by both the user and the node.
    *
    * @param asset - The asset symbol to acknowledge (e.g., "usdc")
+   * @returns The co-signed state with the acknowledgement transition applied
    *
    * @example
    * ```typescript
-   * await client.acknowledge('usdc');
-   * console.log('Acknowledgement successful');
+   * const state = await client.acknowledge('usdc');
    * ```
    */
-  async acknowledge(asset: string): Promise<void> {
+  async acknowledge(asset: string): Promise<core.State> {
     const userWallet = this.getUserAddress();
 
     // Try to get latest state to determine if channel exists
@@ -650,9 +627,10 @@ export class Client {
       const sig = await this.signState(newState);
       newState.userSig = sig;
 
-      await this.requestChannelCreation(newState, channelDef);
+      const nodeSig = await this.requestChannelCreation(newState, channelDef);
+      newState.nodeSig = nodeSig as Hex;
 
-      return;
+      return newState;
     }
 
     if (state.userSig) {
@@ -664,26 +642,79 @@ export class Client {
     applyAcknowledgementTransition(newState);
 
     await this.signAndSubmitState(newState);
+
+    return newState;
   }
 
   /**
-   * CloseHomeChannel finalizes and closes the user's channel for a specific asset.
+   * CloseHomeChannel prepares a finalize state to close the user's channel for a specific asset.
+   * This creates a final state with zero user balance and submits it to the node.
+   *
+   * The returned state is signed by both the user and the node, but has not yet been
+   * submitted to the blockchain. Use {@link checkpoint} to execute the on-chain close.
+   *
+   * @param asset - The asset symbol to close (e.g., "usdc")
+   * @returns The co-signed finalize state ready for on-chain close
+   *
+   * @example
+   * ```typescript
+   * const state = await client.closeHomeChannel('usdc');
+   * const txHash = await client.checkpoint('usdc');
+   * console.log('Close transaction:', txHash);
+   * ```
+   */
+  async closeHomeChannel(asset: string): Promise<core.State> {
+    const senderWallet = this.getUserAddress();
+
+    const state = await this.getLatestState(senderWallet, asset, false);
+
+    if (!state.homeChannelId) {
+      throw new Error(`no channel exists for asset ${asset}`);
+    }
+
+    // Create next state
+    const newState = nextState(state);
+    applyFinalizeTransition(newState);
+
+    // Sign and submit state
+    await this.signAndSubmitState(newState);
+
+    return newState;
+  }
+
+  /**
+   * Checkpoint executes the blockchain transaction for the latest signed state.
+   * It fetches the latest co-signed state and, based on the transition type and on-chain
+   * channel status, calls the appropriate blockchain method.
+   *
+   * This is the only method that interacts with the blockchain. It should be called after
+   * any state-building method (deposit, withdraw, closeHomeChannel, etc.) to settle
+   * the state on-chain. It can also be used as a recovery mechanism if a previous
+   * blockchain transaction failed (e.g., due to gas issues or network problems).
+   *
+   * Blockchain method mapping:
+   * - Channel not yet on-chain (status Void): Creates the channel via blockchainClient.create
+   * - HomeDeposit/HomeWithdrawal on existing channel: Checkpoints via blockchainClient.checkpoint
+   * - Finalize: Closes the channel via blockchainClient.close
    *
    * @param asset - The asset symbol (e.g., "usdc")
    * @returns Transaction hash of the blockchain transaction
    *
    * @example
    * ```typescript
-   * const txHash = await client.closeHomeChannel('usdc');
-   * console.log('Channel closed:', txHash);
+   * const state = await client.deposit(80002n, 'usdc', new Decimal(100));
+   * const txHash = await client.checkpoint('usdc');
+   * console.log('On-chain transaction:', txHash);
    * ```
    */
-  async closeHomeChannel(asset: string): Promise<string> {
-    const senderWallet = this.getUserAddress();
+  async checkpoint(asset: string): Promise<string> {
+    const userWallet = this.getUserAddress();
 
-    const state = await this.getLatestState(senderWallet, asset, false);
+    // Get latest signed state (both user and node signatures must be present)
+    const state = await this.getLatestState(userWallet, asset, true);
 
     if (!state.homeChannelId) {
+      // NOTE: this should never happen, because signed state MUST have a channel ID
       throw new Error(`no channel exists for asset ${asset}`);
     }
 
@@ -693,17 +724,40 @@ export class Client {
     await this.initializeBlockchainClient(blockchainId);
     const blockchainClient = this.blockchainClients.get(blockchainId)!;
 
-    // Create next state
-    const newState = nextState(state);
-    applyFinalizeTransition(newState);
+    // Get home channel info to determine on-chain status
+    const channel = await this.getHomeChannel(userWallet, asset);
 
-    // Sign and submit state
-    await this.signAndSubmitState(newState);
+    switch (state.transition.type) {
+      case core.TransitionType.Acknowledgement:
+      case core.TransitionType.HomeDeposit:
+      case core.TransitionType.HomeWithdrawal:
+      case core.TransitionType.TransferSend:
+      case core.TransitionType.TransferReceive:
+      case core.TransitionType.Commit:
+      case core.TransitionType.Release:  
+      {
+        if (channel.status === core.ChannelStatus.Void) {
+          // Channel not yet created on-chain, reconstruct definition and call Create
+          const channelDef: core.ChannelDefinition = {
+            nonce: channel.nonce,
+            challenge: channel.challengeDuration,
+          };
+          return await blockchainClient.create(channelDef, state);
+        }
 
-    // Close on blockchain
-    const txHash = await blockchainClient.close(newState);
+        // Checkpoint existing channel
+        return await blockchainClient.checkpoint(state);
+      }
 
-    return txHash;
+      case core.TransitionType.Finalize: {
+        return await blockchainClient.close(state);
+      }
+
+      default:
+        throw new Error(
+          `transition type ${state.transition.type} does not require a blockchain operation`
+        );
+    }
   }
 
   /**
@@ -1303,7 +1357,8 @@ export class Client {
   }
 
   /**
-   * Request the node to sign a channel creation.
+   * Request the node to co-sign a channel creation state.
+   * Used when creating a new channel (via deposit, withdraw, transfer, or acknowledge).
    */
   private async requestChannelCreation(
     state: core.State,

@@ -16,8 +16,12 @@ import (
 )
 
 // Client provides a unified interface for interacting with Clearnode.
-// It combines both high-level operations (Deposit, Withdraw, Transfer) and
-// low-level RPC access for advanced use cases.
+// It combines state-building operations (Deposit, Withdraw, Transfer) with a single
+// Checkpoint method for blockchain settlement, plus low-level RPC access for advanced use cases.
+//
+// The two-step pattern for blockchain operations:
+//  1. Build and co-sign the state off-chain (Deposit, Withdraw, CloseHomeChannel, etc.)
+//  2. Settle on-chain via Checkpoint
 //
 // High-level example:
 //
@@ -31,9 +35,12 @@ import (
 //	)
 //	defer client.Close()
 //
-//	// High-level operations
-//	txHash, _ := client.Deposit(ctx, 80002, "usdc", decimal.NewFromInt(100))
-//	txID, _ := client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
+//	// Deposit: build state, then settle on-chain
+//	state, _ := client.Deposit(ctx, 80002, "usdc", decimal.NewFromInt(100))
+//	txHash, _ := client.Checkpoint(ctx, "usdc")
+//
+//	// Transfer: off-chain only, no Checkpoint needed for existing channels
+//	state, _ = client.Transfer(ctx, "0xRecipient...", "usdc", decimal.NewFromInt(50))
 //
 //	// Low-level operations
 //	config, _ := client.GetConfig(ctx)
@@ -257,11 +264,11 @@ func (c *Client) signAndSubmitState(ctx context.Context, state *core.State) (str
 }
 
 // ============================================================================
-// High-Level Operations (Blockchain Interaction)
+// Blockchain Configuration
 // ============================================================================
 
 // WithBlockchainRPC returns an Option that configures a blockchain RPC client for a specific chain.
-// This is required for operations that interact with the blockchain (Deposit, Withdraw).
+// This is required for the Checkpoint method which settles states on-chain.
 //
 // Parameters:
 //   - chainID: The blockchain network ID (e.g., 80002 for Polygon Amoy testnet)

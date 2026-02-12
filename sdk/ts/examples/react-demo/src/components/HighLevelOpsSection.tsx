@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Decimal from 'decimal.js';
-import { ArrowDownToLine, ArrowUpFromLine, Send, XCircle } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Send, XCircle, ShieldCheck, CheckCheck } from 'lucide-react';
 import type { Client } from '@erc7824/nitrolite';
 import type { StatusMessage } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -28,12 +28,16 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
 
   const [closeAsset, setCloseAsset] = useState('usdc');
 
+  const [acknowledgeAsset, setAcknowledgeAsset] = useState('usdc');
+
+  const [checkpointAsset, setCheckpointAsset] = useState('usdc');
+
   const handleDeposit = async () => {
     try {
       setLoading('deposit');
       const amount = new Decimal(depositAmount);
-      const txHash = await client.deposit(BigInt(depositChainId), depositAsset, amount);
-      showStatus('success', 'Deposit completed', `Transaction: ${txHash}`);
+      const state = await client.deposit(BigInt(depositChainId), depositAsset, amount);
+      showStatus('success', 'Deposit state prepared', `State version: ${state.version}, ID: ${state.id}. Use Checkpoint to settle on-chain.`);
       setDepositAmount('');
     } catch (error) {
       showStatus('error', 'Deposit failed', error instanceof Error ? error.message : String(error));
@@ -46,8 +50,8 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
     try {
       setLoading('withdraw');
       const amount = new Decimal(withdrawAmount);
-      const txHash = await client.withdraw(BigInt(withdrawChainId), withdrawAsset, amount);
-      showStatus('success', 'Withdrawal completed', `Transaction: ${txHash}`);
+      const state = await client.withdraw(BigInt(withdrawChainId), withdrawAsset, amount);
+      showStatus('success', 'Withdrawal state prepared', `State version: ${state.version}, ID: ${state.id}. Use Checkpoint to settle on-chain.`);
       setWithdrawAmount('');
     } catch (error) {
       showStatus('error', 'Withdrawal failed', error instanceof Error ? error.message : String(error));
@@ -60,8 +64,8 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
     try {
       setLoading('transfer');
       const amount = new Decimal(transferAmount);
-      const txId = await client.transfer(transferRecipient as `0x${string}`, transferAsset, amount);
-      showStatus('success', 'Transfer completed', `Transaction ID: ${txId}`);
+      const state = await client.transfer(transferRecipient as `0x${string}`, transferAsset, amount);
+      showStatus('success', 'Transfer completed', `State version: ${state.version}, ID: ${state.id}`);
       setTransferAmount('');
     } catch (error) {
       showStatus('error', 'Transfer failed', error instanceof Error ? error.message : String(error));
@@ -73,10 +77,34 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
   const handleCloseChannel = async () => {
     try {
       setLoading('close');
-      const txHash = await client.closeHomeChannel(closeAsset);
-      showStatus('success', 'Channel closed', `Transaction: ${txHash}`);
+      const state = await client.closeHomeChannel(closeAsset);
+      showStatus('success', 'Channel close state prepared', `State version: ${state.version}, ID: ${state.id}. Use Checkpoint to settle on-chain.`);
     } catch (error) {
       showStatus('error', 'Close channel failed', error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleAcknowledge = async () => {
+    try {
+      setLoading('acknowledge');
+      const state = await client.acknowledge(acknowledgeAsset);
+      showStatus('success', 'State acknowledged', `State version: ${state.version}, ID: ${state.id}`);
+    } catch (error) {
+      showStatus('error', 'Acknowledge failed', error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleCheckpoint = async () => {
+    try {
+      setLoading('checkpoint');
+      const txHash = await client.checkpoint(checkpointAsset);
+      showStatus('success', 'Checkpoint completed', `Transaction: ${txHash}`);
+    } catch (error) {
+      showStatus('error', 'Checkpoint failed', error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(null);
     }
@@ -86,7 +114,7 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
     <Card>
       <CardHeader>
         <CardTitle>High-Level Operations</CardTitle>
-        <CardDescription>Smart client operations with automatic state management</CardDescription>
+        <CardDescription>Build states off-chain, then settle on-chain with Checkpoint</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -211,6 +239,50 @@ export default function HighLevelOpsSection({ client, showStatus }: HighLevelOps
               {loading === 'close' ? 'Processing...' : 'Close Channel'}
             </Button>
             <p className="text-xs text-muted-foreground">Warning: This will finalize and close the channel</p>
+          </div>
+
+          {/* Acknowledge */}
+          <div className="border border-border p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <CheckCheck className="h-4 w-4" />
+              <h3 className="text-sm font-semibold uppercase tracking-wider">Acknowledge</h3>
+            </div>
+            <Input
+              type="text"
+              value={acknowledgeAsset}
+              onChange={(e) => setAcknowledgeAsset(e.target.value)}
+              placeholder="Asset"
+            />
+            <Button
+              onClick={handleAcknowledge}
+              disabled={loading === 'acknowledge' || !acknowledgeAsset}
+              className="w-full"
+            >
+              {loading === 'acknowledge' ? 'Processing...' : 'Acknowledge'}
+            </Button>
+            <p className="text-xs text-muted-foreground">Acknowledge a received transfer or channel state</p>
+          </div>
+
+          {/* Checkpoint */}
+          <div className="border border-border p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              <h3 className="text-sm font-semibold uppercase tracking-wider">Checkpoint</h3>
+            </div>
+            <Input
+              type="text"
+              value={checkpointAsset}
+              onChange={(e) => setCheckpointAsset(e.target.value)}
+              placeholder="Asset"
+            />
+            <Button
+              onClick={handleCheckpoint}
+              disabled={loading === 'checkpoint' || !checkpointAsset}
+              className="w-full"
+            >
+              {loading === 'checkpoint' ? 'Processing...' : 'Checkpoint'}
+            </Button>
+            <p className="text-xs text-muted-foreground">Settle the latest signed state on-chain. Use after Deposit, Withdraw, or Close.</p>
           </div>
         </div>
       </CardContent>

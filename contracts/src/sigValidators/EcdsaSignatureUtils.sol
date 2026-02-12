@@ -43,36 +43,4 @@ library EcdsaSignatureUtils {
 
         return false;
     }
-
-    /**
-     * @notice Validates that a signature was created by one of two expected signers
-     * @dev Tries EIP-191 recovery first, then raw ECDSA if that fails.
-     *      Useful for challenger validation where signer must be either user or node.
-     *      Hashes the message internally before recovery.
-     * @param message The message that was signed (will be hashed internally)
-     * @param signature The signature to validate (65 bytes ECDSA: r, s, v)
-     * @param addr1 First possible signer address
-     * @param addr2 Second possible signer address
-     * @return bool True if signature is from addr1 or addr2, false otherwise
-     */
-    function validateEcdsaSignerIsEither(bytes memory message, bytes memory signature, address addr1, address addr2)
-        internal
-        pure
-        returns (bool)
-    {
-        bytes32 eip191Digest = message.toEthSignedMessageHash();
-        address recovered = eip191Digest.recover(signature);
-
-        if (recovered == addr1 || recovered == addr2) {
-            return true;
-        }
-
-        recovered = keccak256(message).recover(signature);
-
-        if (recovered == addr1 || recovered == addr2) {
-            return true;
-        }
-
-        return false;
-    }
 }

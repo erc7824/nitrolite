@@ -36,21 +36,4 @@ interface ISignatureValidator {
         bytes calldata signature,
         address participant
     ) external view returns (ValidationResult);
-
-    /**
-     * @notice Validates a challenger's signature
-     * @param channelId The channel identifier to be included in the signed message
-     * @param signingData The encoded state data (without channelId or signatures)
-     * @param signature The signature to validate
-     * @param user The user's address
-     * @param node The node's address
-     * @return result ValidationResult indicating success or failure
-     */
-    function validateChallengerSignature(
-        bytes32 channelId,
-        bytes calldata signingData,
-        bytes calldata signature,
-        address user,
-        address node
-    ) external view returns (ValidationResult);
 }

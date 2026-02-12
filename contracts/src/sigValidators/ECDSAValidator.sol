@@ -42,31 +42,4 @@ contract ECDSAValidator is ISignatureValidator {
             return VALIDATION_FAILURE;
         }
     }
-
-    /**
-     * @notice Validates a challenger's signature for dispute scenarios
-     * @dev Constructs the full message by prepending channelId to signingData and appending "challenge",
-     *      then tries EIP-191 recovery first, then raw ECDSA if that fails.
-     *      The challenger must be either the user or node.
-     * @param channelId The channel identifier to include in the signed message
-     * @param signingData The encoded state data (without channelId or signatures)
-     * @param signature The challenger's signature (format: [r: 32][s: 32][v: 1], 65 bytes)
-     * @param user The user's address
-     * @param node The node's address
-     * @return result VALIDATION_SUCCESS if challenger is user or node, VALIDATION_FAILURE otherwise
-     */
-    function validateChallengerSignature(
-        bytes32 channelId,
-        bytes calldata signingData,
-        bytes calldata signature,
-        address user,
-        address node
-    ) external pure returns (ValidationResult) {
-        bytes memory message = abi.encodePacked(Utils.pack(channelId, signingData), "challenge");
-        if (EcdsaSignatureUtils.validateEcdsaSignerIsEither(message, signature, user, node)) {
-            return VALIDATION_SUCCESS;
-        } else {
-            return VALIDATION_FAILURE;
-        }
-    }
 }

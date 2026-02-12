@@ -6,12 +6,13 @@ This document describes the pluggable signature validation system in the Nitroli
 
 ## Overview
 
-The protocol supports flexible signature validation through the `ISignatureValidator` interface. All validators implement two methods:
+The protocol supports flexible signature validation through the `ISignatureValidator` interface. All validators implement:
 
 - `validateSignature(channelId, signingData, signature, participant)` - Validates a participant's signature
-- `validateChallengerSignature(channelId, signingData, signature, user, node)` - Validates a challenger's signature
 
 Validators receive the core state data (`signingData`) and `channelId` separately, allowing them to construct the full message according to their signing scheme.
+
+For challenge signatures, ChannelHub appends `"challenge"` to the signing data before calling `validateSignature`.
 
 ---
 

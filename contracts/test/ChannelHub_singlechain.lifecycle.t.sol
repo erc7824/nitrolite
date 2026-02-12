@@ -15,7 +15,6 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             user: alice,
             node: node,
             nonce: NONCE,
-            signatureValidator: SK_SIG_VALIDATOR,
             metadata: bytes32(0)
         });
 
@@ -211,7 +210,6 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             user: alice,
             node: node,
             nonce: NONCE,
-            signatureValidator: EMPTY_SIG_VALIDATOR,
             metadata: bytes32(0)
         });
 
@@ -276,7 +274,6 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             user: alice,
             node: node,
             nonce: NONCE,
-            signatureValidator: EMPTY_SIG_VALIDATOR,
             metadata: bytes32(0)
         });
 
@@ -341,7 +338,6 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
             user: alice,
             node: node,
             nonce: NONCE,
-            signatureValidator: EMPTY_SIG_VALIDATOR,
             metadata: bytes32(0)
         });
 

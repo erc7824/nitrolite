@@ -3,11 +3,10 @@ pragma solidity 0.8.30;
 
 import {Test, console} from "lib/forge-std/src/Test.sol";
 
-import {TestUtils} from "./TestUtils.sol";
+import {TestUtils, SESSION_KEY_VALIDATOR_ID} from "./TestUtils.sol";
 
 import {Utils} from "../src/Utils.sol";
-import {ChannelDefinition, State, Ledger, StateIntent, SigValidatorType} from "../src/interfaces/Types.sol";
-import {ISignatureValidator} from "../src/interfaces/ISignatureValidator.sol";
+import {ChannelDefinition, State, Ledger, StateIntent} from "../src/interfaces/Types.sol";
 import {SessionKeyAuthorization, toSigningData} from "../src/sigValidators/SessionKeyValidator.sol";
 
 contract UtilsTest is Test {
@@ -17,7 +16,6 @@ contract UtilsTest is Test {
             user: 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045,
             node: 0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a,
             nonce: 42,
-            signatureValidator: ISignatureValidator(address(123)),
             metadata: 0x13730b0d8e1bdbdc000000000000000000000000000000000000000000000000
         });
 
@@ -141,7 +139,6 @@ contract UtilsTest is Test {
             user: 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045,
             node: 0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a,
             nonce: 42,
-            signatureValidator: ISignatureValidator(0xA33882C770F3D56b9a8E56Bc02d6C7068624F384),
             metadata: metadata
         });
 
@@ -191,9 +188,28 @@ contract UtilsTest is Test {
         // 0xf8fa3bf9f0660ff737a123d33f19d7939c8662e84d6819259b1543aec89d52720c88a40fa4b99197b8258cf19655e49d957149c6c7acec7007a2b3722b8024b31b
         console.logBytes(skStateSignature);
 
-        bytes memory skModuleSig = abi.encodePacked(uint8(SigValidatorType.CHANNEL), skStateSignature);
+        bytes memory skModuleSig = abi.encodePacked(SESSION_KEY_VALIDATOR_ID, skStateSignature);
         console.log("Encoded signature for channel validator:");
         // 0x01f8fa3bf9f0660ff737a123d33f19d7939c8662e84d6819259b1543aec89d52720c88a40fa4b99197b8258cf19655e49d957149c6c7acec7007a2b3722b8024b31b
         console.logBytes(skModuleSig);
+    }
+
+    function test_log_validatorRegistration() public pure {
+        uint256 nodePk = 0xfa35c49dc36191b998cc651d95699f9d63959d2112e14cc1d241f522bec2fe62;
+        uint8 validatorId = SESSION_KEY_VALIDATOR_ID;
+        address validatorAddress = 0xA33882C770F3D56b9a8E56Bc02d6C7068624F384;
+        uint64 chainId = 420042;
+
+        // Build the registration message
+        bytes memory message = abi.encode(validatorId, validatorAddress, chainId);
+        console.log("Registration message (abi.encode(validatorId, validatorAddress, chainId)):");
+        // 0x0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000a33882c770f3d56b9a8e56bc02d6c7068624f38400000000000000000000000000000000000000000000000000000000000668ca
+        console.logBytes(message);
+
+        // Sign the registration message
+        bytes memory signature = TestUtils.signEip191(vm, nodePk, message);
+        console.log("EIP-191 signature:");
+        // 0xfbee5bdc27ba3abb6d2bf5bb403b4bb79b96ffacfd89caca022e2abe391b42827135297986b6471ab343a57fb6af66608f5e0c749cd1b6b8f19a6ca1eeab50141c
+        console.logBytes(signature);
     }
 }

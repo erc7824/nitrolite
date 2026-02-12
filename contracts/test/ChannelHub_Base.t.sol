@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import {Test} from "lib/forge-std/src/Test.sol";
 
 import {MockERC20} from "./mocks/MockERC20.sol";
-import {TestUtils} from "./TestUtils.sol";
+import {TestUtils, SESSION_KEY_VALIDATOR_ID} from "./TestUtils.sol";
 
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {ECDSAValidator} from "../src/sigValidators/ECDSAValidator.sol";
@@ -55,6 +55,12 @@ contract ChannelHubTest_Base is Test {
         token.approve(address(cHub), INITIAL_BALANCE);
         cHub.depositToVault(node, address(token), INITIAL_BALANCE);
         vm.stopPrank();
+
+        // Register SessionKeyValidator for the node
+        bytes memory skValidatorSig = TestUtils.buildAndSignValidatorRegistration(
+            vm, SESSION_KEY_VALIDATOR_ID, address(SK_SIG_VALIDATOR), NODE_PK
+        );
+        cHub.registerNodeValidator(node, SESSION_KEY_VALIDATOR_ID, SK_SIG_VALIDATOR, skValidatorSig);
 
         vm.prank(alice);
         token.approve(address(cHub), INITIAL_BALANCE);

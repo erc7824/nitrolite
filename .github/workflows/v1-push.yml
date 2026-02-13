@@ -2,7 +2,7 @@ name: Push on release/v1.0.0 branch
 
 on:
   push:
-    branches: [ release/v1.0.0 ]
+    branches: [ release/v1.0.0, mvp-v1/integration ]
 
 jobs:
   test-clearnode:
@@ -54,7 +54,8 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "github-actions@github.com"
 
-          ./clearnode/scripts/auto_tag.sh v1.0.0
+          ./clearnode/scripts/auto_tag.sh v0.78.31
+        # ./clearnode/scripts/auto_tag.sh v1.0.0
 
       - name: Store the new tag
         id: tagger

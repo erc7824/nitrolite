@@ -141,13 +141,13 @@ func coreStateToContractState(state core.State, tokenGetter func(blockchainID ui
 	}
 
 	return State{
-		Version:      state.Version,
-		Intent:       intent,
-		Metadata:     metadata,
-		HomeState:    homeLedger,
-		NonHomeState: nonHomeLedger,
-		UserSig:      userSig,
-		NodeSig:      nodeSig,
+		Version:       state.Version,
+		Intent:        intent,
+		Metadata:      metadata,
+		HomeLedger:    homeLedger,
+		NonHomeLedger: nonHomeLedger,
+		UserSig:       userSig,
+		NodeSig:       nodeSig,
 	}, nil
 }
 
@@ -186,11 +186,11 @@ func coreLedgerToContractLedger(ledger core.Ledger, decimals uint8) (Ledger, err
 }
 
 func contractStateToCoreState(contractState State, homeChannelID string, escrowChannelID *string) (*core.State, error) {
-	homeLedger := contractLedgerToCoreLedger(contractState.HomeState)
+	homeLedger := contractLedgerToCoreLedger(contractState.HomeLedger)
 
 	var escrowLedger *core.Ledger
-	if contractState.NonHomeState.ChainId != 0 {
-		el := contractLedgerToCoreLedger(contractState.NonHomeState)
+	if contractState.NonHomeLedger.ChainId != 0 {
+		el := contractLedgerToCoreLedger(contractState.NonHomeLedger)
 		escrowLedger = &el
 	}
 

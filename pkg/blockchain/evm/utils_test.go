@@ -186,7 +186,7 @@ func TestCoreStateToContractState_BasicState(t *testing.T) {
 	require.Equal(t, expectedNodeSig, result.NodeSig)
 
 	// Verify home ledger
-	require.Equal(t, uint64(1), result.HomeState.ChainId)
+	require.Equal(t, uint64(1), result.HomeLedger.ChainId)
 	// Note: Decimals field is not set by coreLedgerToContractLedger
 }
 
@@ -231,7 +231,7 @@ func TestCoreStateToContractState_WithEscrowLedger(t *testing.T) {
 	require.Equal(t, uint8(core.INTENT_INITIATE_ESCROW_DEPOSIT), result.Intent)
 
 	// Verify escrow ledger is populated
-	require.Equal(t, uint64(2), result.NonHomeState.ChainId)
+	require.Equal(t, uint64(2), result.NonHomeLedger.ChainId)
 	// Note: Decimals field is not set by coreLedgerToContractLedger
 }
 
@@ -263,17 +263,17 @@ func TestCoreStateToContractState_WithoutEscrowLedger(t *testing.T) {
 	result, err := coreStateToContractState(coreState, mockTokenGetter)
 	require.NoError(t, err)
 
-	// Verify that NonHomeState is initialized with non-nil big.Int pointers
-	require.NotNil(t, result.NonHomeState.UserAllocation, "UserAllocation should not be nil")
-	require.NotNil(t, result.NonHomeState.UserNetFlow, "UserNetFlow should not be nil")
-	require.NotNil(t, result.NonHomeState.NodeAllocation, "NodeAllocation should not be nil")
-	require.NotNil(t, result.NonHomeState.NodeNetFlow, "NodeNetFlow should not be nil")
+	// Verify that NonHomeLedger is initialized with non-nil big.Int pointers
+	require.NotNil(t, result.NonHomeLedger.UserAllocation, "UserAllocation should not be nil")
+	require.NotNil(t, result.NonHomeLedger.UserNetFlow, "UserNetFlow should not be nil")
+	require.NotNil(t, result.NonHomeLedger.NodeAllocation, "NodeAllocation should not be nil")
+	require.NotNil(t, result.NonHomeLedger.NodeNetFlow, "NodeNetFlow should not be nil")
 
 	// Verify they are zero values
-	require.Equal(t, big.NewInt(0), result.NonHomeState.UserAllocation)
-	require.Equal(t, big.NewInt(0), result.NonHomeState.UserNetFlow)
-	require.Equal(t, big.NewInt(0), result.NonHomeState.NodeAllocation)
-	require.Equal(t, big.NewInt(0), result.NonHomeState.NodeNetFlow)
+	require.Equal(t, big.NewInt(0), result.NonHomeLedger.UserAllocation)
+	require.Equal(t, big.NewInt(0), result.NonHomeLedger.UserNetFlow)
+	require.Equal(t, big.NewInt(0), result.NonHomeLedger.NodeAllocation)
+	require.Equal(t, big.NewInt(0), result.NonHomeLedger.NodeNetFlow)
 
 	// Verify the intent
 	require.Equal(t, uint8(core.INTENT_DEPOSIT), result.Intent)
@@ -318,7 +318,7 @@ func TestContractStateToCoreState_HomeOnly(t *testing.T) {
 	contractState := State{
 		Version: 1,
 		Intent:  core.INTENT_OPERATE,
-		HomeState: Ledger{
+		HomeLedger: Ledger{
 			ChainId:        1,
 			Token:          common.HexToAddress("0x1234567890123456789012345678901234567890"),
 			Decimals:       18,
@@ -363,7 +363,7 @@ func TestContractStateToCoreState_WithEscrow(t *testing.T) {
 	contractState := State{
 		Version: 2,
 		Intent:  core.INTENT_INITIATE_ESCROW_DEPOSIT,
-		HomeState: Ledger{
+		HomeLedger: Ledger{
 			ChainId:        1,
 			Token:          common.HexToAddress("0x1234567890123456789012345678901234567890"),
 			Decimals:       18,
@@ -372,7 +372,7 @@ func TestContractStateToCoreState_WithEscrow(t *testing.T) {
 			NodeAllocation: homeNodeAllocation,
 			NodeNetFlow:    homeNodeAllocation,
 		},
-		NonHomeState: Ledger{
+		NonHomeLedger: Ledger{
 			ChainId:        2,
 			Token:          common.HexToAddress("0xfedcba0987654321fedcba0987654321fedcba09"),
 			Decimals:       6,
@@ -404,7 +404,7 @@ func TestContractStateToCoreState_EmptyChannelID(t *testing.T) {
 	contractState := State{
 		Version: 1,
 		Intent:  core.INTENT_OPERATE,
-		HomeState: Ledger{
+		HomeLedger: Ledger{
 			ChainId:        1,
 			Token:          common.HexToAddress("0x1234567890123456789012345678901234567890"),
 			Decimals:       18,
@@ -429,7 +429,7 @@ func TestContractStateToCoreState_EmptySignatures(t *testing.T) {
 	contractState := State{
 		Version: 1,
 		Intent:  core.INTENT_OPERATE,
-		HomeState: Ledger{
+		HomeLedger: Ledger{
 			ChainId:        1,
 			Token:          common.HexToAddress("0x1234567890123456789012345678901234567890"),
 			Decimals:       18,

@@ -82,6 +82,64 @@ func (s *Storage) GetAllRPCs() (map[uint64]string, error) {
 	return rpcs, nil
 }
 
+func (s *Storage) SetSessionKeyPrivateKey(privateKey string) error {
+	_, err := s.db.Exec("INSERT OR REPLACE INTO config (key, value) VALUES ('session_key_private_key', ?)", privateKey)
+	return err
+}
+
+func (s *Storage) GetSessionKeyPrivateKey() (string, error) {
+	var privateKey string
+	err := s.db.QueryRow("SELECT value FROM config WHERE key = 'session_key_private_key'").Scan(&privateKey)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("no session key private key configured")
+	}
+	return privateKey, err
+}
+
+func (s *Storage) SetSessionKey(privateKey, metadataHash, authSig string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, kv := range []struct{ key, value string }{
+		{"session_key_private_key", privateKey},
+		{"session_key_metadata_hash", metadataHash},
+		{"session_key_auth_sig", authSig},
+	} {
+		if _, err := tx.Exec("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", kv.key, kv.value); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Storage) GetSessionKey() (privateKey, metadataHash, authSig string, err error) {
+	for _, kv := range []struct {
+		key  string
+		dest *string
+	}{
+		{"session_key_private_key", &privateKey},
+		{"session_key_metadata_hash", &metadataHash},
+		{"session_key_auth_sig", &authSig},
+	} {
+		err = s.db.QueryRow("SELECT value FROM config WHERE key = ?", kv.key).Scan(kv.dest)
+		if err == sql.ErrNoRows {
+			return "", "", "", fmt.Errorf("no session key configured")
+		}
+		if err != nil {
+			return "", "", "", err
+		}
+	}
+	return
+}
+
+func (s *Storage) ClearSessionKey() error {
+	_, err := s.db.Exec("DELETE FROM config WHERE key IN ('session_key_private_key', 'session_key_metadata_hash', 'session_key_auth_sig')")
+	return err
+}
+
 func (s *Storage) Close() error {
 	return s.db.Close()
 }

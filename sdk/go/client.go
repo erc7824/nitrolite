@@ -238,7 +238,7 @@ func (c *Client) SignState(state *core.State) (string, error) {
 // GetUserAddress returns the Ethereum address associated with the signer.
 // This is useful for identifying the current user's wallet address.
 func (c *Client) GetUserAddress() string {
-	return c.stateSigner.PublicKey().Address().String()
+	return c.rawSigner.PublicKey().Address().String()
 }
 
 // signAndSubmitState is a helper that signs a state and submits it to the node.

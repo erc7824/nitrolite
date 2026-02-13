@@ -1,7 +1,8 @@
-import { encodeAbiParameters, keccak256 } from 'viem';
+import { Address, encodeAbiParameters, keccak256 } from 'viem';
 import {
   AppDefinitionV1,
   AppStateUpdateV1,
+  AppSessionKeyStateV1,
   AppSessionVersionV1,
 } from './types';
 
@@ -172,5 +173,42 @@ export function generateRebalanceTransactionIDV1(
   );
 
   // Return the Keccak256 hash as hex string
+  return keccak256(packed);
+}
+
+/**
+ * PackAppSessionKeyStateV1 packs the app session key state for signing using ABI encoding.
+ * Matches Go SDK's PackAppSessionKeyStateV1.
+ *
+ * @param state - The app session key state to pack
+ * @returns Keccak256 hash of the ABI-encoded state (excluding user_sig)
+ */
+export function packAppSessionKeyStateV1(state: AppSessionKeyStateV1): `0x${string}` {
+  const applicationIDHashes = state.application_ids.map(
+    (id) => id as `0x${string}`
+  );
+  const appSessionIDHashes = state.app_session_ids.map(
+    (id) => id as `0x${string}`
+  );
+
+  const packed = encodeAbiParameters(
+    [
+      { type: 'address' },    // user_address
+      { type: 'address' },    // session_key
+      { type: 'uint64' },     // version
+      { type: 'bytes32[]' },  // application_ids
+      { type: 'bytes32[]' },  // app_session_ids
+      { type: 'uint64' },     // expires_at
+    ],
+    [
+      state.user_address as Address,
+      state.session_key as Address,
+      BigInt(state.version),
+      applicationIDHashes,
+      appSessionIDHashes,
+      BigInt(state.expires_at),
+    ]
+  );
+
   return keccak256(packed);
 }

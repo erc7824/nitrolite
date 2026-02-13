@@ -88,10 +88,6 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 	}
 
 	err = h.useStoreInTx(func(tx Store) error {
-		if err := h.verifyQuorum(tx, appSessionID, participantWeights, appDef.Quorum, packedRequest, reqPayload.QuorumSigs); err != nil {
-			return err
-		}
-
 		// Create app session with 0 allocations
 		appSession := app.AppSessionV1{
 			SessionID:    appSessionID,
@@ -108,6 +104,10 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 
 		if err := tx.CreateAppSession(appSession); err != nil {
 			return rpc.Errorf("failed to create app session: %v", err)
+		}
+
+		if err := h.verifyQuorum(tx, appSessionID, participantWeights, appDef.Quorum, packedRequest, reqPayload.QuorumSigs); err != nil {
+			return err
 		}
 
 		return nil

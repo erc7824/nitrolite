@@ -51,7 +51,7 @@ type Client struct {
 	exitCh            chan struct{}
 	blockchainClients map[uint64]core.Client
 	homeBlockchains   map[string]uint64
-	stateSigner       sign.Signer
+	stateSigner       core.ChannelSigner
 	txSigner          sign.Signer
 	assetStore        *clientAssetStore
 }
@@ -61,7 +61,7 @@ type Client struct {
 //
 // Parameters:
 //   - wsURL: WebSocket URL of the Clearnode server (e.g., "wss://clearnode.example.com/ws")
-//   - stateSigner: sign.Signer for signing channel states (use sign.NewEthereumMsgSigner)
+//   - stateSigner: core.ChannelSigner for signing channel states (use sign.NewEthereumMsgSigner)
 //   - txSigner: sign.Signer for signing blockchain transactions (use sign.NewEthereumRawSigner)
 //   - opts: Optional configuration (WithBlockchainRPC, WithHandshakeTimeout, etc.)
 //
@@ -79,7 +79,7 @@ type Client struct {
 //	    txSigner,
 //	    sdk.WithBlockchainRPC(80002, "https://polygon-amoy.alchemy.com/v2/KEY"),
 //	)
-func NewClient(wsURL string, stateSigner, txSigner sign.Signer, opts ...Option) (*Client, error) {
+func NewClient(wsURL string, stateSigner core.ChannelSigner, txSigner sign.Signer, opts ...Option) (*Client, error) {
 	// Build config starting with defaults
 	config := DefaultConfig
 	config.URL = wsURL

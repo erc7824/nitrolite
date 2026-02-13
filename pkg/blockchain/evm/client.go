@@ -2,6 +2,7 @@ package evm
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -309,6 +310,62 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 	if err != nil {
 		return "", errors.Wrap(err, "failed to convert state")
 	}
+
+	// Debug: print channel definition
+	fmt.Println("\n[DEBUG] === CreateChannel ===")
+	fmt.Printf("[DEBUG] Channel Definition:\n")
+	fmt.Printf("[DEBUG]   ChallengeDuration: %d\n", contractDef.ChallengeDuration)
+	fmt.Printf("[DEBUG]   User:              %s\n", contractDef.User.Hex())
+	fmt.Printf("[DEBUG]   Node:              %s\n", contractDef.Node.Hex())
+	fmt.Printf("[DEBUG]   Nonce:             %d\n", contractDef.Nonce)
+	fmt.Printf("[DEBUG]   ApprovedSigVal:    %s\n", contractDef.ApprovedSignatureValidators.String())
+	fmt.Printf("[DEBUG]   Metadata:          %s\n", hexutil.Encode(contractDef.Metadata[:]))
+
+	// Debug: print state
+	fmt.Printf("[DEBUG] State:\n")
+	fmt.Printf("[DEBUG]   Version:           %d\n", contractState.Version)
+	fmt.Printf("[DEBUG]   Intent:            %d\n", contractState.Intent)
+	fmt.Printf("[DEBUG]   Metadata:          %s\n", hexutil.Encode(contractState.Metadata[:]))
+	fmt.Printf("[DEBUG] Home Ledger:\n")
+	fmt.Printf("[DEBUG]   ChainId:           %d\n", contractState.HomeLedger.ChainId)
+	fmt.Printf("[DEBUG]   Token:             %s\n", contractState.HomeLedger.Token.Hex())
+	fmt.Printf("[DEBUG]   Decimals:          %d\n", contractState.HomeLedger.Decimals)
+	fmt.Printf("[DEBUG]   UserAllocation:    %s\n", contractState.HomeLedger.UserAllocation.String())
+	fmt.Printf("[DEBUG]   UserNetFlow:       %s\n", contractState.HomeLedger.UserNetFlow.String())
+	fmt.Printf("[DEBUG]   NodeAllocation:    %s\n", contractState.HomeLedger.NodeAllocation.String())
+	fmt.Printf("[DEBUG]   NodeNetFlow:       %s\n", contractState.HomeLedger.NodeNetFlow.String())
+	fmt.Printf("[DEBUG] NonHome Ledger:\n")
+	fmt.Printf("[DEBUG]   ChainId:           %d\n", contractState.NonHomeLedger.ChainId)
+	fmt.Printf("[DEBUG]   Token:             %s\n", contractState.NonHomeLedger.Token.Hex())
+	fmt.Printf("[DEBUG]   UserAllocation:    %s\n", contractState.NonHomeLedger.UserAllocation.String())
+	fmt.Printf("[DEBUG]   NodeAllocation:    %s\n", contractState.NonHomeLedger.NodeAllocation.String())
+	fmt.Printf("[DEBUG] Signatures:\n")
+	fmt.Printf("[DEBUG]   UserSig (%d bytes): %s\n", len(contractState.UserSig), hexutil.Encode(contractState.UserSig))
+	fmt.Printf("[DEBUG]   NodeSig (%d bytes): %s\n", len(contractState.NodeSig), hexutil.Encode(contractState.NodeSig))
+
+	// Debug: print core state info
+	fmt.Printf("[DEBUG] Core State:\n")
+	fmt.Printf("[DEBUG]   Asset:             %s\n", initCCS.Asset)
+	fmt.Printf("[DEBUG]   UserWallet:        %s\n", initCCS.UserWallet)
+	if initCCS.HomeChannelID != nil {
+		fmt.Printf("[DEBUG]   HomeChannelID:     %s\n", *initCCS.HomeChannelID)
+	}
+	fmt.Printf("[DEBUG]   Transition:        %s (amount: %s)\n", initCCS.Transition.Type, initCCS.Transition.Amount.String())
+	if initCCS.UserSig != nil {
+		fmt.Printf("[DEBUG]   UserSig (raw):     %s\n", *initCCS.UserSig)
+	}
+	if initCCS.NodeSig != nil {
+		fmt.Printf("[DEBUG]   NodeSig (raw):     %s\n", *initCCS.NodeSig)
+	}
+
+	// Debug: try to pack the state the same way signing does, to verify hash
+	packedState, packErr := core.PackState(initCCS, c.assetStore)
+	if packErr != nil {
+		fmt.Printf("[DEBUG]   PackState ERROR:   %v\n", packErr)
+	} else {
+		fmt.Printf("[DEBUG]   PackState hash:    %s\n", hexutil.Encode(packedState))
+	}
+	fmt.Println("[DEBUG] === End CreateChannel ===")
 
 	switch contractState.Intent {
 	case core.INTENT_OPERATE:

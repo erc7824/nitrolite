@@ -57,8 +57,9 @@ func TestCoreDefToContractDef_Success(t *testing.T) {
 	nodeAddress := common.HexToAddress("0x9876543210987654321098765432109876543210")
 
 	coreDef := core.ChannelDefinition{
-		Nonce:     12345,
-		Challenge: 3600,
+		Nonce:                 12345,
+		Challenge:             3600,
+		ApprovedSigValidators: "0x03",
 	}
 
 	result, err := coreDefToContractDef(coreDef, asset, userWallet, nodeAddress)
@@ -69,12 +70,29 @@ func TestCoreDefToContractDef_Success(t *testing.T) {
 	require.Equal(t, common.HexToAddress(userWallet), result.User)
 	require.Equal(t, nodeAddress, result.Node)
 	require.Equal(t, uint64(12345), result.Nonce)
+	require.Equal(t, big.NewInt(3), result.ApprovedSignatureValidators)
 
 	// Verify metadata contains asset hash
 	assetHash := crypto.Keccak256Hash([]byte(asset))
 	expectedMetadata := [32]byte{}
 	copy(expectedMetadata[:8], assetHash[:8])
 	require.Equal(t, expectedMetadata, result.Metadata)
+}
+
+func TestCoreDefToContractDef_EmptyValidators(t *testing.T) {
+	asset := "ETH"
+	userWallet := "0x1234567890123456789012345678901234567890"
+	nodeAddress := common.HexToAddress("0x9876543210987654321098765432109876543210")
+
+	coreDef := core.ChannelDefinition{
+		Nonce:     1,
+		Challenge: 3600,
+	}
+
+	result, err := coreDefToContractDef(coreDef, asset, userWallet, nodeAddress)
+	require.NoError(t, err)
+	require.NotNil(t, result.ApprovedSignatureValidators)
+	require.Equal(t, big.NewInt(0), result.ApprovedSignatureValidators)
 }
 
 // ========= coreLedgerToContractLedger Tests =========

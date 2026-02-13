@@ -67,6 +67,10 @@ func (s *ChannelSessionKeySignerV1) Sign(data []byte) (sign.Signature, error) {
 	return append([]byte{byte(ChannelSignerType_SessionKey)}, fullSig...), nil
 }
 
+func (s *ChannelSessionKeySignerV1) Type() ChannelSignerType {
+	return ChannelSignerType_SessionKey
+}
+
 // PackChannelKeyStateV1 packs the session key state for signing using ABI encoding.
 // This is used to generate a deterministic hash that the user signs when registering/updating a session key.
 // The user_sig field is excluded from packing since it is the signature itself.

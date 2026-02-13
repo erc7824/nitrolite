@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/c-bata/go-prompt"
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/sign"
 	sdk "github.com/erc7824/nitrolite/sdk/go"
 	"github.com/shopspring/decimal"
@@ -28,11 +29,14 @@ func NewOperator(wsURL string, store *Storage) (*Operator, error) {
 	}
 
 	// Create signers
-	stateSigner, err := sign.NewEthereumMsgSigner(privateKey)
+	ethMsgSigner, err := sign.NewEthereumMsgSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create state signer: %w", err)
 	}
-
+	stateSigner, err := core.NewChannelDefaultSigner(ethMsgSigner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create channel signer: %w", err)
+	}
 	txSigner, err := sign.NewEthereumRawSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx signer: %w", err)
@@ -125,6 +129,13 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			// App sessions (Base Client - Low-level)
 			{Text: "app-sessions", Description: "List app sessions"},
 
+			// Session key management
+			{Text: "generate-session-key", Description: "Generate a new session keypair"},
+			{Text: "create-channel-session-key", Description: "Register channel session key"},
+			{Text: "channel-session-keys", Description: "List active channel session keys"},
+			{Text: "create-app-session-key", Description: "Register app session key"},
+			{Text: "app-session-keys", Description: "List active app session keys"},
+
 			{Text: "exit", Description: "Exit the CLI"},
 		}
 	}
@@ -194,6 +205,9 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			return o.getAssetSuggestions()
 		case "state", "home-channel":
 			// Asset for state/home-channel commands (when wallet was explicitly provided)
+			return o.getAssetSuggestions()
+		case "create-channel-session-key":
+			// Fourth arg is assets (comma-separated)
 			return o.getAssetSuggestions()
 		}
 	}
@@ -383,6 +397,46 @@ func (o *Operator) Execute(s string) {
 	case "app-sessions":
 		wallet := o.getImportedWalletAddress()
 		o.listAppSessions(ctx, wallet)
+
+	// Session key management
+	case "generate-session-key":
+		o.generateSessionKey(ctx)
+	case "create-channel-session-key":
+		if len(args) < 4 {
+			fmt.Println("ERROR: Usage: create-channel-session-key <session_key_address> <expires_hours> <assets>")
+			fmt.Println("INFO: Assets are comma-separated, e.g. usdc,weth")
+			return
+		}
+		o.createChannelSessionKey(ctx, args[1], args[2], args[3])
+	case "channel-session-keys":
+		wallet := o.getImportedWalletAddress()
+		if wallet == "" {
+			fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
+			return
+		}
+		o.listChannelSessionKeys(ctx, wallet)
+	case "create-app-session-key":
+		if len(args) < 3 {
+			fmt.Println("ERROR: Usage: create-app-session-key <session_key_address> <expires_hours> [app_ids] [session_ids]")
+			fmt.Println("INFO: IDs are comma-separated. app_ids and session_ids are optional.")
+			return
+		}
+		appIDs := ""
+		sessionIDs := ""
+		if len(args) >= 4 {
+			appIDs = args[3]
+		}
+		if len(args) >= 5 {
+			sessionIDs = args[4]
+		}
+		o.createAppSessionKey(ctx, args[1], args[2], appIDs, sessionIDs)
+	case "app-session-keys":
+		wallet := o.getImportedWalletAddress()
+		if wallet == "" {
+			fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
+			return
+		}
+		o.listAppSessionKeys(ctx, wallet)
 
 	case "exit":
 		fmt.Println("Exiting...")

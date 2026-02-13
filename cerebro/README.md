@@ -91,6 +91,16 @@ escrow-channel <channel_id>     Get escrow channel by ID
 app-sessions                    List app sessions
 ```
 
+### Session Key Management
+
+```
+generate-session-key                                                Generate a new session keypair
+create-channel-session-key <session_key> <expires_hours> <assets>   Register channel session key
+channel-session-keys                                                List active channel session keys
+create-app-session-key <session_key> <expires_hours> [app_ids] [session_ids]  Register app session key
+app-session-keys                                                    List active app session keys
+```
+
 ## Configuration Storage
 
 Default configuration locations:
@@ -131,6 +141,18 @@ Full Ethereum addresses starting with 0x. Commands default to configured wallet 
 ### Amounts
 
 Decimal amounts (e.g., 100, 0.5, 1000.25).
+
+### Session Key Addresses
+
+Full Ethereum addresses (0x-prefixed) of the session key to delegate signing authority to. Generate one with `generate-session-key`.
+
+### Expiration Hours
+
+Integer number of hours until a session key expires (e.g., 24, 48, 168).
+
+### Comma-Separated Lists
+
+Assets, application IDs, and session IDs are passed as comma-separated values without spaces (e.g., `usdc,weth` or `app1,app2`).
 
 ## Interactive Features
 
@@ -180,6 +202,25 @@ clearnode> node info
 clearnode> state usdc
 clearnode> home-channel usdc
 clearnode> balances 0xSomeAddress...
+```
+
+### Session Keys
+
+```bash
+# Generate a new session keypair
+clearnode> generate-session-key
+
+# Register a channel session key (valid for 24 hours, for usdc and weth)
+clearnode> create-channel-session-key 0xSessionKeyAddr... 24 usdc,weth
+
+# List active channel session keys
+clearnode> channel-session-keys
+
+# Register an app session key (valid for 48 hours, for specific app IDs)
+clearnode> create-app-session-key 0xSessionKeyAddr... 48 app1,app2
+
+# List active app session keys
+clearnode> app-session-keys
 ```
 
 ## Security

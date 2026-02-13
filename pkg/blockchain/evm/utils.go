@@ -76,12 +76,22 @@ func hexToBytes32(s string) ([32]byte, error) {
 }
 
 func coreDefToContractDef(def core.ChannelDefinition, asset, userWallet string, nodeAddress common.Address) (ChannelDefinition, error) {
+	approvedSigValidators := new(big.Int)
+	if def.ApprovedSigValidators != "" {
+		var ok bool
+		approvedSigValidators, ok = approvedSigValidators.SetString(def.ApprovedSigValidators, 0)
+		if !ok {
+			return ChannelDefinition{}, errors.Errorf("failed to parse approved sig validators: %s", def.ApprovedSigValidators)
+		}
+	}
+
 	return ChannelDefinition{
-		ChallengeDuration: def.Challenge,
-		User:              common.HexToAddress(userWallet),
-		Node:              nodeAddress,
-		Nonce:             def.Nonce,
-		Metadata:          core.GenerateChannelMetadata(asset),
+		ChallengeDuration:           def.Challenge,
+		User:                        common.HexToAddress(userWallet),
+		Node:                        nodeAddress,
+		Nonce:                       def.Nonce,
+		ApprovedSignatureValidators: approvedSigValidators,
+		Metadata:                    core.GenerateChannelMetadata(asset),
 	}, nil
 }
 

@@ -1,0 +1,11 @@
+{
+  "deployer": "0xF8bedb0aBa14833e95F29e760487C3d34Bc4Ec64",
+  "deployedTo": "0xAE5f5f520D0EDb5c2EAD31381f6d1D1Fc2a7C36B",
+  "transactionHash": "0xca6b247bd5b38818358552029300d7ac502a3468f3a743acb1e8f3f9f81c3806",
+  "commit": "1d9763c885a3eefdf50085beb3ac2bf6a0aa0667",
+  "timestamp": 1770904609,
+  "chainId": 11155111,
+  "contractPath": "./src/sigValidators/SessionKeyValidator.sol:SessionKeyValidator",
+  "constructorArgs": [],
+  "comment": "PoC v1.0.0-alpha2"
+}

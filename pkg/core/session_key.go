@@ -88,7 +88,7 @@ func PackChannelKeyStateV1(sessionKey string, metadataHash common.Hash) ([]byte,
 		return nil, fmt.Errorf("failed to pack session key state: %w", err)
 	}
 
-	return crypto.Keccak256(packed), nil
+	return packed, nil
 }
 
 func GetChannelSessionKeyAuthMetadataHashV1(version uint64, assets []string, expiresAt int64) (common.Hash, error) {

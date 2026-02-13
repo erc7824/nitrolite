@@ -22,64 +22,110 @@ type Operator struct {
 }
 
 func NewOperator(wsURL string, store *Storage) (*Operator, error) {
-	// Get private key to create full client
-	privateKey, err := store.GetPrivateKey()
-	if err != nil {
-		return nil, fmt.Errorf("no wallet imported (use 'import wallet' first): %w", err)
+	op := &Operator{
+		wsURL:  wsURL,
+		store:  store,
+		exitCh: make(chan struct{}),
 	}
 
-	// Create signers
-	ethMsgSigner, err := sign.NewEthereumMsgSigner(privateKey)
+	if err := op.connect(); err != nil {
+		return nil, err
+	}
+
+	return op, nil
+}
+
+// buildStateSigner creates the appropriate ChannelSigner based on whether
+// a session key is stored. Returns ChannelSessionKeySignerV1 if a session key
+// is configured, otherwise returns ChannelDefaultSigner.
+func (o *Operator) buildStateSigner(walletPrivateKey string) (core.ChannelSigner, error) {
+	// Check if a session key is stored
+	skPrivateKey, metadataHash, authSig, err := o.store.GetSessionKey()
+	if err == nil && skPrivateKey != "" {
+		// Use session key signer
+		sessionMsgSigner, err := sign.NewEthereumMsgSigner(skPrivateKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create session key signer: %w", err)
+		}
+		signer, err := core.NewChannelSessionKeySignerV1(sessionMsgSigner, metadataHash, authSig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create session key channel signer: %w", err)
+		}
+		sessionRawSigner, _ := sign.NewEthereumRawSigner(skPrivateKey)
+		fmt.Printf("INFO: Using session key for state signing: %s\n", sessionRawSigner.PublicKey().Address().String())
+		return signer, nil
+	}
+
+	// Use default signer
+	ethMsgSigner, err := sign.NewEthereumMsgSigner(walletPrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create state signer: %w", err)
 	}
-	stateSigner, err := core.NewChannelDefaultSigner(ethMsgSigner)
+	signer, err := core.NewChannelDefaultSigner(ethMsgSigner)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create channel signer: %w", err)
 	}
-	txSigner, err := sign.NewEthereumRawSigner(privateKey)
+	return signer, nil
+}
+
+// connect creates the SDK client with the appropriate signer.
+func (o *Operator) connect() error {
+	privateKey, err := o.store.GetPrivateKey()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create tx signer: %w", err)
+		return fmt.Errorf("no wallet imported (use 'import wallet' first): %w", err)
 	}
 
-	// Get all RPCs
-	rpcs, err := store.GetAllRPCs()
+	stateSigner, err := o.buildStateSigner(privateKey)
 	if err != nil {
-		// No RPCs configured is okay, some operations will fail but basic queries work
+		return err
+	}
+
+	txSigner, err := sign.NewEthereumRawSigner(privateKey)
+	if err != nil {
+		return fmt.Errorf("failed to create tx signer: %w", err)
+	}
+
+	rpcs, err := o.store.GetAllRPCs()
+	if err != nil {
 		rpcs = make(map[uint64]string)
 	}
 
-	// Create unified client with all configured RPCs
 	opts := []sdk.Option{}
 	for chainID, rpcURL := range rpcs {
 		opts = append(opts, sdk.WithBlockchainRPC(chainID, rpcURL))
 	}
 
-	client, err := sdk.NewClient(wsURL, stateSigner, txSigner, opts...)
+	client, err := sdk.NewClient(o.wsURL, stateSigner, txSigner, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	op := &Operator{
-		wsURL:  wsURL,
-		store:  store,
-		client: client,
-		exitCh: make(chan struct{}),
-	}
+	o.client = client
 
-	// Monitor WebSocket connection - exit if connection is lost
+	// Monitor WebSocket connection — only exit if this client is still active
 	go func() {
 		<-client.WaitCh()
+		if o.client != client {
+			return // replaced by reconnect, ignore
+		}
 		fmt.Println("\nWARNING: WebSocket connection lost. Exiting...")
 		select {
-		case <-op.exitCh:
-			// Already closed
+		case <-o.exitCh:
 		default:
-			close(op.exitCh)
+			close(o.exitCh)
 		}
 	}()
 
-	return op, nil
+	return nil
+}
+
+// reconnect closes the current client and creates a new one with the
+// appropriate signer (session key if stored, default otherwise).
+func (o *Operator) reconnect() error {
+	old := o.client
+	o.client = nil // mark stale so the WaitCh goroutine ignores the close
+	old.Close()
+	return o.connect()
 }
 
 func (o *Operator) Wait() <-chan struct{} {
@@ -130,7 +176,9 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "app-sessions", Description: "List app sessions"},
 
 			// Session key management
-			{Text: "generate-session-key", Description: "Generate a new session keypair"},
+			{Text: "generate-session-key", Description: "Generate or import session key (stores locally)"},
+			{Text: "session-key", Description: "Show current session key info"},
+			{Text: "clear-session-key", Description: "Clear session key, revert to default signer"},
 			{Text: "create-channel-session-key", Description: "Register channel session key"},
 			{Text: "channel-session-keys", Description: "List active channel session keys"},
 			{Text: "create-app-session-key", Description: "Register app session key"},
@@ -157,7 +205,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 		}
 	}
 
-	// Third level - chain IDs for import rpc, or wallet addresses, or assets
+	// Third level
 	if len(args) < 4 {
 		switch args[0] {
 		case "import":
@@ -216,7 +264,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 }
 
 func (o *Operator) Execute(s string) {
-	args := strings.Split(strings.TrimSpace(s), " ")
+	args := strings.Fields(s)
 	if s == "" || len(args) == 0 {
 		return
 	}
@@ -401,6 +449,10 @@ func (o *Operator) Execute(s string) {
 	// Session key management
 	case "generate-session-key":
 		o.generateSessionKey(ctx)
+	case "session-key":
+		o.showSessionKey()
+	case "clear-session-key":
+		o.clearSessionKey()
 	case "create-channel-session-key":
 		if len(args) < 4 {
 			fmt.Println("ERROR: Usage: create-channel-session-key <session_key_address> <expires_hours> <assets>")

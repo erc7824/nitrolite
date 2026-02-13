@@ -10,6 +10,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 // SubmitSessionKeyState processes session key state submissions for registration and updates.
@@ -72,8 +73,13 @@ func (h *Handler) SubmitSessionKeyState(c *rpc.Context) {
 	}
 
 	// Recover signer address from signature using ECDSA recovery
-	ecdsaRecoverer := app.NewAppSessionKeySigValidatorV1(nil)
-	recoveredAddress, err := ecdsaRecoverer.Recover(packedState, sigBytes)
+	ethMsgRecoverer, err := sign.NewSigValidator(sign.TypeEthereumMsg)
+	if err != nil {
+		c.Fail(rpc.Errorf("internal_error: failed to create signature validator: %v", err), "")
+		return
+	}
+
+	recoveredAddress, err := ethMsgRecoverer.Recover(packedState, sigBytes)
 	if err != nil {
 		c.Fail(rpc.Errorf("invalid_session_key_state: failed to recover signer: %v", err), "")
 		return

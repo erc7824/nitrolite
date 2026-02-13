@@ -62,7 +62,7 @@ export class WalletTransactionSigner {
   /**
    * Send a transaction to the blockchain
    */
-  async sendTransaction(tx: any): Promise<Hex> {
+  async sendTransaction(_tx: any): Promise<Hex> {
     throw new Error('sendTransaction requires a wallet client - use the blockchain client instead');
   }
 

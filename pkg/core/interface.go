@@ -35,19 +35,19 @@ type Client interface {
 
 	// Channel lifecycle
 	Create(def ChannelDefinition, initCCS State) (string, error)
-	MigrateChannelHere(def ChannelDefinition, candidate State, proof []State) (string, error)
-	Checkpoint(candidate State, proofs []State) (string, error)
-	Challenge(candidate State, proofs []State, challengerSig []byte, challengerIdx ChannelParticipant) (string, error)
-	Close(candidate State, proofs []State) (string, error)
+	MigrateChannelHere(def ChannelDefinition, candidate State) (string, error)
+	Checkpoint(candidate State) (string, error)
+	Challenge(candidate State, challengerSig []byte, challengerIdx ChannelParticipant) (string, error)
+	Close(candidate State) (string, error)
 
 	// Escrow deposit
 	InitiateEscrowDeposit(def ChannelDefinition, initCCS State) (string, error)
-	ChallengeEscrowDeposit(candidate State, proof []State, challengerSig []byte, challengerIdx ChannelParticipant) (string, error)
-	FinalizeEscrowDeposit(candidate State, proof [2]State) (string, error)
+	ChallengeEscrowDeposit(candidate State, challengerSig []byte, challengerIdx ChannelParticipant) (string, error)
+	FinalizeEscrowDeposit(candidate State) (string, error)
 
 	// Escrow withdrawal
 	InitiateEscrowWithdrawal(def ChannelDefinition, initCCS State) (string, error)
-	ChallengeEscrowWithdrawal(candidate State, proof []State, challengerSig []byte, challengerIdx ChannelParticipant) (string, error)
+	ChallengeEscrowWithdrawal(candidate State, challengerSig []byte, challengerIdx ChannelParticipant) (string, error)
 	FinalizeEscrowWithdrawal(candidate State) (string, error)
 }
 

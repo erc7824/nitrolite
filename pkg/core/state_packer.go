@@ -27,11 +27,6 @@ func PackState(state State, assetStore AssetStore) ([]byte, error) {
 
 // PackState encodes a channel ID and state into ABI-packed bytes for on-chain submission.
 // This matches the Solidity contract's two-step encoding:
-//
-//	signingData = abi.encode(version, intent, metadata, homeLedger, nonHomeLedger)
-//	message = abi.encode(channelId, signingData)
-//
-// The signingData is encoded as dynamic bytes inside the outer abi.encode.
 func (p *StatePackerV1) PackState(state State) ([]byte, error) {
 	// Ensure HomeChannelID is present
 	if state.HomeChannelID == nil {

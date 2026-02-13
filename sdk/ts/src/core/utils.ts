@@ -392,3 +392,49 @@ function parseAccountIdToBytes32(accountId: string | undefined): `0x${string}` {
   const hexResult = bytes.map(b => b.toString(16).padStart(2, '0')).join('');
   return pad(`0x${hexResult}` as `0x${string}`, { dir: 'left', size: 32 });
 }
+
+/**
+ * Computes the metadata hash for a channel session key authorization.
+ * Matches Go SDK's GetChannelSessionKeyAuthMetadataHashV1.
+ *
+ * @param version - Session key state version
+ * @param assets - Asset symbols associated with the session key
+ * @param expiresAt - Unix timestamp in seconds when the session key expires
+ * @returns Keccak256 hash of the ABI-encoded metadata
+ */
+export function getChannelSessionKeyAuthMetadataHashV1(
+  version: bigint,
+  assets: string[],
+  expiresAt: bigint
+): `0x${string}` {
+  const packed = encodeAbiParameters(
+    [
+      { type: 'uint64' },   // version
+      { type: 'string[]' }, // assets
+      { type: 'uint64' },   // expires_at
+    ],
+    [version, assets, expiresAt]
+  );
+  return keccak256(packed);
+}
+
+/**
+ * Packs a channel session key state for signing.
+ * Matches Go SDK's PackChannelKeyStateV1.
+ *
+ * @param sessionKey - The session key address
+ * @param metadataHash - The metadata hash from getChannelSessionKeyAuthMetadataHashV1
+ * @returns ABI-encoded (sessionKey, metadataHash) ready for EIP-191 signing
+ */
+export function packChannelKeyStateV1(
+  sessionKey: Address,
+  metadataHash: `0x${string}`
+): `0x${string}` {
+  return encodeAbiParameters(
+    [
+      { type: 'address' },  // session_key
+      { type: 'bytes32' },  // hashed metadata
+    ],
+    [sessionKey, metadataHash]
+  );
+}

@@ -18,11 +18,14 @@ import (
 	"log"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/shopspring/decimal"
+
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/sign"
 	sdk "github.com/erc7824/nitrolite/sdk/go"
-	"github.com/shopspring/decimal"
 )
 
 func main() {
@@ -53,10 +56,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create channel signer for wallet 1: %v", err)
 	}
-
 	channel2Signer, err := core.NewChannelDefaultSigner(wallet2Signer)
 	if err != nil {
 		log.Fatalf("Failed to create channel signer for wallet 2: %v", err)
+	}
+	channel3Signer, err := core.NewChannelDefaultSigner(wallet3Signer)
+	if err != nil {
+		log.Fatalf("Failed to create channel signer for wallet 2: %v", err)
+	}
+
+	appSession1Signer, err := app.NewAppSessionWalletSignerV1(wallet1Signer)
+	if err != nil {
+		log.Fatalf("Failed to create app session signer for wallet 1: %v", err)
+	}
+	appSession2Signer, err := app.NewAppSessionWalletSignerV1(wallet2Signer)
+	if err != nil {
+		log.Fatalf("Failed to create app session signer for wallet 2: %v", err)
 	}
 
 	// Extract wallet addresses
@@ -93,8 +108,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wallet1CreateSession1Sig, _ := wallet1Signer.Sign(session1CreateRequest)
-	session1ID, _, _, err := wallet1Client.CreateAppSession(ctx, session1Definition, "{}", []string{wallet1CreateSession1Sig.String()})
+	appSession1CreateSession1Sig, _ := appSession1Signer.Sign(session1CreateRequest)
+	session1ID, _, _, err := wallet1Client.CreateAppSession(ctx, session1Definition, "{}", []string{appSession1CreateSession1Sig.String()})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -116,9 +131,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wallet1DepositSig, _ := wallet1Signer.Sign(session1DepositRequest)
+	appSession1DepositSig, _ := appSession1Signer.Sign(session1DepositRequest)
 
-	_, err = wallet1Client.SubmitAppSessionDeposit(ctx, session1DepositUpdate, []string{wallet1DepositSig.String()}, "usdc", session1DepositAmount)
+	_, err = wallet1Client.SubmitAppSessionDeposit(ctx, session1DepositUpdate, []string{appSession1DepositSig.String()}, "usdc", session1DepositAmount)
 	if err != nil {
 		log.Printf("⚠ Deposit warning: %v", err)
 	}
@@ -127,13 +142,51 @@ func main() {
 	// --- 3. Create App Session 2 (Multi-Party: Wallet 2 & 3) ---
 	fmt.Println("=== Step 3: Creating App Session 2 (Wallet 2 & 3) ===")
 
+	appID := "multi-party-app"
 	wallet2Client, err := sdk.NewClient(wsURL, channel2Signer, wallet2Signer)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	wallet3Client, err := sdk.NewClient(wsURL, channel3Signer, wallet3Signer) // No channel signer needed for wallet 3 since it's not creating channels
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	msgSigner3, err := generateMsgSigner()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	appSessionKey3State := app.AppSessionKeyStateV1{
+		SessionKey:     msgSigner3.PublicKey().Address().String(),
+		UserAddress:    wallet3Address,
+		Version:        1,
+		ApplicationIDs: []string{appID},
+		ExpiresAt:      time.Now().Add(10 * time.Minute),
+	}
+	packedAppSessionKey3State, err := app.PackAppSessionKeyStateV1(appSessionKey3State)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	appSessionKey3StateSig, err := wallet3Signer.Sign(packedAppSessionKey3State)
+	if err != nil {
+		log.Fatal(err)
+	}
+	appSessionKey3State.UserSig = appSessionKey3StateSig.String()
+
+	if err := wallet3Client.SubmitAppSessionKeyState(context.Background(), appSessionKey3State); err != nil {
+		log.Fatal(err)
+	}
+
+	appSession3Signer, err := app.NewAppSessionKeySignerV1(msgSigner3)
+	if err != nil {
+		log.Fatalf("Failed to create app session signer for wallet 3: %v", err)
+	}
+
 	session2Definition := app.AppDefinitionV1{
-		Application: "multi-party-app",
+		Application: appID,
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: wallet2Address, SignatureWeight: 50},
 			{WalletAddress: wallet3Address, SignatureWeight: 50},
@@ -147,9 +200,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wallet2CreateSession2Sig, _ := wallet2Signer.Sign(session2CreateRequest)
-	wallet3CreateSession2Sig, _ := wallet3Signer.Sign(session2CreateRequest)
-	session2ID, _, _, err := wallet2Client.CreateAppSession(ctx, session2Definition, "{}", []string{wallet2CreateSession2Sig.String(), wallet3CreateSession2Sig.String()})
+	appSession2CreateSession2Sig, _ := appSession2Signer.Sign(session2CreateRequest)
+	appSession3CreateSession2Sig, _ := appSession3Signer.Sign(session2CreateRequest)
+	session2ID, _, _, err := wallet2Client.CreateAppSession(ctx, session2Definition, "{}", []string{appSession2CreateSession2Sig.String(), appSession3CreateSession2Sig.String()})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -171,10 +224,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wallet2DepositSig, _ := wallet2Signer.Sign(session2DepositRequest)
-	wallet3DepositSig, _ := wallet3Signer.Sign(session2DepositRequest)
+	appSession2DepositSig, _ := appSession2Signer.Sign(session2DepositRequest)
+	appSession3DepositSig, _ := appSession3Signer.Sign(session2DepositRequest)
 
-	nodeSig, err := wallet2Client.SubmitAppSessionDeposit(ctx, session2DepositUpdate, []string{wallet2DepositSig.String(), wallet3DepositSig.String()}, "weth", session2DepositAmount)
+	nodeSig, err := wallet2Client.SubmitAppSessionDeposit(ctx, session2DepositUpdate, []string{appSession2DepositSig.String(), appSession3DepositSig.String()}, "weth", session2DepositAmount)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -207,11 +260,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wallet2RedistributeSig, _ := wallet2Signer.Sign(session2RedistributeRequest)
-	wallet3RedistributeSig, _ := wallet3Signer.Sign(session2RedistributeRequest)
+	appSession2RedistributeSig, _ := appSession2Signer.Sign(session2RedistributeRequest)
+	appSession3RedistributeSig, _ := appSession3Signer.Sign(session2RedistributeRequest)
 
 	// Multi-sig required for state transition
-	err = wallet2Client.SubmitAppState(ctx, session2RedistributeUpdate, []string{wallet2RedistributeSig.String(), wallet3RedistributeSig.String()})
+	err = wallet2Client.SubmitAppState(ctx, session2RedistributeUpdate, []string{appSession2RedistributeSig.String(), appSession3RedistributeSig.String()})
 	if err != nil {
 		log.Fatalf("Redistribution failed: %v", err)
 	}
@@ -253,7 +306,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wallet1RebalanceSig, _ := wallet1Signer.Sign(session1RebalanceRequest)
+	appSession1RebalanceSig, _ := appSession1Signer.Sign(session1RebalanceRequest)
 
 	session2RebalanceUpdate := app.AppStateUpdateV1{
 		AppSessionID: session2ID,
@@ -271,18 +324,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wallet2RebalanceSig, _ := wallet2Signer.Sign(session2RebalanceRequest)
-	wallet3RebalanceSig, _ := wallet3Signer.Sign(session2RebalanceRequest)
+	appSession2RebalanceSig, _ := appSession2Signer.Sign(session2RebalanceRequest)
+	appSession3RebalanceSig, _ := appSession3Signer.Sign(session2RebalanceRequest)
 
 	// Submit atomic rebalance
 	signedRebalanceUpdates := []app.SignedAppStateUpdateV1{
 		{
 			AppStateUpdate: session1RebalanceUpdate,
-			QuorumSigs:     []string{wallet1RebalanceSig.String()},
+			QuorumSigs:     []string{appSession1RebalanceSig.String()},
 		},
 		{
 			AppStateUpdate: session2RebalanceUpdate,
-			QuorumSigs:     []string{wallet2RebalanceSig.String(), wallet3RebalanceSig.String()},
+			QuorumSigs:     []string{appSession2RebalanceSig.String(), appSession3RebalanceSig.String()},
 		},
 	}
 
@@ -312,10 +365,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wallet2WithdrawSig, _ := wallet2Signer.Sign(session2WithdrawRequest)
-	wallet3WithdrawSig, _ := wallet3Signer.Sign(session2WithdrawRequest)
+	appSession2WithdrawSig, _ := appSession2Signer.Sign(session2WithdrawRequest)
+	appSession3WithdrawSig, _ := appSession3Signer.Sign(session2WithdrawRequest)
 
-	err = wallet2Client.SubmitAppState(ctx, session2WithdrawUpdate, []string{wallet2WithdrawSig.String(), wallet3WithdrawSig.String()})
+	err = wallet2Client.SubmitAppState(ctx, session2WithdrawUpdate, []string{appSession2WithdrawSig.String(), appSession3WithdrawSig.String()})
 	if err != nil {
 		log.Printf("⚠ Withdraw Error: %v", err)
 	} else {
@@ -341,9 +394,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wallet1CloseSig, _ := wallet1Signer.Sign(session1CloseRequest)
+	appSession1CloseSig, _ := appSession1Signer.Sign(session1CloseRequest)
 
-	err = wallet1Client.SubmitAppState(ctx, session1CloseUpdate, []string{wallet1CloseSig.String()})
+	err = wallet1Client.SubmitAppState(ctx, session1CloseUpdate, []string{appSession1CloseSig.String()})
 	if err != nil {
 		log.Printf("⚠ Close Session 1 Error: %v", err)
 	} else {
@@ -367,10 +420,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wallet2CloseSig, _ := wallet2Signer.Sign(session2CloseRequest)
-	wallet3CloseSig, _ := wallet3Signer.Sign(session2CloseRequest)
+	appSession2CloseSig, _ := appSession2Signer.Sign(session2CloseRequest)
+	appSession3CloseSig, _ := appSession3Signer.Sign(session2CloseRequest)
 
-	err = wallet2Client.SubmitAppState(ctx, session2CloseUpdate, []string{wallet2CloseSig.String(), wallet3CloseSig.String()})
+	err = wallet2Client.SubmitAppState(ctx, session2CloseUpdate, []string{appSession2CloseSig.String(), appSession3CloseSig.String()})
 	if err != nil {
 		log.Printf("⚠ Close Session 2 Error: %v", err)
 	} else {
@@ -378,4 +431,16 @@ func main() {
 	}
 
 	fmt.Println("\n=== Example Complete ===")
+}
+
+func generateMsgSigner() (sign.Signer, error) {
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Convert private key to bytes
+	privateKeyBytes := crypto.FromECDSA(privateKey)
+
+	return sign.NewEthereumMsgSigner(hexutil.Encode(privateKeyBytes))
 }

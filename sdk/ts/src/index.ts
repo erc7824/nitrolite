@@ -9,6 +9,7 @@ export { Client, DEFAULT_CHALLENGE_PERIOD, type StateSigner, type TransactionSig
 export {
   EthereumMsgSigner,
   EthereumRawSigner,
+  ChannelSessionKeyStateSigner,
   createSigners,
 } from './signers';
 

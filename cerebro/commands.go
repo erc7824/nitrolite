@@ -767,11 +767,7 @@ func (o *Operator) createChannelSessionKey(ctx context.Context, sessionKeyAddr, 
 		SessionKey: &sessionKeyAddr,
 	})
 	if err == nil && len(existingStates) > 0 {
-		for _, s := range existingStates {
-			if s.Version >= version {
-				version = s.Version + 1
-			}
-		}
+		version = existingStates[0].Version + 1
 	}
 
 	state := core.ChannelSessionKeyStateV1{

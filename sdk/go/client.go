@@ -52,7 +52,7 @@ type Client struct {
 	blockchainClients map[uint64]core.Client
 	homeBlockchains   map[string]uint64
 	stateSigner       core.ChannelSigner
-	txSigner          sign.Signer
+	rawSigner         sign.Signer
 	assetStore        *clientAssetStore
 }
 
@@ -79,7 +79,7 @@ type Client struct {
 //	    txSigner,
 //	    sdk.WithBlockchainRPC(80002, "https://polygon-amoy.alchemy.com/v2/KEY"),
 //	)
-func NewClient(wsURL string, stateSigner core.ChannelSigner, txSigner sign.Signer, opts ...Option) (*Client, error) {
+func NewClient(wsURL string, stateSigner core.ChannelSigner, rawSigner sign.Signer, opts ...Option) (*Client, error) {
 	// Build config starting with defaults
 	config := DefaultConfig
 	config.URL = wsURL
@@ -105,7 +105,7 @@ func NewClient(wsURL string, stateSigner core.ChannelSigner, txSigner sign.Signe
 		blockchainClients: make(map[uint64]core.Client),
 		homeBlockchains:   make(map[string]uint64),
 		stateSigner:       stateSigner,
-		txSigner:          txSigner,
+		rawSigner:         rawSigner,
 	}
 
 	// Create asset store
@@ -329,7 +329,7 @@ func (c *Client) initializeBlockchainClient(ctx context.Context, chainID uint64)
 	evmClient, err := evm.NewClient(
 		common.HexToAddress(contractAddress),
 		ethClient,
-		c.txSigner,
+		c.rawSigner,
 		chainID,
 		nodeAddress,
 		c.assetStore,

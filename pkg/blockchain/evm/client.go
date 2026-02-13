@@ -2,7 +2,6 @@ package evm
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -309,25 +308,6 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 	contractState, err := coreStateToContractState(initCCS, c.assetStore.GetTokenDecimals)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to convert state")
-	}
-
-	// Debug: verify channel ID match
-	computedChannelID, computeErr := core.GetHomeChannelID(
-		c.nodeAddress.Hex(), initCCS.UserWallet, initCCS.Asset,
-		def.Nonce, def.Challenge, def.ApprovedSigValidators,
-	)
-	if computeErr != nil {
-		fmt.Printf("[DEBUG] ComputeChannelID ERR: %v\n", computeErr)
-	} else if initCCS.HomeChannelID != nil {
-		if computedChannelID != *initCCS.HomeChannelID {
-			fmt.Printf("[DEBUG] *** ChannelID MISMATCH ***\n")
-			fmt.Printf("[DEBUG]   Computed:  %s\n", computedChannelID)
-			fmt.Printf("[DEBUG]   Expected:  %s\n", *initCCS.HomeChannelID)
-			fmt.Printf("[DEBUG]   Params: node=%s user=%s asset=%q nonce=%d challenge=%d approvedSigVal=%q\n",
-				c.nodeAddress.Hex(), initCCS.UserWallet, initCCS.Asset, def.Nonce, def.Challenge, def.ApprovedSigValidators)
-		} else {
-			fmt.Printf("[DEBUG] ChannelIDs MATCH: %s\n", computedChannelID)
-		}
 	}
 
 	switch contractState.Intent {

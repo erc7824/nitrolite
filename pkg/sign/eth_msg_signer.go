@@ -27,6 +27,11 @@ func NewEthereumMsgSigner(privateKeyHex string) (Signer, error) {
 		return nil, err
 	}
 
+	return NewEthereumMsgSignerFromRaw(signer)
+}
+
+// NewEthereumRawSignerFronRaw creates a new Ethereum signer from an existing Signer instance.
+func NewEthereumMsgSignerFromRaw(signer Signer) (Signer, error) {
 	return &EthereumMsgSigner{
 		signer,
 	}, nil

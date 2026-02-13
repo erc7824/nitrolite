@@ -7,6 +7,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/shopspring/decimal"
 )
 
@@ -374,5 +375,6 @@ func (c *Client) SignSessionKeyState(state app.AppSessionKeyStateV1) (string, er
 		return "", fmt.Errorf("failed to sign session key state: %w", err)
 	}
 
-	return fmt.Sprintf("0x%x", sig), nil
+	// Strip the channel signer type prefix byte; session key auth uses plain EIP-191 signatures
+	return hexutil.Encode(sig[1:]), nil
 }

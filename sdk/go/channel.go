@@ -6,6 +6,7 @@ import (
 
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/shopspring/decimal"
 )
 
@@ -851,10 +852,15 @@ func (c *Client) SignChannelSessionKeyState(state core.ChannelSessionKeyStateV1)
 		return "", fmt.Errorf("failed to pack channel session key state: %w", err)
 	}
 
-	sig, err := c.stateSigner.Sign(packed)
+	ethMsgSigner, err := sign.NewEthereumMsgSignerFromRaw(c.rawSigner)
+	if err != nil {
+		return "", fmt.Errorf("failed to create Ethereum message signer: %w", err)
+	}
+
+	sig, err := ethMsgSigner.Sign(packed)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign channel session key state: %w", err)
 	}
 
-	return fmt.Sprintf("0x%x", sig), nil
+	return sig.String(), nil
 }

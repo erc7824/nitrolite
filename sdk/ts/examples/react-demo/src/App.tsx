@@ -1,17 +1,18 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Client, withBlockchainRPC } from '@erc7824/nitrolite';
+import { Client, withBlockchainRPC, ChannelSessionKeyStateSigner } from '@erc7824/nitrolite';
 import { createWalletClient, custom, type WalletClient } from 'viem';
 import { mainnet } from 'viem/chains';
 import { WalletStateSigner, WalletTransactionSigner } from './walletSigners';
 import SetupSection from './components/SetupSection';
 import AllowanceSection from './components/AllowanceSection';
+import SessionKeySection from './components/SessionKeySection';
 import HighLevelOpsSection from './components/HighLevelOpsSection';
 import NodeInfoSection from './components/NodeInfoSection';
 import UserQueriesSection from './components/UserQueriesSection';
 import LowLevelSection from './components/LowLevelSection';
 import AppSessionsSection from './components/AppSessionsSection';
 import StatusBar from './components/StatusBar';
-import type { AppState, StatusMessage } from './types';
+import type { AppState, SessionKeyState, StatusMessage } from './types';
 
 const DEFAULT_NODE_URL = 'wss://clearnode-v1-rc.yellow.org/ws';
 
@@ -25,13 +26,23 @@ const DEFAULT_RPC_CONFIGS: Record<string, string> = {
 };
 
 function App() {
-  const [appState, setAppState] = useState<AppState>({
-    client: null,
-    address: null,
-    connected: false,
-    nodeUrl: DEFAULT_NODE_URL,
-    rpcConfigs: DEFAULT_RPC_CONFIGS,
-    homeBlockchains: {},
+  const [appState, setAppState] = useState<AppState>(() => {
+    // Load session key from localStorage on init
+    let sessionKey: SessionKeyState | null = null;
+    try {
+      const stored = localStorage.getItem('nitrolite_session_key');
+      if (stored) sessionKey = JSON.parse(stored);
+    } catch { /* ignore */ }
+
+    return {
+      client: null,
+      address: null,
+      connected: false,
+      nodeUrl: DEFAULT_NODE_URL,
+      rpcConfigs: DEFAULT_RPC_CONFIGS,
+      homeBlockchains: {},
+      sessionKey,
+    };
   });
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [walletClient, setWalletClient] = useState<WalletClient | null>(null);
@@ -72,13 +83,31 @@ function App() {
 
           // Auto-connect to node if wallet is reconnected
           try {
-            const stateSigner = new WalletStateSigner(client);
-            const txSigner = new WalletTransactionSigner(client);
+            // Check for stored session key
+            let storedSk: SessionKeyState | null = null;
+            try {
+              const raw = localStorage.getItem('nitrolite_session_key');
+              if (raw) storedSk = JSON.parse(raw);
+            } catch { /* ignore */ }
 
             const options = Object.entries(DEFAULT_RPC_CONFIGS).map(([chainId, rpcUrl]) =>
               withBlockchainRPC(BigInt(chainId), rpcUrl)
             );
 
+            let stateSigner;
+            if (storedSk && storedSk.active && storedSk.metadataHash && storedSk.authSig) {
+              stateSigner = new ChannelSessionKeyStateSigner(
+                storedSk.privateKey as `0x${string}`,
+                address as `0x${string}`,
+                storedSk.metadataHash as `0x${string}`,
+                storedSk.authSig as `0x${string}`,
+              );
+            } else {
+              stateSigner = new WalletStateSigner(client);
+              if (storedSk) storedSk = { ...storedSk, active: false };
+            }
+
+            const txSigner = new WalletTransactionSigner(client);
             const sdkClient = await Client.create(
               DEFAULT_NODE_URL,
               stateSigner,
@@ -86,8 +115,9 @@ function App() {
               ...options
             );
 
-            setAppState(prev => ({ ...prev, client: sdkClient, connected: true }));
-            showStatus('success', 'Connected to Clearnode', 'Fully reconnected and ready!');
+            setAppState(prev => ({ ...prev, client: sdkClient, connected: true, sessionKey: storedSk }));
+            const signerInfo = storedSk?.active ? ' (session key active)' : '';
+            showStatus('success', 'Connected to Clearnode', `Fully reconnected and ready!${signerInfo}`);
           } catch (nodeError) {
             console.error('Auto node connection failed:', nodeError);
             showStatus('info', 'Wallet reconnected', 'Click "Connect to Node" to continue');
@@ -240,6 +270,84 @@ function App() {
     showStatus('info', 'Wallet disconnected');
   }, [appState.client, showStatus]);
 
+  // Helper: create SDK client with given state signer
+  const createClient = useCallback(async (
+    wc: WalletClient,
+    rpcConfigs: Record<string, string>,
+    nodeUrl: string,
+    sessionKey: SessionKeyState | null,
+    address: string,
+  ): Promise<Client> => {
+    const options = Object.entries(rpcConfigs).map(([chainId, rpcUrl]) =>
+      withBlockchainRPC(BigInt(chainId), rpcUrl)
+    );
+
+    let stateSigner;
+    if (sessionKey && sessionKey.active && sessionKey.metadataHash && sessionKey.authSig) {
+      stateSigner = new ChannelSessionKeyStateSigner(
+        sessionKey.privateKey as `0x${string}`,
+        address as `0x${string}`,
+        sessionKey.metadataHash as `0x${string}`,
+        sessionKey.authSig as `0x${string}`,
+      );
+    } else {
+      stateSigner = new WalletStateSigner(wc);
+    }
+
+    const txSigner = new WalletTransactionSigner(wc);
+    return await Client.create(nodeUrl, stateSigner, txSigner, ...options);
+  }, []);
+
+  const setSessionKey = useCallback((sk: SessionKeyState) => {
+    localStorage.setItem('nitrolite_session_key', JSON.stringify(sk));
+    setAppState(prev => ({ ...prev, sessionKey: sk }));
+  }, []);
+
+  const activateSessionKey = useCallback(async (sk: SessionKeyState) => {
+    if (!walletClient || !appState.address) return;
+
+    // Save to localStorage
+    localStorage.setItem('nitrolite_session_key', JSON.stringify(sk));
+
+    // Close old client
+    if (appState.client) {
+      await appState.client.close();
+    }
+
+    // Create new client with session key signer
+    const newClient = await createClient(
+      walletClient,
+      appState.rpcConfigs,
+      appState.nodeUrl,
+      sk,
+      appState.address,
+    );
+
+    setAppState(prev => ({ ...prev, client: newClient, connected: true, sessionKey: sk }));
+  }, [walletClient, appState.address, appState.client, appState.rpcConfigs, appState.nodeUrl, createClient]);
+
+  const clearSessionKey = useCallback(async () => {
+    if (!walletClient || !appState.address) return;
+
+    localStorage.removeItem('nitrolite_session_key');
+
+    // Close old client
+    if (appState.client) {
+      await appState.client.close();
+    }
+
+    // Recreate with default MetaMask signer
+    const newClient = await createClient(
+      walletClient,
+      appState.rpcConfigs,
+      appState.nodeUrl,
+      null,
+      appState.address,
+    );
+
+    setAppState(prev => ({ ...prev, client: newClient, connected: true, sessionKey: null }));
+  }, [walletClient, appState.address, appState.client, appState.rpcConfigs, appState.nodeUrl, createClient]);
+
   const updateRpcConfig = useCallback((chainId: string, rpcUrl: string) => {
     setAppState(prev => ({
       ...prev,
@@ -314,6 +422,16 @@ function App() {
         {/* Operations Sections - Only show when connected */}
         {appState.connected && appState.client && (
           <div className="space-y-6 mt-6">
+            {/* Session Key Management */}
+            <SessionKeySection
+              client={appState.client}
+              appState={appState}
+              onSetSessionKey={setSessionKey}
+              onActivateSessionKey={activateSessionKey}
+              onClearSessionKey={clearSessionKey}
+              showStatus={showStatus}
+            />
+
             {/* Token Allowance Management */}
             <AllowanceSection
               client={appState.client}

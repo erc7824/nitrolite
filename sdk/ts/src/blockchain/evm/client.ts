@@ -183,17 +183,20 @@ export class Client {
       args: [channelIdBytes],
     })) as any;
 
-    const lastState = contractStateToCoreState(data.lastState, homeChannelId);
+    // getChannelData returns flat values: (status, definition, lastState, challengeExpiry, lockedFunds)
+    const [, definition, lastState, challengeExpiry] = Array.isArray(data) ? data : [data.status, data.definition, data.lastState, data.challengeExpiry, data.lockedFunds];
+
+    const coreState = contractStateToCoreState(lastState, homeChannelId);
 
     return {
       definition: {
-        nonce: data.definition.nonce,
-        challenge: data.definition.challengeDuration,
-        approvedSigValidators: '0x' + (data.definition.approvedSignatureValidators ?? 0n).toString(16),
+        nonce: definition.nonce,
+        challenge: definition.challengeDuration,
+        approvedSigValidators: '0x' + (definition.approvedSignatureValidators ?? 0n).toString(16),
       },
-      node: data.definition.node,
-      lastState,
-      challengeExpiry: data.challengeExpiry,
+      node: definition.node,
+      lastState: coreState,
+      challengeExpiry,
     };
   }
 
@@ -477,7 +480,7 @@ export class Client {
       address: this.contractAddress,
       abi: ChannelHubAbi,
       functionName: 'checkpointChannel',
-      args: [channelIdBytes, contractCandidate, []],
+      args: [channelIdBytes, contractCandidate],
       gas: 5000000n, // 5M gas limit
     } as any);
 
@@ -485,7 +488,7 @@ export class Client {
     return hash;
   }
 
-  async challenge(candidate: core.State, challengerSig: `0x${string}`): Promise<string> {
+  async challenge(candidate: core.State, challengerSig: `0x${string}`, challengerIdx: number = 0): Promise<string> {
     if (!candidate.homeChannelId) {
       throw new Error('Candidate state must have a home channel ID');
     }
@@ -508,7 +511,7 @@ export class Client {
       address: this.contractAddress,
       abi: ChannelHubAbi,
       functionName: 'challengeChannel',
-      args: [channelIdBytes, contractCandidate, [], challengerSig],
+      args: [channelIdBytes, contractCandidate, challengerSig, challengerIdx],
       gas: 5000000n, // 5M gas limit
     } as any);
 
@@ -545,7 +548,7 @@ export class Client {
       address: this.contractAddress,
       abi: ChannelHubAbi,
       functionName: 'closeChannel',
-      args: [channelIdBytes, contractCandidate, []],
+      args: [channelIdBytes, contractCandidate],
       gas: 5000000n, // 5M gas limit
     } as any);
 

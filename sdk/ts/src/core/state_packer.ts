@@ -28,7 +28,12 @@ export class StatePackerV1 implements StatePacker {
 
   /**
    * PackState encodes a channel ID and state into ABI-packed bytes for on-chain submission.
-   * This matches the Solidity pack function which encodes: channelId, version, intent, metadata, homeState, nonHomeState.
+   * This matches the Solidity contract's two-step encoding:
+   *
+   *   signingData = abi.encode(version, intent, metadata, homeLedger, nonHomeLedger)
+   *   message = abi.encode(channelId, signingData)
+   *
+   * The signingData is encoded as dynamic bytes inside the outer abi.encode.
    * @param state - State to pack
    * @returns Packed bytes as hex string
    */
@@ -115,10 +120,9 @@ export class StatePackerV1 implements StatePacker {
       { name: 'nodeNetFlow', type: 'int256' },
     ] as const;
 
-    // Encode the state using viem
-    const packed = encodeAbiParameters(
+    // Step 1: Pack signingData = abi.encode(version, intent, metadata, homeLedger, nonHomeLedger)
+    const signingData = encodeAbiParameters(
       [
-        { type: 'bytes32' }, // channelId
         { type: 'uint64' }, // version
         { type: 'uint8' }, // intent
         { type: 'bytes32' }, // metadata
@@ -126,7 +130,6 @@ export class StatePackerV1 implements StatePacker {
         { type: 'tuple', components: ledgerComponents }, // nonHomeState
       ],
       [
-        channelId,
         state.version,
         intent,
         metadata as `0x${string}`,
@@ -148,6 +151,20 @@ export class StatePackerV1 implements StatePacker {
           nodeAllocation: nonHomeLedger.nodeAllocation,
           nodeNetFlow: nonHomeLedger.nodeNetFlow,
         },
+      ]
+    );
+
+    // Step 2: Pack message = abi.encode(channelId, signingData)
+    // This matches Solidity: Utils.pack(channelId, signingData) = abi.encode(channelId, signingData)
+    // where signingData is dynamic bytes
+    const packed = encodeAbiParameters(
+      [
+        { type: 'bytes32' }, // channelId
+        { type: 'bytes' },   // signingData (dynamic bytes)
+      ],
+      [
+        channelId,
+        signingData,
       ]
     );
 

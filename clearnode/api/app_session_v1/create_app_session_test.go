@@ -86,10 +86,8 @@ func TestCreateAppSession_Success(t *testing.T) {
 		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1CreateAppSessionMethod), payload),
 	}
 
-	// Execute
 	handler.CreateAppSession(ctx)
 
-	// Assert
 	assert.NotNil(t, ctx.Response)
 
 	// Check for errors first
@@ -194,10 +192,8 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1CreateAppSessionMethod), payload),
 	}
 
-	// Execute
 	handler.CreateAppSession(ctx)
 
-	// Assert
 	assert.NotNil(t, ctx.Response)
 
 	// Check for errors first
@@ -259,10 +255,8 @@ func TestCreateAppSession_ZeroNonce(t *testing.T) {
 		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1CreateAppSessionMethod), payload),
 	}
 
-	// Execute
 	handler.CreateAppSession(ctx)
 
-	// Assert
 	assert.NotNil(t, ctx.Response)
 
 	// Verify response contains error about nonce
@@ -327,10 +321,8 @@ func TestCreateAppSession_QuorumExceedsTotalWeights(t *testing.T) {
 		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1CreateAppSessionMethod), payload),
 	}
 
-	// Execute
 	handler.CreateAppSession(ctx)
 
-	// Assert
 	assert.NotNil(t, ctx.Response)
 
 	// Verify response contains error about quorum
@@ -391,10 +383,8 @@ func TestCreateAppSession_NoSignatures(t *testing.T) {
 		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1CreateAppSessionMethod), payload),
 	}
 
-	// Execute
 	handler.CreateAppSession(ctx)
 
-	// Assert
 	assert.NotNil(t, ctx.Response)
 
 	// Verify response contains error about signatures
@@ -458,6 +448,8 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 		QuorumSigs: []string{sig},
 	}
 
+	mockStore.On("CreateAppSession", mock.Anything).Return(nil).Once()
+
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
 	require.NoError(t, err)
@@ -467,10 +459,8 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1CreateAppSessionMethod), payload),
 	}
 
-	// Execute
 	handler.CreateAppSession(ctx)
 
-	// Assert
 	assert.NotNil(t, ctx.Response)
 
 	// Verify response contains error about non-participant
@@ -548,6 +538,8 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 		},
 	}
 
+	mockStore.On("CreateAppSession", mock.Anything).Return(nil).Once()
+
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
 	require.NoError(t, err)
@@ -557,10 +549,8 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1CreateAppSessionMethod), payload),
 	}
 
-	// Execute
 	handler.CreateAppSession(ctx)
 
-	// Assert
 	assert.NotNil(t, ctx.Response)
 
 	// Verify response contains error about quorum not met
@@ -634,6 +624,8 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 		},
 	}
 
+	mockStore.On("CreateAppSession", mock.Anything).Return(nil).Once()
+
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
 	require.NoError(t, err)
@@ -643,10 +635,8 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1CreateAppSessionMethod), payload),
 	}
 
-	// Execute
 	handler.CreateAppSession(ctx)
 
-	// Assert
 	assert.NotNil(t, ctx.Response)
 
 	// Verify response contains error - duplicate signatures shouldn't count twice
@@ -698,6 +688,8 @@ func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 		QuorumSigs: []string{"not-valid-hex"}, // Invalid hex string
 	}
 
+	mockStore.On("CreateAppSession", mock.Anything).Return(nil).Once()
+
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
 	require.NoError(t, err)
@@ -707,10 +699,8 @@ func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1CreateAppSessionMethod), payload),
 	}
 
-	// Execute
 	handler.CreateAppSession(ctx)
 
-	// Assert
 	assert.NotNil(t, ctx.Response)
 
 	// Verify response contains error about signature decoding
@@ -718,7 +708,7 @@ func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "decode signature")
 
-	// Verify no mocks were called since we fail at signature decoding
+	// Verify mocks were called
 	mockStore.AssertExpectations(t)
 }
 
@@ -762,6 +752,8 @@ func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 		QuorumSigs: []string{"0xa100000000"},
 	}
 
+	mockStore.On("CreateAppSession", mock.Anything).Return(nil).Once()
+
 	// Create RPC context
 	payload, err := rpc.NewPayload(reqPayload)
 	require.NoError(t, err)
@@ -771,10 +763,8 @@ func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1CreateAppSessionMethod), payload),
 	}
 
-	// Execute
 	handler.CreateAppSession(ctx)
 
-	// Assert
 	assert.NotNil(t, ctx.Response)
 
 	// Verify response contains error about signature recovery

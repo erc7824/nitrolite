@@ -33,6 +33,7 @@ export function coreDefToContractDef(
     user: userWallet,
     node: nodeAddress,
     nonce: def.nonce,
+    approvedSignatureValidators: 0n,
     metadata: generateChannelMetadata(asset) as `0x${string}`,
   };
 }
@@ -81,8 +82,8 @@ export async function coreStateToContractState(
     version: state.version,
     intent,
     metadata,
-    homeState: homeLedger,
-    nonHomeState: nonHomeLedger,
+    homeLedger: homeLedger,
+    nonHomeLedger: nonHomeLedger,
     userSig,
     nodeSig,
   };
@@ -116,11 +117,11 @@ export function contractStateToCoreState(
   homeChannelId: string,
   escrowChannelId?: string
 ): core.State {
-  const homeLedger = contractLedgerToCoreLedger(contractState.homeState);
+  const homeLedger = contractLedgerToCoreLedger(contractState.homeLedger);
 
   let escrowLedger: core.Ledger | undefined;
-  if (contractState.nonHomeState.chainId !== 0n) {
-    escrowLedger = contractLedgerToCoreLedger(contractState.nonHomeState);
+  if (contractState.nonHomeLedger.chainId !== 0n) {
+    escrowLedger = contractLedgerToCoreLedger(contractState.nonHomeLedger);
   }
 
   const homeChannelIdPtr = homeChannelId || undefined;

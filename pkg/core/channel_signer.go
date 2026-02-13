@@ -23,6 +23,11 @@ var (
 	}
 )
 
+type ChannelSigner interface {
+	sign.Signer
+	Type() ChannelSignerType
+}
+
 // hexToBitmask parses a hex string (with optional 0x prefix) into a [32]byte big-endian bitmask.
 func hexToBitmask(s string) ([32]byte, bool) {
 	var val [32]byte
@@ -105,6 +110,10 @@ func (s *ChannelDefaultSigner) Sign(data []byte) (sign.Signature, error) {
 	}
 
 	return append([]byte{byte(ChannelSignerType_Default)}, sig...), nil
+}
+
+func (s *ChannelDefaultSigner) Type() ChannelSignerType {
+	return ChannelSignerType_Default
 }
 
 type ChannelSigValidator struct {

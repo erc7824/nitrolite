@@ -7,6 +7,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/shopspring/decimal"
 )
 
@@ -264,7 +265,7 @@ func (c *Client) RebalanceAppSessions(ctx context.Context, signedUpdates []app.S
 // Session Key Methods
 // ============================================================================
 
-// SubmitSessionKeyState submits a session key state for registration or update.
+// SubmitAppSessionKeyState submits a session key state for registration or update.
 // The state must be signed by the user's wallet to authorize the session key delegation.
 //
 // Parameters:
@@ -284,8 +285,8 @@ func (c *Client) RebalanceAppSessions(ctx context.Context, signedUpdates []app.S
 //	    ExpiresAt:      time.Now().Add(24 * time.Hour),
 //	    UserSig:        "0x...",
 //	}
-//	err := client.SubmitSessionKeyState(ctx, state)
-func (c *Client) SubmitSessionKeyState(ctx context.Context, state app.AppSessionKeyStateV1) error {
+//	err := client.SubmitAppSessionKeyState(ctx, state)
+func (c *Client) SubmitAppSessionKeyState(ctx context.Context, state app.AppSessionKeyStateV1) error {
 	req := rpc.AppSessionsV1SubmitSessionKeyStateRequest{
 		State: transformSessionKeyStateToRPC(state),
 	}
@@ -302,7 +303,7 @@ type GetLastKeyStatesOptions struct {
 	SessionKey *string
 }
 
-// GetLastKeyStates retrieves the latest session key states for a user.
+// GetLastAppKeyStates retrieves the latest session key states for a user.
 //
 // Parameters:
 //   - userAddress: The user's wallet address
@@ -314,11 +315,11 @@ type GetLastKeyStatesOptions struct {
 //
 // Example:
 //
-//	states, err := client.GetLastKeyStates(ctx, "0x1234...", nil)
+//	states, err := client.GetLastAppKeyStates(ctx, "0x1234...", nil)
 //	for _, state := range states {
 //	    fmt.Printf("Session key %s expires at %s\n", state.SessionKey, state.ExpiresAt)
 //	}
-func (c *Client) GetLastKeyStates(ctx context.Context, userAddress string, opts *GetLastKeyStatesOptions) ([]app.AppSessionKeyStateV1, error) {
+func (c *Client) GetLastAppKeyStates(ctx context.Context, userAddress string, opts *GetLastKeyStatesOptions) ([]app.AppSessionKeyStateV1, error) {
 	req := rpc.AppSessionsV1GetLastKeyStatesRequest{
 		UserAddress: userAddress,
 	}
@@ -374,5 +375,6 @@ func (c *Client) SignSessionKeyState(state app.AppSessionKeyStateV1) (string, er
 		return "", fmt.Errorf("failed to sign session key state: %w", err)
 	}
 
-	return fmt.Sprintf("0x%x", sig), nil
+	// Strip the channel signer type prefix byte; session key auth uses plain EIP-191 signatures
+	return hexutil.Encode(sig[1:]), nil
 }

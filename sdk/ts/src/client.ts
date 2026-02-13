@@ -7,8 +7,8 @@
 
 import { Address, Hex, createPublicClient, createWalletClient, http, custom } from 'viem';
 import Decimal from 'decimal.js';
-import * as core from './core/types';
-import * as app from './app/types';
+import * as core from './core';
+import * as app from './app';
 import * as API from './rpc/api';
 import { StateV1, ChannelDefinitionV1, ChannelSessionKeyStateV1 } from './rpc/types';
 import { RPCClient } from './rpc/client';
@@ -622,9 +622,13 @@ export class Client {
       }
       const newState = nextState(state);
 
-      const blockchainId = this.homeBlockchains.get(asset);
+      let blockchainId = this.homeBlockchains.get(asset);
       if (!blockchainId) {
-        throw new Error(`home blockchain not set for asset ${asset}`);
+        if (state.homeLedger.blockchainId !== 0n) {
+          blockchainId = state.homeLedger.blockchainId;
+        } else {
+          blockchainId = await this.assetStore.getSuggestedBlockchainId(asset);
+        }
       }
 
       const nodeAddress = await this.getNodeAddress();
@@ -1275,6 +1279,27 @@ export class Client {
   // ============================================================================
 
   /**
+   * Sign a channel session key state using the client's state signer.
+   * This creates a properly formatted EIP-191 signature that can be set on the state's
+   * user_sig field before submitting via submitChannelSessionKeyState.
+   *
+   * @param state - The channel session key state to sign (user_sig field is excluded from signing)
+   * @returns The hex-encoded signature string
+   */
+  async signChannelSessionKeyState(state: ChannelSessionKeyStateV1): Promise<Hex> {
+    const metadataHash = core.getChannelSessionKeyAuthMetadataHashV1(
+      BigInt(state.version),
+      state.assets,
+      BigInt(state.expires_at)
+    );
+    const packed = core.packChannelKeyStateV1(
+      state.session_key as Address,
+      metadataHash
+    );
+    return await this.stateSigner.signMessage(packed);
+  }
+
+  /**
    * Submit a channel session key state for registration or update.
    * The state must be signed by the user's wallet to authorize the session key delegation.
    *
@@ -1309,6 +1334,19 @@ export class Client {
   // ============================================================================
   // App Session Key Methods
   // ============================================================================
+
+  /**
+   * Sign an app session key state using the client's state signer.
+   * This creates a properly formatted EIP-191 signature that can be set on the state's
+   * user_sig field before submitting via submitSessionKeyState.
+   *
+   * @param state - The app session key state to sign (user_sig field is excluded from signing)
+   * @returns The hex-encoded signature string
+   */
+  async signSessionKeyState(state: app.AppSessionKeyStateV1): Promise<Hex> {
+    const packed = app.packAppSessionKeyStateV1(state);
+    return await this.stateSigner.signMessage(packed);
+  }
 
   /**
    * Submit an app session key state for registration or update.

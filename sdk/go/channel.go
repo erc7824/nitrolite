@@ -6,6 +6,7 @@ import (
 
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/shopspring/decimal"
 )
 
@@ -451,7 +452,14 @@ func (c *Client) Acknowledge(ctx context.Context, asset string) (*core.State, er
 
 		blockchainID, ok := c.homeBlockchains[asset]
 		if !ok {
-			return nil, fmt.Errorf("home blockchain not set for asset %s", asset)
+			if state.HomeLedger.BlockchainID != 0 {
+				blockchainID = state.HomeLedger.BlockchainID
+			} else {
+				blockchainID, err = c.assetStore.GetSuggestedBlockchainID(asset)
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 
 		nodeAddress, err := c.getNodeAddress(ctx)
@@ -592,14 +600,14 @@ func (c *Client) Checkpoint(ctx context.Context, asset string) (string, error) {
 		}
 
 		// Checkpoint existing channel for deposit/withdrawal
-		txHash, err := blockchainClient.Checkpoint(*state, nil)
+		txHash, err := blockchainClient.Checkpoint(*state)
 		if err != nil {
 			return "", fmt.Errorf("failed to checkpoint on blockchain: %w", err)
 		}
 		return txHash, nil
 
 	case core.TransitionTypeFinalize:
-		txHash, err := blockchainClient.Close(*state, nil)
+		txHash, err := blockchainClient.Close(*state)
 		if err != nil {
 			return "", fmt.Errorf("failed to close channel on blockchain: %w", err)
 		}
@@ -851,10 +859,15 @@ func (c *Client) SignChannelSessionKeyState(state core.ChannelSessionKeyStateV1)
 		return "", fmt.Errorf("failed to pack channel session key state: %w", err)
 	}
 
-	sig, err := c.stateSigner.Sign(packed)
+	ethMsgSigner, err := sign.NewEthereumMsgSignerFromRaw(c.rawSigner)
+	if err != nil {
+		return "", fmt.Errorf("failed to create Ethereum message signer: %w", err)
+	}
+
+	sig, err := ethMsgSigner.Sign(packed)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign channel session key state: %w", err)
 	}
 
-	return fmt.Sprintf("0x%x", sig), nil
+	return sig.String(), nil
 }

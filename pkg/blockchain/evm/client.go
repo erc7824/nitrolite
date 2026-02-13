@@ -351,7 +351,7 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) MigrateChannelHere(def core.ChannelDefinition, candidate core.State, _ []core.State) (string, error) {
+func (c *Client) MigrateChannelHere(def core.ChannelDefinition, candidate core.State) (string, error) {
 	contractDef, err := coreDefToContractDef(def, candidate.Asset, candidate.UserWallet, c.nodeAddress)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to convert channel definition")
@@ -374,7 +374,7 @@ func (c *Client) MigrateChannelHere(def core.ChannelDefinition, candidate core.S
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) Checkpoint(candidate core.State, _ []core.State) (string, error) {
+func (c *Client) Checkpoint(candidate core.State) (string, error) {
 	if candidate.HomeChannelID == nil {
 		return "", errors.New("candidate state must have a home channel ID")
 	}
@@ -397,7 +397,7 @@ func (c *Client) Checkpoint(candidate core.State, _ []core.State) (string, error
 	switch contractCandidate.Intent {
 	case core.INTENT_OPERATE:
 		// TODO: recheck proofs logic
-		tx, err = c.contract.CheckpointChannel(c.transactOpts, channelIDBytes, contractCandidate, []State{})
+		tx, err = c.contract.CheckpointChannel(c.transactOpts, channelIDBytes, contractCandidate)
 	case core.INTENT_DEPOSIT:
 		// TODO: check for native tokens
 		if c.requireCheckAllowance {
@@ -433,7 +433,7 @@ func (c *Client) Checkpoint(candidate core.State, _ []core.State) (string, error
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) Challenge(candidate core.State, _ []core.State, challengerSig []byte) (string, error) {
+func (c *Client) Challenge(candidate core.State, challengerSig []byte, challengerIdx core.ChannelParticipant) (string, error) {
 	if candidate.HomeChannelID == nil {
 		return "", errors.New("candidate state must have a home channel ID")
 	}
@@ -453,7 +453,7 @@ func (c *Client) Challenge(candidate core.State, _ []core.State, challengerSig [
 	}
 
 	// TODO: recheck proofs logic
-	tx, err := c.contract.ChallengeChannel(c.transactOpts, channelIDBytes, contractCandidate, []State{}, challengerSig)
+	tx, err := c.contract.ChallengeChannel(c.transactOpts, channelIDBytes, contractCandidate, challengerSig, uint8(challengerIdx))
 	if err != nil {
 		return "", errors.Wrap(err, "failed to challenge channel")
 	}
@@ -461,7 +461,7 @@ func (c *Client) Challenge(candidate core.State, _ []core.State, challengerSig [
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) Close(candidate core.State, _ []core.State) (string, error) {
+func (c *Client) Close(candidate core.State) (string, error) {
 	if candidate.HomeChannelID == nil {
 		return "", errors.New("candidate state must have a home channel ID")
 	}
@@ -485,7 +485,7 @@ func (c *Client) Close(candidate core.State, _ []core.State) (string, error) {
 	}
 
 	// TODO: recheck proof logic
-	tx, err := c.contract.CloseChannel(c.transactOpts, channelIDBytes, contractCandidate, []State{})
+	tx, err := c.contract.CloseChannel(c.transactOpts, channelIDBytes, contractCandidate)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to close channel")
 	}
@@ -522,7 +522,7 @@ func (c *Client) InitiateEscrowDeposit(def core.ChannelDefinition, initCCS core.
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) ChallengeEscrowDeposit(candidate core.State, _ []core.State, challengerSig []byte) (string, error) {
+func (c *Client) ChallengeEscrowDeposit(candidate core.State, challengerSig []byte, challengerIdx core.ChannelParticipant) (string, error) {
 	if candidate.EscrowChannelID == nil {
 		return "", errors.New("candidate state must have an escrow channel ID")
 	}
@@ -536,7 +536,7 @@ func (c *Client) ChallengeEscrowDeposit(candidate core.State, _ []core.State, ch
 		return "", err
 	}
 
-	tx, err := c.contract.ChallengeEscrowDeposit(c.transactOpts, escrowIDBytes, challengerSig)
+	tx, err := c.contract.ChallengeEscrowDeposit(c.transactOpts, escrowIDBytes, challengerSig, uint8(challengerIdx))
 	if err != nil {
 		return "", errors.Wrap(err, "failed to challenge escrow deposit")
 	}
@@ -544,7 +544,7 @@ func (c *Client) ChallengeEscrowDeposit(candidate core.State, _ []core.State, ch
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) FinalizeEscrowDeposit(candidate core.State, _ [2]core.State) (string, error) {
+func (c *Client) FinalizeEscrowDeposit(candidate core.State) (string, error) {
 	if candidate.EscrowChannelID == nil {
 		return "", errors.New("candidate state must have an escrow channel ID")
 	}
@@ -604,7 +604,7 @@ func (c *Client) InitiateEscrowWithdrawal(def core.ChannelDefinition, initCCS co
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) ChallengeEscrowWithdrawal(candidate core.State, _ []core.State, challengerSig []byte) (string, error) {
+func (c *Client) ChallengeEscrowWithdrawal(candidate core.State, challengerSig []byte, challengerIdx core.ChannelParticipant) (string, error) {
 	if candidate.EscrowChannelID == nil {
 		return "", errors.New("candidate state must have an escrow channel ID")
 	}
@@ -618,7 +618,7 @@ func (c *Client) ChallengeEscrowWithdrawal(candidate core.State, _ []core.State,
 		return "", err
 	}
 
-	tx, err := c.contract.ChallengeEscrowWithdrawal(c.transactOpts, escrowIDBytes, challengerSig)
+	tx, err := c.contract.ChallengeEscrowWithdrawal(c.transactOpts, escrowIDBytes, challengerSig, uint8(challengerIdx))
 	if err != nil {
 		return "", errors.Wrap(err, "failed to challenge escrow withdrawal")
 	}

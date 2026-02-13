@@ -15,6 +15,13 @@ var (
 	ChannelTypeEscrow ChannelType = 2
 )
 
+type ChannelParticipant uint8
+
+var (
+	ChannelParticipantUser ChannelParticipant = 0
+	ChannelParticipantNode ChannelParticipant = 1
+)
+
 type ChannelStatus uint8
 
 var (

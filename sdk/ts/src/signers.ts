@@ -3,7 +3,7 @@
  * Provides EthereumMsgSigner and EthereumRawSigner matching the Go SDK patterns
  */
 
-import { Address, Hex } from 'viem';
+import { Address, Hex, encodeAbiParameters } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 
 /**
@@ -115,6 +115,90 @@ export class EthereumRawSigner implements TransactionSigner {
    */
   async signMessage(message: { raw: Hex }): Promise<Hex> {
     return await this.account.sign({ hash: message.raw });
+  }
+}
+
+/**
+ * ChannelSessionKeyStateSigner implements StateSigner for session key delegation.
+ * Corresponds to Go SDK's core.ChannelSessionKeySignerV1.
+ *
+ * Signs state data with the session key's private key (EIP-191), then wraps
+ * the signature with the authorization data (session key address, metadata hash,
+ * auth signature from the main wallet) and prepends a 0x01 type byte.
+ *
+ * The resulting compound signature format matches the Solidity SessionKeyValidator:
+ *   0x01 || abi.encode(SessionKeyAuthorization{sessionKey, metadataHash, authSignature}, sessionKeySig)
+ *
+ * @example
+ * ```typescript
+ * const signer = new ChannelSessionKeyStateSigner(
+ *   '0x...',           // session key private key
+ *   '0xWallet...',     // main wallet address
+ *   '0xMeta...',       // metadata hash from registration
+ *   '0xAuthSig...',    // wallet's auth signature
+ * );
+ * const client = await Client.create(wsURL, signer, txSigner);
+ * ```
+ */
+export class ChannelSessionKeyStateSigner implements StateSigner {
+  private account: ReturnType<typeof privateKeyToAccount>;
+  private walletAddress: Address;
+  private metadataHash: Hex;
+  private authSignature: Hex;
+
+  constructor(
+    sessionKeyPrivateKey: Hex,
+    walletAddress: Address,
+    metadataHash: Hex,
+    authSignature: Hex
+  ) {
+    this.account = privateKeyToAccount(sessionKeyPrivateKey);
+    this.walletAddress = walletAddress;
+    this.metadataHash = metadataHash;
+    this.authSignature = authSignature;
+  }
+
+  /** Returns the main wallet address (not the session key address) */
+  getAddress(): Address {
+    return this.walletAddress;
+  }
+
+  /** Returns the session key address */
+  getSessionKeyAddress(): Address {
+    return this.account.address;
+  }
+
+  async signMessage(hash: Hex): Promise<Hex> {
+    // Sign with session key (EIP-191)
+    const sessionKeySig = await this.account.signMessage({
+      message: { raw: hash },
+    });
+
+    // ABI-encode (SessionKeyAuthorization, sessionKeySig) matching Solidity struct
+    const encoded = encodeAbiParameters(
+      [
+        {
+          type: 'tuple',
+          components: [
+            { name: 'sessionKey', type: 'address' },
+            { name: 'metadataHash', type: 'bytes32' },
+            { name: 'authSignature', type: 'bytes' },
+          ],
+        },
+        { type: 'bytes' },
+      ],
+      [
+        {
+          sessionKey: this.account.address,
+          metadataHash: this.metadataHash,
+          authSignature: this.authSignature,
+        },
+        sessionKeySig,
+      ]
+    );
+
+    // Prepend 0x01 type byte (ChannelSignerType_SessionKey)
+    return `0x01${encoded.slice(2)}` as Hex;
   }
 }
 

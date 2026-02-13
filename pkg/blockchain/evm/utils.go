@@ -76,12 +76,22 @@ func hexToBytes32(s string) ([32]byte, error) {
 }
 
 func coreDefToContractDef(def core.ChannelDefinition, asset, userWallet string, nodeAddress common.Address) (ChannelDefinition, error) {
+	approvedSigValidators := new(big.Int)
+	if def.ApprovedSigValidators != "" {
+		var ok bool
+		approvedSigValidators, ok = approvedSigValidators.SetString(def.ApprovedSigValidators, 0)
+		if !ok {
+			return ChannelDefinition{}, errors.Errorf("failed to parse approved sig validators: %s", def.ApprovedSigValidators)
+		}
+	}
+
 	return ChannelDefinition{
-		ChallengeDuration: def.Challenge,
-		User:              common.HexToAddress(userWallet),
-		Node:              nodeAddress,
-		Nonce:             def.Nonce,
-		Metadata:          core.GenerateChannelMetadata(asset),
+		ChallengeDuration:           def.Challenge,
+		User:                        common.HexToAddress(userWallet),
+		Node:                        nodeAddress,
+		Nonce:                       def.Nonce,
+		ApprovedSignatureValidators: approvedSigValidators,
+		Metadata:                    core.GenerateChannelMetadata(asset),
 	}, nil
 }
 
@@ -141,13 +151,13 @@ func coreStateToContractState(state core.State, tokenGetter func(blockchainID ui
 	}
 
 	return State{
-		Version:      state.Version,
-		Intent:       intent,
-		Metadata:     metadata,
-		HomeState:    homeLedger,
-		NonHomeState: nonHomeLedger,
-		UserSig:      userSig,
-		NodeSig:      nodeSig,
+		Version:       state.Version,
+		Intent:        intent,
+		Metadata:      metadata,
+		HomeLedger:    homeLedger,
+		NonHomeLedger: nonHomeLedger,
+		UserSig:       userSig,
+		NodeSig:       nodeSig,
 	}, nil
 }
 
@@ -186,11 +196,11 @@ func coreLedgerToContractLedger(ledger core.Ledger, decimals uint8) (Ledger, err
 }
 
 func contractStateToCoreState(contractState State, homeChannelID string, escrowChannelID *string) (*core.State, error) {
-	homeLedger := contractLedgerToCoreLedger(contractState.HomeState)
+	homeLedger := contractLedgerToCoreLedger(contractState.HomeLedger)
 
 	var escrowLedger *core.Ledger
-	if contractState.NonHomeState.ChainId != 0 {
-		el := contractLedgerToCoreLedger(contractState.NonHomeState)
+	if contractState.NonHomeLedger.ChainId != 0 {
+		el := contractLedgerToCoreLedger(contractState.NonHomeLedger)
 		escrowLedger = &el
 	}
 

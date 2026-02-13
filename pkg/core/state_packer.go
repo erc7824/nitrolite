@@ -26,7 +26,7 @@ func PackState(state State, assetStore AssetStore) ([]byte, error) {
 }
 
 // PackState encodes a channel ID and state into ABI-packed bytes for on-chain submission.
-// This matches the Solidity pack function which encodes: channelId, version, intent, metadata, homeState, nonHomeState.
+// This matches the Solidity contract's two-step encoding:
 func (p *StatePackerV1) PackState(state State) ([]byte, error) {
 	// Ensure HomeChannelID is present
 	if state.HomeChannelID == nil {
@@ -58,8 +58,8 @@ func (p *StatePackerV1) PackState(state State) ([]byte, error) {
 
 	bytes32Type := abi.Type{T: abi.FixedBytesTy, Size: 32}
 
-	args := abi.Arguments{
-		{Type: bytes32Type}, // channelId
+	// Step 1: Pack signingData = abi.encode(version, intent, metadata, homeLedger, nonHomeLedger)
+	signingDataArgs := abi.Arguments{
 		{Type: uint64Type},  // version
 		{Type: uint8Type},   // intent
 		{Type: bytes32Type}, // metadata
@@ -161,8 +161,7 @@ func (p *StatePackerV1) PackState(state State) ([]byte, error) {
 	// Determine intent based on last transition
 	intent := TransitionToIntent(state.Transition)
 
-	packed, err := args.Pack(
-		channelID,
+	signingData, err := signingDataArgs.Pack(
 		state.Version,
 		intent,
 		metadata,
@@ -170,7 +169,29 @@ func (p *StatePackerV1) PackState(state State) ([]byte, error) {
 		nonHomeLedger,
 	)
 	if err != nil {
+		return nil, fmt.Errorf("failed to pack signing data: %w", err)
+	}
+
+	// Step 2: Pack message = abi.encode(channelId, signingData)
+	// This matches Solidity: Utils.pack(channelId, signingData) = abi.encode(channelId, signingData)
+	// where signingData is dynamic bytes
+	bytesType, err := abi.NewType("bytes", "", nil)
+	if err != nil {
 		return nil, err
 	}
+
+	outerArgs := abi.Arguments{
+		{Type: bytes32Type}, // channelId
+		{Type: bytesType},   // signingData (dynamic bytes)
+	}
+
+	packed, err := outerArgs.Pack(
+		channelID,
+		signingData,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack outer message: %w", err)
+	}
+
 	return packed, nil
 }

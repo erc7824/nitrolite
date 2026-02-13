@@ -51,8 +51,8 @@ type Client struct {
 	exitCh            chan struct{}
 	blockchainClients map[uint64]core.Client
 	homeBlockchains   map[string]uint64
-	stateSigner       sign.Signer
-	txSigner          sign.Signer
+	stateSigner       core.ChannelSigner
+	rawSigner         sign.Signer
 	assetStore        *clientAssetStore
 }
 
@@ -61,7 +61,7 @@ type Client struct {
 //
 // Parameters:
 //   - wsURL: WebSocket URL of the Clearnode server (e.g., "wss://clearnode.example.com/ws")
-//   - stateSigner: sign.Signer for signing channel states (use sign.NewEthereumMsgSigner)
+//   - stateSigner: core.ChannelSigner for signing channel states (use sign.NewEthereumMsgSigner)
 //   - txSigner: sign.Signer for signing blockchain transactions (use sign.NewEthereumRawSigner)
 //   - opts: Optional configuration (WithBlockchainRPC, WithHandshakeTimeout, etc.)
 //
@@ -79,7 +79,7 @@ type Client struct {
 //	    txSigner,
 //	    sdk.WithBlockchainRPC(80002, "https://polygon-amoy.alchemy.com/v2/KEY"),
 //	)
-func NewClient(wsURL string, stateSigner, txSigner sign.Signer, opts ...Option) (*Client, error) {
+func NewClient(wsURL string, stateSigner core.ChannelSigner, rawSigner sign.Signer, opts ...Option) (*Client, error) {
 	// Build config starting with defaults
 	config := DefaultConfig
 	config.URL = wsURL
@@ -105,7 +105,7 @@ func NewClient(wsURL string, stateSigner, txSigner sign.Signer, opts ...Option) 
 		blockchainClients: make(map[uint64]core.Client),
 		homeBlockchains:   make(map[string]uint64),
 		stateSigner:       stateSigner,
-		txSigner:          txSigner,
+		rawSigner:         rawSigner,
 	}
 
 	// Create asset store
@@ -238,7 +238,7 @@ func (c *Client) SignState(state *core.State) (string, error) {
 // GetUserAddress returns the Ethereum address associated with the signer.
 // This is useful for identifying the current user's wallet address.
 func (c *Client) GetUserAddress() string {
-	return c.stateSigner.PublicKey().Address().String()
+	return c.rawSigner.PublicKey().Address().String()
 }
 
 // signAndSubmitState is a helper that signs a state and submits it to the node.
@@ -329,7 +329,7 @@ func (c *Client) initializeBlockchainClient(ctx context.Context, chainID uint64)
 	evmClient, err := evm.NewClient(
 		common.HexToAddress(contractAddress),
 		ethClient,
-		c.txSigner,
+		c.rawSigner,
 		chainID,
 		nodeAddress,
 		c.assetStore,

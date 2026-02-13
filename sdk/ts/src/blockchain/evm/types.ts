@@ -12,6 +12,7 @@ export interface ChannelDefinition {
   user: Address;
   node: Address;
   nonce: bigint; // uint64
+  approvedSignatureValidators: bigint; // uint256
   metadata: `0x${string}`; // bytes32
 }
 
@@ -35,8 +36,8 @@ export interface State {
   version: bigint; // uint64
   intent: number; // uint8
   metadata: `0x${string}`; // bytes32
-  homeState: Ledger;
-  nonHomeState: Ledger;
+  homeLedger: Ledger;
+  nonHomeLedger: Ledger;
   userSig: `0x${string}`; // bytes
   nodeSig: `0x${string}`; // bytes
 }

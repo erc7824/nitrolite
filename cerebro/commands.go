@@ -5,8 +5,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/sign"
 	sdk "github.com/erc7824/nitrolite/sdk/go"
@@ -56,6 +59,15 @@ LOW-LEVEL STATE MANAGEMENT (Base Client)
 LOW-LEVEL APP SESSIONS (Base Client)
   app-sessions                  List app sessions
 
+SESSION KEY MANAGEMENT
+  generate-session-key                                                Generate or import session key (stores locally)
+  session-key                                                         Show current session key info
+  clear-session-key                                                   Clear session key, revert to default wallet signer
+  create-channel-session-key <session_key> <expires_hours> <assets>   Register channel session key (auto-activates if stored)
+  channel-session-keys                                                List active channel session keys
+  create-app-session-key <session_key> <expires_hours> [app_ids] [session_ids]  Register app session key (IDs: comma-separated)
+  app-session-keys                                                    List active app session keys
+
 OTHER
   exit                          Exit the CLI
 
@@ -67,7 +79,10 @@ EXAMPLES
   balances              # Uses configured wallet
   balances 0x1234...    # Query specific wallet
   state usdc            # Get state for USDC
-  chains`)
+  chains
+  generate-session-key                               # Step 1: generate/import
+  create-channel-session-key 0xabcd... 24 usdc,weth  # Step 2: register + activate
+  create-app-session-key 0xabcd... 24 app1,app2`)
 }
 
 func (o *Operator) showConfig(ctx context.Context) {
@@ -86,6 +101,19 @@ func (o *Operator) showConfig(ctx context.Context) {
 			fmt.Printf("Wallet:     Configured (%s)\n", signer.PublicKey().Address().String())
 		} else {
 			fmt.Println("Wallet:     Configured")
+		}
+	}
+
+	// Session key status
+	skPrivateKey, _, _, skErr := o.store.GetSessionKey()
+	if skErr != nil {
+		fmt.Println("Session Key: Not configured (using default wallet signer)")
+	} else {
+		skSigner, skSignerErr := sign.NewEthereumRawSigner(skPrivateKey)
+		if skSignerErr == nil {
+			fmt.Printf("Session Key: Configured (%s)\n", skSigner.PublicKey().Address().String())
+		} else {
+			fmt.Println("Session Key: Configured (invalid key)")
 		}
 	}
 
@@ -406,10 +434,25 @@ func (o *Operator) nodeInfo(ctx context.Context) {
 	fmt.Printf("Address:   %s\n", config.NodeAddress)
 	fmt.Printf("Version:   %s\n", config.NodeVersion)
 	fmt.Printf("Chains:    %d\n", len(config.Blockchains))
+
+	if len(config.SupportedSigValidators) > 0 {
+		fmt.Printf("\nSupported Signature Validators:\n")
+		for _, v := range config.SupportedSigValidators {
+			switch v {
+			case core.ChannelSignerType_Default:
+				fmt.Printf("  - Default Wallet (0x%02x)\n", uint8(v))
+			case core.ChannelSignerType_SessionKey:
+				fmt.Printf("  - Session Key (0x%02x)\n", uint8(v))
+			default:
+				fmt.Printf("  - Unknown (0x%02x)\n", uint8(v))
+			}
+		}
+	}
+
 	fmt.Println("\nSupported Blockchains:")
 	for _, bc := range config.Blockchains {
 		fmt.Printf("  - %s (ID: %d)\n", bc.Name, bc.ID)
-		fmt.Printf("    Contract: %s\n", bc.ChannelHubAddress)
+		fmt.Printf("    Contract:   %s\n", bc.ChannelHubAddress)
 	}
 }
 
@@ -684,6 +727,346 @@ func (o *Operator) listAppSessions(ctx context.Context, wallet string) {
 		fmt.Printf("  Closed:       %v\n", session.IsClosed)
 		fmt.Printf("  Participants: %d\n", len(session.Participants))
 		fmt.Printf("  Allocations:  %d\n", len(session.Allocations))
+	}
+}
+
+// ============================================================================
+// Session Key Management
+// ============================================================================
+
+func (o *Operator) generateSessionKey(_ context.Context) {
+	fmt.Println("Session Key Setup")
+	fmt.Println("=================")
+	fmt.Println()
+	fmt.Println("Choose an option:")
+	fmt.Println("  1. Generate new session key")
+	fmt.Println("  2. Import existing private key")
+	fmt.Println()
+	fmt.Print("Enter choice (1 or 2): ")
+
+	var choice string
+	fmt.Scanln(&choice)
+	choice = strings.TrimSpace(choice)
+
+	var privateKeyHex string
+	var err error
+
+	switch choice {
+	case "1":
+		privateKeyHex, err = generatePrivateKey()
+		if err != nil {
+			fmt.Printf("ERROR: Failed to generate session key: %v\n", err)
+			return
+		}
+	case "2":
+		fmt.Print("Enter session key private key (hex): ")
+		fmt.Scanln(&privateKeyHex)
+		privateKeyHex = strings.TrimSpace(privateKeyHex)
+		if privateKeyHex == "" {
+			fmt.Println("ERROR: Private key cannot be empty")
+			return
+		}
+	default:
+		fmt.Println("ERROR: Invalid choice")
+		return
+	}
+
+	signer, err := sign.NewEthereumRawSigner(privateKeyHex)
+	if err != nil {
+		fmt.Printf("ERROR: Invalid private key: %v\n", err)
+		return
+	}
+
+	// Store the session key private key locally (no metadata yet — will be set on registration)
+	if err := o.store.SetSessionKeyPrivateKey(privateKeyHex); err != nil {
+		fmt.Printf("ERROR: Failed to store session key: %v\n", err)
+		return
+	}
+
+	address := signer.PublicKey().Address().String()
+
+	fmt.Println()
+	fmt.Println("SUCCESS: Session key stored locally")
+	fmt.Printf("  Address: %s\n", address)
+	if choice == "1" {
+		fmt.Printf("  Private Key: %s\n", privateKeyHex)
+		fmt.Println()
+		fmt.Println("WARNING: Save the private key securely!")
+	}
+	fmt.Println()
+	fmt.Println("Next step: Register it on the clearnode with:")
+	fmt.Printf("  create-channel-session-key %s <expires_hours> <assets>\n", address)
+}
+
+func (o *Operator) showSessionKey() {
+	skPrivateKey, metadataHash, _, err := o.store.GetSessionKey()
+	if err != nil {
+		// Check if we have just the private key (generated but not yet registered)
+		pk, pkErr := o.store.GetSessionKeyPrivateKey()
+		if pkErr != nil {
+			fmt.Println("No session key configured")
+			fmt.Println("INFO: Use 'generate-session-key' to create one.")
+			return
+		}
+		signer, sigErr := sign.NewEthereumRawSigner(pk)
+		if sigErr != nil {
+			fmt.Printf("ERROR: Invalid stored session key: %v\n", sigErr)
+			return
+		}
+		fmt.Println("Session Key Configuration")
+		fmt.Println("=========================")
+		fmt.Printf("Address: %s\n", signer.PublicKey().Address().String())
+		fmt.Println("Status:  Stored locally (not yet registered on clearnode)")
+		fmt.Println()
+		fmt.Println("Next step: Register it with:")
+		fmt.Printf("  create-channel-session-key %s <expires_hours> <assets>\n", signer.PublicKey().Address().String())
+		return
+	}
+
+	signer, err := sign.NewEthereumRawSigner(skPrivateKey)
+	if err != nil {
+		fmt.Printf("ERROR: Invalid stored session key: %v\n", err)
+		return
+	}
+
+	fmt.Println("Session Key Configuration")
+	fmt.Println("=========================")
+	fmt.Printf("Address:       %s\n", signer.PublicKey().Address().String())
+	fmt.Printf("Metadata Hash: %s\n", metadataHash)
+	fmt.Println("Status:        Active (used for state signing)")
+}
+
+func (o *Operator) clearSessionKey() {
+	if err := o.store.ClearSessionKey(); err != nil {
+		fmt.Printf("ERROR: Failed to clear session key: %v\n", err)
+		return
+	}
+
+	fmt.Println("Reconnecting with default wallet signer...")
+	if err := o.reconnect(); err != nil {
+		fmt.Printf("ERROR: Failed to reconnect: %v\n", err)
+		fmt.Println("INFO: Session key cleared but reconnect failed. Try restarting the CLI.")
+		return
+	}
+
+	fmt.Println("SUCCESS: Session key cleared. Using default wallet signer.")
+}
+
+func (o *Operator) createChannelSessionKey(ctx context.Context, sessionKeyAddr, expiresHoursStr, assetsStr string) {
+	expiresHours, err := strconv.ParseUint(expiresHoursStr, 10, 64)
+	if err != nil {
+		fmt.Printf("ERROR: Invalid expiration hours: %s\n", expiresHoursStr)
+		return
+	}
+
+	assets := strings.Split(assetsStr, ",")
+	for i := range assets {
+		assets[i] = strings.TrimSpace(assets[i])
+	}
+
+	wallet := o.getImportedWalletAddress()
+	if wallet == "" {
+		fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
+		return
+	}
+
+	// Determine version by fetching existing keys
+	var version uint64 = 1
+	existingStates, err := o.client.GetLastChannelKeyStates(ctx, wallet, &sdk.GetLastChannelKeyStatesOptions{
+		SessionKey: &sessionKeyAddr,
+	})
+	if err == nil && len(existingStates) > 0 {
+		version = existingStates[0].Version + 1
+	}
+
+	expiresAt := time.Now().Add(time.Duration(expiresHours) * time.Hour)
+
+	state := core.ChannelSessionKeyStateV1{
+		UserAddress: wallet,
+		SessionKey:  sessionKeyAddr,
+		Version:     version,
+		Assets:      assets,
+		ExpiresAt:   expiresAt,
+	}
+
+	fmt.Printf("Signing channel session key (version %d)...\n", version)
+	sig, err := o.client.SignChannelSessionKeyState(state)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to sign session key state: %v\n", err)
+		return
+	}
+	state.UserSig = sig
+
+	fmt.Println("Submitting channel session key state...")
+	if err := o.client.SubmitChannelSessionKeyState(ctx, state); err != nil {
+		fmt.Printf("ERROR: Failed to submit session key state: %v\n", err)
+		return
+	}
+
+	fmt.Println("SUCCESS: Channel session key registered")
+	fmt.Printf("  Session Key: %s\n", sessionKeyAddr)
+	fmt.Printf("  Version:     %d\n", version)
+	fmt.Printf("  Assets:      %s\n", strings.Join(assets, ", "))
+	fmt.Printf("  Expires At:  %s\n", expiresAt.Format("2006-01-02 15:04:05"))
+
+	// If we have a stored session key matching this address, activate it as the state signer
+	storedPK, pkErr := o.store.GetSessionKeyPrivateKey()
+	if pkErr != nil {
+		return
+	}
+	storedSigner, sigErr := sign.NewEthereumRawSigner(storedPK)
+	if sigErr != nil {
+		return
+	}
+	if !strings.EqualFold(storedSigner.PublicKey().Address().String(), sessionKeyAddr) {
+		return
+	}
+
+	// Compute metadata hash and store full session key data
+	metadataHash, err := core.GetChannelSessionKeyAuthMetadataHashV1(version, assets, expiresAt.Unix())
+	if err != nil {
+		fmt.Printf("WARNING: Failed to compute metadata hash: %v\n", err)
+		return
+	}
+
+	if err := o.store.SetSessionKey(storedPK, metadataHash.Hex(), sig); err != nil {
+		fmt.Printf("WARNING: Failed to store session key data: %v\n", err)
+		return
+	}
+
+	fmt.Println("Activating session key as state signer...")
+	if err := o.reconnect(); err != nil {
+		fmt.Printf("WARNING: Failed to reconnect: %v\n", err)
+		fmt.Println("INFO: Session key is registered. Restart the CLI to activate it.")
+		return
+	}
+
+	fmt.Println("SUCCESS: Session key is now used for state signing")
+}
+
+func (o *Operator) listChannelSessionKeys(ctx context.Context, wallet string) {
+	states, err := o.client.GetLastChannelKeyStates(ctx, wallet, nil)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to get channel session keys: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Channel Session Keys for %s (%d)\n", wallet, len(states))
+	fmt.Println("===========================================")
+	if len(states) == 0 {
+		fmt.Println("No active channel session keys found")
+		return
+	}
+
+	for _, state := range states {
+		fmt.Printf("\n- Session Key: %s\n", state.SessionKey)
+		fmt.Printf("  Version:    %d\n", state.Version)
+		fmt.Printf("  Assets:     %s\n", strings.Join(state.Assets, ", "))
+		fmt.Printf("  Expires At: %s\n", state.ExpiresAt.Format("2006-01-02 15:04:05"))
+	}
+}
+
+func (o *Operator) createAppSessionKey(ctx context.Context, sessionKeyAddr, expiresHoursStr, appIDsStr, sessionIDsStr string) {
+	expiresHours, err := strconv.ParseUint(expiresHoursStr, 10, 64)
+	if err != nil {
+		fmt.Printf("ERROR: Invalid expiration hours: %s\n", expiresHoursStr)
+		return
+	}
+
+	var applicationIDs []string
+	if appIDsStr != "" {
+		applicationIDs = strings.Split(appIDsStr, ",")
+		for i := range applicationIDs {
+			applicationIDs[i] = strings.TrimSpace(applicationIDs[i])
+		}
+	}
+
+	var appSessionIDs []string
+	if sessionIDsStr != "" {
+		appSessionIDs = strings.Split(sessionIDsStr, ",")
+		for i := range appSessionIDs {
+			appSessionIDs[i] = strings.TrimSpace(appSessionIDs[i])
+		}
+	}
+
+	wallet := o.getImportedWalletAddress()
+	if wallet == "" {
+		fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
+		return
+	}
+
+	// Determine version by fetching existing keys
+	var version uint64 = 1
+	existingStates, err := o.client.GetLastAppKeyStates(ctx, wallet, &sdk.GetLastKeyStatesOptions{
+		SessionKey: &sessionKeyAddr,
+	})
+	if err == nil && len(existingStates) > 0 {
+		for _, s := range existingStates {
+			if s.Version >= version {
+				version = s.Version + 1
+			}
+		}
+	}
+
+	state := app.AppSessionKeyStateV1{
+		UserAddress:    wallet,
+		SessionKey:     sessionKeyAddr,
+		Version:        version,
+		ApplicationIDs: applicationIDs,
+		AppSessionIDs:  appSessionIDs,
+		ExpiresAt:      time.Now().Add(time.Duration(expiresHours) * time.Hour),
+	}
+
+	fmt.Printf("Signing app session key (version %d)...\n", version)
+	sig, err := o.client.SignSessionKeyState(state)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to sign session key state: %v\n", err)
+		return
+	}
+	state.UserSig = sig
+
+	fmt.Println("Submitting app session key state...")
+	if err := o.client.SubmitAppSessionKeyState(ctx, state); err != nil {
+		fmt.Printf("ERROR: Failed to submit session key state: %v\n", err)
+		return
+	}
+
+	fmt.Println("SUCCESS: App session key registered")
+	fmt.Printf("  Session Key:     %s\n", sessionKeyAddr)
+	fmt.Printf("  Version:         %d\n", version)
+	if len(applicationIDs) > 0 {
+		fmt.Printf("  Application IDs: %s\n", strings.Join(applicationIDs, ", "))
+	}
+	if len(appSessionIDs) > 0 {
+		fmt.Printf("  Session IDs:     %s\n", strings.Join(appSessionIDs, ", "))
+	}
+	fmt.Printf("  Expires At:      %s\n", state.ExpiresAt.Format("2006-01-02 15:04:05"))
+}
+
+func (o *Operator) listAppSessionKeys(ctx context.Context, wallet string) {
+	states, err := o.client.GetLastAppKeyStates(ctx, wallet, nil)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to get app session keys: %v\n", err)
+		return
+	}
+
+	fmt.Printf("App Session Keys for %s (%d)\n", wallet, len(states))
+	fmt.Println("===========================================")
+	if len(states) == 0 {
+		fmt.Println("No active app session keys found")
+		return
+	}
+
+	for _, state := range states {
+		fmt.Printf("\n- Session Key: %s\n", state.SessionKey)
+		fmt.Printf("  Version:         %d\n", state.Version)
+		if len(state.ApplicationIDs) > 0 {
+			fmt.Printf("  Application IDs: %s\n", strings.Join(state.ApplicationIDs, ", "))
+		}
+		if len(state.AppSessionIDs) > 0 {
+			fmt.Printf("  Session IDs:     %s\n", strings.Join(state.AppSessionIDs, ", "))
+		}
+		fmt.Printf("  Expires At:      %s\n", state.ExpiresAt.Format("2006-01-02 15:04:05"))
 	}
 }
 

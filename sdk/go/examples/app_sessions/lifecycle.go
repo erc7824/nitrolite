@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/app"
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/sign"
 	sdk "github.com/erc7824/nitrolite/sdk/go"
 	"github.com/shopspring/decimal"
@@ -48,6 +49,16 @@ func main() {
 		log.Fatalf("Invalid wallet 3 private key: %v", err)
 	}
 
+	channel1Signer, err := core.NewChannelDefaultSigner(wallet1Signer)
+	if err != nil {
+		log.Fatalf("Failed to create channel signer for wallet 1: %v", err)
+	}
+
+	channel2Signer, err := core.NewChannelDefaultSigner(wallet2Signer)
+	if err != nil {
+		log.Fatalf("Failed to create channel signer for wallet 2: %v", err)
+	}
+
 	// Extract wallet addresses
 	wallet1Address := wallet1Signer.PublicKey().Address().String() // 0x053aEAD7d3eebE4359300fDE849bCD9E77384989
 	wallet2Address := wallet2Signer.PublicKey().Address().String() // 0x2BfA10aAd64Ae0F7855f54f27117Fcc9C61C6770
@@ -60,7 +71,7 @@ func main() {
 	fmt.Println("------------------------")
 
 	// Create SDK clients (in a real app, these would be separate instances)
-	wallet1Client, err := sdk.NewClient(wsURL, wallet1Signer, wallet1Signer)
+	wallet1Client, err := sdk.NewClient(wsURL, channel1Signer, wallet1Signer)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -116,7 +127,7 @@ func main() {
 	// --- 3. Create App Session 2 (Multi-Party: Wallet 2 & 3) ---
 	fmt.Println("=== Step 3: Creating App Session 2 (Wallet 2 & 3) ===")
 
-	wallet2Client, err := sdk.NewClient(wsURL, wallet2Signer, wallet2Signer)
+	wallet2Client, err := sdk.NewClient(wsURL, channel2Signer, wallet2Signer)
 	if err != nil {
 		log.Fatal(err)
 	}

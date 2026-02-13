@@ -12,16 +12,17 @@ import (
 // databaseChannelToCore converts database.Channel to core.Channel
 func databaseChannelToCore(dbChannel *Channel) *core.Channel {
 	return &core.Channel{
-		ChannelID:          dbChannel.ChannelID,
-		UserWallet:         dbChannel.UserWallet,
-		Type:               dbChannel.Type,
-		BlockchainID:       dbChannel.BlockchainID,
-		TokenAddress:       dbChannel.Token,
-		ChallengeDuration:  dbChannel.ChallengeDuration,
-		ChallengeExpiresAt: dbChannel.ChallengeExpiresAt,
-		Nonce:              dbChannel.Nonce,
-		Status:             dbChannel.Status,
-		StateVersion:       dbChannel.StateVersion,
+		ChannelID:             dbChannel.ChannelID,
+		UserWallet:            dbChannel.UserWallet,
+		Type:                  dbChannel.Type,
+		BlockchainID:          dbChannel.BlockchainID,
+		TokenAddress:          dbChannel.Token,
+		ApprovedSigValidators: dbChannel.ApprovedSigValidators,
+		ChallengeDuration:     dbChannel.ChallengeDuration,
+		ChallengeExpiresAt:    dbChannel.ChallengeExpiresAt,
+		Nonce:                 dbChannel.Nonce,
+		Status:                dbChannel.Status,
+		StateVersion:          dbChannel.StateVersion,
 	}
 }
 

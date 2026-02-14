@@ -1,11 +1,8 @@
 import {
     Account,
     Address,
-    Chain,
     ParseAccount,
     SimulateContractReturnType,
-    Transport,
-    WalletClient,
     zeroAddress,
 } from 'viem';
 import { ContractAddresses } from '../abis';
@@ -41,7 +38,6 @@ export interface PreparerDependencies {
     erc20Service: Erc20Service;
     addresses: ContractAddresses;
     account: ParseAccount<Account>;
-    walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
     stateSigner: StateSigner;
     challengeDuration: bigint;
     chainId: number;

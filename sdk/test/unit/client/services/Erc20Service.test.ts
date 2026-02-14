@@ -17,6 +17,7 @@ describe('Erc20Service', () => {
         mockPublicClient = {
             readContract: jest.fn(),
             simulateContract: jest.fn(),
+            waitForTransactionReceipt: jest.fn((_: any) => ({ status: 'success' })),
         };
         mockWalletClient = {
             writeContract: jest.fn(),
@@ -120,9 +121,9 @@ describe('Erc20Service', () => {
             expect(result).toBe('0xhash');
         });
 
-        test('should throw WalletClientRequiredError if walletClient missing', async () => {
+        test('should throw ContractWriterRequiredError if walletClient missing', async () => {
             const svc = new Erc20Service(mockPublicClient as any, undefined, account);
-            await expect(svc.approve(tokenAddress, spender, 123n)).rejects.toThrow(Errors.WalletClientRequiredError);
+            await expect(svc.approve(tokenAddress, spender, 123n)).rejects.toThrow(Errors.ContractWriterRequiredError);
         });
 
         test('should throw TransactionError on error', async () => {

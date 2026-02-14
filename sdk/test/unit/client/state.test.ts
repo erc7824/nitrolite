@@ -34,7 +34,10 @@ describe('_prepareAndSignInitialState', () => {
 
     beforeEach(() => {
         deps = {
-            account: { address: '0xOWNER' as Hex },
+            account: { 
+                address: '0xOWNER' as Hex, 
+                signMessage: stateSigner.signRawMessage,
+            },
             stateSigner,
             walletClient: {
                 account: { address: '0xWALLET' as Hex },
@@ -49,7 +52,7 @@ describe('_prepareAndSignInitialState', () => {
         };
 
         defaultChannel = {
-            participants: [deps.account.address, guestAddress],
+            participants: ['0xWALLET', guestAddress],
             adjudicator: adjudicatorAddress,
             challenge: challengeDuration,
             nonce: 999n,
@@ -90,16 +93,13 @@ describe('_prepareAndSignInitialState', () => {
             sigs: ['accSig', '0xSRVSIG'],
         });
         // Signs the state
-        expect(stateSigner.signState).toHaveBeenCalledWith(
-            'cid',
-            {
-                data: '0xcustomData',
-                intent: StateIntent.INITIALIZE,
-                allocations: expect.any(Array),
-                version: 0n,
-                sigs: [],
-            }
-        );
+        expect(stateSigner.signState).toHaveBeenCalledWith('cid', {
+            data: '0xcustomData',
+            intent: StateIntent.INITIALIZE,
+            allocations: expect.any(Array),
+            version: 0n,
+            sigs: [],
+        });
     });
 
     test('throws if no adjudicator', async () => {
@@ -205,16 +205,13 @@ describe('_prepareAndSignFinalState', () => {
             version,
             sigs: ['accSig', 'srvSig'],
         });
-        expect(stateSigner.signState).toHaveBeenCalledWith(
-            'cid',
-            {
-                data: 'finalData',
-                intent: StateIntent.FINALIZE,
-                allocations,
-                version,
-                sigs: [],
-            }
-        );
+        expect(stateSigner.signState).toHaveBeenCalledWith('cid', {
+            data: 'finalData',
+            intent: StateIntent.FINALIZE,
+            allocations,
+            version,
+            sigs: [],
+        });
     });
 
     test('throws if no stateData', async () => {

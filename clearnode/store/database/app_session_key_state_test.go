@@ -52,7 +52,9 @@ func TestDBStore_StoreAppSessionKeyState(t *testing.T) {
 			UserSig:        "0xsig123",
 		}
 
-		err := store.StoreAppSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		})
 		require.NoError(t, err)
 
 		// Verify via GetLastAppSessionKeyState
@@ -85,7 +87,9 @@ func TestDBStore_StoreAppSessionKeyState(t *testing.T) {
 			UserSig:        "0xsig123",
 		}
 
-		err := store.StoreAppSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		})
 		require.NoError(t, err)
 
 		result, err := store.GetLastAppSessionKeyState(testUser1, testSessionKey)
@@ -113,7 +117,9 @@ func TestDBStore_StoreAppSessionKeyState(t *testing.T) {
 			UserSig:        "0xsig123",
 		}
 
-		err := store.StoreAppSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		})
 		require.NoError(t, err)
 
 		result, err := store.GetLastAppSessionKeyState(testUser1, testSessionKey)
@@ -140,7 +146,9 @@ func TestDBStore_StoreAppSessionKeyState(t *testing.T) {
 			UserSig:        "0xsig123",
 		}
 
-		err := store.StoreAppSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		})
 		require.NoError(t, err)
 
 		result, err := store.GetLastAppSessionKeyState(testUser1, testSessionKey)
@@ -166,7 +174,9 @@ func TestDBStore_StoreAppSessionKeyState(t *testing.T) {
 			UserSig:        "0xsig",
 		}
 
-		err := store.StoreAppSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		})
 		require.NoError(t, err)
 
 		// Query with mixed case - should still find it
@@ -193,11 +203,15 @@ func TestDBStore_StoreAppSessionKeyState(t *testing.T) {
 			UserSig:     "0xsig123",
 		}
 
-		err := store.StoreAppSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		})
 		require.NoError(t, err)
 
 		// Same user, session key, and version should fail
-		err = store.StoreAppSessionKeyState(state)
+		err = store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		})
 		assert.Error(t, err)
 	})
 }
@@ -217,7 +231,9 @@ func TestDBStore_GetLastAppSessionKeyState(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v1",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state1)
+		}))
 
 		// Store version 2
 		state2 := app.AppSessionKeyStateV1{
@@ -227,7 +243,9 @@ func TestDBStore_GetLastAppSessionKeyState(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v2",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state2)
+		}))
 
 		result, err := store.GetLastAppSessionKeyState(testUser1, testSessionKey)
 		require.NoError(t, err)
@@ -261,28 +279,20 @@ func TestDBStore_GetLastAppSessionKeyState(t *testing.T) {
 			ExpiresAt:   time.Now().Add(-1 * time.Hour), // Expired
 			UserSig:     "0xsig123",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		}))
 
 		result, err := store.GetLastAppSessionKeyState(testUser1, testSessionKey)
 		require.NoError(t, err)
 		assert.Nil(t, result)
 	})
 
-	t.Run("Ignores expired versions and returns latest non-expired", func(t *testing.T) {
+	t.Run("Latest version expired returns nil", func(t *testing.T) {
 		db, cleanup := SetupTestDB(t)
 		defer cleanup()
 
 		store := NewDBStore(db)
-
-		// Store expired version 2 (higher version but expired)
-		state2 := app.AppSessionKeyStateV1{
-			UserAddress: testUser1,
-			SessionKey:  testSessionKey,
-			Version:     2,
-			ExpiresAt:   time.Now().Add(-1 * time.Hour),
-			UserSig:     "0xsig_v2",
-		}
-		require.NoError(t, store.StoreAppSessionKeyState(state2))
 
 		// Store non-expired version 1
 		state1 := app.AppSessionKeyStateV1{
@@ -292,14 +302,26 @@ func TestDBStore_GetLastAppSessionKeyState(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v1",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state1)
+		}))
 
+		// Store expired version 2 (higher version but expired)
+		state2 := app.AppSessionKeyStateV1{
+			UserAddress: testUser1,
+			SessionKey:  testSessionKey,
+			Version:     2,
+			ExpiresAt:   time.Now().Add(-1 * time.Hour),
+			UserSig:     "0xsig_v2",
+		}
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state2)
+		}))
+
+		// Head is now version 2 (expired), so GetLast should return nil
 		result, err := store.GetLastAppSessionKeyState(testUser1, testSessionKey)
 		require.NoError(t, err)
-		require.NotNil(t, result)
-
-		assert.Equal(t, uint64(1), result.Version)
-		assert.Equal(t, "0xsig_v1", result.UserSig)
+		assert.Nil(t, result)
 	})
 }
 
@@ -317,7 +339,9 @@ func TestDBStore_GetLastAppSessionKeyVersion(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v1",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state1)
+		}))
 
 		state2 := app.AppSessionKeyStateV1{
 			UserAddress: testUser1,
@@ -326,7 +350,9 @@ func TestDBStore_GetLastAppSessionKeyVersion(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v5",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state2)
+		}))
 
 		version, err := store.GetLastAppSessionKeyVersion(testUser1, testSessionKey)
 		require.NoError(t, err)
@@ -357,7 +383,9 @@ func TestDBStore_GetLastAppSessionKeyVersion(t *testing.T) {
 			ExpiresAt:   time.Now().Add(-1 * time.Hour),
 			UserSig:     "0xsig",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		}))
 
 		version, err := store.GetLastAppSessionKeyVersion(testUser1, testSessionKey)
 		require.NoError(t, err)
@@ -381,7 +409,9 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsigA1",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateA1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateA1)
+		}))
 
 		stateA2 := app.AppSessionKeyStateV1{
 			UserAddress:    testUser1,
@@ -391,7 +421,9 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsigA2",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateA2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateA2)
+		}))
 
 		// Session key B: version 1
 		stateB1 := app.AppSessionKeyStateV1{
@@ -402,7 +434,9 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsigB1",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateB1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateB1)
+		}))
 
 		results, err := store.GetLastAppSessionKeyStates(testUser1, nil)
 		require.NoError(t, err)
@@ -441,7 +475,9 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigA",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateA))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateA)
+		}))
 
 		stateB := app.AppSessionKeyStateV1{
 			UserAddress: testUser1,
@@ -450,7 +486,9 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigB",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateB))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateB)
+		}))
 
 		sessionKey := testKeyA
 		results, err := store.GetLastAppSessionKeyStates(testUser1, &sessionKey)
@@ -474,7 +512,9 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigA",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateA))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateA)
+		}))
 
 		// Expired key
 		stateB := app.AppSessionKeyStateV1{
@@ -484,7 +524,9 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(-1 * time.Hour),
 			UserSig:     "0xsigB",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateB))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateB)
+		}))
 
 		results, err := store.GetLastAppSessionKeyStates(testUser1, nil)
 		require.NoError(t, err)
@@ -517,7 +559,9 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig1",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state1)
+		}))
 
 		state2 := app.AppSessionKeyStateV1{
 			UserAddress: testUser2,
@@ -526,7 +570,9 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig2",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state2)
+		}))
 
 		results, err := store.GetLastAppSessionKeyStates(testUser1, nil)
 		require.NoError(t, err)
@@ -552,7 +598,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsig",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		}))
 
 		// Retrieve the parent state's generated ID
 		var parentState AppSessionKeyStateV1
@@ -598,7 +646,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsig_v1",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state1)
+		}))
 
 		// Version 2: authorized for app2, app3 and sess2 (completely different set)
 		state2 := app.AppSessionKeyStateV1{
@@ -610,7 +660,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsig_v2",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state2)
+		}))
 
 		// Get both parent IDs
 		var parentV1, parentV2 AppSessionKeyStateV1
@@ -670,7 +722,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsigA",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateA))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateA)
+		}))
 
 		// Key B with app2 and app3
 		stateB := app.AppSessionKeyStateV1{
@@ -682,7 +736,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsigB",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateB))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateB)
+		}))
 
 		// Retrieve both states and verify no cross-contamination
 		resultA, err := store.GetLastAppSessionKeyState(testUser1, testKeyA)
@@ -719,7 +775,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsigA",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateA))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateA)
+		}))
 
 		// Key B: 1 app, 2 sessions
 		stateB := app.AppSessionKeyStateV1{
@@ -731,7 +789,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsigB",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateB))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateB)
+		}))
 
 		// GetLastAppSessionKeyStates returns both — verify preloaded relations are correct
 		results, err := store.GetLastAppSessionKeyStates(testUser1, nil)
@@ -778,7 +838,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			UserSig:        "0xsig",
 		}
 
-		err := store.StoreAppSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		})
 		assert.Error(t, err)
 	})
 
@@ -797,7 +859,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			UserSig:       "0xsig",
 		}
 
-		err := store.StoreAppSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		})
 		assert.Error(t, err)
 	})
 
@@ -816,7 +880,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsigA",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateA))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateA)
+		}))
 
 		// Key B also authorized for app1 (same app, different session key)
 		stateB := app.AppSessionKeyStateV1{
@@ -827,7 +893,9 @@ func TestDBStore_AppSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsigB",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(stateB))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(stateB)
+		}))
 
 		resultA, err := store.GetLastAppSessionKeyState(testUser1, testKeyA)
 		require.NoError(t, err)
@@ -874,7 +942,9 @@ func TestDBStore_GetAppSessionKeyOwner(t *testing.T) {
 			ExpiresAt:     time.Now().Add(24 * time.Hour),
 			UserSig:       "0xsig123",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		}))
 
 		owner, err := store.GetAppSessionKeyOwner(testSessionKey, testSess1)
 		require.NoError(t, err)
@@ -913,7 +983,9 @@ func TestDBStore_GetAppSessionKeyOwner(t *testing.T) {
 			ExpiresAt:      time.Now().Add(24 * time.Hour),
 			UserSig:        "0xsig123",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		}))
 
 		owner, err := store.GetAppSessionKeyOwner(testSessionKey, testSess1)
 		require.NoError(t, err)
@@ -963,7 +1035,9 @@ func TestDBStore_GetAppSessionKeyOwner(t *testing.T) {
 			ExpiresAt:     time.Now().Add(-1 * time.Hour), // Expired
 			UserSig:       "0xsig123",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state)
+		}))
 
 		_, err := store.GetAppSessionKeyOwner(testSessionKey, testSess1)
 		assert.Error(t, err)
@@ -1002,7 +1076,9 @@ func TestDBStore_GetAppSessionKeyOwner(t *testing.T) {
 			ExpiresAt:     time.Now().Add(24 * time.Hour),
 			UserSig:       "0xsig_v1",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state1)
+		}))
 
 		// Store version 2 with the app session ID
 		state2 := app.AppSessionKeyStateV1{
@@ -1013,7 +1089,9 @@ func TestDBStore_GetAppSessionKeyOwner(t *testing.T) {
 			ExpiresAt:     time.Now().Add(24 * time.Hour),
 			UserSig:       "0xsig_v2",
 		}
-		require.NoError(t, store.StoreAppSessionKeyState(state2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreAppSessionKeyState(state2)
+		}))
 
 		owner, err := store.GetAppSessionKeyOwner(testSessionKey, testSess1)
 		require.NoError(t, err)

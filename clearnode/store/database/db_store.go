@@ -33,6 +33,7 @@ func (s *DBStore) ExecuteInTransaction(txFunc StoreTxHandler) error {
 }
 
 // GetUserBalances retrieves the balances for a user's wallet.
+// This method reads directly from channel_state_heads for O(1) performance.
 func (s *DBStore) GetUserBalances(wallet string) ([]core.BalanceEntry, error) {
 	wallet = strings.ToLower(wallet)
 
@@ -42,28 +43,14 @@ func (s *DBStore) GetUserBalances(wallet string) ([]core.BalanceEntry, error) {
 	}
 	var balanceEntries []balanceEntry
 
-	// Get the latest state for each asset (highest epoch and version)
-	// For each asset, find the state with max epoch, and for that epoch, max version
-	err := s.db.Raw(`
-		SELECT cs.asset, cs.home_user_balance
-		FROM channel_states cs
-		INNER JOIN (
-			SELECT asset, MAX(epoch) as max_epoch
-			FROM channel_states
-			WHERE user_wallet = ?
-			GROUP BY asset
-		) max_e ON cs.asset = max_e.asset AND cs.epoch = max_e.max_epoch
-		INNER JOIN (
-			SELECT asset, epoch, MAX(version) as max_version
-			FROM channel_states
-			WHERE user_wallet = ?
-			GROUP BY asset, epoch
-		) max_v ON cs.asset = max_v.asset AND cs.epoch = max_v.epoch AND cs.version = max_v.max_version
-		WHERE cs.user_wallet = ?
-	`, wallet, wallet, wallet).Scan(&balanceEntries).Error
+	// Simple query on head table - one row per asset
+	err := s.db.Table("channel_state_heads").
+		Select("asset, home_user_balance").
+		Where("user_wallet = ?", wallet).
+		Scan(&balanceEntries).Error
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user states: %w", err)
+		return nil, fmt.Errorf("failed to get user balances: %w", err)
 	}
 
 	result := make([]core.BalanceEntry, 0, len(balanceEntries))
@@ -95,26 +82,34 @@ func (s *DBStore) EnsureNoOngoingStateTransitions(wallet, asset string) error {
 	type versionCheck struct {
 		TransitionType       core.TransitionType
 		StateVersion         uint64
+		LastSignedStateID    *string
 		HomeChannelVersion   *uint64
 		EscrowChannelVersion *uint64
 	}
 
 	var result versionCheck
+
+	// Read from head table with left join to channels
+	// If head is unsigned, use last_signed_state_id to get the version from history
 	err := s.db.Raw(`
 		SELECT
-			s.transition_type as transition_type,
-			s.version as state_version,
+			CASE
+				WHEN h.user_sig IS NOT NULL AND h.node_sig IS NOT NULL
+				THEN h.transition_type
+				ELSE (SELECT transition_type FROM channel_states WHERE id = h.last_signed_state_id)
+			END as transition_type,
+			CASE
+				WHEN h.user_sig IS NOT NULL AND h.node_sig IS NOT NULL
+				THEN h.version
+				ELSE (SELECT version FROM channel_states WHERE id = h.last_signed_state_id)
+			END as state_version,
+			h.last_signed_state_id,
 			hc.state_version as home_channel_version,
 			ec.state_version as escrow_channel_version
-		FROM channel_states s
-		LEFT JOIN channels hc ON hc.channel_id = s.home_channel_id
-		LEFT JOIN channels ec ON ec.channel_id = s.escrow_channel_id
-		WHERE s.user_wallet = ?
-			AND s.asset = ?
-			AND s.user_sig IS NOT NULL
-			AND s.node_sig IS NOT NULL
-		ORDER BY s.epoch DESC, s.version DESC
-		LIMIT 1
+		FROM channel_state_heads h
+		LEFT JOIN channels hc ON hc.channel_id = h.home_channel_id
+		LEFT JOIN channels ec ON ec.channel_id = h.escrow_channel_id
+		WHERE h.user_wallet = ? AND h.asset = ?
 	`, wallet, asset).Scan(&result).Error
 
 	if err != nil {

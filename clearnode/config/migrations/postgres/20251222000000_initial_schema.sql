@@ -64,6 +64,10 @@ CREATE INDEX idx_channel_states_epoch_version ON channel_states(epoch DESC, vers
 CREATE INDEX idx_channel_states_home_channel_id ON channel_states(home_channel_id) WHERE home_channel_id IS NOT NULL;
 CREATE INDEX idx_channel_states_escrow_channel_id ON channel_states(escrow_channel_id) WHERE escrow_channel_id IS NOT NULL;
 
+-- Add uniqueness constraint for race condition prevention (seatbelt)
+ALTER TABLE channel_states ADD CONSTRAINT uq_channel_states_user_asset_epoch_version
+    UNIQUE (user_wallet, asset, epoch, version);
+
 -- Transactions table: Records all transactions with optional state references
 CREATE TABLE transactions (
     id CHAR(66) PRIMARY KEY, -- Deterministic hash
@@ -222,7 +226,115 @@ CREATE TABLE channel_session_key_assets_v1 (
 
 CREATE INDEX idx_channel_session_key_assets_v1_asset ON channel_session_key_assets_v1(asset);
 
+-- ====================================================================================
+-- PHASE 1 OPTIMIZATION: HEAD TABLES FOR O(1) READS AND PROPER LOCKING
+-- ====================================================================================
+
+-- Channel State Heads: mirrors channel_states with last_signed_state_id tracking
+-- Provides O(1) latest state reads and single row to lock per (user_wallet, asset) key
+CREATE TABLE channel_state_heads (
+    user_wallet CHAR(42) NOT NULL,
+    asset VARCHAR(20) NOT NULL,
+
+    -- Mirror all fields from channel_states for complete head row
+    epoch NUMERIC(20,0) NOT NULL DEFAULT 0,
+    version NUMERIC(20,0) NOT NULL DEFAULT 0,
+
+    transition_type SMALLINT NOT NULL DEFAULT 0,
+    transition_tx_id CHAR(66),
+    transition_account_id VARCHAR(66),
+    transition_amount NUMERIC(78, 18) NOT NULL DEFAULT 0,
+
+    -- Optional channel references
+    home_channel_id CHAR(66),
+    escrow_channel_id CHAR(66),
+
+    -- Home Channel balances and flows
+    home_user_balance NUMERIC(78, 18) NOT NULL DEFAULT 0,
+    home_user_net_flow NUMERIC(78, 18) NOT NULL DEFAULT 0,
+    home_node_balance NUMERIC(78, 18) NOT NULL DEFAULT 0,
+    home_node_net_flow NUMERIC(78, 18) NOT NULL DEFAULT 0,
+
+    -- Escrow Channel balances and flows
+    escrow_user_balance NUMERIC(78, 18) NOT NULL DEFAULT 0,
+    escrow_user_net_flow NUMERIC(78, 18) NOT NULL DEFAULT 0,
+    escrow_node_balance NUMERIC(78, 18) NOT NULL DEFAULT 0,
+    escrow_node_net_flow NUMERIC(78, 18) NOT NULL DEFAULT 0,
+
+    user_sig TEXT,
+    node_sig TEXT,
+
+    -- References to history
+    history_id CHAR(66), -- References the current head row in channel_states
+    last_signed_state_id CHAR(66), -- References the most recent fully signed state in history
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (user_wallet, asset)
+);
+
+-- Indexes for channel_state_heads
+CREATE INDEX idx_csh_home_channel ON channel_state_heads(home_channel_id) WHERE home_channel_id IS NOT NULL;
+CREATE INDEX idx_csh_escrow_channel ON channel_state_heads(escrow_channel_id) WHERE escrow_channel_id IS NOT NULL;
+CREATE INDEX idx_csh_last_signed ON channel_state_heads(last_signed_state_id) WHERE last_signed_state_id IS NOT NULL;
+
+-- App Session Key Heads: mirrors app_session_key_states_v1
+-- Provides O(1) latest session key reads and single row to lock per (user_address, session_key) key
+CREATE TABLE app_session_key_heads_v1 (
+    user_address CHAR(42) NOT NULL,
+    session_key CHAR(42) NOT NULL,
+
+    -- Mirror all fields from app_session_key_states_v1
+    version NUMERIC(20,0) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    user_sig TEXT NOT NULL,
+
+    -- Reference to history
+    history_id CHAR(66), -- References the current head row in app_session_key_states_v1
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (user_address, session_key)
+);
+
+-- Index for app_session_key_heads_v1
+CREATE INDEX idx_askh_user_expires ON app_session_key_heads_v1(user_address, expires_at);
+
+-- Channel Session Key Heads: mirrors channel_session_key_states_v1
+-- Provides O(1) latest session key reads and single row to lock per (user_address, session_key) key
+CREATE TABLE channel_session_key_heads_v1 (
+    user_address CHAR(42) NOT NULL,
+    session_key CHAR(42) NOT NULL,
+
+    -- Mirror all fields from channel_session_key_states_v1
+    version NUMERIC(20,0) NOT NULL,
+    metadata_hash CHAR(66) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    user_sig TEXT NOT NULL,
+
+    -- Reference to history
+    history_id CHAR(66), -- References the current head row in channel_session_key_states_v1
+
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (user_address, session_key)
+);
+
+-- Index for channel_session_key_heads_v1
+CREATE INDEX idx_cskh_user_expires ON channel_session_key_heads_v1(user_address, expires_at);
+
 -- +goose Down
+-- Drop head tables first (Phase 1 optimization)
+DROP INDEX IF EXISTS idx_cskh_user_expires;
+DROP TABLE IF EXISTS channel_session_key_heads_v1;
+DROP INDEX IF EXISTS idx_askh_user_expires;
+DROP TABLE IF EXISTS app_session_key_heads_v1;
+DROP INDEX IF EXISTS idx_csh_last_signed;
+DROP INDEX IF EXISTS idx_csh_escrow_channel;
+DROP INDEX IF EXISTS idx_csh_home_channel;
+DROP TABLE IF EXISTS channel_state_heads;
+
+-- Drop session key tables
 DROP INDEX IF EXISTS idx_channel_session_key_assets_v1_asset;
 DROP TABLE IF EXISTS channel_session_key_assets_v1;
 DROP INDEX IF EXISTS idx_channel_session_key_states_v1_expires;
@@ -262,6 +374,7 @@ DROP INDEX IF EXISTS idx_channel_states_epoch_version;
 DROP INDEX IF EXISTS idx_channel_states_user_wallet_asset;
 DROP INDEX IF EXISTS idx_channel_states_asset;
 DROP INDEX IF EXISTS idx_channel_states_user_wallet;
+ALTER TABLE IF EXISTS channel_states DROP CONSTRAINT IF EXISTS uq_channel_states_user_asset_epoch_version;
 DROP TABLE IF EXISTS channel_states;
 DROP INDEX IF EXISTS idx_channels_status;
 DROP INDEX IF EXISTS idx_channels_user_wallet;

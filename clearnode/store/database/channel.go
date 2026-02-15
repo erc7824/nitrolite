@@ -77,13 +77,13 @@ func (s *DBStore) GetChannelByID(channelID string) (*core.Channel, error) {
 }
 
 // GetActiveHomeChannel retrieves the active home channel for a user's wallet and asset.
+// Uses head table for O(1) lookup instead of scanning history.
 func (s *DBStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, error) {
 	var dbChannel Channel
 	err := s.db.
-		Joins("JOIN channel_states ON channel_states.home_channel_id = channels.channel_id").
-		Where("channel_states.user_wallet = ? AND channel_states.asset = ?", strings.ToLower(wallet), asset).
+		Joins("JOIN channel_state_heads ON channel_state_heads.home_channel_id = channels.channel_id").
+		Where("channel_state_heads.user_wallet = ? AND channel_state_heads.asset = ?", strings.ToLower(wallet), asset).
 		Where("channels.status <= ? AND channels.type = ?", core.ChannelStatusOpen, core.ChannelTypeHome).
-		Order("channel_states.epoch DESC, channel_states.version DESC").
 		First(&dbChannel).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -97,14 +97,15 @@ func (s *DBStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, err
 
 // CheckOpenChannel verifies if a user has an active channel for the given asset
 // and returns the approved signature validators if such a channel exists.
+// Uses head table for O(1) lookup.
 func (s *DBStore) CheckOpenChannel(wallet, asset string) (string, bool, error) {
 	var approvedSigValidators string
 	result := s.db.Raw(`
 		SELECT c.approved_sig_validators
-		FROM channel_states s
-		INNER JOIN channels c ON c.channel_id = s.home_channel_id
-		WHERE s.user_wallet = ?
-			AND s.asset = ?
+		FROM channel_state_heads h
+		INNER JOIN channels c ON c.channel_id = h.home_channel_id
+		WHERE h.user_wallet = ?
+			AND h.asset = ?
 			AND c.status <= ?
 			AND c.type = ?
 		LIMIT 1

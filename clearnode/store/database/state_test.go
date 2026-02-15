@@ -47,7 +47,13 @@ func TestDBStore_StoreUserState(t *testing.T) {
 			NodeSig: &nodeSig,
 		}
 
-		err := store.StoreUserState(state)
+		// StoreUserState must be called within a transaction
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			// GetLastUserState first to lock the head
+			_, err := txStore.GetLastUserState("0xuser123", "USDC", false)
+			require.NoError(t, err)
+			return txStore.StoreUserState(state)
+		})
 		require.NoError(t, err)
 
 		// Verify state was stored
@@ -56,7 +62,7 @@ func TestDBStore_StoreUserState(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "state123", dbState.ID)
-		assert.Equal(t, "USDC", dbState.Asset)
+		assert.Equal(t, "usdc", dbState.Asset)
 		assert.Equal(t, "0xuser123", dbState.UserWallet)
 		assert.Equal(t, uint64(1), dbState.Epoch)
 		assert.Equal(t, uint64(1), dbState.Version)
@@ -83,7 +89,7 @@ func TestDBStore_StoreUserState(t *testing.T) {
 			Asset:           "USDC",
 			UserWallet:      "0xuser123",
 			Epoch:           1,
-			Version:         2,
+			Version:         1,
 			HomeChannelID:   &homeChannelID,
 			EscrowChannelID: &escrowChannelID,
 			Transition: core.Transition{
@@ -107,7 +113,12 @@ func TestDBStore_StoreUserState(t *testing.T) {
 			NodeSig: &nodeSig,
 		}
 
-		err := store.StoreUserState(state)
+		// StoreUserState must be called within a transaction
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			_, err := txStore.GetLastUserState("0xuser123", "USDC", false)
+			require.NoError(t, err)
+			return txStore.StoreUserState(state)
+		})
 		require.NoError(t, err)
 
 		// Verify state was stored
@@ -144,11 +155,18 @@ func TestDBStore_StoreUserState(t *testing.T) {
 			},
 		}
 
-		err := store.StoreUserState(state)
+		// Store first time
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			_, err := txStore.GetLastUserState("0xuser123", "USDC", false)
+			require.NoError(t, err)
+			return txStore.StoreUserState(state)
+		})
 		require.NoError(t, err)
 
 		// Try to store again with same ID
-		err = store.StoreUserState(state)
+		err = store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreUserState(state)
+		})
 		assert.Error(t, err)
 	})
 }
@@ -206,8 +224,22 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, store.StoreUserState(state1))
-		require.NoError(t, store.StoreUserState(state2))
+		// Store states in transaction
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			_, err := txStore.GetLastUserState("0xuser123", "USDC", false)
+			if err != nil {
+				return err
+			}
+			if err := txStore.StoreUserState(state1); err != nil {
+				return err
+			}
+			_, err = txStore.GetLastUserState("0xuser123", "USDC", false)
+			if err != nil {
+				return err
+			}
+			return txStore.StoreUserState(state2)
+		})
+		require.NoError(t, err)
 
 		// Get last state
 		result, err := store.GetLastUserState("0xuser123", "USDC", false)

@@ -40,7 +40,9 @@ func TestDBStore_StoreChannelSessionKeyState(t *testing.T) {
 			UserSig:     "0xsig123",
 		}
 
-		err := store.StoreChannelSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		})
 		require.NoError(t, err)
 
 		// Verify via GetLastChannelSessionKeyStates
@@ -72,7 +74,9 @@ func TestDBStore_StoreChannelSessionKeyState(t *testing.T) {
 			UserSig:     "0xsig123",
 		}
 
-		err := store.StoreChannelSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		})
 		require.NoError(t, err)
 
 		results, err := store.GetLastChannelSessionKeyStates(testUser1, nil)
@@ -96,7 +100,9 @@ func TestDBStore_StoreChannelSessionKeyState(t *testing.T) {
 			UserSig:     "0xsig",
 		}
 
-		err := store.StoreChannelSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		})
 		require.NoError(t, err)
 
 		// Query with mixed case - should still find it
@@ -122,11 +128,15 @@ func TestDBStore_StoreChannelSessionKeyState(t *testing.T) {
 			UserSig:     "0xsig123",
 		}
 
-		err := store.StoreChannelSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		})
 		require.NoError(t, err)
 
 		// Same user, session key, and version should fail
-		err = store.StoreChannelSessionKeyState(state)
+		err = store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		})
 		assert.Error(t, err)
 	})
 
@@ -144,7 +154,9 @@ func TestDBStore_StoreChannelSessionKeyState(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v1",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state1)
+		}))
 
 		state2 := core.ChannelSessionKeyStateV1{
 			UserAddress: testUser1,
@@ -154,7 +166,9 @@ func TestDBStore_StoreChannelSessionKeyState(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v2",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state2)
+		}))
 
 		// Should return only the latest version
 		results, err := store.GetLastChannelSessionKeyStates(testUser1, nil)
@@ -179,7 +193,9 @@ func TestDBStore_StoreChannelSessionKeyState(t *testing.T) {
 			UserSig:     "0xsig",
 		}
 
-		err := store.StoreChannelSessionKeyState(state)
+		err := store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		})
 		assert.Error(t, err)
 	})
 }
@@ -200,7 +216,9 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigA1",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateA1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateA1)
+		}))
 
 		stateA2 := core.ChannelSessionKeyStateV1{
 			UserAddress: testUser1,
@@ -210,7 +228,9 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigA2",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateA2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateA2)
+		}))
 
 		// Session key B: version 1
 		stateB1 := core.ChannelSessionKeyStateV1{
@@ -221,7 +241,9 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigB1",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateB1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateB1)
+		}))
 
 		results, err := store.GetLastChannelSessionKeyStates(testUser1, nil)
 		require.NoError(t, err)
@@ -260,7 +282,9 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigA",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateA))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateA)
+		}))
 
 		stateB := core.ChannelSessionKeyStateV1{
 			UserAddress: testUser1,
@@ -269,7 +293,9 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigB",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateB))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateB)
+		}))
 
 		sessionKey := testKeyA
 		results, err := store.GetLastChannelSessionKeyStates(testUser1, &sessionKey)
@@ -293,7 +319,9 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigA",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateA))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateA)
+		}))
 
 		// Expired key
 		stateB := core.ChannelSessionKeyStateV1{
@@ -303,7 +331,9 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(-1 * time.Hour),
 			UserSig:     "0xsigB",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateB))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateB)
+		}))
 
 		results, err := store.GetLastChannelSessionKeyStates(testUser1, nil)
 		require.NoError(t, err)
@@ -336,7 +366,9 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig1",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state1)
+		}))
 
 		state2 := core.ChannelSessionKeyStateV1{
 			UserAddress: testUser2,
@@ -345,7 +377,9 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig2",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state2)
+		}))
 
 		results, err := store.GetLastChannelSessionKeyStates(testUser1, nil)
 		require.NoError(t, err)
@@ -369,7 +403,9 @@ func TestDBStore_GetLastChannelSessionKeyVersion(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v1",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state1)
+		}))
 
 		state2 := core.ChannelSessionKeyStateV1{
 			UserAddress: testUser1,
@@ -378,7 +414,9 @@ func TestDBStore_GetLastChannelSessionKeyVersion(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v5",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state2)
+		}))
 
 		version, err := store.GetLastChannelSessionKeyVersion(testUser1, testSessionKey)
 		require.NoError(t, err)
@@ -409,28 +447,20 @@ func TestDBStore_GetLastChannelSessionKeyVersion(t *testing.T) {
 			ExpiresAt:   time.Now().Add(-1 * time.Hour),
 			UserSig:     "0xsig",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		}))
 
 		version, err := store.GetLastChannelSessionKeyVersion(testUser1, testSessionKey)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(0), version)
 	})
 
-	t.Run("Ignores expired versions and returns latest non-expired", func(t *testing.T) {
+	t.Run("Latest version expired returns 0", func(t *testing.T) {
 		db, cleanup := SetupTestDB(t)
 		defer cleanup()
 
 		store := NewDBStore(db)
-
-		// Store expired version 2 (higher version but expired)
-		state2 := core.ChannelSessionKeyStateV1{
-			UserAddress: testUser1,
-			SessionKey:  testSessionKey,
-			Version:     2,
-			ExpiresAt:   time.Now().Add(-1 * time.Hour),
-			UserSig:     "0xsig_v2",
-		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state2))
 
 		// Store non-expired version 1
 		state1 := core.ChannelSessionKeyStateV1{
@@ -440,11 +470,26 @@ func TestDBStore_GetLastChannelSessionKeyVersion(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v1",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state1)
+		}))
 
+		// Store expired version 2 (higher version but expired)
+		state2 := core.ChannelSessionKeyStateV1{
+			UserAddress: testUser1,
+			SessionKey:  testSessionKey,
+			Version:     2,
+			ExpiresAt:   time.Now().Add(-1 * time.Hour),
+			UserSig:     "0xsig_v2",
+		}
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state2)
+		}))
+
+		// Head is now version 2 (expired), so GetLastVersion should return 0
 		version, err := store.GetLastChannelSessionKeyVersion(testUser1, testSessionKey)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(1), version)
+		assert.Equal(t, uint64(0), version)
 	})
 }
 
@@ -474,7 +519,9 @@ func TestDBStore_ValidateChannelSessionKeyForAsset(t *testing.T) {
 			ExpiresAt:   expiresAt,
 			UserSig:     "0xsig123",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		}))
 
 		metadataHash := computeMetadataHash(t, 1, assets, expiresAt)
 
@@ -505,7 +552,9 @@ func TestDBStore_ValidateChannelSessionKeyForAsset(t *testing.T) {
 			ExpiresAt:   expiresAt,
 			UserSig:     "0xsig123",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		}))
 
 		metadataHash := computeMetadataHash(t, 1, assets, expiresAt)
 
@@ -532,7 +581,9 @@ func TestDBStore_ValidateChannelSessionKeyForAsset(t *testing.T) {
 			ExpiresAt:   expiresAt,
 			UserSig:     "0xsig123",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		}))
 
 		wrongHash := "0x0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -558,7 +609,9 @@ func TestDBStore_ValidateChannelSessionKeyForAsset(t *testing.T) {
 			ExpiresAt:   expiresAt,
 			UserSig:     "0xsig123",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		}))
 
 		metadataHash := computeMetadataHash(t, 1, assets, expiresAt)
 
@@ -584,7 +637,9 @@ func TestDBStore_ValidateChannelSessionKeyForAsset(t *testing.T) {
 			ExpiresAt:   expiresAt,
 			UserSig:     "0xsig_v1",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state1)
+		}))
 
 		// Version 2: allows only testAsset2 (removes testAsset1)
 		state2 := core.ChannelSessionKeyStateV1{
@@ -595,7 +650,9 @@ func TestDBStore_ValidateChannelSessionKeyForAsset(t *testing.T) {
 			ExpiresAt:   expiresAt,
 			UserSig:     "0xsig_v2",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state2)
+		}))
 
 		// Use v1 metadata hash with testAsset1 - should fail because v2 is latest
 		metadataHashV1 := computeMetadataHash(t, 1, []string{testAsset1}, expiresAt)
@@ -638,7 +695,9 @@ func TestDBStore_ValidateChannelSessionKeyForAsset(t *testing.T) {
 			ExpiresAt:   expiresAt,
 			UserSig:     "0xsig123",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		}))
 
 		metadataHash := computeMetadataHash(t, 1, assets, expiresAt)
 
@@ -665,7 +724,9 @@ func TestDBStore_ValidateChannelSessionKeyForAsset(t *testing.T) {
 			ExpiresAt:   expiresAt,
 			UserSig:     "0xsig123",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		}))
 
 		metadataHash := computeMetadataHash(t, 1, assets, expiresAt)
 
@@ -696,7 +757,9 @@ func TestDBStore_ChannelSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state)
+		}))
 
 		// Retrieve the parent state's generated ID
 		var parentState ChannelSessionKeyStateV1
@@ -731,7 +794,9 @@ func TestDBStore_ChannelSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v1",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state1))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state1)
+		}))
 
 		// Version 2: authorized for asset2 and asset3 (completely different set)
 		state2 := core.ChannelSessionKeyStateV1{
@@ -742,7 +807,9 @@ func TestDBStore_ChannelSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsig_v2",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(state2))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(state2)
+		}))
 
 		// Get both parent IDs
 		var parentV1, parentV2 ChannelSessionKeyStateV1
@@ -787,7 +854,9 @@ func TestDBStore_ChannelSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigA",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateA))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateA)
+		}))
 
 		// Key B: 1 asset
 		stateB := core.ChannelSessionKeyStateV1{
@@ -798,7 +867,9 @@ func TestDBStore_ChannelSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigB",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateB))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateB)
+		}))
 
 		// GetLastChannelSessionKeyStates returns both — verify preloaded relations are correct
 		results, err := store.GetLastChannelSessionKeyStates(testUser1, nil)
@@ -840,7 +911,9 @@ func TestDBStore_ChannelSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigA",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateA))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateA)
+		}))
 
 		// Key B also authorized for asset1 (same asset, different session key)
 		stateB := core.ChannelSessionKeyStateV1{
@@ -851,7 +924,9 @@ func TestDBStore_ChannelSessionKeyState_ForeignRelations(t *testing.T) {
 			ExpiresAt:   time.Now().Add(24 * time.Hour),
 			UserSig:     "0xsigB",
 		}
-		require.NoError(t, store.StoreChannelSessionKeyState(stateB))
+		require.NoError(t, store.ExecuteInTransaction(func(txStore DatabaseStore) error {
+			return txStore.StoreChannelSessionKeyState(stateB)
+		}))
 
 		results, err := store.GetLastChannelSessionKeyStates(testUser1, nil)
 		require.NoError(t, err)

@@ -35,6 +35,10 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 			},
 		}
 
+		// Lock user state before storing (ensures row exists in user_balances)
+		_, err := store.LockUserState("0xuser123", "USDC")
+		require.NoError(t, err)
+
 		require.NoError(t, store.StoreUserState(state))
 
 		balances, err := store.GetUserBalances("0xuser123")
@@ -86,6 +90,12 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 				NodeNetFlow: decimal.Zero,
 			},
 		}
+
+		// Lock user states before storing (ensures rows exist in user_balances)
+		_, err := store.LockUserState("0xuser123", "USDC")
+		require.NoError(t, err)
+		_, err = store.LockUserState("0xuser123", "ETH")
+		require.NoError(t, err)
 
 		require.NoError(t, store.StoreUserState(state1))
 		require.NoError(t, store.StoreUserState(state2))
@@ -153,6 +163,10 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 			},
 		}
 
+		// Lock user state before storing (ensures row exists in user_balances)
+		_, err := store.LockUserState("0xuser123", "USDC")
+		require.NoError(t, err)
+
 		require.NoError(t, store.StoreUserState(state1))
 		require.NoError(t, store.StoreUserState(state2))
 
@@ -204,6 +218,10 @@ func TestDBStore_GetUserBalances(t *testing.T) {
 				NodeNetFlow: decimal.Zero,
 			},
 		}
+
+		// Lock user state before storing (ensures row exists in user_balances)
+		_, err := store.LockUserState("0xuser123", "USDC")
+		require.NoError(t, err)
 
 		require.NoError(t, store.StoreUserState(state1))
 		require.NoError(t, store.StoreUserState(state2))
@@ -282,9 +300,14 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			UserSig: &userSig,
 			NodeSig: &nodeSig,
 		}
+
+		// Lock user state before storing
+		_, err := store.LockUserState("0xuser123", "USDC")
+		require.NoError(t, err)
+
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
+		err = store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		require.NoError(t, err)
 	})
 
@@ -332,9 +355,14 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			UserSig: &userSig,
 			NodeSig: &nodeSig,
 		}
+
+		// Lock user state before storing
+		_, err := store.LockUserState("0xuser123", "USDC")
+		require.NoError(t, err)
+
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
+		err = store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "home deposit is still ongoing")
 	})
@@ -405,9 +433,14 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			UserSig: &userSig,
 			NodeSig: &nodeSig,
 		}
+
+		// Lock user state before storing
+		_, err := store.LockUserState("0xuser123", "USDC")
+		require.NoError(t, err)
+
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
+		err = store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		require.NoError(t, err)
 	})
 
@@ -477,9 +510,14 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			UserSig: &userSig,
 			NodeSig: &nodeSig,
 		}
+
+		// Lock user state before storing
+		_, err := store.LockUserState("0xuser123", "USDC")
+		require.NoError(t, err)
+
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
+		err = store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mutual lock is still ongoing")
 	})
@@ -536,9 +574,14 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			UserSig: &userSig,
 			NodeSig: &nodeSig,
 		}
+
+		// Lock user state before storing
+		_, err := store.LockUserState("0xuser123", "USDC")
+		require.NoError(t, err)
+
 		require.NoError(t, store.StoreUserState(state))
 
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
+		err = store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		require.NoError(t, err)
 	})
 
@@ -583,10 +626,15 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 			},
 			// No signatures
 		}
+
+		// Lock user state before storing
+		_, err := store.LockUserState("0xuser123", "USDC")
+		require.NoError(t, err)
+
 		require.NoError(t, store.StoreUserState(state))
 
 		// Should not error because there's no signed state
-		err := store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
+		err = store.EnsureNoOngoingStateTransitions("0xuser123", "USDC")
 		require.NoError(t, err)
 	})
 }

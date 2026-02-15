@@ -10,6 +10,20 @@ import (
 	"gorm.io/gorm"
 )
 
+// UserBalance represents aggregated user balance for an asset
+type UserBalance struct {
+	UserWallet string          `gorm:"column:user_wallet;primaryKey;size:42"`
+	Asset      string          `gorm:"column:asset;primaryKey;size:20"`
+	Balance    decimal.Decimal `gorm:"column:balance;type:varchar(78);not null"`
+	CreatedAt  time.Time       `gorm:"column:created_at"`
+	UpdatedAt  time.Time       `gorm:"column:updated_at"`
+}
+
+// TableName specifies the table name for the UserBalance model
+func (UserBalance) TableName() string {
+	return "user_balances"
+}
+
 // State represents an immutable state in the system
 // ID is deterministic: Hash(UserWallet, Asset, CycleIndex, Version)
 type State struct {
@@ -95,52 +109,133 @@ func (s *DBStore) StoreUserState(state core.State) error {
 		return fmt.Errorf("failed to store user state: %w", err)
 	}
 
+	// Update user_balances table with the new balance (entry should already exist from LockUserState)
+	wallet := strings.ToLower(state.UserWallet)
+	balance := dbState.HomeUserBalance
+
+	err = s.db.Model(&UserBalance{}).
+		Where("user_wallet = ? AND asset = ?", wallet, state.Asset).
+		Updates(map[string]interface{}{
+			"balance":    balance,
+			"updated_at": time.Now(),
+		}).Error
+
+	if err != nil {
+		return fmt.Errorf("failed to update user balance: %w", err)
+	}
+
 	return nil
 }
 
 // GetLastStateByChannelID retrieves the most recent state for a given channel.
+// Uses UNION ALL of two indexed queries instead of OR for better performance.
 func (s *DBStore) GetLastStateByChannelID(channelID string, signed bool) (*core.State, error) {
 	channelID = strings.ToLower(channelID)
 
-	var dbState State
-	query := s.db.Table("channel_states AS s").
-		Select("s.*, hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address, ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address").
-		Joins("LEFT JOIN channels AS hc ON s.home_channel_id = hc.channel_id").
-		Joins("LEFT JOIN channels AS ec ON s.escrow_channel_id = ec.channel_id").
-		Where("s.home_channel_id = ? OR s.escrow_channel_id = ?", channelID, channelID)
-
+	signedFilter := ""
 	if signed {
-		query = query.Where("s.user_sig IS NOT NULL AND s.node_sig IS NOT NULL")
+		signedFilter = "AND s.user_sig IS NOT NULL AND s.node_sig IS NOT NULL"
 	}
 
-	err := query.Order("s.epoch DESC, s.version DESC").First(&dbState).Error
+	// Use UNION ALL to leverage separate indexes on home_channel_id and escrow_channel_id
+	// Each branch returns its own best match, then we pick the overall best
+	// Note: We explicitly list columns instead of using s.* to avoid collision with AutoMigrate columns
+	const stateColumns = `s.id, s.asset, s.user_wallet, s.epoch, s.version,
+		s.transition_type, s.transition_tx_id, s.transition_account_id, s.transition_amount,
+		s.home_channel_id, s.escrow_channel_id,
+		s.home_user_balance, s.home_user_net_flow, s.home_node_balance, s.home_node_net_flow,
+		s.escrow_user_balance, s.escrow_user_net_flow, s.escrow_node_balance, s.escrow_node_net_flow,
+		s.user_sig, s.node_sig, s.created_at`
+
+	var state State
+	err := s.db.Raw(fmt.Sprintf(`
+		SELECT * FROM (
+			SELECT %s,
+			       hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address,
+			       ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address
+			FROM channel_states s
+			LEFT JOIN channels hc ON s.home_channel_id = hc.channel_id
+			LEFT JOIN channels ec ON s.escrow_channel_id = ec.channel_id
+			WHERE s.home_channel_id = ? %s
+			ORDER BY s.epoch DESC, s.version DESC
+			LIMIT 1
+		) home_result
+		UNION ALL
+		SELECT * FROM (
+			SELECT %s,
+			       hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address,
+			       ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address
+			FROM channel_states s
+			LEFT JOIN channels hc ON s.home_channel_id = hc.channel_id
+			LEFT JOIN channels ec ON s.escrow_channel_id = ec.channel_id
+			WHERE s.escrow_channel_id = ? %s
+			ORDER BY s.epoch DESC, s.version DESC
+			LIMIT 1
+		) escrow_result
+		ORDER BY epoch DESC, version DESC
+		LIMIT 1
+	`, stateColumns, signedFilter, stateColumns, signedFilter), channelID, channelID).Scan(&state).Error
+
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("failed to get last state by channel ID: %w", err)
 	}
 
-	return databaseStateToCore(&dbState)
+	// Check if no results were found (empty ID means no rows)
+	if state.ID == "" {
+		return nil, nil
+	}
+
+	return databaseStateToCore(&state)
 }
 
 // GetStateByChannelIDAndVersion retrieves a specific state version for a channel.
+// Uses UNION ALL of two indexed queries instead of OR for better performance.
 func (s *DBStore) GetStateByChannelIDAndVersion(channelID string, version uint64) (*core.State, error) {
 	channelID = strings.ToLower(channelID)
 
-	var dbState State
-	err := s.db.Table("channel_states AS s").
-		Select("s.*, hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address, ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address").
-		Joins("LEFT JOIN channels AS hc ON s.home_channel_id = hc.channel_id").
-		Joins("LEFT JOIN channels AS ec ON s.escrow_channel_id = ec.channel_id").
-		Where("(s.home_channel_id = ? OR s.escrow_channel_id = ?) AND s.version = ?", channelID, channelID, version).
-		First(&dbState).Error
+	// Use UNION ALL to leverage separate indexes on home_channel_id and escrow_channel_id
+	// Note: We explicitly list columns instead of using s.* to avoid collision with AutoMigrate columns
+	const stateColumns = `s.id, s.asset, s.user_wallet, s.epoch, s.version,
+		s.transition_type, s.transition_tx_id, s.transition_account_id, s.transition_amount,
+		s.home_channel_id, s.escrow_channel_id,
+		s.home_user_balance, s.home_user_net_flow, s.home_node_balance, s.home_node_net_flow,
+		s.escrow_user_balance, s.escrow_user_net_flow, s.escrow_node_balance, s.escrow_node_net_flow,
+		s.user_sig, s.node_sig, s.created_at`
+
+	var state State
+	err := s.db.Raw(fmt.Sprintf(`
+		SELECT * FROM (
+			SELECT %s,
+			       hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address,
+			       ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address
+			FROM channel_states s
+			LEFT JOIN channels hc ON s.home_channel_id = hc.channel_id
+			LEFT JOIN channels ec ON s.escrow_channel_id = ec.channel_id
+			WHERE s.home_channel_id = ? AND s.version = ?
+			LIMIT 1
+		) home_result
+		UNION ALL
+		SELECT * FROM (
+			SELECT %s,
+			       hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address,
+			       ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address
+			FROM channel_states s
+			LEFT JOIN channels hc ON s.home_channel_id = hc.channel_id
+			LEFT JOIN channels ec ON s.escrow_channel_id = ec.channel_id
+			WHERE s.escrow_channel_id = ? AND s.version = ?
+			LIMIT 1
+		) escrow_result
+		LIMIT 1
+	`, stateColumns, stateColumns), channelID, version, channelID, version).Scan(&state).Error
+
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("failed to get state by channel ID and version: %w", err)
 	}
 
-	return databaseStateToCore(&dbState)
+	// Check if no results were found (empty ID means no rows)
+	if state.ID == "" {
+		return nil, nil
+	}
+
+	return databaseStateToCore(&state)
 }

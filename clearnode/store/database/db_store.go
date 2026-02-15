@@ -3,10 +3,12 @@ package database
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DBStore struct {
@@ -36,45 +38,79 @@ func (s *DBStore) ExecuteInTransaction(txFunc StoreTxHandler) error {
 func (s *DBStore) GetUserBalances(wallet string) ([]core.BalanceEntry, error) {
 	wallet = strings.ToLower(wallet)
 
-	type balanceEntry struct {
-		Asset           string          `gorm:"column:asset"`
-		HomeUserBalance decimal.Decimal `gorm:"column:home_user_balance"`
-	}
-	var balanceEntries []balanceEntry
-
-	// Get the latest state for each asset (highest epoch and version)
-	// For each asset, find the state with max epoch, and for that epoch, max version
-	err := s.db.Raw(`
-		SELECT cs.asset, cs.home_user_balance
-		FROM channel_states cs
-		INNER JOIN (
-			SELECT asset, MAX(epoch) as max_epoch
-			FROM channel_states
-			WHERE user_wallet = ?
-			GROUP BY asset
-		) max_e ON cs.asset = max_e.asset AND cs.epoch = max_e.max_epoch
-		INNER JOIN (
-			SELECT asset, epoch, MAX(version) as max_version
-			FROM channel_states
-			WHERE user_wallet = ?
-			GROUP BY asset, epoch
-		) max_v ON cs.asset = max_v.asset AND cs.epoch = max_v.epoch AND cs.version = max_v.max_version
-		WHERE cs.user_wallet = ?
-	`, wallet, wallet, wallet).Scan(&balanceEntries).Error
-
+	var balances []UserBalance
+	err := s.db.Where("user_wallet = ?", wallet).Find(&balances).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user states: %w", err)
+		return nil, fmt.Errorf("failed to get user balances: %w", err)
 	}
 
-	result := make([]core.BalanceEntry, 0, len(balanceEntries))
-	for _, entry := range balanceEntries {
+	result := make([]core.BalanceEntry, 0, len(balances))
+	for _, balance := range balances {
 		result = append(result, core.BalanceEntry{
-			Asset:   entry.Asset,
-			Balance: entry.HomeUserBalance,
+			Asset:   balance.Asset,
+			Balance: balance.Balance,
 		})
 	}
 
 	return result, nil
+}
+
+// LockUserState locks a user's balance row for update (postgres only, must be used within a transaction).
+// Uses INSERT ... ON CONFLICT DO NOTHING to ensure the row exists, then SELECT ... FOR UPDATE to lock it.
+// Returns the current balance or zero if the row was just inserted.
+func (s *DBStore) LockUserState(wallet, asset string) (decimal.Decimal, error) {
+	wallet = strings.ToLower(wallet)
+	now := time.Now()
+
+	// Check if this is postgres - only postgres supports FOR UPDATE in the way we need
+	if s.db.Dialector.Name() == "postgres" {
+		// First, ensure the row exists using INSERT ... ON CONFLICT DO NOTHING
+		newBalance := UserBalance{
+			UserWallet: wallet,
+			Asset:      asset,
+			Balance:    decimal.Zero,
+			CreatedAt:  now,
+			UpdatedAt:  now,
+		}
+		err := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&newBalance).Error
+		if err != nil {
+			return decimal.Zero, fmt.Errorf("failed to ensure user balance row exists: %w", err)
+		}
+
+		// Now lock the row and retrieve the balance using FOR UPDATE
+		var balance UserBalance
+		err = s.db.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_wallet = ? AND asset = ?", wallet, asset).
+			First(&balance).Error
+		if err != nil {
+			return decimal.Zero, fmt.Errorf("failed to lock user balance: %w", err)
+		}
+
+		return balance.Balance, nil
+	}
+
+	// For non-postgres databases (like sqlite in tests), just return the balance without locking
+	var balance UserBalance
+	err := s.db.Where("user_wallet = ? AND asset = ?", wallet, asset).First(&balance).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Create the row if it doesn't exist
+			balance = UserBalance{
+				UserWallet: wallet,
+				Asset:      asset,
+				Balance:    decimal.Zero,
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			}
+			if err := s.db.Create(&balance).Error; err != nil {
+				return decimal.Zero, fmt.Errorf("failed to create user balance: %w", err)
+			}
+			return decimal.Zero, nil
+		}
+		return decimal.Zero, fmt.Errorf("failed to get user balance: %w", err)
+	}
+
+	return balance.Balance, nil
 }
 
 // EnsureNoOngoingStateTransitions validates that no conflicting blockchain operations are pending.
@@ -100,7 +136,7 @@ func (s *DBStore) EnsureNoOngoingStateTransitions(wallet, asset string) error {
 	}
 
 	var result versionCheck
-	err := s.db.Raw(`
+	tx := s.db.Raw(`
 		SELECT
 			s.transition_type as transition_type,
 			s.version as state_version,
@@ -115,17 +151,15 @@ func (s *DBStore) EnsureNoOngoingStateTransitions(wallet, asset string) error {
 			AND s.node_sig IS NOT NULL
 		ORDER BY s.epoch DESC, s.version DESC
 		LIMIT 1
-	`, wallet, asset).Scan(&result).Error
+	`, wallet, asset).Scan(&result)
 
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil
-		}
-		return fmt.Errorf("failed to check state transitions: %w", err)
+	if tx.Error != nil {
+		return fmt.Errorf("failed to check state transitions: %w", tx.Error)
 	}
 
-	// No previous state found (result will have zero values)
-	if result.StateVersion == 0 {
+	// No previous state found - check RowsAffected instead of StateVersion == 0
+	// (StateVersion == 0 could be a valid version)
+	if tx.RowsAffected == 0 {
 		return nil
 	}
 

@@ -56,13 +56,26 @@ CREATE TABLE channel_states (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Basic indexes
 CREATE INDEX idx_channel_states_user_wallet ON channel_states(user_wallet);
-CREATE INDEX idx_channel_states_asset ON channel_states(asset);
 CREATE INDEX idx_channel_states_transition_type ON channel_states(transition_type);
-CREATE INDEX idx_channel_states_user_wallet_asset ON channel_states(user_wallet, asset);
-CREATE INDEX idx_channel_states_epoch_version ON channel_states(epoch DESC, version DESC);
-CREATE INDEX idx_channel_states_home_channel_id ON channel_states(home_channel_id) WHERE home_channel_id IS NOT NULL;
-CREATE INDEX idx_channel_states_escrow_channel_id ON channel_states(escrow_channel_id) WHERE escrow_channel_id IS NOT NULL;
+
+-- Uniqueness constraint to catch bugs in version computation or concurrency issues
+ALTER TABLE channel_states ADD CONSTRAINT uq_channel_states_wallet_asset_epoch_version
+    UNIQUE (user_wallet, asset, epoch, version);
+
+-- Covering index for "latest state" queries: WHERE user_wallet=? AND asset=? ORDER BY epoch DESC, version DESC LIMIT 1
+CREATE INDEX idx_channel_states_latest ON channel_states(user_wallet, asset, epoch DESC, version DESC);
+
+-- Partial index for "signed latest state" queries
+CREATE INDEX idx_channel_states_latest_signed ON channel_states(user_wallet, asset, epoch DESC, version DESC)
+    WHERE user_sig IS NOT NULL AND node_sig IS NOT NULL;
+
+-- Improved channel ID indexes with epoch/version DESC for "latest by channel" queries
+CREATE INDEX idx_channel_states_home_channel_id ON channel_states(home_channel_id, epoch DESC, version DESC)
+    WHERE home_channel_id IS NOT NULL;
+CREATE INDEX idx_channel_states_escrow_channel_id ON channel_states(escrow_channel_id, epoch DESC, version DESC)
+    WHERE escrow_channel_id IS NOT NULL;
 
 -- Transactions table: Records all transactions with optional state references
 CREATE TABLE transactions (
@@ -222,7 +235,23 @@ CREATE TABLE channel_session_key_assets_v1 (
 
 CREATE INDEX idx_channel_session_key_assets_v1_asset ON channel_session_key_assets_v1(asset);
 
+-- User balances table: Stores aggregated user balances per asset
+-- This table is used to quickly retrieve user balances without querying channel_states
+-- and provides row-level locking for concurrent balance updates
+CREATE TABLE user_balances (
+    user_wallet CHAR(42) NOT NULL,
+    asset VARCHAR(20) NOT NULL,
+    balance NUMERIC(78, 18) NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_wallet, asset)
+);
+
+CREATE INDEX idx_user_balances_user_wallet ON user_balances(user_wallet);
+
 -- +goose Down
+DROP INDEX IF EXISTS idx_user_balances_user_wallet;
+DROP TABLE IF EXISTS user_balances;
 DROP INDEX IF EXISTS idx_channel_session_key_assets_v1_asset;
 DROP TABLE IF EXISTS channel_session_key_assets_v1;
 DROP INDEX IF EXISTS idx_channel_session_key_states_v1_expires;
@@ -258,9 +287,10 @@ DROP INDEX IF EXISTS idx_transactions_type;
 DROP TABLE IF EXISTS transactions;
 DROP INDEX IF EXISTS idx_channel_states_escrow_channel_id;
 DROP INDEX IF EXISTS idx_channel_states_home_channel_id;
-DROP INDEX IF EXISTS idx_channel_states_epoch_version;
-DROP INDEX IF EXISTS idx_channel_states_user_wallet_asset;
-DROP INDEX IF EXISTS idx_channel_states_asset;
+DROP INDEX IF EXISTS idx_channel_states_latest_signed;
+DROP INDEX IF EXISTS idx_channel_states_latest;
+ALTER TABLE channel_states DROP CONSTRAINT IF EXISTS uq_channel_states_wallet_asset_epoch_version;
+DROP INDEX IF EXISTS idx_channel_states_transition_type;
 DROP INDEX IF EXISTS idx_channel_states_user_wallet;
 DROP TABLE IF EXISTS channel_states;
 DROP INDEX IF EXISTS idx_channels_status;

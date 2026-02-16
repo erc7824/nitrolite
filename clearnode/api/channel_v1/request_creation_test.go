@@ -84,6 +84,7 @@ func TestRequestCreation_Success(t *testing.T) {
 	// Mock expectations for handler
 	mockMemoryStore.On("IsAssetSupported", asset, tokenAddress, blockchainID).Return(true, nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil).Once()
+	mockTxStore.On("LockUserState", userWallet, asset).Return(decimal.Zero, nil).Once()
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil).Once()
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("CreateChannel", mock.MatchedBy(func(channel core.Channel) bool {
@@ -229,6 +230,7 @@ func TestRequestCreation_Acknowledgement_Success(t *testing.T) {
 	// Mock expectations for handler
 	mockMemoryStore.On("IsAssetSupported", asset, tokenAddress, blockchainID).Return(true, nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil).Once()
+	mockTxStore.On("LockUserState", userWallet, asset).Return(decimal.Zero, nil).Once()
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil).Once()
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("CreateChannel", mock.MatchedBy(func(channel core.Channel) bool {
@@ -344,6 +346,7 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 	require.NoError(t, err)
 
 	mockMemoryStore.On("IsAssetSupported", asset, tokenAddress, uint64(1)).Return(true, nil).Once()
+	mockTxStore.On("LockUserState", userWallet, asset).Return(decimal.Zero, nil).Once()
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil).Once()
 
 	// Create RPC request with challenge below minimum

@@ -116,12 +116,14 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	// Mock expectations
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil)
+	mockTxStore.On("LockUserState", senderWallet, asset).Return(decimal.Zero, nil)
 	mockTxStore.On("CheckOpenChannel", senderWallet, asset).Return("0x03", true, nil)
 	mockTxStore.On("GetLastUserState", senderWallet, asset, false).Return(currentSenderState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", senderWallet, asset).Return(nil)
 	mockStatePacker.On("PackState", mock.Anything).Return(packedSenderState, nil).Maybe()
 
 	// For issueTransferReceiverState
+	mockTxStore.On("LockUserState", receiverWallet, asset).Return(decimal.Zero, nil)
 	mockTxStore.On("GetLastUserState", receiverWallet, asset, false).Return(currentReceiverState, nil)
 	mockTxStore.On("GetLastUserState", receiverWallet, asset, true).Return(nil, nil)
 	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
@@ -563,6 +565,7 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 	// Mock expectations
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil)
+	mockTxStore.On("LockUserState", userWallet, asset).Return(decimal.Zero, nil)
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return("0x03", true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
@@ -691,6 +694,7 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 	// Mock expectations
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil)
+	mockTxStore.On("LockUserState", userWallet, asset).Return(decimal.Zero, nil)
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return("0x03", true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
@@ -1126,6 +1130,7 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 	// Mock expectations
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockAssetStore.On("GetTokenDecimals", uint64(1), "0xTokenAddress").Return(uint8(6), nil)
+	mockTxStore.On("LockUserState", userWallet, asset).Return(decimal.Zero, nil)
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return("0x03", true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
@@ -1256,6 +1261,7 @@ func TestSubmitState_Acknowledgement_Success(t *testing.T) {
 
 	// Mock expectations
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
+	mockTxStore.On("LockUserState", userWallet, asset).Return(decimal.Zero, nil)
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return("0x03", true, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)

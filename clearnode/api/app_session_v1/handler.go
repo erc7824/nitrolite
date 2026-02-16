@@ -92,6 +92,11 @@ func (h *Handler) verifyQuorum(tx Store, appSessionId string, participantWeights
 func (h *Handler) issueReleaseReceiverState(ctx context.Context, tx Store, receiverWallet, asset, appSessionID string, amount decimal.Decimal) error {
 	logger := log.FromContext(ctx)
 
+	// Lock the receiver's state to prevent concurrent modifications
+	if _, err := tx.LockUserState(receiverWallet, asset); err != nil {
+		return rpc.Errorf("failed to lock receiver state: %v", err)
+	}
+
 	// Get the receiver's current state (or create void state if none exists)
 	currentState, err := tx.GetLastUserState(receiverWallet, asset, false)
 	if err != nil {

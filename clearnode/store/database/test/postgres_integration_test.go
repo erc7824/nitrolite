@@ -438,6 +438,12 @@ func TestPostgres_UserBalances(t *testing.T) {
 			},
 		}
 
+		// Lock user states before storing
+		_, err := store.LockUserState(wallet, "USDC")
+		require.NoError(t, err)
+		_, err = store.LockUserState(wallet, "ETH")
+		require.NoError(t, err)
+
 		require.NoError(t, store.StoreUserState(state1))
 		require.NoError(t, store.StoreUserState(state2))
 

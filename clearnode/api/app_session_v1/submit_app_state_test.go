@@ -312,6 +312,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", decimal.NewFromInt(-40)).Return(nil)
 
 	// Mock expectations for channel state issuance (issueReleaseReceiverState)
+	mockStore.On("LockUserState", participant1, "USDC").Return(decimal.Zero, nil)
 	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil)
 	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil)
 	mockStatePacker.On("PackState", mock.Anything).Return([]byte("packed"), nil)
@@ -427,6 +428,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	// Mock expectations for fund release and channel state issuance on close
 	// Participant 1: 100 USDC
 	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", decimal.NewFromInt(-100)).Return(nil)
+	mockStore.On("LockUserState", participant1, "USDC").Return(decimal.Zero, nil)
 	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil)
 	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil)
 	mockStatePacker.On("PackState", mock.Anything).Return([]byte("packed"), nil)
@@ -435,6 +437,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 
 	// Participant 2: 50 USDC
 	mockStore.On("RecordLedgerEntry", participant2, appSessionID, "USDC", decimal.NewFromInt(-50)).Return(nil)
+	mockStore.On("LockUserState", participant2, "USDC").Return(decimal.Zero, nil)
 	mockStore.On("GetLastUserState", participant2, "USDC", false).Return(nil, nil)
 	mockStore.On("GetLastUserState", participant2, "USDC", true).Return(nil, nil)
 	mockStore.On("StoreUserState", mock.Anything).Return(nil).Once()
@@ -742,6 +745,7 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 
 	// Map iteration order is non-deterministic, so USDC might be processed before the DAI missing error
 	mockStore.On("RecordLedgerEntry", participant1, appSessionID, "USDC", decimal.NewFromInt(-40)).Return(nil).Maybe()
+	mockStore.On("LockUserState", participant1, "USDC").Return(decimal.Zero, nil).Maybe()
 	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil).Maybe()
 	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil).Maybe()
 	mockStore.On("StoreUserState", mock.Anything).Return(nil).Maybe()

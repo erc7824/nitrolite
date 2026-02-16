@@ -2,6 +2,7 @@ package channel_v1
 
 import (
 	"github.com/erc7824/nitrolite/pkg/core"
+	"github.com/shopspring/decimal"
 )
 
 // StoreTxHandler is a function that executes Store operations within a transaction.
@@ -16,6 +17,10 @@ type StoreTxProvider func(StoreTxHandler) error
 // Store defines the persistence layer interface for channel state management.
 // All methods should be implemented to work within database transactions.
 type Store interface {
+	// LockUserState locks a user's balance for update, must be used within a transaction.
+	// Returns the current balance.
+	LockUserState(wallet, asset string) (decimal.Decimal, error)
+
 	// GetLastUserState retrieves the most recent state for a user's asset.
 	// If signed is true, only returns states with both user and node signatures.
 	// Returns nil state if no matching state exists.

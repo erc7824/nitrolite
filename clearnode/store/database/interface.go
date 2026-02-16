@@ -21,6 +21,11 @@ type DatabaseStore interface {
 	// GetUserBalances retrieves the balances for a user's wallet.
 	GetUserBalances(wallet string) ([]core.BalanceEntry, error)
 
+	// LockUserState locks a user's balance row for update (postgres only, must be used within a transaction).
+	// Uses INSERT ... ON CONFLICT DO NOTHING to ensure the row exists, then SELECT ... FOR UPDATE to lock it.
+	// Returns the current balance or zero if the row was just inserted.
+	LockUserState(wallet, asset string) (decimal.Decimal, error)
+
 	// GetUserTransactions retrieves transaction history for a user with optional filters.
 	GetUserTransactions(wallet string, asset *string, txType *core.TransactionType, fromTime *uint64, toTime *uint64, paginate *core.PaginationParams) ([]core.Transaction, core.PaginationMetadata, error)
 

@@ -23,6 +23,10 @@ type Store interface {
 
 	// Channel state operations
 
+	// LockUserState locks a user's balance for update, must be used within a transaction.
+	// Returns the current balance.
+	LockUserState(wallet, asset string) (decimal.Decimal, error)
+
 	// CheckOpenChannel verifies if a user has an active channel for the given asset
 	// and returns the approved signature validators if such a channel exists.
 	CheckOpenChannel(wallet, asset string) (string, bool, error)

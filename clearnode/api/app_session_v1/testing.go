@@ -81,6 +81,11 @@ func (m *MockStore) CheckOpenChannel(wallet, asset string) (string, bool, error)
 	return args.String(0), args.Bool(1), args.Error(2)
 }
 
+func (m *MockStore) LockUserState(wallet, asset string) (decimal.Decimal, error) {
+	args := m.Called(wallet, asset)
+	return args.Get(0).(decimal.Decimal), args.Error(1)
+}
+
 func (m *MockStore) GetLastUserState(wallet, asset string, signed bool) (*core.State, error) {
 	args := m.Called(wallet, asset, signed)
 	if args.Get(0) == nil {

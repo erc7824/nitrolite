@@ -39,6 +39,12 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 
 	var nodeSig string
 	err = h.useStoreInTx(func(tx Store) error {
+		// Lock the user's state to prevent concurrent modifications
+		_, err := tx.LockUserState(userState.UserWallet, userState.Asset)
+		if err != nil {
+			return rpc.Errorf("failed to lock user state: %v", err)
+		}
+
 		lastTransition := userState.Transition
 		if lastTransition.Type != core.TransitionTypeCommit {
 			return rpc.Errorf("user state transition must have 'commit' type, got '%s'", lastTransition.Type.String())

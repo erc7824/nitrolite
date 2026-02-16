@@ -180,32 +180,24 @@ contract ChannelHub is IVault, ReentrancyGuard {
         return _userChannels[user].values();
     }
 
-    // filter only non-closed and non-migrated-out channels
-    function getOpenChannels(address user) external view returns (bytes32[] memory) {
-        bytes32[] memory allChannels = _userChannels[user].values();
-        uint256 openChannelCount = 0;
-        for (uint256 i = 0; i < allChannels.length; i++) {
-            if (
-                _channels[allChannels[i]].status != ChannelStatus.CLOSED
-                    && _channels[allChannels[i]].status != ChannelStatus.MIGRATED_OUT
-            ) {
-                openChannelCount++;
+    // Filter only non-closed and non-migrated-out channels
+    function getOpenChannels(address user) external view returns (bytes32[] memory openChannels) {
+        openChannels = _userChannels[user].values();
+        uint256 count = 0;
+
+        // Optimization: single pass filter moves open channels to front, tracks count
+        for (uint256 i = 0; i < openChannels.length; i++) {
+            ChannelStatus status = _channels[openChannels[i]].status;
+            if (status != ChannelStatus.CLOSED && status != ChannelStatus.MIGRATED_OUT) {
+                if (count < i) openChannels[count] = openChannels[i];
+                count++;
             }
         }
 
-        bytes32[] memory openChannels = new bytes32[](openChannelCount);
-        uint256 openChannelIndex = 0;
-        for (uint256 i = 0; i < allChannels.length; i++) {
-            if (
-                _channels[allChannels[i]].status != ChannelStatus.CLOSED
-                    && _channels[allChannels[i]].status != ChannelStatus.MIGRATED_OUT
-            ) {
-                openChannels[openChannelIndex] = allChannels[i];
-                openChannelIndex++;
-            }
+        // Resize array to actual count
+        assembly {
+            mstore(openChannels, count)
         }
-
-        return openChannels;
     }
 
     function getChannelData(bytes32 channelId)
@@ -267,7 +259,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         initState = meta.initState;
     }
 
-    // *** IVault ***
+    // ========= IVault ==========
 
     function depositToVault(address node, address token, uint256 amount) external payable {
         require(node != address(0), InvalidAddress());
@@ -292,40 +284,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
         _pushFunds(to, token, amount);
 
         emit Withdrawn(msg.sender, token, amount);
-    }
-
-    // ========= Validator Registry ==========
-
-    /**
-     * @notice Register a signature validator for a node using signature-based authorization
-     * @dev Anyone can submit this transaction with a valid node signature, enabling relayer-friendly registration.
-     *      The node's private key only signs the registration data, never sends transactions directly.
-     *      This allows nodes to use cold storage or HSMs without exposing keys to transaction submission.
-     *      The signature includes block.chainid to prevent cross-chain replay attacks.
-     * @param node The node address that signed the registration
-     * @param validatorId The validator ID (0x01-0xFF, 0x00 reserved for DEFAULT)
-     * @param validator The validator contract address
-     * @param signature Node's signature over abi.encode(validatorId, validator, block.chainid)
-     */
-    function registerNodeValidator(
-        address node,
-        uint8 validatorId,
-        ISignatureValidator validator,
-        bytes calldata signature
-    ) external {
-        require(validatorId != DEFAULT_SIG_VALIDATOR_ID, InvalidValidatorId());
-        require(address(validator) != address(0), InvalidAddress());
-        require(
-            address(_nodeValidatorRegistry[node][validatorId]) == address(0),
-            ValidatorAlreadyRegistered(node, validatorId)
-        );
-
-        bytes memory message = abi.encode(validatorId, validator, block.chainid);
-        require(EcdsaSignatureUtils.validateEcdsaSigner(message, signature, node), IncorrectSignature());
-
-        _nodeValidatorRegistry[node][validatorId] = validator;
-
-        emit ValidatorRegistered(node, validatorId, validator);
     }
 
     // ========= Escrow Deposit Purge ==========
@@ -416,6 +374,40 @@ contract ChannelHub is IVault, ReentrancyGuard {
     /// @dev Check if an escrow deposit can be unlocked
     function _isEscrowUnlockable(EscrowDepositMeta storage meta) internal view returns (bool) {
         return meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED;
+    }
+
+    // ========= Validator Registry ==========
+
+    /**
+     * @notice Register a signature validator for a node using signature-based authorization
+     * @dev Anyone can submit this transaction with a valid node signature, enabling relayer-friendly registration.
+     *      The node's private key only signs the registration data, never sends transactions directly.
+     *      This allows nodes to use cold storage or HSMs without exposing keys to transaction submission.
+     *      The signature includes block.chainid to prevent cross-chain replay attacks.
+     * @param node The node address that signed the registration
+     * @param validatorId The validator ID (0x01-0xFF, 0x00 reserved for DEFAULT)
+     * @param validator The validator contract address
+     * @param signature Node's signature over abi.encode(validatorId, validator, block.chainid)
+     */
+    function registerNodeValidator(
+        address node,
+        uint8 validatorId,
+        ISignatureValidator validator,
+        bytes calldata signature
+    ) external {
+        require(validatorId != DEFAULT_SIG_VALIDATOR_ID, InvalidValidatorId());
+        require(address(validator) != address(0), InvalidAddress());
+        require(
+            address(_nodeValidatorRegistry[node][validatorId]) == address(0),
+            ValidatorAlreadyRegistered(node, validatorId)
+        );
+
+        bytes memory message = abi.encode(validatorId, validator, block.chainid);
+        require(EcdsaSignatureUtils.validateEcdsaSigner(message, signature, node), IncorrectSignature());
+
+        _nodeValidatorRegistry[node][validatorId] = validator;
+
+        emit ValidatorRegistered(node, validatorId, validator);
     }
 
     // ========== Channel lifecycle ==========
@@ -828,10 +820,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
         ChannelEngine.TransitionContext memory ctx =
             _buildChannelContext(channelId, _nodeBalances[def.node][targetCandidate.homeLedger.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, targetCandidate);
-
         _applyEffects(channelId, def, targetCandidate, effects);
 
-        // event with the correct candidate state
         if (isHomeChain) {
             emit MigrationOutInitiated(channelId, candidate);
         } else {
@@ -849,7 +839,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         _validateSignatures(channelId, candidate, user, def.node, def.approvedSignatureValidators);
 
         State memory targetCandidate = candidate;
-        // `_isHomeChain` cannot be used here as channel exists on both chains
+        // `_isHomeChain(...)` cannot be used here as channel exists on both chains
         bool isHomeChain = candidate.nonHomeLedger.chainId == block.chainid;
 
         if (isHomeChain) {
@@ -866,10 +856,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
         ChannelEngine.TransitionContext memory ctx =
             _buildChannelContext(channelId, _nodeBalances[def.node][targetCandidate.homeLedger.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, targetCandidate);
-
         _applyEffects(channelId, def, targetCandidate, effects);
 
-        // event with the correct candidate state
         if (isHomeChain) {
             emit MigrationOutFinalized(channelId, candidate);
         } else {
@@ -1020,15 +1008,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
         return ctx;
     }
 
-    function _isHomeChain(bytes32 channelId) internal view returns (bool) {
-        ChannelStatus status = _channels[channelId].status;
-        if (status == ChannelStatus.VOID || status == ChannelStatus.MIGRATED_OUT) {
-            return false;
-        }
-
-        return _channels[channelId].lastState.homeLedger.chainId == block.chainid;
-    }
-
     function _applyEffects(
         bytes32 channelId,
         ChannelDefinition memory def,
@@ -1106,30 +1085,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         // NOTE: purge escrow deposits to unlock unutilized node liquidity
         _purgeEscrowDeposits();
-    }
-
-    function _pullFunds(address from, address token, uint256 amount) internal nonReentrant {
-        if (amount == 0) return;
-
-        if (token == address(0)) {
-            require(msg.value == amount, IncorrectValue());
-        } else {
-            require(msg.value == 0, IncorrectValue());
-        }
-
-        if (token != address(0)) {
-            IERC20(token).safeTransferFrom(from, address(this), amount);
-        }
-    }
-
-    function _pushFunds(address to, address token, uint256 amount) internal nonReentrant {
-        if (amount == 0) return;
-
-        if (token == address(0)) {
-            payable(to).transfer(amount);
-        } else {
-            IERC20(token).safeTransfer(to, amount);
-        }
     }
 
     function _applyEscrowDepositEffects(
@@ -1253,5 +1208,38 @@ contract ChannelHub is IVault, ReentrancyGuard {
         require(def.node != address(0), InvalidAddress());
         require(def.user != def.node, AddressCollision(def.user));
         require(def.challengeDuration >= MIN_CHALLENGE_DURATION, IncorrectChallengeDuration());
+    }
+
+    function _isHomeChain(bytes32 channelId) internal view returns (bool) {
+        ChannelStatus status = _channels[channelId].status;
+        if (status == ChannelStatus.VOID || status == ChannelStatus.MIGRATED_OUT) {
+            return false;
+        }
+
+        return _channels[channelId].lastState.homeLedger.chainId == block.chainid;
+    }
+
+    function _pullFunds(address from, address token, uint256 amount) internal nonReentrant {
+        if (amount == 0) return;
+
+        if (token == address(0)) {
+            require(msg.value == amount, IncorrectValue());
+        } else {
+            require(msg.value == 0, IncorrectValue());
+        }
+
+        if (token != address(0)) {
+            IERC20(token).safeTransferFrom(from, address(this), amount);
+        }
+    }
+
+    function _pushFunds(address to, address token, uint256 amount) internal nonReentrant {
+        if (amount == 0) return;
+
+        if (token == address(0)) {
+            payable(to).transfer(amount);
+        } else {
+            IERC20(token).safeTransfer(to, amount);
+        }
     }
 }

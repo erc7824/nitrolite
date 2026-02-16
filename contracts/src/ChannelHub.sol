@@ -328,42 +328,13 @@ contract ChannelHub is IVault, ReentrancyGuard {
         emit ValidatorRegistered(node, validatorId, validator);
     }
 
-    // TODO: extract into a separate contract
     // ========= Escrow Deposit Purge ==========
     function getUnlockableEscrowDepositAmount() external view returns (uint256 totalUnlockable) {
-        uint256 totalDeposits = _escrowDepositIds.length;
-        uint256 escrowHeadTemp = escrowHead;
-
-        while (escrowHeadTemp < totalDeposits) {
-            bytes32 escrowId = _escrowDepositIds[escrowHeadTemp];
-            EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
-
-            if (meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED) {
-                totalUnlockable += meta.lockedAmount;
-            } else {
-                break;
-            }
-
-            escrowHeadTemp++;
-        }
+        (, totalUnlockable) = _getUnlockableEscrowStats();
     }
 
     function getUnlockableEscrowDepositCount() external view returns (uint256 count) {
-        uint256 totalDeposits = _escrowDepositIds.length;
-        uint256 escrowHeadTemp = escrowHead;
-
-        while (escrowHeadTemp < totalDeposits) {
-            bytes32 escrowId = _escrowDepositIds[escrowHeadTemp];
-            EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
-
-            if (meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED) {
-                count++;
-            } else {
-                break;
-            }
-
-            escrowHeadTemp++;
-        }
+        (count,) = _getUnlockableEscrowStats();
     }
 
     function getEscrowDepositIds(uint256 page, uint256 pageSize) external view returns (bytes32[] memory ids) {
@@ -404,14 +375,13 @@ contract ChannelHub is IVault, ReentrancyGuard {
                 escrowHeadTemp++;
                 continue;
             }
-            // only still "INITIALIZED" escrows can be purged: "CHALLENGED" escrows require manual finalization
-            if (meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED) {
+            // Only INITIALIZED escrows can be purged; CHALLENGED escrows require manual finalization
+            if (_isEscrowUnlockable(meta)) {
                 _nodeBalances[meta.node][meta.initState.nonHomeLedger.token] += meta.lockedAmount;
                 meta.status = EscrowStatus.FINALIZED;
                 meta.lockedAmount = 0;
                 purgedCount++;
                 escrowHeadTemp++;
-                continue;
             } else {
                 break;
             }
@@ -422,6 +392,30 @@ contract ChannelHub is IVault, ReentrancyGuard {
         if (purgedCount != 0) {
             emit EscrowDepositsPurged(purgedCount);
         }
+    }
+
+    /// @dev Internal helper to compute unlockable escrow statistics
+    function _getUnlockableEscrowStats() internal view returns (uint256 count, uint256 totalAmount) {
+        uint256 totalDeposits = _escrowDepositIds.length;
+        uint256 escrowHeadTemp = escrowHead;
+
+        while (escrowHeadTemp < totalDeposits) {
+            bytes32 escrowId = _escrowDepositIds[escrowHeadTemp];
+            EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
+
+            if (_isEscrowUnlockable(meta)) {
+                count++;
+                totalAmount += meta.lockedAmount;
+                escrowHeadTemp++;
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// @dev Check if an escrow deposit can be unlocked
+    function _isEscrowUnlockable(EscrowDepositMeta storage meta) internal view returns (bool) {
+        return meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED;
     }
 
     // ========== Channel lifecycle ==========

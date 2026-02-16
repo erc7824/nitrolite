@@ -8,16 +8,10 @@ jobs:
   test-clearnode:
     name: Test (Clearnode)
     uses: ./.github/workflows/test-go.yml
-    # with:
-    #   project-path: 'clearnode'
-    #   project-name: 'Clearnode'
 
-  # test-forge:
-  #   name: Test (Foundry)
-  #   uses: ./.github/workflows/test-forge.yml
-  #   with:
-  #     project-path: 'contract'
-  #     project-name: 'Foundry'
+  test-forge:
+    name: Test (Foundry)
+    uses: ./.github/workflows/test-forge.yml
 
   # test-sdk:
   #   name: Test (SDK)

@@ -62,9 +62,11 @@ func main() {
 		}
 		reactor := evm.NewReactor(b.ID, eventHandlerService, bb.DbStore.StoreContractEvent)
 		l := evm.NewListener(common.HexToAddress(b.ChannelHubAddress), client, b.ID, b.BlockStep, logger, reactor.HandleEvent, bb.DbStore.GetLatestEvent)
-		if err := l.Listen(ctx); err != nil {
-			logger.Fatal("failed to start EVM listener")
-		}
+		l.Listen(ctx, func(err error) {
+			if err != nil {
+				logger.Fatal("blockchain listener stopped", "error", err, "blockchainID", b.ID)
+			}
+		})
 
 		// For the node itself, the node address is the signer's address
 		nodeAddress := bb.StateSigner.PublicKey().Address().String()
@@ -79,8 +81,12 @@ func main() {
 			logger.Fatal("failed to create EVM client")
 		}
 
-		worker := NewBlockchainWorker(blockchainClient, bb.DbStore, logger)
-		go worker.Start(ctx)
+		worker := NewBlockchainWorker(b.ID, blockchainClient, bb.DbStore, logger)
+		worker.Start(ctx, func(err error) {
+			if err != nil {
+				logger.Fatal("blockchain worker stopped", "error", err, "blockchainID", b.ID)
+			}
+		})
 	}
 
 	metricsListenAddr := ":4242"
@@ -98,7 +104,7 @@ func main() {
 	go func() {
 		logger.Info("prometheus metrics available", "listenAddr", metricsListenAddr, "endpoint", metricsEndpoint)
 		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("metrics server failure", "error", err)
+			logger.Fatal("metrics server failure", "error", err)
 		}
 	}()
 
@@ -131,5 +137,6 @@ func main() {
 		logger.Error("failed to shut down RPC server", "error", err)
 	}
 
+	// TODO: gracefully stop blockchain listeners and workers
 	logger.Info("shutdown complete")
 }

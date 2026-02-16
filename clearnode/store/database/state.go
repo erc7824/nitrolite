@@ -83,6 +83,26 @@ func (State) TableName() string {
 	return "channel_states"
 }
 
+// GetStateByID retrieves a state by its deterministic ID.
+func (s *DBStore) GetStateByID(stateID string) (*core.State, error) {
+	stateID = strings.ToLower(stateID)
+
+	var dbState State
+	err := s.db.Table("channel_states AS s").
+		Select("s.*, hc.blockchain_id AS home_blockchain_id, hc.token AS home_token_address, ec.blockchain_id AS escrow_blockchain_id, ec.token AS escrow_token_address").
+		Joins("LEFT JOIN channels AS hc ON s.home_channel_id = hc.channel_id").
+		Joins("LEFT JOIN channels AS ec ON s.escrow_channel_id = ec.channel_id").
+		Where("s.id = ?", stateID).First(&dbState).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get state by ID: %w", err)
+	}
+
+	return databaseStateToCore(&dbState)
+}
+
 // GetLastUserState retrieves the most recent state for a user's asset.
 func (s *DBStore) GetLastUserState(wallet, asset string, signed bool) (*core.State, error) {
 	var dbState State

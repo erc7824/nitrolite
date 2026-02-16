@@ -16,6 +16,33 @@ library EscrowDepositEngine {
     using WadMath for uint256;
     using WadMath for int256;
 
+    error IncorrectStateIntent();
+    error IncorrectStateVersion();
+
+    error UnlockPeriodPassed();
+    error IncorrectEscrowStatus();
+    error EscrowAlreadyExists();
+    error EscrowAlreadyFinalized();
+
+    error IncorrectUserAllocation();
+    error UserAllocationAndNetFlowMismatch();
+    error IncorrectNodeAllocation();
+    error IncorrectNodeNetFlow();
+
+    error IncorrectHomeChain();
+    error IncorrectNonHomeChain();
+    error NegativeNetFlowSum();
+    error InvalidAllocationSum();
+
+    error UserNodeAllocationMismatch();
+    error UserAllocationDeltaAndDepositMismatch();
+    error IncorrectUserNetFlowDelta();
+
+    error FundMovementIsRequired();
+    error FundConservationOnInitiate();
+    error FundConservationOnFinalize();
+    error NodeFundsDeltaAndLockedAmountMismatch();
+
     // ========== Constants ==========
 
     uint64 constant UNLOCK_DELAY = 3 hours;
@@ -73,8 +100,8 @@ library EscrowDepositEngine {
      * @return effects The calculated effects to apply
      */
     function validateChallenge(TransitionContext memory ctx) external view returns (TransitionEffects memory effects) {
-        require(ctx.status == EscrowStatus.INITIALIZED, "invalid status for challenge");
-        require(block.timestamp < ctx.unlockAt, "unlock period has passed");
+        require(ctx.status == EscrowStatus.INITIALIZED, IncorrectEscrowStatus());
+        require(block.timestamp < ctx.unlockAt, UnlockPeriodPassed());
 
         effects.newStatus = EscrowStatus.DISPUTED;
         effects.newChallengeExpiry = uint64(block.timestamp) + CHALLENGE_DURATION;
@@ -86,11 +113,11 @@ library EscrowDepositEngine {
     // ========== Internal: Phase 1 - Universal Validation ==========
 
     function _validateUniversal(TransitionContext memory ctx, State memory candidate) internal view {
-        require(ctx.status != EscrowStatus.FINALIZED, "escrow already finalized");
+        require(ctx.status != EscrowStatus.FINALIZED, EscrowAlreadyFinalized());
         uint64 blockchainId = uint64(block.chainid);
-        require(candidate.homeLedger.chainId != blockchainId, "must not be on home chain");
-        require(candidate.nonHomeLedger.chainId == blockchainId, "must be on non-home chain");
-        require(candidate.version > 0, "invalid version");
+        require(candidate.homeLedger.chainId != blockchainId, IncorrectHomeChain());
+        require(candidate.nonHomeLedger.chainId == blockchainId, IncorrectNonHomeChain());
+        require(candidate.version > 0, IncorrectStateVersion());
 
         // Validate token decimals for nonHomeLedger (current chain)
         Utils.validateTokenDecimals(candidate.nonHomeLedger);
@@ -99,8 +126,8 @@ library EscrowDepositEngine {
         uint256 allocsSum = candidate.nonHomeLedger.userAllocation + candidate.nonHomeLedger.nodeAllocation;
         int256 netFlowsSum = candidate.nonHomeLedger.userNetFlow + candidate.nonHomeLedger.nodeNetFlow;
 
-        require(netFlowsSum >= 0, "negative net flow sum");
-        require(allocsSum == netFlowsSum.toUint256(), "invalid allocation sum");
+        require(netFlowsSum >= 0, NegativeNetFlowSum());
+        require(allocsSum == netFlowsSum.toUint256(), InvalidAllocationSum());
     }
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========
@@ -117,7 +144,7 @@ library EscrowDepositEngine {
         } else if (intent == StateIntent.FINALIZE_ESCROW_DEPOSIT) {
             effects = _calculateFinalizeEffects(ctx, candidate);
         } else {
-            require(false, "invalid intent for escrow deposit");
+            revert IncorrectStateIntent();
         }
 
         return effects;
@@ -129,17 +156,17 @@ library EscrowDepositEngine {
         returns (TransitionEffects memory effects)
     {
         // INITIATE: User deposits on non-home, node locks on home
-        require(ctx.status == EscrowStatus.VOID, "escrow already exists");
+        require(ctx.status == EscrowStatus.VOID, EscrowAlreadyExists());
         uint256 depositAmount = candidate.nonHomeLedger.userAllocation;
-        require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), "invalid user net flow");
-        require(candidate.nonHomeLedger.nodeAllocation == 0, "node allocation must be zero on non-home");
-        require(candidate.nonHomeLedger.nodeNetFlow == 0, "node net flow must be zero on non-home");
+        require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), UserAllocationAndNetFlowMismatch());
+        require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
+        require(candidate.nonHomeLedger.nodeNetFlow == 0, IncorrectNodeNetFlow());
 
         // Validate that home state shows node locking equal amount
         require(
             candidate.homeLedger.nodeAllocation.toWad(candidate.homeLedger.decimals)
                 == depositAmount.toWad(candidate.nonHomeLedger.decimals),
-            "home node alloc must match non-home user deposit"
+            UserNodeAllocationMismatch()
         );
 
         // Calculate effects
@@ -158,29 +185,29 @@ library EscrowDepositEngine {
     {
         // FINALIZE: Node claims with finalization proof
         require(
-            ctx.status == EscrowStatus.INITIALIZED || ctx.status == EscrowStatus.DISPUTED, "invalid status for finalize"
+            ctx.status == EscrowStatus.INITIALIZED || ctx.status == EscrowStatus.DISPUTED, IncorrectEscrowStatus()
         );
 
         // Must be immediate successor
-        require(candidate.version == ctx.initState.version + 1, "candidate must be immediate successor");
-        require(ctx.initState.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, "initial intent must be initiate");
+        require(candidate.version == ctx.initState.version + 1, IncorrectStateVersion());
+        require(ctx.initState.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, IncorrectStateIntent());
 
         uint256 depositAmount = ctx.initState.nonHomeLedger.userAllocation;
-        require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), "invalid user net flow");
-        require(candidate.nonHomeLedger.nodeNetFlow == -(depositAmount).toInt256(), "invalid node net flow");
-        require(candidate.nonHomeLedger.userAllocation == 0, "user allocation must be zero on non-home");
-        require(candidate.nonHomeLedger.nodeAllocation == 0, "node allocation must be zero on non-home");
+        require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), UserAllocationAndNetFlowMismatch());
+        require(candidate.nonHomeLedger.nodeNetFlow == -(depositAmount).toInt256(), IncorrectNodeNetFlow());
+        require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
+        require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
 
         // Check home - non-home state consistency
         uint256 userHomeAllocDelta = candidate.homeLedger.userAllocation - ctx.initState.homeLedger.userAllocation;
         require(
             userHomeAllocDelta.toWad(candidate.homeLedger.decimals)
                 == depositAmount.toWad(ctx.initState.nonHomeLedger.decimals),
-            "home user allocation must increase by deposit amount"
+            UserAllocationDeltaAndDepositMismatch()
         );
-        require(candidate.homeLedger.nodeAllocation == 0, "home node allocation must be zero");
+        require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
         int256 userHomeNfDelta = candidate.homeLedger.userNetFlow - ctx.initState.homeLedger.userNetFlow;
-        require(userHomeNfDelta == 0, "home user net flow must not change");
+        require(userHomeNfDelta == 0, IncorrectUserNetFlowDelta());
 
         // Calculate effects
         effects.nodeFundsDelta = -(ctx.lockedAmount).toInt256(); // Release to node vault
@@ -196,18 +223,18 @@ library EscrowDepositEngine {
         internal
         pure
     {
-        require(effects.userFundsDelta != 0 || effects.nodeFundsDelta != 0, "no fund movement");
+        require(effects.userFundsDelta != 0 || effects.nodeFundsDelta != 0, FundMovementIsRequired());
 
         int256 totalDelta = effects.userFundsDelta + effects.nodeFundsDelta;
 
         if (candidate.intent == StateIntent.INITIATE_ESCROW_DEPOSIT) {
             // On initiate: funds locked (positive delta)
-            require(totalDelta == effects.userFundsDelta, "fund conservation on initiate");
+            require(totalDelta == effects.userFundsDelta, FundConservationOnInitiate());
         } else if (candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT) {
             // On finalize: funds released (negative delta)
-            require(totalDelta == effects.nodeFundsDelta, "fund conservation on finalize");
+            require(totalDelta == effects.nodeFundsDelta, FundConservationOnFinalize());
             require(
-                (-effects.nodeFundsDelta).toUint256() == ctx.lockedAmount, "released amount must equal locked amount"
+                (-effects.nodeFundsDelta).toUint256() == ctx.lockedAmount, NodeFundsDeltaAndLockedAmountMismatch()
             );
         }
     }

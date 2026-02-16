@@ -12,6 +12,10 @@ library Utils {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
 
+    error DecimalsExceedMaxPrecision();
+    error DecimalsMismatch();
+    error FailedToFetchDecimals();
+
     function getChannelId(ChannelDefinition memory def, uint8 version) internal pure returns (bytes32 channelId) {
         bytes32 baseId = keccak256(abi.encode(def));
 
@@ -60,14 +64,14 @@ library Utils {
      */
     function validateTokenDecimals(Ledger memory ledger) internal view {
         if (ledger.decimals > WadMath.MAX_PRECISION) {
-            revert("decimals exceed max precision");
+            revert DecimalsExceedMaxPrecision();
         }
 
         if (ledger.chainId == block.chainid) {
             try IERC20Metadata(ledger.token).decimals() returns (uint8 tokenDecimals) {
-                require(ledger.decimals == tokenDecimals, "decimals mismatch");
+                require(ledger.decimals == tokenDecimals, DecimalsMismatch());
             } catch {
-                revert("failed to fetch decimals");
+                revert FailedToFetchDecimals();
             }
         }
     }

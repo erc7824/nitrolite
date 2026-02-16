@@ -38,7 +38,7 @@ contract WadMathTest is Test {
     }
 
     function test_toWad_uint256_revert_withOverPrecision() public {
-        vm.expectRevert("decimals exceed max precision");
+        vm.expectRevert(WadMath.DecimalsExceedMaxPrecision.selector);
         wadMath.exposed_toWad_uint256(1000, 19);
     }
 
@@ -72,7 +72,7 @@ contract WadMathTest is Test {
     }
 
     function test_toWad_int256_revert_withOverPrecision() public {
-        vm.expectRevert("decimals exceed max precision");
+        vm.expectRevert(WadMath.DecimalsExceedMaxPrecision.selector);
         wadMath.exposed_toWad_int256(-1000, 19);
     }
 

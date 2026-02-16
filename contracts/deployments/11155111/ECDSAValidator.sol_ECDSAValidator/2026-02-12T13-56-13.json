@@ -1,0 +1,11 @@
+{
+  "deployer": "0xF8bedb0aBa14833e95F29e760487C3d34Bc4Ec64",
+  "deployedTo": "0xd2cCa19A353b9983f2D568674C8Ad0aBA94C07EC",
+  "transactionHash": "0x9668717342bcf251d2215b0fc374f5de0c716fd35dfc64e22055294d9e91943d",
+  "commit": "1d9763c885a3eefdf50085beb3ac2bf6a0aa0667",
+  "timestamp": 1770904573,
+  "chainId": 11155111,
+  "contractPath": "./src/sigValidators/ECDSAValidator.sol:ECDSAValidator",
+  "constructorArgs": [],
+  "comment": "PoC v1.0.0-alpha2"
+}

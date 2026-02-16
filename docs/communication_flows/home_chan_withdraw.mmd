@@ -1,0 +1,36 @@
+sequenceDiagram
+        actor User
+        actor Client
+        actor Node
+        actor HomeChain
+        Note over Client: Connected to Node
+        Note over HomeChain: User already has a home channel
+        Note over Node: Contains user's state with Home Chain 
+
+        User->>Client: withdraw(blockchainId, asset, amount)
+        Client->>Node: GetLastState(UserWallet, asset)
+        Note right of Node: GetLastState(userWallet, asset)
+        Node->>Client: Returns a state with home chain
+        %% Note over Client: Check current state transitions
+        Note over Client: createNextState(currentState) returns state
+        Note over Client: state.setID(CalculateStateID(state.userWallet, state.asset, cycleId, state.version))
+        Note over Client: NewTransition(withdrawalT, state.ID(), userWallet, amount)
+        Note over Client: state.applyTransitions(transitions) returns true
+        Note over Client: signState(state) returns userSig
+
+        Client->>Node: SubmitState(state, userSig)
+        Note right of Node: GetLastState(userWallet, asset) returns currentState
+        Note right of Node: EnsureNoOngoingTransitions()
+        Note right of Node: ValidateStateTransition(currentState, state)
+        Note right of Node: StoreState(state)
+        Node->>Client: Return node signature
+
+        Note over Client: PackState(channelId, state)
+        Client->>HomeChain: checkpoint(channelId, packedState)
+        HomeChain->>Client: Return Tx Hash
+        HomeChain-->>Node: Emits Checkpointed Event
+        Note right of Node: HandleCheckpointed()
+        Note right of Node: UpdateChannel(channel)
+        Node-->>Client: Sends ChannelUpdate & BalanceUpdate
+        Client-->>User: Returns success
+        

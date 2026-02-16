@@ -1,0 +1,16 @@
+{
+  "deployer": "0xF8bedb0aBa14833e95F29e760487C3d34Bc4Ec64",
+  "deployedTo": "0xCe87FD88F4B5Fd5475d163e2642C5c2c7dD655Ec",
+  "transactionHash": "0xbc84279ef63b69f52664565ece778469419bac4a728a6843296a3ca3b18be923",
+  "commit": "0e5cd5b75117e6e8ab61f4de7271e60087f2f523",
+  "timestamp": 1769592277,
+  "chainId": 11155111,
+  "contractPath": "src/ChannelHub.sol:ChannelHub",
+  "constructorArgs": [],
+  "comment": "PoC v1.0.0-alpha1",
+  "libraries": {
+    "src/ChannelEngine.sol:ChannelEngine": "0x0827b6aAA03475A8BF59Ee1A2bD76903DDFbaDB6",
+    "src/EscrowDepositEngine.sol:EscrowDepositEngine": "0x9d8193e5655a36FFB9CD7D88D31c91d2650896D0",
+    "src/EscrowWithdrawalEngine.sol:EscrowWithdrawalEngine": "0xE749eCF94531A3dDbC5F293B91C9DAbE1Df44a06"
+  }
+}

@@ -1,0 +1,54 @@
+config:
+  args: ["clearnode"]
+  logLevel: info
+  database:
+    driver: postgres
+    host: postgresql.core
+    port: 5432
+    name: clearnode_v1_rc
+    user: clearnode_v1_rc_admin
+  envSecret: clearnode-secret-env
+  extraEnvs: {}
+
+image:
+  repository: ghcr.io/erc7824/nitrolite/clearnode
+  tag: v1.0.0-rc.0
+
+service:
+  http:
+    enabled: true
+    port: 7824
+    path: /ws
+
+metrics:
+  enabled: true
+  podmonitoring:
+    enabled: true
+  port: 4242
+  endpoint: "/metrics"
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 256Mi
+    ephemeral-storage: 100Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+    ephemeral-storage: 100Mi
+
+autoscaling:
+  enabled: false
+
+networking:
+  externalHostname: clearnode-v1-rc.yellow.org
+  tlsClusterIssuer: zerossl-prod
+  gateway:
+    enabled: false
+  ingress:
+    enabled: true
+    className: nginx
+    tls:
+      enabled: true
+
+imagePullSecret: ghcr-pull

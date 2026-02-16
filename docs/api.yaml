@@ -1,0 +1,922 @@
+types:
+  - channel:
+      description: Represents an on-chain channel
+      fields:
+        - name: channel_id
+          type: string
+          description: Unique identifier for the channel
+        - name: user_wallet
+          type: string
+          description: User wallet address
+        - name: type
+          type: string
+          description: Type of the channel (home, escrow)
+        - name: blockchain_id
+          type: string
+          description: Unique identifier for the blockchain
+        - name: token_address
+          type: string
+          description: Address of the token used in the channel
+        - name: challenge_duration
+          type: integer
+          description: Challenge period for the channel in seconds
+        - name: challenge_expires_at
+          type: string
+          description: Challenge expiration timestamp (in unix seconds)
+          optional: true
+        - name: nonce
+          type: string
+          description: Nonce for the channel
+        - name: status
+          type: string
+          description: Current status of the channel (void, open, challenged, closed)
+        - name: state_version
+          type: string
+          description: On-chain state version of the channel
+
+  - transition_type:
+      description: Type of state transition
+      enum:
+        - transfer_receive
+        - transfer_send
+        - release
+        - commit
+        - home_deposit
+        - home_withdrawal
+        - mutual_lock
+        - escrow_deposit
+        - escrow_lock
+        - escrow_withdraw
+        - migrate
+        - finalize
+
+  - transition:
+      description: Represents a state transition
+      fields:
+        - name: type
+          type: transition_type
+          description: Type of state transition
+        - name: tx_id
+          type: string
+          description: Transaction ID associated with the transition
+        - name: account_id
+          type: string
+          description: Account identifier (varies based on transition type)
+        - name: amount
+          type: string
+          description: Amount involved in the transition
+
+  - state:
+      description: Represents the current state of the user stored on Node
+      fields:
+        - name: id
+          type: string
+          description: Deterministic ID (hash) of the state
+        - name: transition
+          type: transition
+          description: The state transition that led to this state
+        - name: asset
+          type: string
+          description: Asset type of the state
+        - name: user_wallet
+          type: string
+          description: User wallet address
+        - name: epoch
+          type: string
+          description: User Epoch Index
+        - name: version
+          type: string
+          description: Version of the state
+        - name: home_channel_id
+          type: string
+          description: Identifier for the home Channel
+          optional: true
+        - name: escrow_channel_id
+          type: string
+          description: Identifier for the escrow Channel
+          optional: true
+        - name: home_ledger
+          type: ledger
+          description: User and node balances for the home channel
+        - name: escrow_ledger
+          type: ledger
+          description: User and node balances for the escrow channel
+          optional: true
+        - name: user_sig
+          type: string
+          description: User signature for the state
+          optional: true
+        - name: node_sig
+          type: string
+          description: Node signature for the state
+          optional: true
+
+  - ledger:
+      description: Represents ledger balances
+      fields:
+        - name: token_address
+          type: string
+          description: Address of the token used in this channel
+        - name: blockchain_id
+          type: string
+          description: Unique identifier for the blockchain
+        - name: user_balance
+          type: string
+          description: User balance in the channel
+        - name: user_net_flow
+          type: string
+          description: User net flow in the channel
+        - name: node_balance
+          type: string
+          description: Node balance in the channel
+        - name: node_net_flow
+          type: string
+          description: Node net flow in the channel
+
+  - channel_definition:
+      description: Configuration for creating a channel
+      fields:
+        - name: nonce
+          type: string
+          description: A unique number to prevent replay attacks
+        - name: challenge
+          type: integer
+          description: Challenge period for the channel in seconds
+
+  - app_participant:
+      description: Definition for an app participant
+      fields:
+        - name: wallet_address
+          type: string
+          description: Participant's wallet address
+        - name: signature_weight
+          type: integer
+          description: Signature weight for the participant
+
+  - app_definition:
+      description: Definition for an app session
+      fields:
+        - name: application
+          type: string
+          description: Application identifier from an app registry
+        - name: participants
+          type: array
+          items:
+            type: app_participant
+          description: List of participants in the app session
+        - name: quorum
+          type: integer
+          description: Quorum required for the app session
+        - name: nonce
+          type: string
+          description: A unique number to prevent replay attacks
+
+  - app_allocation:
+      description: Allocation of assets to a participant in an app session
+      fields:
+        - name: participant
+          type: string
+          description: Participant's wallet address
+        - name: asset
+          type: string
+          description: Asset symbol
+        - name: amount
+          type: string
+          description: Amount allocated to the participant
+
+  - app_state_update:
+      description: Represents the current state of an application session
+      fields:
+        - name: app_session_id
+          type: string
+          description: A unique application session identifier
+        - name: intent
+          type: string
+          description: The intent of the app session update (operate, deposit, withdraw, close, rebalance)
+        - name: version
+          type: string
+          description: Version of the app state
+        - name: allocations
+          type: array
+          items:
+            type: app_allocation
+          description: List of allocations in the app state
+        - name: session_data
+          type: string
+          description: JSON stringified session data
+
+  - signed_app_state_update:
+      description: Represents a signed application session state update
+      fields:
+        - name: app_state_update
+          type: app_state_update
+          description: The application session state update
+        - name: quorum_sigs
+          type: array
+          items:
+            type: string
+          description: The signature quorum for the application session
+
+  - token:
+      description: Information about a supported token
+      fields:
+        - name: name
+          type: string
+          description: Token name
+        - name: symbol
+          type: string
+          description: Token symbol
+        - name: address
+          type: string
+          description: Token contract address
+        - name: blockchain_id
+          type: string
+          description: Blockchain network ID
+        - name: decimals
+          type: integer
+          description: Number of decimal places
+
+  - asset:
+      description: Information about a supported asset
+      fields:
+        - name: name
+          type: string
+          description: Asset name
+        - name: symbol
+          type: string
+          description: Asset symbol
+        - name: decimals
+          type: integer
+          description: Number of decimal places for the asset
+        - name: suggested_blockchain_id
+          type: string
+          description: Suggested blockchain network ID for this asset
+        - name: tokens
+          type: array
+          items:
+            type: token
+          description: Supported tokens for the asset
+
+  - blockchain_info:
+      description: Information about a supported network
+      fields:
+        - name: name
+          type: string
+          description: Blockchain name
+        - name: blockchain_id
+          type: string
+          description: Blockchain network ID
+        - name: contract_address
+          type: string
+          description: Address of the main contract on this blockchain
+
+  - balance_entry:
+      description: Balance for a specific asset
+      fields:
+        - name: asset
+          type: string
+          description: Asset symbol
+        - name: amount
+          type: string
+          description: Balance amount
+
+  - transaction_type:
+      description: Type of transaction
+      enum:
+        - transfer
+        - release
+        - commit
+        - home_deposit
+        - home_withdrawal
+        - mutual_lock
+        - escrow_deposit
+        - escrow_lock
+        - escrow_withdraw
+        - migrate
+        - rebalance
+        - finalize
+
+  - transaction:
+      description: Transaction record
+      fields:
+        - name: id
+          type: string
+          description: Unique transaction reference
+        - name: asset
+          type: string
+          description: Asset symbol
+        - name: tx_type
+          type: transaction_type
+          description: Transaction type
+        - name: from_account
+          type: string
+          description: The account that sent the funds
+        - name: to_account
+          type: string
+          description: The account that received the funds
+        - name: sender_new_state_id
+          type: string
+          description: The ID of the new sender's channel state
+          optional: true
+        - name: receiver_new_state_id
+          type: string
+          description: The ID of the new receiver's channel state
+          optional: true
+        - name: amount
+          type: string
+          description: Transaction amount
+        - name: created_at
+          type: string
+          description: When the transaction was created
+
+  - app_session_info:
+      description: Information about an application session
+      fields:
+        - name: app_session_id
+          type: string
+          description: A unique application session identifier
+        - name: status
+          type: string
+          description: Session status (open/closed)
+        - name: participants
+          type: array
+          items:
+            type: app_participant
+          description: List of participant wallet addresses with weights
+        - name: session_data
+          type: string
+          description: JSON stringified session data
+          optional: true
+        - name: quorum
+          type: integer
+          description: Quorum required for operations
+        - name: version
+          type: string
+          description: Current version of the session state
+        - name: nonce
+          type: string
+          description: Nonce for the session
+        - name: allocations
+          type: array
+          items:
+            type: app_allocation
+          description: List of allocations in the app state
+
+  - channel_session_key_state:
+      description: Represents the state of a channel session key
+      fields:
+        - name: user_address
+          type: string
+          description: User wallet address
+        - name: session_key
+          type: string
+          description: Session key address for delegation
+        - name: version
+          type: string
+          description: Version of the session key format
+        - name: assets
+          type: array
+          items:
+            type: string
+          description: Assets associated with this session key
+        - name: expires_at
+          type: string
+          description: Unix timestamp in seconds indicating when the session key expires
+        - name: user_sig
+          type: string
+          description: User's signature over the session key metadata to authorize the registration/update of the session key
+
+  - app_session_key_state:
+      description: Represents the state of an app session key
+      fields:
+        - name: user_address
+          type: string
+          description: User wallet address
+        - name: session_key
+          type: string
+          description: Session key address for delegation
+        - name: version
+          type: string
+          description: Version of the session key format
+        - name: application_id
+          type: array
+          items:
+            type: string
+          description: Application IDs associated with this session key
+        - name: app_session_id
+          type: array
+          items:
+            type: string
+          description: Application session IDs associated with this session key
+        - name: expires_at
+          type: string
+          description: Unix timestamp in seconds indicating when the session key expires
+        - name: user_sig
+          type: string
+          description: User's signature over the session key metadata to authorize the registration/update of the session key
+
+  - pagination_params:
+      description: Pagination request parameters
+      fields:
+        - name: offset
+          type: integer
+          description: Pagination offset (number of items to skip)
+          optional: true
+        - name: limit
+          type: integer
+          description: Number of items to return
+          optional: true
+        - name: sort
+          type: string
+          description: Sort order (asc/desc)
+          optional: true
+
+  - pagination_metadata:
+      description: Pagination information
+      fields:
+        - name: page
+          type: integer
+          description: Current page number
+        - name: per_page
+          type: integer
+          description: Number of items per page
+        - name: total_count
+          type: integer
+          description: Total number of items
+        - name: page_count
+          type: integer
+          description: Total number of pages
+
+api:
+  groups:
+    - name: channels
+      description: Operations related to channel management
+      versions:
+        - version: v1
+          methods:
+            - name: get_home_channel
+              description: Retrieve current on-chain home channel information
+              request:
+                - field_name: wallet
+                  type: string
+                  description: The user's wallet address
+                - field_name: asset
+                  type: string
+                  description: The asset symbol
+              response:
+                - field_name: channel
+                  type: channel
+                  description: The on-chain channel information
+              errors:
+                - message: channel_not_found
+                  description: The specified channel was not found
+            - name: get_escrow_channel
+              description: Retrieve current on-chain escrow channel information
+              request:
+                - field_name: escrow_channel_id
+                  type: string
+                  description: The escrow channel ID
+              response:
+                - field_name: channel
+                  type: channel
+                  description: The on-chain channel information
+              errors:
+                - message: channel_not_found
+                  description: The specified channel was not found
+            - name: get_channels
+              description: Retrieve all channels for a user with optional filtering
+              request:
+                - field_name: wallet
+                  type: string
+                  description: Filter by user's wallet address
+                - field_name: asset
+                  type: string
+                  description: Filter by asset
+                  optional: true
+                - field_name: status
+                  type: string
+                  description: Filter by status
+                  optional: true
+                - field_name: pagination
+                  type: pagination_params
+                  description: Pagination parameters (offset, limit, sort)
+                  optional: true
+              response:
+                - field_name: channels
+                  type: array
+                  items:
+                    type: channel
+                  description: List of channels
+                - field_name: metadata
+                  type: pagination_metadata
+                  description: Pagination information
+                  optional: true
+              errors:
+                - message: invalid_parameters
+                  description: The request parameters are invalid
+            - name: get_latest_state
+              description: Retrieve the current state of the user stored on the Node
+              request:
+                - field_name: wallet
+                  type: string
+                  description: The user's wallet address
+                - field_name: asset
+                  type: string
+                  description: The asset symbol
+                # by default returns the latest state regardless of signature
+                - field_name: only_signed
+                  type: boolean
+                  description: Can be enabled to get the latest signed state to know what is the current pending transition
+              response:
+                - field_name: state
+                  type: state
+                  description: The current state of the user
+              errors:
+                - message: channel_not_found
+                  description: The specified channel was not found
+            - name: get_states
+              description: Retrieve state history for a user with optional filtering
+              request:
+                - field_name: wallet
+                  type: string
+                  description: The user's wallet address
+                - field_name: asset
+                  type: string
+                  description: Filter by asset symbol
+                - field_name: epoch
+                  type: string
+                  description: Filter by user epoch index
+                  optional: true
+                - field_name: channel_id
+                  type: string
+                  description: Filter by Home/Escrow Channel ID
+                  optional: true
+                - field_name: only_signed
+                  type: boolean
+                  description: Return only signed states
+                - field_name: pagination
+                  type: pagination_params
+                  description: Pagination parameters (offset, limit, sort)
+                  optional: true
+              response:
+                - field_name: states
+                  type: array
+                  items:
+                    type: state
+                  description: List of states
+                - field_name: metadata
+                  type: pagination_metadata
+                  description: Pagination information
+                  optional: true
+              errors:
+                - message: invalid_parameters
+                  description: The request parameters are invalid
+            - name: request_creation
+              description: Request the creation of a channel from Node
+              request:
+                - field_name: state
+                  type: state
+                  description: The state to be submitted
+                - field_name: channel_definition
+                  type: channel_definition
+                  description: Definition of the channel to be created
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the state
+              errors:
+                - message: invalid_channel_definition
+                  description: The channel definition is invalid
+                - message: invalid_state
+                  description: The submitted state is invalid
+                - message: channel_already_exists
+                  description: A channel with the same parameters already exists
+            - name: submit_state
+              description: Submit a cross-chain state
+              request:
+                - field_name: state
+                  type: state
+                  description: The state to be submitted
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the state
+              errors:
+                - message: invalid_transition
+                  description: The state transition is invalid
+                - message: ongoing_transition
+                  description: There is an ongoing transition that must be resolved first
+                - message: channel_not_found
+                  description: The specified channel was not found
+                - message: denied_until_checkpoint
+                  description: State submissions are denied until the next checkpoint
+            - name: submit_session_key_state
+              description: Submit the session key state for registration and updates
+              request:
+                - field_name: state
+                  type: channel_session_key_state
+                  description: Session key metadata and delegation information
+              response: []
+              errors:
+                - message: invalid_session_key_state
+                  description: The session key state is invalid
+            - name: get_last_key_states
+              description: Retrieve the latest session key states for a user with optional filtering by session key
+              request:
+                - field_name: user_address
+                  type: string
+                  description: User's wallet address
+                - field_name: session_key
+                  type: string
+                  description: Optionally filter by session key
+                  optional: true
+              response:
+                - field_name: states
+                  type: array
+                  items:
+                    type: app_session_key_state
+                  description: List of active session key states for the user
+              errors:
+                - message: account_not_found
+                  description: The specified account was not found
+
+          events:
+            - name: home_channel_created
+              description: Event emitted when a home channel is created
+              payload:
+                - field_name: channel
+                  type: channel
+                  description: The created home channel information
+                - field_name: initial_state
+                  type: state
+                  description: The initial state of the home channel
+
+    - name: app_sessions
+      description: Operations related to application session management
+      versions:
+        - version: v1
+          methods:
+            - name: submit_deposit_state
+              description: Submit an application session state update
+              request:
+                - field_name: app_state_update
+                  type: app_state_update
+                  description: The application session state update to be submitted
+                - field_name: quorum_sigs
+                  type: array
+                  description: App Session State Update signatures
+                  items:
+                    type: string
+                - field_name: user_state
+                  type: state
+                  description: The user state associated with the application session update
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the deposit state
+              errors:
+                - message: invalid_app_state
+                  description: The application session state is invalid
+                - message: quorum_not_met
+                  description: The signature quorum requirement is not satisfied
+                - message: channel_not_found
+                  description: The associated channel was not found
+            - name: submit_app_state
+              description: Submit an application session state update
+              request:
+                - field_name: app_state_update
+                  type: app_state_update
+                  description: The application session state update to be submitted
+                - field_name: quorum_sigs
+                  type: array
+                  description: App Session State Update signatures required for quorum
+                  items:
+                    type: string
+              response: []
+              errors:
+                - message: invalid_app_state
+                  description: The application session state is invalid
+                - message: quorum_not_met
+                  description: The signature quorum requirement is not satisfied
+                - message: ongoing_transition
+                  description: There is an ongoing transition that must be resolved first
+            - name: rebalance_app_sessions
+              description: Rebalance multiple application sessions atomically
+              request:
+                - field_name: signed_updates
+                  type: array
+                  description: List of signed application session state updates to be submitted (each update must have intent 'rebalance')
+                  items:
+                    type: signed_app_state_update
+              response:
+                - field_name: batch_id
+                  type: string
+                  description: A unique identifier of executed rebalance operation
+
+              errors: []
+            - name: get_app_definition
+              description: Retrieve the application definition for a specific app session
+              request:
+                - field_name: app_session_id
+                  type: string
+                  description: The application session ID
+              response:
+                - field_name: definition
+                  type: app_definition
+                  description: The application definition
+              errors:
+                - message: app_session_not_found
+                  description: The specified app session was not found
+            - name: get_app_sessions
+              description: List all application sessions for a participant with optional filtering
+              request:
+                - field_name: app_session_id
+                  type: string
+                  description: Filter by application session ID
+                  optional: true
+                - field_name: participant
+                  type: string
+                  description: Filter by participant wallet address
+                  optional: true
+                - field_name: status
+                  type: string
+                  description: Filter by status (open/closed)
+                  optional: true
+                - field_name: pagination
+                  type: pagination_params
+                  description: Pagination parameters (offset, limit, sort)
+                  optional: true
+              response:
+                - field_name: app_sessions
+                  type: array
+                  items:
+                    type: app_session_info
+                  description: List of application sessions
+                - field_name: metadata
+                  type: pagination_metadata
+                  description: Pagination information
+                  optional: true
+              errors:
+                - message: invalid_parameters
+                  description: The request parameters are invalid
+            - name: create_app_session
+              description: Create a new application session between participants
+              request:
+                - field_name: definition
+                  type: app_definition
+                  description: Application definition including participants and quorum
+                - field_name: session_data
+                  type: string
+                  description: JSON stringified session data
+                - field_name: quorum_sigs
+                  type: array
+                  description: Participant signatures for the app session creation
+                  items:
+                    type: string
+                  optional: true
+              response:
+                - field_name: app_session_id
+                  type: string
+                  description: The created application session ID
+                - field_name: version
+                  type: string
+                  description: Initial version of the session
+                - field_name: status
+                  type: string
+                  description: Status of the session (open)
+              errors:
+                - message: invalid_definition
+                  description: The application definition is invalid
+                - message: insufficient_balance
+                  description: Participant has insufficient balance for allocations
+            - name: submit_session_key_state
+              description: Submit the session key state for registration and updates
+              request:
+                - field_name: state
+                  type: app_session_key_state
+                  description: Session key metadata and delegation information
+              response: []
+              errors:
+                - message: invalid_session_key_state
+                  description: The session key state is invalid
+            - name: get_last_key_states
+              description: Retrieve the latest session key states for a user with optional filtering by session key
+              request:
+                - field_name: wallet
+                  type: string
+                  description: User's wallet address
+                - field_name: session_key
+                  type: string
+                  description: Optionally filter by session key
+                  optional: true
+              response:
+                - field_name: states
+                  type: array
+                  items:
+                    type: app_session_key_state
+                  description: List of active session key states for the user
+              errors:
+                - message: account_not_found
+                  description: The specified account was not found
+
+    - name: session_keys
+      description: Operations related to session key management
+      versions:
+        - version: v1
+          methods:
+
+    - name: user
+      description: Operations related to user account
+      versions:
+        - version: v1
+          methods:
+            - name: get_balances
+              description: Retrieve the balances of the user in YN
+              request:
+                - field_name: wallet
+                  type: string
+                  description: User's wallet address
+              response:
+                - field_name: balances
+                  type: array
+                  items:
+                    type: balance_entry
+                  description: List of asset balances
+              errors:
+                - message: account_not_found
+                  description: The specified account was not found
+            - name: get_transactions
+              description: Retrieve ledger transaction history with optional filtering
+              request:
+                - field_name: wallet
+                  type: string
+                  description: Filter by user's wallet address
+                - field_name: asset
+                  type: string
+                  description: Filter by asset symbol
+                  optional: true
+                - field_name: tx_type
+                  type: transaction_type
+                  description: Filter by transaction type (allow all types except for mutual_lock, escrow_lock, migrate)
+                  optional: true
+                - field_name: pagination
+                  type: pagination_params
+                  description: Pagination parameters (offset, limit, sort)
+                  optional: true
+                - field_name: from_time
+                  type: integer
+                  optional: true
+                - field_name: to_time
+                  type: integer
+                  optional: true
+              response:
+                - field_name: transactions
+                  type: array
+                  items:
+                    type: transaction
+                  description: List of transactions
+                - field_name: metadata
+                  type: pagination_metadata
+                  description: Pagination information
+                  optional: true
+
+    - name: node
+      description: Utility methods to get node's configuration and check connectivity
+      versions:
+        - version: v1
+          methods:
+            - name: ping
+              description: Simple connectivity check
+              request: []
+              response: []
+              errors: []
+            - name: get_config
+              description: Retrieve broker configuration and supported networks
+              request: []
+              response:
+                - field_name: node_address
+                  type: string
+                  description: Node wallet address
+                - field_name: node_version
+                  type: string
+                  description: Node software version
+                - field_name: blockchains
+                  type: array
+                  items:
+                    type: blockchain_info
+                  description: List of supported networks
+              errors: []
+            - name: get_assets
+              description: Retrieve all supported assets with optional blockchain filter
+              request:
+                - field_name: blockchain_id
+                  type: string
+                  description: Filter by blockchain network ID
+                  optional: true
+              response:
+                - field_name: assets
+                  type: array
+                  items:
+                    type: asset
+                  description: List of supported assets (filtered by blockchain if blockchain_id is provided)
+              errors: []

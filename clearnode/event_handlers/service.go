@@ -123,10 +123,11 @@ func (s *EventHandlerService) HandleHomeChannelChallenged(ctx context.Context, e
 			return nil
 		}
 
-		if event.StateVersion <= channel.StateVersion {
-			logger.Warn("stale HomeChannelChallenged event received", "channelId", chanID, "eventStateVersion", event.StateVersion, "currentStateVersion", channel.StateVersion)
+		if event.StateVersion < channel.StateVersion {
+			logger.Error("challenged state version is less than current channel state version", "channelId", chanID, "currentStateVersion", channel.StateVersion, "challengedStateVersion", event.StateVersion)
 			return nil
 		}
+
 		channel.StateVersion = event.StateVersion
 		channel.Status = core.ChannelStatusChallenged
 
@@ -253,10 +254,11 @@ func (s *EventHandlerService) HandleEscrowDepositChallenged(ctx context.Context,
 			return nil
 		}
 
-		if event.StateVersion <= channel.StateVersion {
-			logger.Warn("stale EscrowDepositChallenged event received", "channelId", chanID, "eventStateVersion", event.StateVersion, "currentStateVersion", channel.StateVersion)
+		if event.StateVersion < channel.StateVersion {
+			logger.Error("challenged escrow deposit state version is less than current channel state version", "channelId", chanID, "currentStateVersion", channel.StateVersion, "challengedStateVersion", event.StateVersion)
 			return nil
 		}
+
 		channel.StateVersion = event.StateVersion
 		channel.Status = core.ChannelStatusChallenged
 
@@ -374,10 +376,11 @@ func (s *EventHandlerService) HandleEscrowWithdrawalChallenged(ctx context.Conte
 			return nil
 		}
 
-		if event.StateVersion <= channel.StateVersion {
-			logger.Warn("stale EscrowWithdrawalChallenged event received", "channelId", chanID, "eventStateVersion", event.StateVersion, "currentStateVersion", channel.StateVersion)
+		if event.StateVersion < channel.StateVersion {
+			logger.Error("challenged escrow withdrawal state version is less than current channel state version", "channelId", chanID, "currentStateVersion", channel.StateVersion, "challengedStateVersion", event.StateVersion)
 			return nil
 		}
+
 		channel.StateVersion = event.StateVersion
 		channel.Status = core.ChannelStatusChallenged
 

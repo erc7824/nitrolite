@@ -7,6 +7,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/erc7824/nitrolite/pkg/sign"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/shopspring/decimal"
 )
 
@@ -616,6 +617,99 @@ func (c *Client) Checkpoint(ctx context.Context, asset string) (string, error) {
 	default:
 		return "", fmt.Errorf("transition type %s does not require a blockchain operation", state.Transition.Type)
 	}
+}
+
+// Challenge submits an on-chain challenge for a channel using a co-signed state.
+// The state must have both user and node signatures, which are validated before
+// the challenge transaction is submitted.
+//
+// A challenge initiates a dispute period on-chain. If the counterparty does not
+// respond with a higher-versioned state before the challenge period expires,
+// the channel can be closed with the challenged state.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - state: A co-signed state (both UserSig and NodeSig must be present)
+//
+// Returns:
+//   - Transaction hash of the on-chain challenge transaction
+//   - Error if validation or submission fails
+//
+// Requirements:
+//   - Blockchain RPC must be configured for the chain (use WithBlockchainRPC)
+//   - State must have both user and node signatures
+//   - State must have a HomeChannelID
+//
+// Example:
+//
+//	state, err := client.GetLatestState(ctx, wallet, "usdc", true)
+//	txHash, err := client.Challenge(ctx, *state)
+//	fmt.Printf("Challenge transaction: %s\n", txHash)
+func (c *Client) Challenge(ctx context.Context, state core.State) (string, error) {
+	if state.UserSig == nil || state.NodeSig == nil {
+		return "", fmt.Errorf("state must have both user and node signatures")
+	}
+
+	if state.HomeChannelID == nil {
+		return "", fmt.Errorf("state must have a home channel ID")
+	}
+
+	// Pack state for signature verification
+	packedState, err := core.PackState(state, c.assetStore)
+	if err != nil {
+		return "", fmt.Errorf("failed to pack state: %w", err)
+	}
+
+	sigValidator := core.NewChannelSigValidator(func(wallet, sessionKey, metadataHash string) (bool, error) {
+		// Accept signatures from the user's wallet or any valid session key
+		return true, nil
+	})
+
+	// Verify user signature
+	userSigBytes, err := hexutil.Decode(*state.UserSig)
+	if err != nil {
+		return "", fmt.Errorf("invalid user signature encoding: %w", err)
+	}
+	if err := sigValidator.Verify(state.UserWallet, packedState, userSigBytes); err != nil {
+		return "", fmt.Errorf("invalid user signature: %w", err)
+	}
+
+	// Verify node signature
+	nodeAddress, err := c.getNodeAddress(ctx)
+	if err != nil {
+		return "", err
+	}
+	nodeSigBytes, err := hexutil.Decode(*state.NodeSig)
+	if err != nil {
+		return "", fmt.Errorf("invalid node signature encoding: %w", err)
+	}
+	if err := sigValidator.Verify(nodeAddress, packedState, nodeSigBytes); err != nil {
+		return "", fmt.Errorf("invalid node signature: %w", err)
+	}
+
+	// Create the challenge signature
+	challengeData, err := core.PackChallengeState(state, c.assetStore)
+	if err != nil {
+		return "", fmt.Errorf("failed to pack challenge state: %w", err)
+	}
+	challengerSig, err := c.stateSigner.Sign(challengeData)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign challenge: %w", err)
+	}
+
+	// Initialize blockchain client and submit
+	blockchainID := state.HomeLedger.BlockchainID
+	if err := c.initializeBlockchainClient(ctx, blockchainID); err != nil {
+		return "", err
+	}
+
+	blockchainClient := c.blockchainClients[blockchainID]
+	txHash, err := blockchainClient.Challenge(state, challengerSig, core.ChannelParticipantUser)
+	if err != nil {
+		return "", fmt.Errorf("failed to challenge on blockchain: %w", err)
+	}
+
+	return txHash, nil
 }
 
 // ============================================================================

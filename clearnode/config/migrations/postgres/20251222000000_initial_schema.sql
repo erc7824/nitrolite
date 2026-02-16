@@ -55,10 +55,6 @@ CREATE TABLE channel_states (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Basic indexes
-CREATE INDEX idx_channel_states_user_wallet ON channel_states(user_wallet);
-CREATE INDEX idx_channel_states_transition_type ON channel_states(transition_type);
-
 -- Uniqueness constraint to catch bugs in version computation or concurrency issues
 ALTER TABLE channel_states ADD CONSTRAINT uq_channel_states_wallet_asset_epoch_version
     UNIQUE (user_wallet, asset, epoch, version);
@@ -290,8 +286,6 @@ DROP INDEX IF EXISTS idx_channel_states_home_channel_id;
 DROP INDEX IF EXISTS idx_channel_states_latest_signed;
 DROP INDEX IF EXISTS idx_channel_states_latest;
 ALTER TABLE channel_states DROP CONSTRAINT IF EXISTS uq_channel_states_wallet_asset_epoch_version;
-DROP INDEX IF EXISTS idx_channel_states_transition_type;
-DROP INDEX IF EXISTS idx_channel_states_user_wallet;
 DROP TABLE IF EXISTS channel_states;
 DROP INDEX IF EXISTS idx_channels_status;
 DROP INDEX IF EXISTS idx_channels_user_wallet;

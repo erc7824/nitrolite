@@ -41,7 +41,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: clearnode
+          context: .
+          file: ./clearnode/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ github.repository }}/clearnode:${{ steps.tagger.outputs.tag }}

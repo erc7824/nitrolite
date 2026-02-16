@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
-import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import {IVault} from "./interfaces/IVault.sol";
 import {ISignatureValidator, ValidationResult, VALIDATION_FAILURE} from "./interfaces/ISignatureValidator.sol";
@@ -575,7 +575,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
-        if (!_isHomeChain(channelId)) {
+        if (_isHomeChain(channelId)) {
             _processHomeChainEscrowInitiate(channelId, candidate);
             emit EscrowDepositInitiatedOnHome(escrowId, channelId, candidate);
         } else {
@@ -637,7 +637,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         require(candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT, IncorrectStateIntent());
 
-        if (!_isHomeChain(meta.channelId)) {
+        if (_isHomeChain(meta.channelId)) {
             _processHomeChainEscrowFinalize(meta.channelId, candidate, user, node);
             emit EscrowDepositFinalizedOnHome(escrowId, meta.channelId, candidate);
             return;
@@ -666,7 +666,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
-        if (!_isHomeChain(channelId)) {
+        if (_isHomeChain(channelId)) {
             _processHomeChainEscrowInitiate(channelId, candidate);
             emit EscrowWithdrawalInitiatedOnHome(escrowId, channelId, candidate);
         } else {
@@ -731,7 +731,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         require(candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL, IncorrectStateIntent());
 
-        if (!_isHomeChain(channelId)) {
+        if (_isHomeChain(channelId)) {
             _processHomeChainEscrowFinalize(channelId, candidate, user, node);
             emit EscrowWithdrawalFinalizedOnHome(escrowId, channelId, candidate);
         } else {

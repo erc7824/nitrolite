@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ChannelStatus, State, StateIntent, Ledger} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {WadMath} from "./WadMath.sol";

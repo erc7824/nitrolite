@@ -3,6 +3,7 @@ package evm
 import (
 	"context"
 	"math/big"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -49,10 +50,40 @@ func NewListener(contractAddress common.Address, client bind.ContractBackend, bl
 	}
 }
 
-// GetLatestContractEvent(contractAddress string, networkID uint32) (*ContractEvent, error)
-func (l *Listener) Listen(ctx context.Context) error {
-	go l.listenEvents(ctx)
-	return nil
+// Listen starts the event listener in a background goroutine.
+// The handleClosure callback is invoked when the listener exits, with an error if any.
+func (l *Listener) Listen(ctx context.Context, handleClosure func(err error)) {
+	childCtx, cancel := context.WithCancel(ctx)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	var closureErr error
+	var closureErrMu sync.Mutex
+	childHandleClosure := func(err error) {
+		closureErrMu.Lock()
+		defer closureErrMu.Unlock()
+
+		if err != nil && closureErr == nil {
+			closureErr = err
+		}
+
+		cancel()
+		wg.Done()
+	}
+
+	go func() {
+		defer childHandleClosure(nil)
+		l.listenEvents(childCtx)
+	}()
+
+	go func() {
+		wg.Wait()
+
+		closureErrMu.Lock()
+		defer closureErrMu.Unlock()
+
+		handleClosure(closureErr)
+	}()
 }
 
 // listenEvents listens for blockchain events and processes them with the provided handler
@@ -118,6 +149,8 @@ func (l *Listener) listenEvents(ctx context.Context) {
 		}
 
 		select {
+		case <-ctx.Done():
+			l.logger.Info("stopping event listener", "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String())
 		case eventLog := <-historicalCh:
 			l.logger.Debug("received new event", "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String(), "blockNumber", lastBlock, "logIndex", eventLog.Index)
 

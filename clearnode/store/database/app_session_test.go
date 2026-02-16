@@ -537,7 +537,7 @@ func TestDBStore_UpdateAppSession(t *testing.T) {
 		assert.Equal(t, app.AppSessionStatusClosed, result.Status)
 	})
 
-	t.Run("Success - Update non-existent session (no error from GORM)", func(t *testing.T) {
+	t.Run("Error - Update non-existent session", func(t *testing.T) {
 		db, cleanup := SetupTestDB(t)
 		defer cleanup()
 
@@ -562,6 +562,42 @@ func TestDBStore_UpdateAppSession(t *testing.T) {
 		}
 
 		err := store.UpdateAppSession(session)
-		require.NoError(t, err) // GORM doesn't error on update with no rows affected
+		require.Error(t, err) // Optimistic locking detects no rows affected
+		assert.Contains(t, err.Error(), "concurrent modification detected")
+	})
+
+	t.Run("Error - Version mismatch (concurrent modification)", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		session := app.AppSessionV1{
+			SessionID:   "session456",
+			Application: "poker",
+			Nonce:       1,
+			Participants: []app.AppParticipantV1{
+				{
+					WalletAddress:   "0xuser123",
+					SignatureWeight: 100,
+				},
+			},
+			SessionData: `{"state": "active"}`,
+			Quorum:      100,
+			Version:     1,
+			Status:      app.AppSessionStatusOpen,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+
+		require.NoError(t, store.CreateAppSession(session))
+
+		// Try to update with wrong version (expecting version 2, but DB has version 1)
+		session.SessionData = `{"state": "updated"}`
+		session.Version = 3 // This expects DB to have version 2, but it has version 1
+
+		err := store.UpdateAppSession(session)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "concurrent modification detected")
 	})
 }

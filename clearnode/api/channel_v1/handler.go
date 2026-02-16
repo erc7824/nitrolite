@@ -68,6 +68,11 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 
 	logger.Debug("issuing transfer receiver state")
 
+	// Lock the receiver's state to prevent concurrent modifications
+	if _, err := tx.LockUserState(receiverWallet, senderState.Asset); err != nil {
+		return nil, rpc.Errorf("failed to lock receiver state: %v", err)
+	}
+
 	currentState, err := tx.GetLastUserState(receiverWallet, senderState.Asset, false)
 	if err != nil {
 		return nil, rpc.Errorf("failed to get last %s user state for transfer receiver with address %s", senderState.Asset, incomingTransition.AccountID)

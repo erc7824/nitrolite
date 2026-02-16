@@ -61,6 +61,11 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 
 	var nodeSig string
 	err = h.useStoreInTx(func(tx Store) error {
+		_, err := tx.LockUserState(incomingState.UserWallet, incomingState.Asset)
+		if err != nil {
+			return rpc.Errorf("failed to lock user state: %v", err)
+		}
+
 		// Check if channel already exists
 		currentState, err := tx.GetLastUserState(incomingState.UserWallet, incomingState.Asset, false)
 		if err != nil {

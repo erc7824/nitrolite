@@ -3,6 +3,7 @@ package channel_v1
 import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -17,6 +18,11 @@ type MockStore struct {
 func (m *MockStore) BeginTx() (Store, func() error, func() error) {
 	args := m.Called()
 	return args.Get(0).(Store), args.Get(1).(func() error), args.Get(2).(func() error)
+}
+
+func (m *MockStore) LockUserState(wallet, asset string) (decimal.Decimal, error) {
+	args := m.Called(wallet, asset)
+	return args.Get(0).(decimal.Decimal), args.Error(1)
 }
 
 func (m *MockStore) GetLastUserState(wallet, asset string, signed bool) (*core.State, error) {

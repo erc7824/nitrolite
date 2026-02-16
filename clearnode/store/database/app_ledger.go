@@ -103,12 +103,9 @@ func (s *DBStore) GetParticipantAllocations(appSessionID string) (map[string]map
 			l.asset_symbol,
 			COALESCE(SUM(l.credit), 0) - COALESCE(SUM(l.debit), 0) AS balance
 		FROM app_ledger_v1 l
+		INNER JOIN app_session_participants_v1 p
+			ON p.wallet_address = l.wallet AND p.app_session_id = ?
 		WHERE l.account_id = ?
-			AND l.wallet IN (
-				SELECT wallet_address
-				FROM app_session_participants_v1
-				WHERE app_session_id = ?
-			)
 		GROUP BY l.wallet, l.asset_symbol
 	`, appSessionID, appSessionID).Scan(&rows).Error
 

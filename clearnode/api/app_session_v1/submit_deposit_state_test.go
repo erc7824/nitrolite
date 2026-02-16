@@ -141,6 +141,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	}
 
 	// Mock expectations
+	mockStore.On("LockUserState", participant1, asset).Return(decimal.Zero, nil).Once()
 	mockStore.On("CheckOpenChannel", participant1, asset).Return("0x03", true, nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
@@ -307,6 +308,9 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 		},
 	}
 
+	// Mock expectations - LockUserState is called before transition type check
+	mockStore.On("LockUserState", participant1, asset).Return(decimal.Zero, nil).Once()
+
 	// Create RPC request
 	rpcState := toRPCState(userState)
 	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
@@ -452,6 +456,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	}
 
 	// Mock expectations
+	mockStore.On("LockUserState", participant1, asset).Return(decimal.Zero, nil).Once()
 	mockStore.On("CheckOpenChannel", participant1, asset).Return("0x03", true, nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()

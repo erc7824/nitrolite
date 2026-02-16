@@ -10,6 +10,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// stateSelectColumns lists explicit columns for State queries to avoid collision with AutoMigrate columns.
+// Used in raw SQL queries with UNION ALL pattern.
+const stateSelectColumns = `s.id, s.asset, s.user_wallet, s.epoch, s.version,
+	s.transition_type, s.transition_tx_id, s.transition_account_id, s.transition_amount,
+	s.home_channel_id, s.escrow_channel_id,
+	s.home_user_balance, s.home_user_net_flow, s.home_node_balance, s.home_node_net_flow,
+	s.escrow_user_balance, s.escrow_user_net_flow, s.escrow_node_balance, s.escrow_node_net_flow,
+	s.user_sig, s.node_sig, s.created_at`
+
 // UserBalance represents aggregated user balance for an asset
 type UserBalance struct {
 	UserWallet string          `gorm:"column:user_wallet;primaryKey;size:42"`
@@ -139,14 +148,6 @@ func (s *DBStore) GetLastStateByChannelID(channelID string, signed bool) (*core.
 
 	// Use UNION ALL to leverage separate indexes on home_channel_id and escrow_channel_id
 	// Each branch returns its own best match, then we pick the overall best
-	// Note: We explicitly list columns instead of using s.* to avoid collision with AutoMigrate columns
-	const stateColumns = `s.id, s.asset, s.user_wallet, s.epoch, s.version,
-		s.transition_type, s.transition_tx_id, s.transition_account_id, s.transition_amount,
-		s.home_channel_id, s.escrow_channel_id,
-		s.home_user_balance, s.home_user_net_flow, s.home_node_balance, s.home_node_net_flow,
-		s.escrow_user_balance, s.escrow_user_net_flow, s.escrow_node_balance, s.escrow_node_net_flow,
-		s.user_sig, s.node_sig, s.created_at`
-
 	var state State
 	err := s.db.Raw(fmt.Sprintf(`
 		SELECT * FROM (
@@ -174,7 +175,7 @@ func (s *DBStore) GetLastStateByChannelID(channelID string, signed bool) (*core.
 		) escrow_result
 		ORDER BY epoch DESC, version DESC
 		LIMIT 1
-	`, stateColumns, signedFilter, stateColumns, signedFilter), channelID, channelID).Scan(&state).Error
+	`, stateSelectColumns, signedFilter, stateSelectColumns, signedFilter), channelID, channelID).Scan(&state).Error
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get last state by channel ID: %w", err)
@@ -194,14 +195,6 @@ func (s *DBStore) GetStateByChannelIDAndVersion(channelID string, version uint64
 	channelID = strings.ToLower(channelID)
 
 	// Use UNION ALL to leverage separate indexes on home_channel_id and escrow_channel_id
-	// Note: We explicitly list columns instead of using s.* to avoid collision with AutoMigrate columns
-	const stateColumns = `s.id, s.asset, s.user_wallet, s.epoch, s.version,
-		s.transition_type, s.transition_tx_id, s.transition_account_id, s.transition_amount,
-		s.home_channel_id, s.escrow_channel_id,
-		s.home_user_balance, s.home_user_net_flow, s.home_node_balance, s.home_node_net_flow,
-		s.escrow_user_balance, s.escrow_user_net_flow, s.escrow_node_balance, s.escrow_node_net_flow,
-		s.user_sig, s.node_sig, s.created_at`
-
 	var state State
 	err := s.db.Raw(fmt.Sprintf(`
 		SELECT * FROM (
@@ -226,7 +219,7 @@ func (s *DBStore) GetStateByChannelIDAndVersion(channelID string, version uint64
 			LIMIT 1
 		) escrow_result
 		LIMIT 1
-	`, stateColumns, stateColumns), channelID, version, channelID, version).Scan(&state).Error
+	`, stateSelectColumns, stateSelectColumns), channelID, version, channelID, version).Scan(&state).Error
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state by channel ID and version: %w", err)

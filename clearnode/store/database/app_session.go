@@ -99,8 +99,10 @@ func (s *DBStore) GetAppSessions(appSessionID *string, participant *string, stat
 
 	if participant != nil && *participant != "" {
 		// Join with participants table to filter by participant
+		// Use Distinct to avoid counting duplicate rows from JOIN
 		query = query.Joins("JOIN app_session_participants_v1 ON app_sessions_v1.id = app_session_participants_v1.app_session_id").
-			Where("app_session_participants_v1.wallet_address = ?", strings.ToLower(*participant))
+			Where("app_session_participants_v1.wallet_address = ?", strings.ToLower(*participant)).
+			Distinct("app_sessions_v1.id")
 	}
 
 	if status != app.AppSessionStatusVoid {
@@ -131,9 +133,14 @@ func (s *DBStore) GetAppSessions(appSessionID *string, participant *string, stat
 	return sessions, metadata, nil
 }
 
-// UpdateAppSession updates existing session data.
+// UpdateAppSession updates existing session data with optimistic locking.
+// The session.Version must be the new version (current + 1). The update will only
+// succeed if the database version is session.Version - 1, preventing lost updates.
 func (s *DBStore) UpdateAppSession(session app.AppSessionV1) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		sessionID := strings.ToLower(session.SessionID)
+		expectedVersion := session.Version - 1
+
 		updates := map[string]interface{}{
 			"session_data": session.SessionData,
 			"version":      session.Version,
@@ -141,8 +148,17 @@ func (s *DBStore) UpdateAppSession(session app.AppSessionV1) error {
 			"updated_at":   time.Now(),
 		}
 
-		if err := tx.Model(&AppSessionV1{}).Where("id = ?", strings.ToLower(session.SessionID)).Updates(updates).Error; err != nil {
-			return fmt.Errorf("failed to update app session: %w", err)
+		// Use optimistic locking: only update if version matches expected
+		result := tx.Model(&AppSessionV1{}).
+			Where("id = ? AND version = ?", sessionID, expectedVersion).
+			Updates(updates)
+
+		if result.Error != nil {
+			return fmt.Errorf("failed to update app session: %w", result.Error)
+		}
+
+		if result.RowsAffected == 0 {
+			return fmt.Errorf("concurrent modification detected for session %s", sessionID)
 		}
 
 		return nil

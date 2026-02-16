@@ -287,12 +287,22 @@ contract ChannelHub is IVault, ReentrancyGuard {
     }
 
     // ========= Escrow Deposit Purge ==========
-    function getUnlockableEscrowDepositAmount() external view returns (uint256 totalUnlockable) {
-        (, totalUnlockable) = _getUnlockableEscrowStats();
-    }
+    function getUnlockableEscrowDepositStats() internal view returns (uint256 count, uint256 totalAmount) {
+        uint256 totalDeposits = _escrowDepositIds.length;
+        uint256 escrowHeadTemp = escrowHead;
 
-    function getUnlockableEscrowDepositCount() external view returns (uint256 count) {
-        (count,) = _getUnlockableEscrowStats();
+        while (escrowHeadTemp < totalDeposits) {
+            bytes32 escrowId = _escrowDepositIds[escrowHeadTemp];
+            EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
+
+            if (_isEscrowDepositUnlockable(meta)) {
+                count++;
+                totalAmount += meta.lockedAmount;
+                escrowHeadTemp++;
+            } else {
+                break;
+            }
+        }
     }
 
     function getEscrowDepositIds(uint256 page, uint256 pageSize) external view returns (bytes32[] memory ids) {
@@ -334,7 +344,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
                 continue;
             }
             // Only INITIALIZED escrows can be purged; CHALLENGED escrows require manual finalization
-            if (_isEscrowUnlockable(meta)) {
+            if (_isEscrowDepositUnlockable(meta)) {
                 _nodeBalances[meta.node][meta.initState.nonHomeLedger.token] += meta.lockedAmount;
                 meta.status = EscrowStatus.FINALIZED;
                 meta.lockedAmount = 0;
@@ -352,27 +362,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
         }
     }
 
-    /// @dev Internal helper to compute unlockable escrow statistics
-    function _getUnlockableEscrowStats() internal view returns (uint256 count, uint256 totalAmount) {
-        uint256 totalDeposits = _escrowDepositIds.length;
-        uint256 escrowHeadTemp = escrowHead;
-
-        while (escrowHeadTemp < totalDeposits) {
-            bytes32 escrowId = _escrowDepositIds[escrowHeadTemp];
-            EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
-
-            if (_isEscrowUnlockable(meta)) {
-                count++;
-                totalAmount += meta.lockedAmount;
-                escrowHeadTemp++;
-            } else {
-                break;
-            }
-        }
-    }
-
     /// @dev Check if an escrow deposit can be unlocked
-    function _isEscrowUnlockable(EscrowDepositMeta storage meta) internal view returns (bool) {
+    function _isEscrowDepositUnlockable(EscrowDepositMeta storage meta) internal view returns (bool) {
         return meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED;
     }
 
@@ -584,17 +575,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
-        if (_isHomeChain(channelId)) {
-            // HOME CHAIN: Update channel via ChannelEngine
-            ChannelMeta storage meta = _channels[channelId];
-            ChannelDefinition memory metaDef = meta.definition;
-
-            ChannelEngine.TransitionContext memory ctx =
-                _buildChannelContext(channelId, _nodeBalances[metaDef.node][candidate.homeLedger.token]);
-            ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
-
-            _applyEffects(channelId, metaDef, candidate, effects);
-
+        if (!_isHomeChain(channelId)) {
+            _processHomeChainEscrowInitiate(channelId, candidate);
             emit EscrowDepositInitiatedOnHome(escrowId, channelId, candidate);
         } else {
             // NON-HOME CHAIN: Create escrow record - recover addresses from signatures
@@ -655,17 +637,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         require(candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT, IncorrectStateIntent());
 
-        if (isHomeChain) {
-            // HOME CHAIN: Update channel via ChannelEngine
-            ChannelMeta storage channelMeta = _channels[meta.channelId];
-            ChannelDefinition memory channelDef = channelMeta.definition;
-            _validateSignatures(meta.channelId, candidate, user, node, channelDef.approvedSignatureValidators);
-            ChannelEngine.TransitionContext memory ctx =
-                _buildChannelContext(meta.channelId, _nodeBalances[channelDef.node][candidate.homeLedger.token]);
-            ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
-
-            _applyEffects(meta.channelId, channelDef, candidate, effects);
-
+        if (!_isHomeChain(meta.channelId)) {
+            _processHomeChainEscrowFinalize(meta.channelId, candidate, user, node);
             emit EscrowDepositFinalizedOnHome(escrowId, meta.channelId, candidate);
             return;
         } else {
@@ -693,17 +666,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
-        if (_isHomeChain(channelId)) {
-            // HOME CHAIN
-            ChannelMeta storage meta = _channels[channelId];
-            ChannelDefinition memory metaDef = meta.definition;
-
-            ChannelEngine.TransitionContext memory ctx =
-                _buildChannelContext(channelId, _nodeBalances[metaDef.node][candidate.homeLedger.token]);
-            ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
-
-            _applyEffects(channelId, metaDef, candidate, effects);
-
+        if (!_isHomeChain(channelId)) {
+            _processHomeChainEscrowInitiate(channelId, candidate);
             emit EscrowWithdrawalInitiatedOnHome(escrowId, channelId, candidate);
         } else {
             // NON-HOME CHAIN
@@ -767,17 +731,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         require(candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL, IncorrectStateIntent());
 
-        if (isHomeChain) {
-            // HOME CHAIN: Update channel via ChannelEngine
-            ChannelMeta storage channelMeta = _channels[channelId];
-            ChannelDefinition memory channelDef = channelMeta.definition;
-            _validateSignatures(channelId, candidate, user, node, channelDef.approvedSignatureValidators);
-            ChannelEngine.TransitionContext memory ctx =
-                _buildChannelContext(channelId, _nodeBalances[channelDef.node][candidate.homeLedger.token]);
-            ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
-
-            _applyEffects(channelId, channelDef, candidate, effects);
-
+        if (!_isHomeChain(channelId)) {
+            _processHomeChainEscrowFinalize(channelId, candidate, user, node);
             emit EscrowWithdrawalFinalizedOnHome(escrowId, channelId, candidate);
         } else {
             // Non-Home chain: Update via EscrowWithdrawalEngine
@@ -957,6 +912,38 @@ contract ChannelHub is IVault, ReentrancyGuard {
             ValidationResult.unwrap(result) != ValidationResult.unwrap(VALIDATION_FAILURE),
             IncorrectSignature()
         );
+    }
+
+    /// @dev Process HOME CHAIN path for escrow initiate operations
+    function _processHomeChainEscrowInitiate(bytes32 channelId, State calldata candidate)
+        internal
+    {
+        ChannelMeta storage meta = _channels[channelId];
+        ChannelDefinition memory metaDef = meta.definition;
+
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[metaDef.node][candidate.homeLedger.token]);
+        ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
+
+        _applyEffects(channelId, metaDef, candidate, effects);
+    }
+
+    /// @dev Process HOME CHAIN path for escrow finalize operations
+    function _processHomeChainEscrowFinalize(
+        bytes32 channelId,
+        State calldata candidate,
+        address user,
+        address node
+    ) internal {
+        ChannelMeta storage channelMeta = _channels[channelId];
+        ChannelDefinition memory channelDef = channelMeta.definition;
+        _validateSignatures(channelId, candidate, user, node, channelDef.approvedSignatureValidators);
+
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[channelDef.node][candidate.homeLedger.token]);
+        ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
+
+        _applyEffects(channelId, channelDef, candidate, effects);
     }
 
     function _buildChannelContext(bytes32 channelId, uint256 nodeBalance)

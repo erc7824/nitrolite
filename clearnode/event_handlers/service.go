@@ -123,20 +123,6 @@ func (s *EventHandlerService) HandleHomeChannelChallenged(ctx context.Context, e
 			return nil
 		}
 
-		if event.StateVersion <= channel.StateVersion {
-			logger.Warn("stale HomeChannelChallenged event received", "channelId", chanID, "eventStateVersion", event.StateVersion, "currentStateVersion", channel.StateVersion)
-			return nil
-		}
-		channel.StateVersion = event.StateVersion
-		channel.Status = core.ChannelStatusChallenged
-
-		expirationTime := time.Unix(int64(event.ChallengeExpiry), 0)
-		channel.ChallengeExpiresAt = &expirationTime
-
-		if err := tx.UpdateChannel(*channel); err != nil {
-			return err
-		}
-
 		lastSignedState, err := tx.GetLastStateByChannelID(chanID, true)
 		if err != nil {
 			return err
@@ -149,6 +135,16 @@ func (s *EventHandlerService) HandleHomeChannelChallenged(ctx context.Context, e
 			if err := tx.ScheduleCheckpoint(lastSignedState.ID, lastSignedState.HomeLedger.BlockchainID); err != nil {
 				return err
 			}
+		}
+
+		channel.StateVersion = event.StateVersion
+		channel.Status = core.ChannelStatusChallenged
+
+		expirationTime := time.Unix(int64(event.ChallengeExpiry), 0)
+		channel.ChallengeExpiresAt = &expirationTime
+
+		if err := tx.UpdateChannel(*channel); err != nil {
+			return err
 		}
 
 		logger.Info("handled HomeChannelChallenged event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)

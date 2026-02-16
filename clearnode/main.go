@@ -79,7 +79,7 @@ func main() {
 			logger.Fatal("failed to create EVM client")
 		}
 
-		worker := NewBlockchainWorker(blockchainClient, bb.DbStore, logger)
+		worker := NewBlockchainWorker(b.ID, blockchainClient, bb.DbStore, logger)
 		go worker.Start(ctx)
 	}
 

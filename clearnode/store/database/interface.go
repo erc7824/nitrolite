@@ -107,6 +107,9 @@ type DatabaseStore interface {
 	// GetActions retrieves pending blockchain actions, optionally limited by count.
 	GetActions(limit uint8, chainID uint64) ([]BlockchainAction, error)
 
+	// GetStateByID retrieves a state by its deterministic ID.
+	GetStateByID(stateID string) (*core.State, error)
+
 	// --- App Session Operations ---
 
 	// CreateAppSession initializes a new application session.

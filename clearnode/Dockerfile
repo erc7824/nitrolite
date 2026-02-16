@@ -13,7 +13,7 @@ COPY . .
 
 RUN go build -o ./bin/clearnode -ldflags "-X main.Version=${VERSION}" ./clearnode
 
-FROM alpine
+FROM alpine:3.23.3
 
 RUN addgroup -g 1001 -S clearnode
 RUN adduser -S clearnode -u 1001 -G clearnode

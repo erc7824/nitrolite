@@ -5,7 +5,7 @@
  * low-level RPC access for advanced use cases.
  */
 
-import { Address, Hex, createPublicClient, createWalletClient, http, custom } from 'viem';
+import { Address, Hex, createPublicClient, createWalletClient, http, custom, verifyMessage } from 'viem';
 import Decimal from 'decimal.js';
 import * as core from './core';
 import * as app from './app';
@@ -31,7 +31,7 @@ import {
 import * as blockchain from './blockchain';
 import { nextState, applyChannelCreation, applyAcknowledgementTransition, applyHomeDepositTransition, applyHomeWithdrawalTransition, applyTransferSendTransition, applyFinalizeTransition, applyCommitTransition } from './core/state';
 import { newVoidState } from './core/types';
-import { packState } from './core/state_packer';
+import { packState, packChallengeState } from './core/state_packer';
 import { StateSigner, TransactionSigner } from './signers';
 
 /**
@@ -779,6 +779,71 @@ export class Client {
           `transition type ${state.transition.type} does not require a blockchain operation`
         );
     }
+  }
+
+  /**
+   * Challenge submits an on-chain challenge for a channel using a co-signed state.
+   * The state must have both user and node signatures, which are validated before
+   * the challenge transaction is submitted.
+   *
+   * A challenge initiates a dispute period on-chain. If the counterparty does not
+   * respond with a higher-versioned state before the challenge period expires,
+   * the channel can be closed with the challenged state.
+   *
+   * @param state - A co-signed state (both userSig and nodeSig must be present)
+   * @returns Transaction hash of the on-chain challenge transaction
+   *
+   * @example
+   * ```typescript
+   * const state = await client.getLatestState(wallet, 'usdc', true);
+   * const txHash = await client.challenge(state);
+   * console.log('Challenge transaction:', txHash);
+   * ```
+   */
+  async challenge(state: core.State): Promise<string> {
+    if (!state.userSig || !state.nodeSig) {
+      throw new Error('state must have both user and node signatures');
+    }
+
+    if (!state.homeChannelId) {
+      throw new Error('state must have a home channel ID');
+    }
+
+    // Pack state for signature verification
+    const packedState = await packState(state, this.assetStore);
+
+    // Strip the signer type byte (first byte) from signatures before verification
+    const userSigRaw = `0x${state.userSig.slice(4)}` as Hex; // skip 0x + type byte
+    const userValid = await verifyMessage({
+      address: state.userWallet,
+      message: { raw: packedState },
+      signature: userSigRaw,
+    });
+    if (!userValid) {
+      throw new Error('invalid user signature');
+    }
+
+    const nodeAddress = await this.getNodeAddress();
+    const nodeSigRaw = `0x${state.nodeSig.slice(4)}` as Hex;
+    const nodeValid = await verifyMessage({
+      address: nodeAddress,
+      message: { raw: packedState },
+      signature: nodeSigRaw,
+    });
+    if (!nodeValid) {
+      throw new Error('invalid node signature');
+    }
+
+    // Create the challenge signature
+    const challengeData = await packChallengeState(state, this.assetStore);
+    const challengerSig = await this.stateSigner.signMessage(challengeData);
+
+    // Initialize blockchain client and submit
+    const blockchainId = state.homeLedger.blockchainId;
+    await this.initializeBlockchainClient(blockchainId);
+    const blockchainClient = this.blockchainClients.get(blockchainId)!;
+
+    return await blockchainClient.challenge(state, challengerSig);
   }
 
   /**

@@ -99,7 +99,6 @@ func (s *DBStore) GetAppSessions(appSessionID *string, participant *string, stat
 
 	if participant != nil && *participant != "" {
 		// Join with participants table to filter by participant
-		// Use Distinct to avoid counting duplicate rows from JOIN
 		query = query.Joins("JOIN app_session_participants_v1 ON app_sessions_v1.id = app_session_participants_v1.app_session_id").
 			Where("app_session_participants_v1.wallet_address = ?", strings.ToLower(*participant)).
 			Distinct("app_sessions_v1.id")
@@ -134,8 +133,6 @@ func (s *DBStore) GetAppSessions(appSessionID *string, participant *string, stat
 }
 
 // UpdateAppSession updates existing session data with optimistic locking.
-// The session.Version must be the new version (current + 1). The update will only
-// succeed if the database version is session.Version - 1, preventing lost updates.
 func (s *DBStore) UpdateAppSession(session app.AppSessionV1) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		sessionID := strings.ToLower(session.SessionID)

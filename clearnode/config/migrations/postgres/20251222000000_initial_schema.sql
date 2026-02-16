@@ -1,5 +1,4 @@
 -- +goose Up
--- Squashed migration combining all previous migrations and adding new data models
 
 -- Channels table: Represents state channels between user and node
 CREATE TABLE channels (
@@ -151,9 +150,8 @@ CREATE TABLE contract_events (
 );
 
 CREATE UNIQUE INDEX contract_events_tx_log_chain_idx ON contract_events (transaction_hash, log_index, blockchain_id);
-CREATE INDEX idx_contract_events_block ON contract_events(blockchain_id, block_number);
--- Covering index for GetLatestEvent queries: WHERE blockchain_id = ? AND contract_address = ? ORDER BY block_number DESC, log_index DESC
 CREATE INDEX idx_contract_events_latest ON contract_events(blockchain_id, contract_address, block_number DESC, log_index DESC);
+
 -- Blockchain actions table: Pending blockchain operations
 CREATE TABLE blockchain_actions (
     id BIGSERIAL PRIMARY KEY,
@@ -270,7 +268,6 @@ DROP INDEX IF EXISTS idx_blockchain_actions_state_id;
 DROP INDEX IF EXISTS idx_blockchain_actions_pending;
 DROP TABLE IF EXISTS blockchain_actions;
 DROP INDEX IF EXISTS idx_contract_events_latest;
-DROP INDEX IF EXISTS idx_contract_events_block;
 DROP INDEX IF EXISTS contract_events_tx_log_chain_idx;
 DROP TABLE IF EXISTS contract_events;
 DROP INDEX IF EXISTS idx_app_ledger_v1_wallet;

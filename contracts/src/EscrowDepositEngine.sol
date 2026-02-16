@@ -184,9 +184,7 @@ library EscrowDepositEngine {
         returns (TransitionEffects memory effects)
     {
         // FINALIZE: Node claims with finalization proof
-        require(
-            ctx.status == EscrowStatus.INITIALIZED || ctx.status == EscrowStatus.DISPUTED, IncorrectEscrowStatus()
-        );
+        require(ctx.status == EscrowStatus.INITIALIZED || ctx.status == EscrowStatus.DISPUTED, IncorrectEscrowStatus());
 
         // Must be immediate successor
         require(candidate.version == ctx.initState.version + 1, IncorrectStateVersion());
@@ -233,9 +231,7 @@ library EscrowDepositEngine {
         } else if (candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT) {
             // On finalize: funds released (negative delta)
             require(totalDelta == effects.nodeFundsDelta, FundConservationOnFinalize());
-            require(
-                (-effects.nodeFundsDelta).toUint256() == ctx.lockedAmount, NodeFundsDeltaAndLockedAmountMismatch()
-            );
+            require((-effects.nodeFundsDelta).toUint256() == ctx.lockedAmount, NodeFundsDeltaAndLockedAmountMismatch());
         }
     }
 }

@@ -494,7 +494,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
         ChannelMeta storage meta = _channels[channelId];
         ChannelDefinition memory def = meta.definition;
 
-        require(meta.status == ChannelStatus.OPERATING || meta.status == ChannelStatus.MIGRATING_IN, IncorrectChannelStatus());
+        require(
+            meta.status == ChannelStatus.OPERATING || meta.status == ChannelStatus.MIGRATING_IN,
+            IncorrectChannelStatus()
+        );
 
         State memory prevState = meta.lastState;
         require(candidate.version >= prevState.version, ChallengerVersionTooLow());
@@ -908,16 +911,11 @@ contract ChannelHub is IVault, ReentrancyGuard {
         bytes memory challengerSigningData = abi.encodePacked(signingData, "challenge");
         address challenger = challengerIdx == ParticipantIndex.USER ? user : node;
         ValidationResult result = validator.validateSignature(channelId, challengerSigningData, sigData, challenger);
-        require(
-            ValidationResult.unwrap(result) != ValidationResult.unwrap(VALIDATION_FAILURE),
-            IncorrectSignature()
-        );
+        require(ValidationResult.unwrap(result) != ValidationResult.unwrap(VALIDATION_FAILURE), IncorrectSignature());
     }
 
     /// @dev Process HOME CHAIN path for escrow initiate operations
-    function _processHomeChainEscrowInitiate(bytes32 channelId, State calldata candidate)
-        internal
-    {
+    function _processHomeChainEscrowInitiate(bytes32 channelId, State calldata candidate) internal {
         ChannelMeta storage meta = _channels[channelId];
         ChannelDefinition memory metaDef = meta.definition;
 
@@ -929,12 +927,9 @@ contract ChannelHub is IVault, ReentrancyGuard {
     }
 
     /// @dev Process HOME CHAIN path for escrow finalize operations
-    function _processHomeChainEscrowFinalize(
-        bytes32 channelId,
-        State calldata candidate,
-        address user,
-        address node
-    ) internal {
+    function _processHomeChainEscrowFinalize(bytes32 channelId, State calldata candidate, address user, address node)
+        internal
+    {
         ChannelMeta storage channelMeta = _channels[channelId];
         ChannelDefinition memory channelDef = channelMeta.definition;
         _validateSignatures(channelId, candidate, user, node, channelDef.approvedSignatureValidators);

@@ -156,10 +156,7 @@ library EscrowWithdrawalEngine {
         require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
         require(candidate.nonHomeLedger.userNetFlow == 0, IncorrectNodeNetFlow());
         uint256 withdrawalAmount = candidate.nonHomeLedger.nodeAllocation;
-        require(
-            candidate.nonHomeLedger.nodeNetFlow == withdrawalAmount.toInt256(),
-            NodeAllocationAndNetFlowMismatch()
-        );
+        require(candidate.nonHomeLedger.nodeNetFlow == withdrawalAmount.toInt256(), NodeAllocationAndNetFlowMismatch());
 
         // Validate that home state shows user has allocation to withdraw
         require(
@@ -183,9 +180,7 @@ library EscrowWithdrawalEngine {
         returns (TransitionEffects memory effects)
     {
         // FINALIZE: Release to user with finalization proof
-        require(
-            ctx.status == EscrowStatus.INITIALIZED || ctx.status == EscrowStatus.DISPUTED, IncorrectEscrowStatus()
-        );
+        require(ctx.status == EscrowStatus.INITIALIZED || ctx.status == EscrowStatus.DISPUTED, IncorrectEscrowStatus());
 
         // Must be immediate successor
         require(candidate.version == ctx.initState.version + 1, IncorrectStateVersion());
@@ -199,8 +194,7 @@ library EscrowWithdrawalEngine {
 
         // Validate homeLedger shows user allocation decreased
         require(
-            candidate.homeLedger.userAllocation < ctx.initState.homeLedger.userAllocation,
-            UserAllocationMustDecrease()
+            candidate.homeLedger.userAllocation < ctx.initState.homeLedger.userAllocation, UserAllocationMustDecrease()
         );
         uint256 homeUserAllocDelta = ctx.initState.homeLedger.userAllocation - candidate.homeLedger.userAllocation;
         require(
@@ -242,9 +236,7 @@ library EscrowWithdrawalEngine {
         } else if (candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL) {
             // On finalize: user funds released (negative delta)
             require(totalDelta == effects.userFundsDelta, FundConservationOnFinalize());
-            require(
-                (-effects.userFundsDelta).toUint256() == ctx.lockedAmount, UserFundsDeltaAndLockedAmountMismatch()
-            );
+            require((-effects.userFundsDelta).toUint256() == ctx.lockedAmount, UserFundsDeltaAndLockedAmountMismatch());
         }
     }
 }

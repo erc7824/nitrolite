@@ -167,11 +167,11 @@ library ChannelEngine {
         return effects;
     }
 
-    function _calculateDepositEffects(
-        TransitionContext memory ctx,
-        int256 userNfDelta,
-        int256 nodeNfDelta
-    ) internal pure returns (TransitionEffects memory effects) {
+    function _calculateDepositEffects(TransitionContext memory ctx, int256 userNfDelta, int256 nodeNfDelta)
+        internal
+        pure
+        returns (TransitionEffects memory effects)
+    {
         // DEPOSIT-specific validations
         require(
             ctx.status == ChannelStatus.VOID || ctx.status == ChannelStatus.OPERATING
@@ -189,11 +189,11 @@ library ChannelEngine {
         return effects;
     }
 
-    function _calculateWithdrawEffects(
-        TransitionContext memory ctx,
-        int256 userNfDelta,
-        int256 nodeNfDelta
-    ) internal pure returns (TransitionEffects memory effects) {
+    function _calculateWithdrawEffects(TransitionContext memory ctx, int256 userNfDelta, int256 nodeNfDelta)
+        internal
+        pure
+        returns (TransitionEffects memory effects)
+    {
         // WITHDRAW-specific validations
         require(
             ctx.status == ChannelStatus.VOID || ctx.status == ChannelStatus.OPERATING
@@ -253,10 +253,7 @@ library ChannelEngine {
         // Ensure final locked funds will be sufficient for special nodeAllocation handling
         int256 finalLockedFunds = ctx.lockedFunds.toInt256() + userNfDelta + nodeNfDelta;
         require(finalLockedFunds >= 0, InsufficientLockedFunds());
-        require(
-            finalLockedFunds >= candidate.homeLedger.nodeAllocation.toInt256(),
-            InsufficientLockedFunds()
-        );
+        require(finalLockedFunds >= candidate.homeLedger.nodeAllocation.toInt256(), InsufficientLockedFunds());
 
         // Calculate effects
         // Push allocations to parties (negative = push out from channel)
@@ -401,10 +398,7 @@ library ChannelEngine {
         // Check home - non-home state consistency
         require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
         require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
-        require(
-            candidate.nonHomeLedger.userNetFlow == -candidate.nonHomeLedger.nodeNetFlow,
-            IncorrectUserNetFlow()
-        );
+        require(candidate.nonHomeLedger.userNetFlow == -candidate.nonHomeLedger.nodeNetFlow, IncorrectUserNetFlow());
 
         // TODO: provide V-1 state (INITIATE_ESCROW_WITHDRAWAL) to validate against?
 
@@ -502,9 +496,7 @@ library ChannelEngine {
             uint256 userMigratedAlloc = ctx.prevState.homeLedger.userAllocation;
 
             // Validate that this completes the migration
-            require(
-                candidate.homeLedger.userAllocation == userMigratedAlloc, IncorrectUserAllocation()
-            );
+            require(candidate.homeLedger.userAllocation == userMigratedAlloc, IncorrectUserAllocation());
             require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
             require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
             require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());

@@ -20,6 +20,20 @@ export function generateNonce(): bigint {
 // ============================================================================
 
 /**
+ * Decode supported_sig_validators from the server response.
+ * Go's encoding/json serializes []uint8-based types as base64 strings,
+ * so we handle both base64 strings and number arrays.
+ */
+function decodeSigValidators(raw: unknown): number[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.length > 0) {
+    const binary = atob(raw);
+    return Array.from(binary, (c) => c.charCodeAt(0));
+  }
+  return [];
+}
+
+/**
  * Transform RPC NodeV1GetConfigResponse to core NodeConfig type
  */
 export function transformNodeConfig(resp: API.NodeV1GetConfigResponse): core.NodeConfig {
@@ -33,7 +47,7 @@ export function transformNodeConfig(resp: API.NodeV1GetConfigResponse): core.Nod
   return {
     nodeAddress: resp.node_address as Address,
     nodeVersion: resp.node_version,
-    supportedSigValidators: resp.supported_sig_validators || [],
+    supportedSigValidators: decodeSigValidators(resp.supported_sig_validators),
     blockchains,
   };
 }
@@ -162,12 +176,17 @@ export function transformLedger(ledger: LedgerV1): core.Ledger {
  * Transform RPC TransitionV1 to core Transition
  */
 export function transformTransition(transition: TransitionV1): core.Transition {
-  return {
+  const result: core.Transition = {
     type: transition.type, // Already TransitionType enum in RPC
     txId: transition.tx_id,
-    accountId: transition.account_id,
     amount: new Decimal(transition.amount),
   };
+
+  if (transition.account_id) {
+    result.accountId = transition.account_id;
+  }
+
+  return result;
 }
 
 // ============================================================================
@@ -262,11 +281,7 @@ export function transformPaginationMetadata(
 // App Session Transformations
 // ============================================================================
 
-// Note: App types from app/types.ts are already in the correct format
-// and don't need transformation for responses. However, we need to transform
-// SDK types to RPC types for requests.
-
-import { AppDefinitionV1, AppStateUpdateV1, SignedAppStateUpdateV1, AppParticipantV1, AppAllocationV1 } from './app/types';
+import { AppDefinitionV1, AppStateUpdateV1, SignedAppStateUpdateV1, AppParticipantV1, AppAllocationV1, AppSessionInfoV1 } from './app/types';
 import * as RPCApp from './rpc/api';
 
 /**
@@ -311,5 +326,49 @@ export function transformSignedAppStateUpdateToRPC(signed: SignedAppStateUpdateV
   return {
     app_state_update: transformAppStateUpdateToRPC(signed.appStateUpdate),
     quorum_sigs: signed.quorumSigs,
+  };
+}
+
+// ============================================================================
+// App Session Incoming Transformations (RPC snake_case → SDK camelCase)
+// ============================================================================
+
+/**
+ * Transform RPC AppSessionInfoV1 (snake_case) to SDK AppSessionInfoV1 (camelCase).
+ * The server returns snake_case JSON that needs conversion to SDK types.
+ */
+export function transformAppSessionInfo(raw: any): AppSessionInfoV1 {
+  return {
+    appSessionId: raw.app_session_id,
+    isClosed: raw.status === 'closed',
+    participants: (raw.participants || []).map((p: any) => ({
+      walletAddress: p.wallet_address as Address,
+      signatureWeight: p.signature_weight,
+    })),
+    sessionData: raw.session_data || '',
+    quorum: raw.quorum,
+    version: BigInt(raw.version),
+    nonce: BigInt(raw.nonce),
+    allocations: (raw.allocations || []).map((a: any) => ({
+      participant: a.participant as Address,
+      asset: a.asset,
+      amount: new Decimal(a.amount),
+    })),
+  };
+}
+
+/**
+ * Transform RPC AppDefinitionV1 (snake_case) to SDK AppDefinitionV1 (camelCase).
+ * The server returns snake_case JSON that needs conversion to SDK types.
+ */
+export function transformAppDefinitionFromRPC(raw: any): AppDefinitionV1 {
+  return {
+    application: raw.application,
+    participants: (raw.participants || []).map((p: any) => ({
+      walletAddress: p.wallet_address as Address,
+      signatureWeight: p.signature_weight,
+    })),
+    quorum: raw.quorum,
+    nonce: BigInt(raw.nonce),
   };
 }

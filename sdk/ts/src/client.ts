@@ -27,6 +27,8 @@ import {
   transformAppDefinitionToRPC,
   transformAppStateUpdateToRPC,
   transformSignedAppStateUpdateToRPC,
+  transformAppSessionInfo,
+  transformAppDefinitionFromRPC,
 } from './utils';
 import * as blockchain from './blockchain';
 import { nextState, applyChannelCreation, applyAcknowledgementTransition, applyHomeDepositTransition, applyHomeWithdrawalTransition, applyTransferSendTransition, applyFinalizeTransition, applyCommitTransition } from './core/state';
@@ -38,6 +40,26 @@ import { StateSigner, TransactionSigner } from './signers';
  * Default challenge period for channels (1 day in seconds)
  */
 export const DEFAULT_CHALLENGE_PERIOD = 86400;
+
+/**
+ * Strip the channel signer type prefix byte from a signature.
+ * Session key registration requires a raw EIP-191 wallet signature,
+ * so the ChannelDefaultSigner's 0x00 prefix must be removed.
+ * Throws if the signature doesn't start with the expected 0x00 prefix.
+ */
+function stripSignerTypePrefix(sig: Hex): Hex {
+  if (sig.length < 6) {
+    throw new Error(`signature too short to contain a signer type prefix: ${sig}`);
+  }
+  const prefixByte = parseInt(sig.slice(2, 4), 16);
+  if (prefixByte !== core.ChannelSignerType.Default) {
+    throw new Error(
+      `expected ChannelDefaultSigner prefix 0x00, got 0x${prefixByte.toString(16).padStart(2, '0')}; ` +
+      `session key signing requires the default wallet signer, not a session key signer`
+    );
+  }
+  return `0x${sig.slice(4)}` as Hex;
+}
 
 // Re-export signer interfaces for convenience
 export type { StateSigner, TransactionSigner };
@@ -1006,6 +1028,9 @@ export class Client {
     wallet: Address,
     options?: {
       asset?: string;
+      txType?: core.TransactionType;
+      fromTime?: bigint;
+      toTime?: bigint;
       page?: number;
       pageSize?: number;
     }
@@ -1013,6 +1038,9 @@ export class Client {
     const req: API.UserV1GetTransactionsRequest = {
       wallet,
       asset: options?.asset,
+      tx_type: options?.txType,
+      from_time: options?.fromTime,
+      to_time: options?.toTime,
       pagination: options?.page && options?.pageSize ? {
         offset: (options.page - 1) * options.pageSize,
         limit: options.pageSize,
@@ -1133,7 +1161,7 @@ export class Client {
     };
     const resp = await this.rpcClient.appSessionsV1GetAppSessions(req);
     return {
-      sessions: resp.app_sessions,
+      sessions: (resp.app_sessions as any[]).map(transformAppSessionInfo),
       metadata: transformPaginationMetadata(resp.metadata),
     };
   }
@@ -1155,7 +1183,7 @@ export class Client {
       app_session_id: appSessionId,
     };
     const resp = await this.rpcClient.appSessionsV1GetAppDefinition(req);
-    return resp.definition; // Already in correct format
+    return transformAppDefinitionFromRPC(resp.definition);
   }
 
   /**
@@ -1260,7 +1288,7 @@ export class Client {
     };
 
     const resp = await this.rpcClient.appSessionsV1SubmitDepositState(req);
-    return resp.state_node_sig;
+    return resp.signature;
   }
 
   /**
@@ -1361,7 +1389,8 @@ export class Client {
       state.session_key as Address,
       metadataHash
     );
-    return await this.stateSigner.signMessage(packed);
+    const channelSig = await this.stateSigner.signMessage(packed);
+    return stripSignerTypePrefix(channelSig);
   }
 
   /**
@@ -1410,7 +1439,8 @@ export class Client {
    */
   async signSessionKeyState(state: app.AppSessionKeyStateV1): Promise<Hex> {
     const packed = app.packAppSessionKeyStateV1(state);
-    return await this.stateSigner.signMessage(packed);
+    const channelSig = await this.stateSigner.signMessage(packed);
+    return stripSignerTypePrefix(channelSig);
   }
 
   /**
@@ -1604,7 +1634,7 @@ export class Client {
       transition: {
         type: state.transition.type,
         tx_id: state.transition.txId,
-        account_id: state.transition.accountId,
+        account_id: state.transition.accountId || '',
         amount: state.transition.amount.toString(),
       },
       asset: state.asset,

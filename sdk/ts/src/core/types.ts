@@ -10,6 +10,16 @@ export enum ChannelType {
   Escrow = 2,
 }
 
+export enum ChannelParticipant {
+  User = 0,
+  Node = 1,
+}
+
+export enum ChannelSignerType {
+  Default = 0x00,
+  SessionKey = 0x01,
+}
+
 export enum ChannelStatus {
   Void = 0,
   Open = 1,

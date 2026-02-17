@@ -174,7 +174,7 @@ export interface AppSessionsV1SubmitDepositStateRequest {
 
 export interface AppSessionsV1SubmitDepositStateResponse {
   /** Node's signature for the deposit state */
-  state_node_sig: string;
+  signature: string;
 }
 
 export interface AppSessionsV1SubmitAppStateRequest {

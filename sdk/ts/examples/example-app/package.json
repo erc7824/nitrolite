@@ -1,5 +1,5 @@
 {
-  "name": "nitrolite-react-demo",
+  "name": "nitrolite-example-app",
   "version": "1.0.0",
   "private": true,
   "description": "React demo app for Nitrolite SDK with MetaMask integration",

@@ -16,6 +16,17 @@ const (
 	ChannelSignerType_SessionKey ChannelSignerType = 0x01
 )
 
+func (t ChannelSignerType) String() string {
+	switch t {
+	case ChannelSignerType_Default:
+		return "default"
+	case ChannelSignerType_SessionKey:
+		return "session_key"
+	default:
+		return fmt.Sprintf("unknown(%d)", t)
+	}
+}
+
 var (
 	ChannelSignerTypes = []ChannelSignerType{
 		ChannelSignerType_Default,

@@ -31,6 +31,21 @@ var (
 	ChannelStatusClosed     ChannelStatus = 3
 )
 
+func (s ChannelStatus) String() string {
+	switch s {
+	case ChannelStatusVoid:
+		return "void"
+	case ChannelStatusOpen:
+		return "open"
+	case ChannelStatusChallenged:
+		return "challenged"
+	case ChannelStatusClosed:
+		return "closed"
+	default:
+		return "unknown"
+	}
+}
+
 const (
 	INTENT_OPERATE                    = 0
 	INTENT_CLOSE                      = 1

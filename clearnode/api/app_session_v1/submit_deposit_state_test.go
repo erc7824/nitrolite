@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -35,6 +36,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 		},
 		signer:      mockSigner,
 		nodeAddress: nodeAddress,
+		metrics:     metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - create one key for both app session and channel state signing
@@ -235,6 +237,7 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 		},
 		signer:      mockSigner,
 		nodeAddress: nodeAddress,
+		metrics:     metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data
@@ -359,6 +362,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 		},
 		signer:      mockSigner,
 		nodeAddress: nodeAddress,
+		metrics:     metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - create one key for both app session and channel state signing

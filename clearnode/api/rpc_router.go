@@ -7,6 +7,7 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/api/channel_v1"
 	"github.com/erc7824/nitrolite/clearnode/api/node_v1"
 	"github.com/erc7824/nitrolite/clearnode/api/user_v1"
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/erc7824/nitrolite/clearnode/store/memory"
 	"github.com/erc7824/nitrolite/pkg/core"
@@ -16,8 +17,9 @@ import (
 )
 
 type RPCRouter struct {
-	Node rpc.Node
-	lg   log.Logger
+	Node           rpc.Node
+	lg             log.Logger
+	runtimeMetrics metrics.RuntimeMetricExporter
 }
 
 func NewRPCRouter(
@@ -27,27 +29,39 @@ func NewRPCRouter(
 	signer sign.Signer,
 	dbStore database.DatabaseStore,
 	memoryStore memory.MemoryStore,
+	runtimeMetrics metrics.RuntimeMetricExporter,
 	logger log.Logger,
 ) *RPCRouter {
 	r := &RPCRouter{
-		Node: node,
-		lg:   logger.WithName("rpc-router"),
+		Node:           node,
+		lg:             logger.WithName("rpc-router"),
+		runtimeMetrics: runtimeMetrics,
 	}
 
-	r.Node.Use(r.LoggerMiddleware)
+	r.Node.Use(r.ObservabilityMiddleware)
 
-	// Transaction wrapper helpers for each store type
-	wrapInTx := func(handler func(database.DatabaseStore) error) error {
-		return dbStore.ExecuteInTransaction(handler)
+	// Transaction wrapper helpers for each store type.
+	// wrapWithMetrics executes fn inside a DB transaction with a metricStore wrapper,
+	// then flushes buffered metrics only after the transaction commits successfully.
+	wrapWithMetrics := func(fn func(*metricStore) error) error {
+		var ms *metricStore
+		if err := dbStore.ExecuteInTransaction(func(s database.DatabaseStore) error {
+			ms = &metricStore{DatabaseStore: s, m: runtimeMetrics}
+			return fn(ms)
+		}); err != nil {
+			return err
+		}
+		ms.flush()
+		return nil
 	}
 	useChannelV1StoreInTx := func(h channel_v1.StoreTxHandler) error {
-		return wrapInTx(func(s database.DatabaseStore) error { return h(s) })
+		return wrapWithMetrics(func(ms *metricStore) error { return h(ms) })
 	}
 	useAppSessionV1StoreInTx := func(h app_session_v1.StoreTxHandler) error {
-		return wrapInTx(func(s database.DatabaseStore) error { return h(s) })
+		return wrapWithMetrics(func(ms *metricStore) error { return h(ms) })
 	}
 	useUserV1StoreInTx := func(h user_v1.StoreTxHandler) error {
-		return wrapInTx(func(s database.DatabaseStore) error { return h(s) })
+		return dbStore.ExecuteInTransaction(func(s database.DatabaseStore) error { return h(s) })
 	}
 
 	nodeAddress := signer.PublicKey().Address().String()
@@ -60,8 +74,8 @@ func NewRPCRouter(
 		panic("failed to create channel wallet signer: " + err.Error())
 	}
 
-	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, nodeChannelSigner, stateAdvancer, statePacker, nodeAddress, minChallenge)
-	appSessionV1Handler := app_session_v1.NewHandler(useAppSessionV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, nodeAddress)
+	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, nodeChannelSigner, stateAdvancer, statePacker, nodeAddress, minChallenge, runtimeMetrics)
+	appSessionV1Handler := app_session_v1.NewHandler(useAppSessionV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, nodeAddress, runtimeMetrics)
 	nodeV1Handler := node_v1.NewHandler(memoryStore, nodeAddress, nodeVersion)
 	userV1Handler := user_v1.NewHandler(useUserV1StoreInTx)
 
@@ -96,14 +110,22 @@ func NewRPCRouter(
 	return r
 }
 
-func (r *RPCRouter) LoggerMiddleware(c *rpc.Context) {
+func (r *RPCRouter) ObservabilityMiddleware(c *rpc.Context) {
 	logger := r.lg.WithKV("requestID", c.Request.RequestID)
 	c.Context = log.SetContextLogger(c.Context, logger)
 	logger = log.FromContext(c.Context)
 
 	startTime := time.Now()
+	methodPath := getMethodPath(c)
 
 	c.Next()
+
+	reqDuration := time.Since(startTime)
+
+	r.runtimeMetrics.IncRPCMessage(c.Request.Type, c.Request.Method)
+	r.runtimeMetrics.IncRPCMessage(c.Response.Type, c.Response.Method)
+	r.runtimeMetrics.IncRPCRequest(c.Request.Method, methodPath, c.Response.Type == rpc.MsgTypeResp)
+	r.runtimeMetrics.ObserveRPCDuration(c.Request.Method, methodPath, c.Response.Type == rpc.MsgTypeResp, reqDuration)
 
 	if c.Request.Method == rpc.NodeV1PingMethod.String() {
 		// Skip logging for ping requests
@@ -113,5 +135,5 @@ func (r *RPCRouter) LoggerMiddleware(c *rpc.Context) {
 	logger.Info("handled RPC request",
 		"method", c.Request.Method,
 		"success", c.Response.Type == rpc.MsgTypeResp,
-		"duration", time.Since(startTime).String())
+		"duration", reqDuration.String())
 }

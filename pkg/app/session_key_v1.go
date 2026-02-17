@@ -100,6 +100,17 @@ const (
 	AppSessionSignerTypeV1_SessionKey AppSessionSignerTypeV1 = 0xA2
 )
 
+func (t AppSessionSignerTypeV1) String() string {
+	switch t {
+	case AppSessionSignerTypeV1_Wallet:
+		return "wallet"
+	case AppSessionSignerTypeV1_SessionKey:
+		return "session_key"
+	default:
+		return fmt.Sprintf("unknown(%d)", t)
+	}
+}
+
 type AppSessionSignerV1 struct {
 	signerType AppSessionSignerTypeV1
 	sign.Signer

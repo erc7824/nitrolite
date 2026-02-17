@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
-import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import {IVault} from "./interfaces/IVault.sol";
 import {ISignatureValidator, ValidationResult, VALIDATION_FAILURE} from "./interfaces/ISignatureValidator.sol";
@@ -40,11 +40,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
     using SafeCast for uint256;
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
-    using {Utils.isEmpty} for Ledger;
-
-    uint8 public constant VERSION = 1;
-
-    ISignatureValidator public immutable DEFAULT_SIG_VALIDATOR;
 
     event EscrowDepositsPurged(uint256 purgedCount);
 
@@ -81,15 +76,24 @@ contract ChannelHub is IVault, ReentrancyGuard {
     event ValidatorRegistered(address indexed node, uint8 indexed validatorId, ISignatureValidator indexed validator);
 
     error InvalidAddress();
-    error InvalidAmount();
-    error InvalidValue();
+    error IncorrectAmount();
+    error IncorrectValue();
+    error TransferFailed(address recepient, address token, uint256 amount);
     error AddressCollision(address collision);
     error IncorrectChallengeDuration();
-    error ChannelDoesNotExist(bytes32 channelId);
+
     error InvalidValidatorId();
     error ValidatorAlreadyRegistered(address node, uint8 validatorId);
     error ValidatorNotRegistered(address node, uint8 validatorId);
-    error InvalidSignature();
+    error ValidatorNotApproved();
+
+    error EmptySignature();
+    error IncorrectSignature();
+    error InsufficientBalance();
+    error IncorrectStateIntent();
+    error IncorrectChannelStatus();
+    error ChallengerVersionTooLow();
+    error OnlyNonHomeEscrowsCanBeChallenged();
 
     struct ChannelMeta {
         ChannelStatus status;
@@ -104,7 +108,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         EscrowStatus status;
         address user;
         address node;
-        uint256 approvedSignatureValidators; // Bitmask of approved validator IDs for user signatures
+        uint256 approvedSignatureValidators;
         uint64 unlockAt;
         uint64 challengeExpireAt;
         uint256 lockedAmount;
@@ -116,13 +120,17 @@ contract ChannelHub is IVault, ReentrancyGuard {
         EscrowStatus status;
         address user;
         address node;
-        uint256 approvedSignatureValidators; // Bitmask of approved validator IDs for user signatures
+        uint256 approvedSignatureValidators;
         uint64 challengeExpireAt;
         uint256 lockedAmount;
         State initState;
     }
 
     // ======== Contract Storage ==========
+
+    uint8 public constant VERSION = 1;
+
+    ISignatureValidator public immutable DEFAULT_SIG_VALIDATOR;
 
     // TODO: estimate these values better
     uint32 public constant MIN_CHALLENGE_DURATION = 1 days;
@@ -172,32 +180,24 @@ contract ChannelHub is IVault, ReentrancyGuard {
         return _userChannels[user].values();
     }
 
-    // filter only non-closed and non-migrated-out channels
-    function getOpenChannels(address user) external view returns (bytes32[] memory) {
-        bytes32[] memory allChannels = _userChannels[user].values();
-        uint256 openChannelCount = 0;
-        for (uint256 i = 0; i < allChannels.length; i++) {
-            if (
-                _channels[allChannels[i]].status != ChannelStatus.CLOSED
-                    && _channels[allChannels[i]].status != ChannelStatus.MIGRATED_OUT
-            ) {
-                openChannelCount++;
+    // Filter only non-closed and non-migrated-out channels
+    function getOpenChannels(address user) external view returns (bytes32[] memory openChannels) {
+        openChannels = _userChannels[user].values();
+        uint256 count = 0;
+
+        // Optimization: single pass filter moves open channels to front, tracks count
+        for (uint256 i = 0; i < openChannels.length; i++) {
+            ChannelStatus status = _channels[openChannels[i]].status;
+            if (status != ChannelStatus.CLOSED && status != ChannelStatus.MIGRATED_OUT) {
+                if (count < i) openChannels[count] = openChannels[i];
+                count++;
             }
         }
 
-        bytes32[] memory openChannels = new bytes32[](openChannelCount);
-        uint256 openChannelIndex = 0;
-        for (uint256 i = 0; i < allChannels.length; i++) {
-            if (
-                _channels[allChannels[i]].status != ChannelStatus.CLOSED
-                    && _channels[allChannels[i]].status != ChannelStatus.MIGRATED_OUT
-            ) {
-                openChannels[openChannelIndex] = allChannels[i];
-                openChannelIndex++;
-            }
+        // Resize array to actual count
+        assembly {
+            mstore(openChannels, count)
         }
-
-        return openChannels;
     }
 
     function getChannelData(bytes32 channelId)
@@ -259,11 +259,11 @@ contract ChannelHub is IVault, ReentrancyGuard {
         initState = meta.initState;
     }
 
-    // *** IVault ***
+    // ========= IVault ==========
 
     function depositToVault(address node, address token, uint256 amount) external payable {
         require(node != address(0), InvalidAddress());
-        require(amount > 0, InvalidAmount());
+        require(amount > 0, IncorrectAmount());
 
         _nodeBalances[node][token] += amount;
 
@@ -274,10 +274,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
     function withdrawFromVault(address to, address token, uint256 amount) external {
         require(to != address(0), InvalidAddress());
-        require(amount > 0, InvalidAmount());
+        require(amount > 0, IncorrectAmount());
 
         uint256 currentBalance = _nodeBalances[msg.sender][token];
-        require(currentBalance >= amount, "insufficient balance");
+        require(currentBalance >= amount, InsufficientBalance());
 
         _nodeBalances[msg.sender][token] = currentBalance - amount;
 
@@ -286,44 +286,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
         emit Withdrawn(msg.sender, token, amount);
     }
 
-    // ========= Validator Registry ==========
-
-    /**
-     * @notice Register a signature validator for a node using signature-based authorization
-     * @dev Anyone can submit this transaction with a valid node signature, enabling relayer-friendly registration.
-     *      The node's private key only signs the registration data, never sends transactions directly.
-     *      This allows nodes to use cold storage or HSMs without exposing keys to transaction submission.
-     *      The signature includes block.chainid to prevent cross-chain replay attacks.
-     * @param node The node address that signed the registration
-     * @param validatorId The validator ID (0x01-0xFF, 0x00 reserved for DEFAULT)
-     * @param validator The validator contract address
-     * @param signature Node's signature over abi.encode(validatorId, validator, block.chainid)
-     */
-    function registerNodeValidator(
-        address node,
-        uint8 validatorId,
-        ISignatureValidator validator,
-        bytes calldata signature
-    ) external {
-        require(validatorId != DEFAULT_SIG_VALIDATOR_ID, InvalidValidatorId());
-        require(address(validator) != address(0), InvalidAddress());
-        require(
-            address(_nodeValidatorRegistry[node][validatorId]) == address(0),
-            ValidatorAlreadyRegistered(node, validatorId)
-        );
-
-        // Verify node signed the registration data (includes chainid to prevent cross-chain replay)
-        bytes memory message = abi.encode(validatorId, validator, block.chainid);
-        require(EcdsaSignatureUtils.validateEcdsaSigner(message, signature, node), InvalidSignature());
-
-        _nodeValidatorRegistry[node][validatorId] = validator;
-
-        emit ValidatorRegistered(node, validatorId, validator);
-    }
-
-    // TODO: extract into a separate contract
     // ========= Escrow Deposit Purge ==========
-    function getUnlockableEscrowDepositAmount() external view returns (uint256 totalUnlockable) {
+    function getUnlockableEscrowDepositStats() internal view returns (uint256 count, uint256 totalAmount) {
         uint256 totalDeposits = _escrowDepositIds.length;
         uint256 escrowHeadTemp = escrowHead;
 
@@ -331,31 +295,13 @@ contract ChannelHub is IVault, ReentrancyGuard {
             bytes32 escrowId = _escrowDepositIds[escrowHeadTemp];
             EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
 
-            if (meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED) {
-                totalUnlockable += meta.lockedAmount;
-            } else {
-                break;
-            }
-
-            escrowHeadTemp++;
-        }
-    }
-
-    function getUnlockableEscrowDepositCount() external view returns (uint256 count) {
-        uint256 totalDeposits = _escrowDepositIds.length;
-        uint256 escrowHeadTemp = escrowHead;
-
-        while (escrowHeadTemp < totalDeposits) {
-            bytes32 escrowId = _escrowDepositIds[escrowHeadTemp];
-            EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
-
-            if (meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED) {
+            if (_isEscrowDepositUnlockable(meta)) {
                 count++;
+                totalAmount += meta.lockedAmount;
+                escrowHeadTemp++;
             } else {
                 break;
             }
-
-            escrowHeadTemp++;
         }
     }
 
@@ -397,14 +343,13 @@ contract ChannelHub is IVault, ReentrancyGuard {
                 escrowHeadTemp++;
                 continue;
             }
-            // only still "INITIALIZED" escrows can be purged: "CHALLENGED" escrows require manual finalization
-            if (meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED) {
+            // Only INITIALIZED escrows can be purged; CHALLENGED escrows require manual finalization
+            if (_isEscrowDepositUnlockable(meta)) {
                 _nodeBalances[meta.node][meta.initState.nonHomeLedger.token] += meta.lockedAmount;
                 meta.status = EscrowStatus.FINALIZED;
                 meta.lockedAmount = 0;
                 purgedCount++;
                 escrowHeadTemp++;
-                continue;
             } else {
                 break;
             }
@@ -417,6 +362,45 @@ contract ChannelHub is IVault, ReentrancyGuard {
         }
     }
 
+    /// @dev Check if an escrow deposit can be unlocked
+    function _isEscrowDepositUnlockable(EscrowDepositMeta storage meta) internal view returns (bool) {
+        return meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED;
+    }
+
+    // ========= Validator Registry ==========
+
+    /**
+     * @notice Register a signature validator for a node using signature-based authorization
+     * @dev Anyone can submit this transaction with a valid node signature, enabling relayer-friendly registration.
+     *      The node's private key only signs the registration data, never sends transactions directly.
+     *      This allows nodes to use cold storage or HSMs without exposing keys to transaction submission.
+     *      The signature includes block.chainid to prevent cross-chain replay attacks.
+     * @param node The node address that signed the registration
+     * @param validatorId The validator ID (0x01-0xFF, 0x00 reserved for DEFAULT)
+     * @param validator The validator contract address
+     * @param signature Node's signature over abi.encode(validatorId, validator, block.chainid)
+     */
+    function registerNodeValidator(
+        address node,
+        uint8 validatorId,
+        ISignatureValidator validator,
+        bytes calldata signature
+    ) external {
+        require(validatorId != DEFAULT_SIG_VALIDATOR_ID, InvalidValidatorId());
+        require(address(validator) != address(0), InvalidAddress());
+        require(
+            address(_nodeValidatorRegistry[node][validatorId]) == address(0),
+            ValidatorAlreadyRegistered(node, validatorId)
+        );
+
+        bytes memory message = abi.encode(validatorId, validator, block.chainid);
+        require(EcdsaSignatureUtils.validateEcdsaSigner(message, signature, node), IncorrectSignature());
+
+        _nodeValidatorRegistry[node][validatorId] = validator;
+
+        emit ValidatorRegistered(node, validatorId, validator);
+    }
+
     // ========== Channel lifecycle ==========
 
     // Create channel with DEPOSIT, WITHDRAW, or OPERATE intent
@@ -426,7 +410,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         require(
             initState.intent == StateIntent.DEPOSIT || initState.intent == StateIntent.WITHDRAW
                 || initState.intent == StateIntent.OPERATE,
-            "invalid state intent for channel creation"
+            IncorrectStateIntent()
         );
 
         bytes32 channelId = Utils.getChannelId(def, VERSION);
@@ -454,64 +438,49 @@ contract ChannelHub is IVault, ReentrancyGuard {
     }
 
     function depositToChannel(bytes32 channelId, State calldata candidate) public payable {
-        require(candidate.intent == StateIntent.DEPOSIT, "invalid state intent");
+        require(candidate.intent == StateIntent.DEPOSIT, IncorrectStateIntent());
 
         ChannelMeta storage meta = _channels[channelId];
-        _validateSignatures(
-            channelId,
-            candidate,
-            meta.definition.user,
-            meta.definition.node,
-            meta.definition.approvedSignatureValidators
-        );
+        ChannelDefinition memory def = meta.definition;
+        _validateSignatures(channelId, candidate, def.user, def.node, def.approvedSignatureValidators);
 
         ChannelEngine.TransitionContext memory ctx =
-            _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeLedger.token]);
+            _buildChannelContext(channelId, _nodeBalances[def.node][candidate.homeLedger.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
-        _applyEffects(channelId, meta.definition, candidate, effects);
+        _applyEffects(channelId, def, candidate, effects);
 
         emit ChannelDeposited(channelId, candidate);
     }
 
     function withdrawFromChannel(bytes32 channelId, State calldata candidate) public payable {
-        require(candidate.intent == StateIntent.WITHDRAW, "invalid state intent");
+        require(candidate.intent == StateIntent.WITHDRAW, IncorrectStateIntent());
 
         ChannelMeta storage meta = _channels[channelId];
-        _validateSignatures(
-            channelId,
-            candidate,
-            meta.definition.user,
-            meta.definition.node,
-            meta.definition.approvedSignatureValidators
-        );
+        ChannelDefinition memory def = meta.definition;
+        _validateSignatures(channelId, candidate, def.user, def.node, def.approvedSignatureValidators);
 
         ChannelEngine.TransitionContext memory ctx =
-            _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeLedger.token]);
+            _buildChannelContext(channelId, _nodeBalances[def.node][candidate.homeLedger.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
-        _applyEffects(channelId, meta.definition, candidate, effects);
+        _applyEffects(channelId, def, candidate, effects);
 
         emit ChannelWithdrawn(channelId, candidate);
     }
 
     function checkpointChannel(bytes32 channelId, State calldata candidate) external payable {
-        require(candidate.intent == StateIntent.OPERATE, "can only checkpoint operate states");
+        require(candidate.intent == StateIntent.OPERATE, IncorrectStateIntent()); // Can only checkpoint operate states
 
         ChannelMeta storage meta = _channels[channelId];
-        _validateSignatures(
-            channelId,
-            candidate,
-            meta.definition.user,
-            meta.definition.node,
-            meta.definition.approvedSignatureValidators
-        );
+        ChannelDefinition memory def = meta.definition;
+        _validateSignatures(channelId, candidate, def.user, def.node, def.approvedSignatureValidators);
 
         ChannelEngine.TransitionContext memory ctx =
-            _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeLedger.token]);
+            _buildChannelContext(channelId, _nodeBalances[def.node][candidate.homeLedger.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
-        _applyEffects(channelId, meta.definition, candidate, effects);
+        _applyEffects(channelId, def, candidate, effects);
 
         emit ChannelCheckpointed(channelId, candidate);
     }
@@ -523,50 +492,53 @@ contract ChannelHub is IVault, ReentrancyGuard {
         ParticipantIndex challengerIdx
     ) external payable {
         ChannelMeta storage meta = _channels[channelId];
+        ChannelDefinition memory def = meta.definition;
 
-        require(meta.status == ChannelStatus.OPERATING, "invalid channel status");
+        require(
+            meta.status == ChannelStatus.OPERATING || meta.status == ChannelStatus.MIGRATING_IN,
+            IncorrectChannelStatus()
+        );
 
         State memory prevState = meta.lastState;
-        require(candidate.version >= prevState.version, "challenge candidate must have higher or equal version");
+        require(candidate.version >= prevState.version, ChallengerVersionTooLow());
 
-        address user = meta.definition.user;
-        address node = meta.definition.node;
+        address user = def.user;
+        address node = def.node;
 
         // If version is higher, process the new state
         if (candidate.version > prevState.version) {
-            require(candidate.intent == StateIntent.OPERATE, "invalid intent");
-            _validateSignatures(channelId, candidate, user, node, meta.definition.approvedSignatureValidators);
+            require(candidate.intent == StateIntent.OPERATE, IncorrectStateIntent());
+            _validateSignatures(channelId, candidate, user, node, def.approvedSignatureValidators);
 
             ChannelEngine.TransitionContext memory ctx =
-                _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeLedger.token]);
+                _buildChannelContext(channelId, _nodeBalances[def.node][candidate.homeLedger.token]);
             ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
-            _applyTransitionEffects(channelId, meta.definition, candidate, effects);
+            _applyTransitionEffects(channelId, def, candidate, effects);
         }
         // else: challenging with same version, state already processed
 
         (ISignatureValidator validator, bytes calldata sigData) =
-            _extractValidator(challengerSig, node, meta.definition.approvedSignatureValidators);
+            _extractValidator(challengerSig, node, def.approvedSignatureValidators);
         _validateChallengerSignature(channelId, candidate, sigData, validator, user, node, challengerIdx);
 
         meta.status = ChannelStatus.DISPUTED;
-        uint64 challengeExpiry = uint64(block.timestamp) + meta.definition.challengeDuration;
+        uint64 challengeExpiry = uint64(block.timestamp) + def.challengeDuration;
         meta.challengeExpireAt = challengeExpiry;
 
         emit ChannelChallenged(channelId, candidate, challengeExpiry);
     }
 
     function closeChannel(bytes32 channelId, State calldata candidate) external payable {
-        require(candidate.intent == StateIntent.CLOSE, "invalid state intent");
+        require(candidate.intent == StateIntent.CLOSE, IncorrectStateIntent());
 
         ChannelMeta storage meta = _channels[channelId];
+        ChannelDefinition memory def = meta.definition;
         ChannelStatus status = meta.status;
 
-        require(status == ChannelStatus.OPERATING || status == ChannelStatus.DISPUTED, "invalid channel status");
-
         State memory prevState = meta.lastState;
-        address node = meta.definition.node;
-        address user = meta.definition.user;
+        address node = def.node;
+        address user = def.user;
 
         // Path 1: Unilateral closure after challenge timeout
         if (status == ChannelStatus.DISPUTED && block.timestamp > meta.challengeExpireAt) {
@@ -584,13 +556,13 @@ contract ChannelHub is IVault, ReentrancyGuard {
         }
 
         // Path 2: Cooperative closure with signed CLOSE state
-        _validateSignatures(channelId, candidate, user, node, meta.definition.approvedSignatureValidators);
+        _validateSignatures(channelId, candidate, user, node, def.approvedSignatureValidators);
 
         ChannelEngine.TransitionContext memory ctx =
-            _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeLedger.token]);
+            _buildChannelContext(channelId, _nodeBalances[def.node][candidate.homeLedger.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
-        _applyEffects(channelId, meta.definition, candidate, effects);
+        _applyEffects(channelId, def, candidate, effects);
         _userChannels[user].remove(channelId);
 
         emit ChannelClosed(channelId, candidate);
@@ -599,7 +571,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     // ========= Cross-Chain Functions ==========
 
     function initiateEscrowDeposit(ChannelDefinition calldata def, State calldata candidate) external payable {
-        require(candidate.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, "invalid intent");
+        require(candidate.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, IncorrectStateIntent());
 
         bytes32 channelId = Utils.getChannelId(def, VERSION);
         _validateSignatures(channelId, candidate, def.user, def.node, def.approvedSignatureValidators);
@@ -607,15 +579,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
         if (_isHomeChain(channelId)) {
-            // HOME CHAIN: Update channel via ChannelEngine
-            ChannelMeta storage meta = _channels[channelId];
-
-            ChannelEngine.TransitionContext memory ctx =
-                _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeLedger.token]);
-            ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
-
-            _applyEffects(channelId, meta.definition, candidate, effects);
-
+            _processHomeChainEscrowInitiate(channelId, candidate);
             emit EscrowDepositInitiatedOnHome(escrowId, channelId, candidate);
         } else {
             // NON-HOME CHAIN: Create escrow record - recover addresses from signatures
@@ -636,7 +600,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         external
     {
         EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
-        require(!_isHomeChain(meta.channelId), "only non-home escrows can be challenged");
+        require(!_isHomeChain(meta.channelId), OnlyNonHomeEscrowsCanBeChallenged());
 
         bytes32 channelId = meta.channelId;
         (ISignatureValidator validator, bytes calldata sigData) =
@@ -674,21 +638,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
             return;
         }
 
-        require(candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT, "invalid intent");
+        require(candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT, IncorrectStateIntent());
 
-        if (isHomeChain) {
-            // HOME CHAIN: Update channel via ChannelEngine
-            ChannelMeta storage channelMeta = _channels[meta.channelId];
-            _validateSignatures(
-                meta.channelId, candidate, user, node, channelMeta.definition.approvedSignatureValidators
-            );
-            ChannelEngine.TransitionContext memory ctx = _buildChannelContext(
-                meta.channelId, _nodeBalances[channelMeta.definition.node][candidate.homeLedger.token]
-            );
-            ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
-
-            _applyEffects(meta.channelId, channelMeta.definition, candidate, effects);
-
+        if (_isHomeChain(meta.channelId)) {
+            _processHomeChainEscrowFinalize(meta.channelId, candidate, user, node);
             emit EscrowDepositFinalizedOnHome(escrowId, meta.channelId, candidate);
             return;
         } else {
@@ -709,7 +662,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     }
 
     function initiateEscrowWithdrawal(ChannelDefinition calldata def, State calldata candidate) external {
-        require(candidate.intent == StateIntent.INITIATE_ESCROW_WITHDRAWAL, "invalid intent");
+        require(candidate.intent == StateIntent.INITIATE_ESCROW_WITHDRAWAL, IncorrectStateIntent());
 
         bytes32 channelId = Utils.getChannelId(def, VERSION);
         _validateSignatures(channelId, candidate, def.user, def.node, def.approvedSignatureValidators);
@@ -717,15 +670,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
         if (_isHomeChain(channelId)) {
-            // HOME CHAIN
-            ChannelMeta storage meta = _channels[channelId];
-
-            ChannelEngine.TransitionContext memory ctx =
-                _buildChannelContext(channelId, _nodeBalances[meta.definition.node][candidate.homeLedger.token]);
-            ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
-
-            _applyEffects(channelId, meta.definition, candidate, effects);
-
+            _processHomeChainEscrowInitiate(channelId, candidate);
             emit EscrowWithdrawalInitiatedOnHome(escrowId, channelId, candidate);
         } else {
             // NON-HOME CHAIN
@@ -745,7 +690,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         external
     {
         EscrowWithdrawalMeta storage meta = _escrowWithdrawals[escrowId];
-        require(!_isHomeChain(meta.channelId), "only non-home escrows can be challenged");
+        require(!_isHomeChain(meta.channelId), OnlyNonHomeEscrowsCanBeChallenged());
 
         EscrowWithdrawalEngine.TransitionContext memory ctx = _buildEscrowWithdrawalContext(escrowId, meta.node);
         EscrowWithdrawalEngine.TransitionEffects memory effects = EscrowWithdrawalEngine.validateChallenge(ctx);
@@ -787,18 +732,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
             return;
         }
 
-        require(candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL, "invalid intent");
+        require(candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL, IncorrectStateIntent());
 
-        if (isHomeChain) {
-            // HOME CHAIN: Update channel via ChannelEngine
-            ChannelMeta storage channelMeta = _channels[channelId];
-            _validateSignatures(channelId, candidate, user, node, channelMeta.definition.approvedSignatureValidators);
-            ChannelEngine.TransitionContext memory ctx =
-                _buildChannelContext(channelId, _nodeBalances[channelMeta.definition.node][candidate.homeLedger.token]);
-            ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
-
-            _applyEffects(channelId, channelMeta.definition, candidate, effects);
-
+        if (_isHomeChain(channelId)) {
+            _processHomeChainEscrowFinalize(channelId, candidate, user, node);
             emit EscrowWithdrawalFinalizedOnHome(escrowId, channelId, candidate);
         } else {
             // Non-Home chain: Update via EscrowWithdrawalEngine
@@ -817,7 +754,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     }
 
     function initiateMigration(ChannelDefinition calldata def, State calldata candidate) external {
-        require(candidate.intent == StateIntent.INITIATE_MIGRATION, "invalid intent");
+        require(candidate.intent == StateIntent.INITIATE_MIGRATION, IncorrectStateIntent());
 
         bytes32 channelId = Utils.getChannelId(def, VERSION);
         _validateSignatures(channelId, candidate, def.user, def.node, def.approvedSignatureValidators);
@@ -841,10 +778,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
         ChannelEngine.TransitionContext memory ctx =
             _buildChannelContext(channelId, _nodeBalances[def.node][targetCandidate.homeLedger.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, targetCandidate);
-
         _applyEffects(channelId, def, targetCandidate, effects);
 
-        // event with the correct candidate state
         if (isHomeChain) {
             emit MigrationOutInitiated(channelId, candidate);
         } else {
@@ -853,17 +788,16 @@ contract ChannelHub is IVault, ReentrancyGuard {
     }
 
     function finalizeMigration(bytes32 channelId, State calldata candidate) external {
-        require(candidate.intent == StateIntent.FINALIZE_MIGRATION, "invalid intent");
+        require(candidate.intent == StateIntent.FINALIZE_MIGRATION, IncorrectStateIntent());
 
         ChannelMeta storage meta = _channels[channelId];
-        address user = meta.definition.user;
+        ChannelDefinition memory def = meta.definition;
+        address user = def.user;
 
-        _validateSignatures(
-            channelId, candidate, user, meta.definition.node, meta.definition.approvedSignatureValidators
-        );
+        _validateSignatures(channelId, candidate, user, def.node, def.approvedSignatureValidators);
 
         State memory targetCandidate = candidate;
-        // `_isHomeChain` cannot be used here as channel exists on both chains
+        // `_isHomeChain(...)` cannot be used here as channel exists on both chains
         bool isHomeChain = candidate.nonHomeLedger.chainId == block.chainid;
 
         if (isHomeChain) {
@@ -878,12 +812,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
         }
 
         ChannelEngine.TransitionContext memory ctx =
-            _buildChannelContext(channelId, _nodeBalances[meta.definition.node][targetCandidate.homeLedger.token]);
+            _buildChannelContext(channelId, _nodeBalances[def.node][targetCandidate.homeLedger.token]);
         ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, targetCandidate);
+        _applyEffects(channelId, def, targetCandidate, effects);
 
-        _applyEffects(channelId, meta.definition, targetCandidate, effects);
-
-        // event with the correct candidate state
         if (isHomeChain) {
             emit MigrationOutFinalized(channelId, candidate);
         } else {
@@ -925,7 +857,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     ) internal view {
         bytes memory signingData = Utils.toSigningData(state);
         ValidationResult result = validator.validateSignature(channelId, signingData, sigData, participant);
-        require(ValidationResult.unwrap(result) != ValidationResult.unwrap(VALIDATION_FAILURE), "invalid signature");
+        require(ValidationResult.unwrap(result) != ValidationResult.unwrap(VALIDATION_FAILURE), IncorrectSignature());
     }
 
     function _extractValidator(bytes calldata signature, address node, uint256 approvedSignatureValidators)
@@ -933,7 +865,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         view
         returns (ISignatureValidator validator, bytes calldata sigData)
     {
-        require(signature.length > 0, "empty signature");
+        require(signature.length > 0, EmptySignature());
 
         uint8 validatorId = uint8(signature[0]);
 
@@ -942,7 +874,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
             validator = DEFAULT_SIG_VALIDATOR;
         } else {
             // Look up validator in node's registry
-            require((approvedSignatureValidators >> validatorId) & 1 == 1, "Validator not approved");
+            require((approvedSignatureValidators >> validatorId) & 1 == 1, ValidatorNotApproved());
             validator = _nodeValidatorRegistry[node][validatorId];
             require(address(validator) != address(0), ValidatorNotRegistered(node, validatorId));
         }
@@ -979,10 +911,34 @@ contract ChannelHub is IVault, ReentrancyGuard {
         bytes memory challengerSigningData = abi.encodePacked(signingData, "challenge");
         address challenger = challengerIdx == ParticipantIndex.USER ? user : node;
         ValidationResult result = validator.validateSignature(channelId, challengerSigningData, sigData, challenger);
-        require(
-            ValidationResult.unwrap(result) != ValidationResult.unwrap(VALIDATION_FAILURE),
-            "invalid challenger signature"
-        );
+        require(ValidationResult.unwrap(result) != ValidationResult.unwrap(VALIDATION_FAILURE), IncorrectSignature());
+    }
+
+    /// @dev Process HOME CHAIN path for escrow initiate operations
+    function _processHomeChainEscrowInitiate(bytes32 channelId, State calldata candidate) internal {
+        ChannelMeta storage meta = _channels[channelId];
+        ChannelDefinition memory metaDef = meta.definition;
+
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[metaDef.node][candidate.homeLedger.token]);
+        ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
+
+        _applyEffects(channelId, metaDef, candidate, effects);
+    }
+
+    /// @dev Process HOME CHAIN path for escrow finalize operations
+    function _processHomeChainEscrowFinalize(bytes32 channelId, State calldata candidate, address user, address node)
+        internal
+    {
+        ChannelMeta storage channelMeta = _channels[channelId];
+        ChannelDefinition memory channelDef = channelMeta.definition;
+        _validateSignatures(channelId, candidate, user, node, channelDef.approvedSignatureValidators);
+
+        ChannelEngine.TransitionContext memory ctx =
+            _buildChannelContext(channelId, _nodeBalances[channelDef.node][candidate.homeLedger.token]);
+        ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
+
+        _applyEffects(channelId, channelDef, candidate, effects);
     }
 
     function _buildChannelContext(bytes32 channelId, uint256 nodeBalance)
@@ -1032,15 +988,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
         ctx.nodeAddress = node;
 
         return ctx;
-    }
-
-    function _isHomeChain(bytes32 channelId) internal view returns (bool) {
-        ChannelStatus status = _channels[channelId].status;
-        if (status == ChannelStatus.VOID || status == ChannelStatus.MIGRATED_OUT) {
-            return false;
-        }
-
-        return _channels[channelId].lastState.homeLedger.chainId == block.chainid;
     }
 
     function _applyEffects(
@@ -1120,30 +1067,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         // NOTE: purge escrow deposits to unlock unutilized node liquidity
         _purgeEscrowDeposits();
-    }
-
-    function _pullFunds(address from, address token, uint256 amount) internal nonReentrant {
-        if (amount == 0) return;
-
-        if (token == address(0)) {
-            require(msg.value == amount, InvalidValue());
-        } else {
-            require(msg.value == 0, InvalidValue());
-        }
-
-        if (token != address(0)) {
-            IERC20(token).safeTransferFrom(from, address(this), amount);
-        }
-    }
-
-    function _pushFunds(address to, address token, uint256 amount) internal nonReentrant {
-        if (amount == 0) return;
-
-        if (token == address(0)) {
-            payable(to).transfer(amount);
-        } else {
-            IERC20(token).safeTransfer(to, amount);
-        }
     }
 
     function _applyEscrowDepositEffects(
@@ -1267,5 +1190,39 @@ contract ChannelHub is IVault, ReentrancyGuard {
         require(def.node != address(0), InvalidAddress());
         require(def.user != def.node, AddressCollision(def.user));
         require(def.challengeDuration >= MIN_CHALLENGE_DURATION, IncorrectChallengeDuration());
+    }
+
+    function _isHomeChain(bytes32 channelId) internal view returns (bool) {
+        ChannelStatus status = _channels[channelId].status;
+        if (status == ChannelStatus.VOID || status == ChannelStatus.MIGRATED_OUT) {
+            return false;
+        }
+
+        return _channels[channelId].lastState.homeLedger.chainId == block.chainid;
+    }
+
+    function _pullFunds(address from, address token, uint256 amount) internal nonReentrant {
+        if (amount == 0) return;
+
+        if (token == address(0)) {
+            require(msg.value == amount, IncorrectValue());
+        } else {
+            require(msg.value == 0, IncorrectValue());
+        }
+
+        if (token != address(0)) {
+            IERC20(token).safeTransferFrom(from, address(this), amount);
+        }
+    }
+
+    function _pushFunds(address to, address token, uint256 amount) internal nonReentrant {
+        if (amount == 0) return;
+
+        if (token == address(0)) {
+            (bool success,) = payable(to).call{value: amount}("");
+            require(success, TransferFailed(to, address(0), amount));
+        } else {
+            IERC20(token).safeTransfer(to, amount);
+        }
     }
 }

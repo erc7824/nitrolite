@@ -7,6 +7,8 @@ pragma solidity 0.8.30;
  * @dev Provides toWad() as attached functions for uint256 and int256 types
  */
 library WadMath {
+    error DecimalsExceedMaxPrecision();
+
     uint8 constant MAX_PRECISION = 18;
 
     /**
@@ -17,7 +19,7 @@ library WadMath {
      */
     function toWad(uint256 amount, uint8 decimals) internal pure returns (uint256) {
         if (decimals > MAX_PRECISION) {
-            revert("decimals exceed max precision");
+            revert DecimalsExceedMaxPrecision();
         }
 
         if (decimals == MAX_PRECISION) {
@@ -35,7 +37,7 @@ library WadMath {
      */
     function toWad(int256 amount, uint8 decimals) internal pure returns (int256) {
         if (decimals > MAX_PRECISION) {
-            revert("decimals exceed max precision");
+            revert DecimalsExceedMaxPrecision();
         }
 
         if (decimals == MAX_PRECISION) {

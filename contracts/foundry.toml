@@ -1,0 +1,20 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+dynamic_test_linking = true
+
+via_ir = true
+
+# high optimizer runs for better gas efficiency
+optimizer_runs = 1_000_000
+
+# special compiler profile for ChannelHub to prevent code size overflow
+additional_compiler_profiles = [
+  { name = "channelhub", optimizer_runs = 20_000 }
+]
+
+# compile ChannelHub with lower optimizer runs to stay within size limits
+compilation_restrictions = [
+  { paths = "src/ChannelHub.sol", optimizer_runs = 20_000 }
+]

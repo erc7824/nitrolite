@@ -1,0 +1,7 @@
+default_contract_addresses:
+  channel_hub: "0xB5E7D2B8DB56A173Ca8c05CDdCC1379852CdC095"
+
+blockchains:
+- name: "ethereum_sepolia"
+  id: 11155111
+  channel_hub_address: "0xB5E7D2B8DB56A173Ca8c05CDdCC1379852CdC095"

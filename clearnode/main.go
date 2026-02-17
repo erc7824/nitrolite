@@ -2,96 +2,91 @@ package main
 
 import (
 	"context"
-	"embed"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/erc7824/nitrolite/clearnode/api"
+	"github.com/erc7824/nitrolite/clearnode/event_handlers"
+	"github.com/erc7824/nitrolite/clearnode/store/database"
+	"github.com/erc7824/nitrolite/pkg/blockchain/evm"
 )
 
-//go:embed config/migrations/*/*.sql
-var embedMigrations embed.FS
-
 func main() {
-	logger := NewLoggerIPFS("root")
-	if len(os.Args) > 1 {
-		// If a CLI command is provided, run it and exit
-		runCli(logger, os.Args[1])
-		return
-	}
+	bb := InitBackbone()
+	logger := bb.Logger
+	ctx := context.Background()
 
-	config, err := LoadConfig(logger)
-	if err != nil {
-		logger.Fatal("failed to load configuration", "error", err)
-	}
+	api.NewRPCRouter(bb.NodeVersion, bb.ChannelMinChallengeDuration,
+		bb.RpcNode, bb.StateSigner, bb.DbStore, bb.MemoryStore, bb.Logger)
 
-	db, err := ConnectToDB(config.dbConf)
-	if err != nil {
-		logger.Fatal("Failed to setup database", "error", err)
-	}
-
-	err = loadSessionKeyCache(db)
-	if err != nil {
-		logger.Fatal("Failed to load session key cache", "error", err)
-	}
-
-	signer, err := NewSigner(config.privateKeyHex)
-	if err != nil {
-		logger.Fatal("failed to initialise signer", "error", err)
-	}
-	logger.Info("broker signer initialized", "address", signer.GetAddress().Hex())
-
-	rpcStore := NewRPCStore(db)
-
-	// Initialize Prometheus metrics
-	metrics := NewMetrics()
-	// Map to store custody clients for later reference
-	custodyClients := make(map[uint32]*Custody)
-
-	authManager, err := NewAuthManager(signer.GetPrivateKey())
-	if err != nil {
-		logger.Fatal("failed to initialize auth manager", "error", err)
-	}
-
-	rpcNode := NewRPCNode(signer, logger)
-	wsNotifier := NewWSNotifier(rpcNode.Notify, logger)
-	appSessionService := NewAppSessionService(db, wsNotifier)
-	channelService := NewChannelService(db, config.blockchains, &config.assets, signer)
-
-	NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, wsNotifier, logger)
-
-	rpcListenAddr := ":8000"
+	rpcListenAddr := ":7824"
 	rpcListenEndpoint := "/ws"
 	rpcMux := http.NewServeMux()
-	rpcMux.HandleFunc(rpcListenEndpoint, rpcNode.HandleConnection)
+	rpcMux.HandleFunc(rpcListenEndpoint, bb.RpcNode.ServeHTTP)
 
 	rpcServer := &http.Server{
 		Addr:    rpcListenAddr,
 		Handler: rpcMux,
 	}
 
-	for chainID, blockchain := range config.blockchains {
-		client, err := NewCustody(signer, db, wsNotifier, blockchain, &config.assets, logger)
-		if err != nil {
-			logger.Fatal("failed to initialize blockchain client", "chainID", chainID, "error", err)
-			continue
-		}
-		custodyClients[chainID] = client
-		go client.ListenEvents(context.Background())
+	blockchains, err := bb.MemoryStore.GetBlockchains()
+	if err != nil {
+		logger.Fatal("failed to get blockchains from memory store", "error", err)
 	}
 
-	// Start blockchain action worker for all custody clients
-	// TODO: This can be moved to a separate worker process in the future for better scalability
-	if len(custodyClients) > 0 {
-		custodyClients := make(map[uint32]CustodyInterface, len(custodyClients))
-		for chainID, client := range custodyClients {
-			custodyClients[chainID] = client
+	wrapInTx := func(handler func(database.DatabaseStore) error) error {
+		return bb.DbStore.ExecuteInTransaction(handler)
+	}
+	useEHV1StoreInTx := func(h event_handlers.StoreTxHandler) error {
+		return wrapInTx(func(s database.DatabaseStore) error { return h(s) })
+	}
+
+	eventHandlerService := event_handlers.NewEventHandlerService(useEHV1StoreInTx, logger)
+
+	for _, b := range blockchains {
+		rpcURL, ok := bb.BlockchainRPCs[b.ID]
+		if !ok {
+			logger.Fatal("no RPC URL configured for blockchain", "blockchainID", b.ID)
 		}
-		worker := NewBlockchainWorker(db, custodyClients, logger)
-		go worker.Start(context.Background())
+
+		client, err := ethclient.Dial(rpcURL)
+		if err != nil {
+			logger.Fatal("failed to connect to EVM Node")
+		}
+		reactor := evm.NewReactor(b.ID, eventHandlerService, bb.DbStore.StoreContractEvent)
+		l := evm.NewListener(common.HexToAddress(b.ChannelHubAddress), client, b.ID, b.BlockStep, logger, reactor.HandleEvent, bb.DbStore.GetLatestEvent)
+		l.Listen(ctx, func(err error) {
+			if err != nil {
+				logger.Fatal("blockchain listener stopped", "error", err, "blockchainID", b.ID)
+			}
+		})
+
+		// For the node itself, the node address is the signer's address
+		nodeAddress := bb.StateSigner.PublicKey().Address().String()
+
+		clientOpts := []evm.ClientOption{
+			evm.ClientBalanceCheck{RequireBalanceCheck: false},
+			evm.ClientAllowanceCheck{RequireAllowanceCheck: false},
+		}
+
+		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ChannelHubAddress), client, bb.TxSigner, b.ID, nodeAddress, bb.MemoryStore, clientOpts...)
+		if err != nil {
+			logger.Fatal("failed to create EVM client")
+		}
+
+		worker := NewBlockchainWorker(b.ID, blockchainClient, bb.DbStore, logger)
+		worker.Start(ctx, func(err error) {
+			if err != nil {
+				logger.Fatal("blockchain worker stopped", "error", err, "blockchainID", b.ID)
+			}
+		})
 	}
 
 	metricsListenAddr := ":4242"
@@ -106,13 +101,10 @@ func main() {
 		Handler: metricsMux,
 	}
 
-	// Start metrics monitoring
-	go metrics.RecordMetricsPeriodically(db, custodyClients, logger)
-
 	go func() {
-		logger.Info("Prometheus metrics available", "listenAddr", metricsListenAddr, "endpoint", metricsEndpoint)
+		logger.Info("prometheus metrics available", "listenAddr", metricsListenAddr, "endpoint", metricsEndpoint)
 		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("metrics server failure", "error", err)
+			logger.Fatal("metrics server failure", "error", err)
 		}
 	}()
 
@@ -145,16 +137,6 @@ func main() {
 		logger.Error("failed to shut down RPC server", "error", err)
 	}
 
+	// TODO: gracefully stop blockchain listeners and workers
 	logger.Info("shutdown complete")
-}
-
-func runCli(logger Logger, name string) {
-	switch name {
-	case "reconcile":
-		runReconcileCli(logger)
-	case "export-transactions":
-		runExportTransactionsCli(logger)
-	default:
-		logger.Fatal("Unknown CLI command", "name", name)
-	}
 }

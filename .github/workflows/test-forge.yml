@@ -7,7 +7,7 @@ on:
         description: 'Path to the Forge project directory'
         required: false
         type: string
-        default: 'contract'
+        default: 'contracts'
       project-name:
         description: 'Human-readable name for the project'
         required: false
@@ -30,7 +30,7 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: v0.3.0
+          version: v1.5.1
 
       - name: Show Forge version
         run: forge --version

@@ -1,14 +1,22 @@
 .dockerignore
 .gitignore
+.gitmodules
+docker-compose.yml
 .git/
 .github/
 LICENSE
+contracts/
+docs/
+erc7824-docs/
+sdk/ts/
+test/
 
 *.md
 
 # clearnode
 clearnode/Dockerfile
 clearnode/.gitignore
-clearndoe/docs/
-clearndoe/chart/
-clearndoe/scripts/
+clearnode/docs/
+clearnode/chart/
+clearnode/scripts/
+clearnode/docker-compose.yml

@@ -41,22 +41,22 @@ replicaCount: 1
 
 image:
   # -- Docker image repository
-  repository: ghcr.io/erc7824/clearnode
+  repository: ghcr.io/erc7824/nitrolite/clearnode
   # -- Docker image tag
-  tag: 0.0.1
+  tag: v1.0.0-rc.0
 
 service:
   http:
     # -- Enable HTTP service
     enabled: true
     # -- HTTP service port
-    port: 8000
+    port: 7824
     # -- HTTP service path
     path: /
 
 metrics:
   # -- Enable Prometheus metrics
-  enabled: true
+  enabled: false
   podmonitoring:
     # -- Enable PodMonitoring for Managed Prometheus
     enabled: false

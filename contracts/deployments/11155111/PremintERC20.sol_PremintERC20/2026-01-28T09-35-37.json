@@ -1,0 +1,17 @@
+{
+  "deployer": "0xF8bedb0aBa14833e95F29e760487C3d34Bc4Ec64",
+  "deployedTo": "0x6E2C4707DA119425dF2c722E2695300154652f56",
+  "transactionHash": "0x648808592926bb7fb5390c0a21c1474e9de5d76deabafb6102805efb7454e5eb",
+  "commit": "0e5cd5b75117e6e8ab61f4de7271e60087f2f523",
+  "timestamp": 1769592937,
+  "chainId": 11155111,
+  "contractPath": "./src/PremintERC20.sol:PremintERC20",
+  "constructorArgs": [
+    "USD Circle",
+    "usdc",
+    "6",
+    "0xF8bedb0aBa14833e95F29e760487C3d34Bc4Ec64",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+  ],
+  "comment": ""
+}

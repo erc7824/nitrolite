@@ -6,14 +6,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// ========= Listener Interface =========
-
-// Listener defines the interface for listening to channel events
-type Listener interface {
-	// Listen starts listening for events
-	Listen(context.Context) error
-}
-
 // ========= Client Interface =========
 
 // Client defines the interface for interacting with the ChannelsHub smart contract
@@ -78,24 +70,14 @@ type AssetStore interface {
 // Channel lifecycle event handlers
 type BlockchainEventHandler interface {
 	HandleHomeChannelCreated(context.Context, *HomeChannelCreatedEvent) error
-
 	HandleHomeChannelMigrated(context.Context, *HomeChannelMigratedEvent) error
-
 	HandleHomeChannelCheckpointed(context.Context, *HomeChannelCheckpointedEvent) error
-
 	HandleHomeChannelChallenged(context.Context, *HomeChannelChallengedEvent) error
-
 	HandleHomeChannelClosed(context.Context, *HomeChannelClosedEvent) error
-
 	HandleEscrowDepositInitiated(context.Context, *EscrowDepositInitiatedEvent) error
-
 	HandleEscrowDepositChallenged(context.Context, *EscrowDepositChallengedEvent) error
-
 	HandleEscrowDepositFinalized(context.Context, *EscrowDepositFinalizedEvent) error
-
 	HandleEscrowWithdrawalInitiated(context.Context, *EscrowWithdrawalInitiatedEvent) error
-
 	HandleEscrowWithdrawalChallenged(context.Context, *EscrowWithdrawalChallengedEvent) error
-
 	HandleEscrowWithdrawalFinalized(context.Context, *EscrowWithdrawalFinalizedEvent) error
 }

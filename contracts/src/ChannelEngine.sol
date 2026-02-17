@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ChannelStatus, State, StateIntent, Ledger} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {WadMath} from "./WadMath.sol";
@@ -14,9 +14,36 @@ import {WadMath} from "./WadMath.sol";
 library ChannelEngine {
     using SafeCast for int256;
     using SafeCast for uint256;
-    using {Utils.isEmpty} for Ledger;
     using WadMath for uint256;
     using WadMath for int256;
+
+    error IncorrectHomeChainId();
+    error IncorrectNonHomeChainId();
+    error NonHomeStateRequired();
+    error NonHomeStateMustBeEmpty();
+
+    error IncorrectStateIntent();
+    error IncorrectPreviousStateIntent();
+    error IncorrectChannelStatus();
+    error IncorrectStateVersion();
+
+    error IncorrectUserAllocation();
+    error IncorrectNodeAllocation();
+    error IncorrectUserNetFlow();
+    error IncorrectNodeNetFlow();
+
+    error IncorrectUserNetFlowDelta();
+    error IncorrectNodeNetFlowDelta();
+    error NegativeNetFlowSum();
+    error IncorrectAllocationSum();
+
+    error AllocationExceedsLockedFunds();
+    error UserAllocationDeltaMismatch();
+    error UserNodeAllocationsMismatch();
+
+    error InsufficientLockedFunds();
+    error LockedFundsConsistencyViolation();
+    error InsufficientNodeBalance();
 
     // ========== Structs ==========
 
@@ -71,8 +98,8 @@ library ChannelEngine {
 
     function _validateUniversal(TransitionContext memory ctx, State memory candidate) internal view {
         // homeLedger always represents current chain
-        require(candidate.homeLedger.chainId == block.chainid, "invalid chain id");
-        require(candidate.version > ctx.prevState.version || ctx.prevState.version == 0, "invalid version");
+        require(candidate.homeLedger.chainId == block.chainid, IncorrectHomeChainId());
+        require(candidate.version > ctx.prevState.version || Utils.isEmpty(ctx.prevState), IncorrectStateVersion());
 
         // Validate token decimals for homeLedger
         Utils.validateTokenDecimals(candidate.homeLedger);
@@ -86,17 +113,17 @@ library ChannelEngine {
                 || candidate.intent == StateIntent.INITIATE_MIGRATION
                 || candidate.intent == StateIntent.FINALIZE_MIGRATION
         ) {
-            require(!candidate.nonHomeLedger.isEmpty(), "non-home state required for cross-chain operations");
-            require(candidate.nonHomeLedger.chainId != block.chainid, "invalid non-home chain id");
+            require(!Utils.isEmpty(candidate.nonHomeLedger), NonHomeStateRequired());
+            require(candidate.nonHomeLedger.chainId != block.chainid, IncorrectNonHomeChainId());
         } else {
-            require(candidate.nonHomeLedger.isEmpty(), "non-home state must be empty for home-only operations");
+            require(Utils.isEmpty(candidate.nonHomeLedger), NonHomeStateMustBeEmpty());
         }
 
         uint256 allocsSum = candidate.homeLedger.userAllocation + candidate.homeLedger.nodeAllocation;
         int256 netFlowsSum = candidate.homeLedger.userNetFlow + candidate.homeLedger.nodeNetFlow;
 
-        require(netFlowsSum >= 0, "negative net flow sum");
-        require(allocsSum == netFlowsSum.toUint256(), "invalid allocation sum");
+        require(netFlowsSum >= 0, NegativeNetFlowSum());
+        require(allocsSum == netFlowsSum.toUint256(), IncorrectAllocationSum());
     }
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========
@@ -112,9 +139,9 @@ library ChannelEngine {
         StateIntent intent = candidate.intent;
 
         if (intent == StateIntent.DEPOSIT) {
-            effects = _calculateDepositEffects(ctx, candidate, userNfDelta, nodeNfDelta);
+            effects = _calculateDepositEffects(ctx, userNfDelta, nodeNfDelta);
         } else if (intent == StateIntent.WITHDRAW) {
-            effects = _calculateWithdrawEffects(ctx, candidate, userNfDelta, nodeNfDelta);
+            effects = _calculateWithdrawEffects(ctx, userNfDelta, nodeNfDelta);
         } else if (intent == StateIntent.OPERATE) {
             effects = _calculateOperateEffects(ctx, candidate, userNfDelta, nodeNfDelta);
         } else if (intent == StateIntent.CLOSE) {
@@ -132,26 +159,25 @@ library ChannelEngine {
         } else if (intent == StateIntent.FINALIZE_MIGRATION) {
             effects = _calculateFinalizeMigrationEffects(ctx, candidate, userNfDelta, nodeNfDelta);
         } else {
-            require(false, "invalid intent");
+            revert IncorrectStateIntent();
         }
 
         effects.updateLastState = true;
         return effects;
     }
 
-    function _calculateDepositEffects(
-        TransitionContext memory ctx,
-        State memory candidate,
-        int256 userNfDelta,
-        int256 nodeNfDelta
-    ) internal pure returns (TransitionEffects memory effects) {
+    function _calculateDepositEffects(TransitionContext memory ctx, int256 userNfDelta, int256 nodeNfDelta)
+        internal
+        pure
+        returns (TransitionEffects memory effects)
+    {
         // DEPOSIT-specific validations
         require(
             ctx.status == ChannelStatus.VOID || ctx.status == ChannelStatus.OPERATING
                 || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN,
-            "invalid status"
+            IncorrectChannelStatus()
         );
-        require(userNfDelta > 0, "invalid user delta");
+        require(userNfDelta > 0, IncorrectUserNetFlowDelta());
 
         // Calculate effects
         effects.userFundsDelta = userNfDelta; // Pull deposit from user
@@ -162,19 +188,18 @@ library ChannelEngine {
         return effects;
     }
 
-    function _calculateWithdrawEffects(
-        TransitionContext memory ctx,
-        State memory candidate,
-        int256 userNfDelta,
-        int256 nodeNfDelta
-    ) internal pure returns (TransitionEffects memory effects) {
+    function _calculateWithdrawEffects(TransitionContext memory ctx, int256 userNfDelta, int256 nodeNfDelta)
+        internal
+        pure
+        returns (TransitionEffects memory effects)
+    {
         // WITHDRAW-specific validations
         require(
             ctx.status == ChannelStatus.VOID || ctx.status == ChannelStatus.OPERATING
                 || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN,
-            "invalid status"
+            IncorrectChannelStatus()
         );
-        require(userNfDelta < 0, "invalid user delta");
+        require(userNfDelta < 0, IncorrectUserNetFlowDelta());
 
         // Calculate effects
         effects.userFundsDelta = userNfDelta; // Negative = push to user
@@ -195,10 +220,10 @@ library ChannelEngine {
         require(
             ctx.status == ChannelStatus.VOID || ctx.status == ChannelStatus.OPERATING
                 || ctx.status == ChannelStatus.DISPUTED || ctx.status == ChannelStatus.MIGRATING_IN,
-            "invalid status"
+            IncorrectChannelStatus()
         );
-        require(userNfDelta == 0, "invalid user delta");
-        require(candidate.homeLedger.nodeAllocation == 0, "node allocation must be zero");
+        require(userNfDelta == 0, IncorrectUserNetFlowDelta());
+        require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
 
         // Calculate effects
         effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
@@ -218,19 +243,16 @@ library ChannelEngine {
         require(
             ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
                 || ctx.status == ChannelStatus.MIGRATING_IN,
-            "invalid status"
+            IncorrectChannelStatus()
         );
 
         uint256 allocsSum = candidate.homeLedger.userAllocation + candidate.homeLedger.nodeAllocation;
-        require(allocsSum <= ctx.lockedFunds, "allocation exceeds locked funds");
+        require(allocsSum <= ctx.lockedFunds, AllocationExceedsLockedFunds());
 
         // Ensure final locked funds will be sufficient for special nodeAllocation handling
         int256 finalLockedFunds = ctx.lockedFunds.toInt256() + userNfDelta + nodeNfDelta;
-        require(finalLockedFunds >= 0, "negative final locked funds");
-        require(
-            finalLockedFunds >= candidate.homeLedger.nodeAllocation.toInt256(),
-            "insufficient funds for node allocation payout"
-        );
+        require(finalLockedFunds >= 0, InsufficientLockedFunds());
+        require(finalLockedFunds >= candidate.homeLedger.nodeAllocation.toInt256(), InsufficientLockedFunds());
 
         // Calculate effects
         // Push allocations to parties (negative = push out from channel)
@@ -253,21 +275,21 @@ library ChannelEngine {
         require(
             ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
                 || ctx.status == ChannelStatus.MIGRATING_IN,
-            "invalid status"
+            IncorrectChannelStatus()
         );
-        require(userNfDelta == 0, "user delta must be zero"); // no user funds movement
+        require(userNfDelta == 0, IncorrectUserNetFlowDelta()); // no user funds movement
         // node fund movement may accommodate transfers, thus it can be both positive or negative
         // node allocation may not have changed if previous operation is also initiate escrow deposit
 
         // Check home - non-home state consistency
         uint256 depositAmount = candidate.nonHomeLedger.userAllocation;
-        require(depositAmount > 0, "deposit amount must be positive");
+        require(depositAmount > 0, IncorrectUserAllocation());
         require(
             candidate.homeLedger.nodeAllocation.toWad(candidate.homeLedger.decimals)
                 == depositAmount.toWad(candidate.nonHomeLedger.decimals),
-            "invalid home node allocation"
+            IncorrectNodeAllocation()
         );
-        require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), "invalid non-home user net flow");
+        require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), IncorrectUserNetFlow());
 
         // Calculate effects
         effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
@@ -289,28 +311,28 @@ library ChannelEngine {
         require(
             ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
                 || ctx.status == ChannelStatus.MIGRATING_IN,
-            "invalid status"
+            IncorrectChannelStatus()
         );
-        require(candidate.homeLedger.nodeAllocation == 0, "node allocation must be zero");
+        require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
         // nothing changes from initiate escrow deposit state
-        require(userNfDelta == 0, "user delta must be 0");
-        require(nodeNfDelta == 0, "node delta must be 0");
+        require(userNfDelta == 0, IncorrectUserNetFlowDelta());
+        require(nodeNfDelta == 0, IncorrectNodeNetFlowDelta());
 
         // Check home - non-home state consistency
-        require(ctx.prevState.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, "invalid intent");
-        require(candidate.version == ctx.prevState.version + 1, "invalid version");
-        require(candidate.nonHomeLedger.userAllocation == 0, "invalid non-home user allocation");
-        require(candidate.nonHomeLedger.nodeAllocation == 0, "invalid non-home node allocation");
+        require(ctx.prevState.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, IncorrectPreviousStateIntent());
+        require(candidate.version == ctx.prevState.version + 1, IncorrectStateVersion());
+        require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
+        require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
 
         uint256 depositAmount = ctx.prevState.nonHomeLedger.userAllocation;
-        require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), "invalid non-home user net flow");
-        require(candidate.nonHomeLedger.nodeNetFlow == -depositAmount.toInt256(), "invalid non-home node net flow");
+        require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), IncorrectUserNetFlow());
+        require(candidate.nonHomeLedger.nodeNetFlow == -depositAmount.toInt256(), IncorrectNodeNetFlow());
 
         uint256 userAllocDelta = candidate.homeLedger.userAllocation - ctx.prevState.homeLedger.userAllocation;
         require(
             userAllocDelta.toWad(candidate.homeLedger.decimals)
                 == depositAmount.toWad(ctx.prevState.nonHomeLedger.decimals),
-            "user allocation delta mismatch"
+            UserAllocationDeltaMismatch()
         );
 
         // Calculate effects - funds stay in channel, no external movement
@@ -334,17 +356,17 @@ library ChannelEngine {
         require(
             ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
                 || ctx.status == ChannelStatus.MIGRATING_IN,
-            "invalid status"
+            IncorrectChannelStatus()
         );
-        require(userNfDelta == 0, "user delta must be zero"); // no user funds movement
-        require(candidate.homeLedger.nodeAllocation == 0, "node allocation must be zero");
+        require(userNfDelta == 0, IncorrectUserNetFlowDelta()); // no user funds movement
+        require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
 
         // Check home - non-home state consistency
-        require(candidate.nonHomeLedger.userNetFlow == 0, "withdrawal user net flow must be zero");
-        require(candidate.nonHomeLedger.userAllocation == 0, "withdrawal user allocation must be zero");
+        require(candidate.nonHomeLedger.userNetFlow == 0, IncorrectUserNetFlow());
+        require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
         require(
             candidate.nonHomeLedger.nodeAllocation.toInt256() == candidate.nonHomeLedger.nodeNetFlow,
-            "invalid non-home node net flow"
+            IncorrectNodeNetFlow()
         );
 
         // Calculate effects - no immediate fund movement
@@ -367,18 +389,15 @@ library ChannelEngine {
         require(
             ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED
                 || ctx.status == ChannelStatus.MIGRATING_IN,
-            "invalid status"
+            IncorrectChannelStatus()
         );
-        require(userNfDelta == 0, "user delta must be zero"); // no user funds movement
-        require(candidate.homeLedger.nodeAllocation == 0, "node allocation must be zero");
+        require(userNfDelta == 0, IncorrectUserNetFlowDelta()); // no user funds movement
+        require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
 
         // Check home - non-home state consistency
-        require(candidate.nonHomeLedger.userAllocation == 0, "withdrawal user allocation must be zero");
-        require(candidate.nonHomeLedger.nodeAllocation == 0, "withdrawal node allocation must be zero");
-        require(
-            candidate.nonHomeLedger.userNetFlow == -candidate.nonHomeLedger.nodeNetFlow,
-            "invalid non-home user net flow"
-        );
+        require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
+        require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
+        require(candidate.nonHomeLedger.userNetFlow == -candidate.nonHomeLedger.nodeNetFlow, IncorrectUserNetFlow());
 
         // TODO: provide V-1 state (INITIATE_ESCROW_WITHDRAWAL) to validate against?
 
@@ -403,21 +422,21 @@ library ChannelEngine {
             // homeLedger represents new home (current chain)
 
             uint256 userNonHomeAlloc = candidate.nonHomeLedger.userAllocation;
-            require(userNonHomeAlloc > 0, "old home must have user allocation");
-            require(candidate.nonHomeLedger.nodeAllocation == 0, "old home node allocation must be zero");
+            require(userNonHomeAlloc > 0, IncorrectUserAllocation());
+            require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
 
-            require(candidate.homeLedger.userAllocation == 0, "new home user allocation must be zero");
+            require(candidate.homeLedger.userAllocation == 0, IncorrectUserAllocation());
             require(
                 candidate.homeLedger.nodeAllocation.toWad(candidate.homeLedger.decimals)
                     == userNonHomeAlloc.toWad(candidate.nonHomeLedger.decimals),
-                "node must deposit user allocation amount"
+                UserNodeAllocationsMismatch()
             );
             require(
                 candidate.homeLedger.nodeNetFlow.toWad(candidate.homeLedger.decimals)
                     == userNonHomeAlloc.toInt256().toWad(candidate.nonHomeLedger.decimals),
-                "invalid new home node net flow"
+                IncorrectNodeNetFlow()
             );
-            require(candidate.homeLedger.userNetFlow == 0, "new home user net flow must be zero");
+            require(candidate.homeLedger.userNetFlow == 0, IncorrectUserNetFlow());
 
             // Calculate effects - lock node funds
             // No delta calculation needed - creating fresh channel
@@ -425,34 +444,34 @@ library ChannelEngine {
             effects.newStatus = ChannelStatus.MIGRATING_IN;
         } else if (ctx.status == ChannelStatus.OPERATING || ctx.status == ChannelStatus.DISPUTED) {
             // HOME CHAIN (OUT): Update state
-            require(candidate.homeLedger.chainId == block.chainid, "invalid chain id");
+            require(candidate.homeLedger.chainId == block.chainid, IncorrectHomeChainId());
 
-            require(userNfDelta == 0, "user delta must be zero"); // no user funds movement
+            require(userNfDelta == 0, IncorrectUserNetFlowDelta()); // no user funds movement
 
             // Validate homeLedger (current chain)
             uint256 userHomeAlloc = candidate.homeLedger.userAllocation;
-            require(userHomeAlloc > 0, "old home must have user allocation");
-            require(candidate.homeLedger.nodeAllocation == 0, "node allocation must be zero");
+            require(userHomeAlloc > 0, IncorrectUserAllocation());
+            require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
 
             // Validate nonHomeLedger (target chain)
-            require(candidate.nonHomeLedger.userAllocation == 0, "new home user allocation must be zero");
+            require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
             require(
                 candidate.nonHomeLedger.nodeAllocation.toWad(candidate.nonHomeLedger.decimals)
                     == userHomeAlloc.toWad(candidate.homeLedger.decimals),
-                "node must deposit user allocation amount"
+                UserNodeAllocationsMismatch()
             );
             require(
                 candidate.nonHomeLedger.nodeNetFlow.toWad(candidate.nonHomeLedger.decimals)
                     == userHomeAlloc.toInt256().toWad(candidate.homeLedger.decimals),
-                "invalid new home node net flow"
+                IncorrectNodeNetFlow()
             );
-            require(candidate.nonHomeLedger.userNetFlow == 0, "new home user net flow must be zero");
+            require(candidate.nonHomeLedger.userNetFlow == 0, IncorrectUserNetFlow());
 
             // Calculate effects - may adjust node vault based on net flow delta
             effects.nodeFundsDelta = nodeNfDelta;
             effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
         } else {
-            revert("invalid status for initiate migration");
+            revert IncorrectChannelStatus();
         }
 
         return effects;
@@ -469,25 +488,23 @@ library ChannelEngine {
         if (ctx.status == ChannelStatus.MIGRATING_IN) {
             // NEW HOME CHAIN (IN): Move MIGRATING_IN → OPERATING
             // The home state represents the new home (current chain)
-            require(candidate.homeLedger.chainId == block.chainid, "invalid chain id");
-            require(ctx.prevState.intent == StateIntent.INITIATE_MIGRATION, "invalid previous intent");
-            require(candidate.version == ctx.prevState.version + 1, "invalid version");
+            require(candidate.homeLedger.chainId == block.chainid, IncorrectHomeChainId());
+            require(ctx.prevState.intent == StateIntent.INITIATE_MIGRATION, IncorrectPreviousStateIntent());
+            require(candidate.version == ctx.prevState.version + 1, IncorrectStateVersion());
 
             uint256 userMigratedAlloc = ctx.prevState.homeLedger.userAllocation;
 
             // Validate that this completes the migration
-            require(
-                candidate.homeLedger.userAllocation == userMigratedAlloc, "user allocation must match migrated amount"
-            );
-            require(candidate.homeLedger.nodeAllocation == 0, "node allocation must be zero");
-            require(candidate.nonHomeLedger.userAllocation == 0, "old home user allocation must be zero");
-            require(candidate.nonHomeLedger.nodeAllocation == 0, "old home node allocation must be zero");
+            require(candidate.homeLedger.userAllocation == userMigratedAlloc, IncorrectUserAllocation());
+            require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
+            require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
+            require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
 
             // Special delta calculation: previous state was swapped during INITIATE_MIGRATION
             // So prevState.homeLedger represents new home (current chain)
             // Calculate deltas normally - no special handling needed since state was swapped on storage
-            require(userNfDelta == 0, "user net flow delta must be zero");
-            require(nodeNfDelta == 0, "node net flow delta must be zero");
+            require(userNfDelta == 0, IncorrectUserNetFlowDelta());
+            require(nodeNfDelta == 0, IncorrectNodeNetFlowDelta());
 
             // Calculate effects - just status change
             effects.newStatus = ChannelStatus.OPERATING;
@@ -496,12 +513,12 @@ library ChannelEngine {
             // homeLedger represents old home (current chain)
 
             // Validate homeLedger
-            require(candidate.homeLedger.userAllocation == 0, "old home user allocation must be zero");
-            require(candidate.homeLedger.nodeAllocation == 0, "old home node allocation must be zero");
+            require(candidate.homeLedger.userAllocation == 0, IncorrectUserAllocation());
+            require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
 
             // Validate nonHomeLedger (new home)
-            require(candidate.nonHomeLedger.userAllocation > 0, "new home user allocation must be positive");
-            require(candidate.nonHomeLedger.nodeAllocation == 0, "new home node allocation must be zero");
+            require(candidate.nonHomeLedger.userAllocation > 0, IncorrectUserAllocation());
+            require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
 
             // Calculate effects - release all currently locked funds to node vault
             effects.nodeFundsDelta = nodeNfDelta;
@@ -509,7 +526,7 @@ library ChannelEngine {
             effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
             effects.closeChannel = true;
         } else {
-            revert("invalid status for finalize migration");
+            revert IncorrectChannelStatus();
         }
 
         return effects;
@@ -522,17 +539,17 @@ library ChannelEngine {
         pure
     {
         int256 expectedLocked = ctx.lockedFunds.toInt256() + effects.userFundsDelta + effects.nodeFundsDelta;
-        require(expectedLocked >= 0, "negative locked funds");
+        require(expectedLocked >= 0, InsufficientLockedFunds());
 
         // Check that allocations equal expected locked funds (unless deleting)
         if (!effects.closeChannel) {
             uint256 allocsSum = candidate.homeLedger.userAllocation + candidate.homeLedger.nodeAllocation;
-            require(allocsSum == expectedLocked.toUint256(), "locked funds consistency violation");
+            require(allocsSum == expectedLocked.toUint256(), LockedFundsConsistencyViolation());
         }
 
         // Check node has sufficient funds for positive nodeNfDelta
         if (effects.nodeFundsDelta > 0) {
-            require(ctx.nodeAvailableFunds >= effects.nodeFundsDelta.toUint256(), "insufficient node balance");
+            require(ctx.nodeAvailableFunds >= effects.nodeFundsDelta.toUint256(), InsufficientNodeBalance());
         }
     }
 }

@@ -34,25 +34,29 @@ library Utils {
         return keccak256(abi.encode(channelId, version));
     }
 
-    // ========== Cross-Chain State ==========
+    // ========== State ==========
 
-    function pack(State memory ccs, bytes32 channelId) internal pure returns (bytes memory) {
-        return abi.encode(channelId, toSigningData(ccs));
+    function pack(State memory state, bytes32 channelId) internal pure returns (bytes memory) {
+        return abi.encode(channelId, toSigningData(state));
     }
 
     function pack(bytes32 channelId, bytes memory signingData) internal pure returns (bytes memory) {
         return abi.encode(channelId, signingData);
     }
 
-    function toSigningData(State memory ccs) internal pure returns (bytes memory) {
+    function toSigningData(State memory state) internal pure returns (bytes memory) {
         return abi.encode(
-            ccs.version,
-            ccs.intent,
-            ccs.metadata,
-            ccs.homeLedger,
-            ccs.nonHomeLedger
+            state.version,
+            state.intent,
+            state.metadata,
+            state.homeLedger,
+            state.nonHomeLedger
             // omit signatures
         );
+    }
+
+    function isEmpty(State memory state) internal pure returns (bool) {
+        return state.homeLedger.chainId == 0 && state.nonHomeLedger.chainId == 0;
     }
 
     // ========== Ledger ==========
@@ -76,7 +80,7 @@ library Utils {
         }
     }
 
-    function isEmpty(Ledger memory state) internal pure returns (bool) {
-        return state.chainId == 0;
+    function isEmpty(Ledger memory ledger) internal pure returns (bool) {
+        return ledger.chainId == 0;
     }
 }

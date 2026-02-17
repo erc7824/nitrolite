@@ -40,7 +40,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
     using SafeCast for uint256;
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
-    using {Utils.isEmpty} for Ledger;
 
     event EscrowDepositsPurged(uint256 purgedCount);
 
@@ -79,6 +78,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     error InvalidAddress();
     error IncorrectAmount();
     error IncorrectValue();
+    error TransferFailed(address recepient, address token, uint256 amount);
     error AddressCollision(address collision);
     error IncorrectChallengeDuration();
 
@@ -1219,7 +1219,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
         if (amount == 0) return;
 
         if (token == address(0)) {
-            payable(to).transfer(amount);
+            (bool success, ) = payable(to).call{value: amount}("");
+            require(success, TransferFailed(to, address(0), amount));
         } else {
             IERC20(token).safeTransfer(to, amount);
         }

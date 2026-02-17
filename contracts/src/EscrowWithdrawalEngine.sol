@@ -154,7 +154,7 @@ library EscrowWithdrawalEngine {
         // INITIATE: Node locks funds for user withdrawal
         require(ctx.status == EscrowStatus.VOID, EscrowAlreadyExists());
         require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
-        require(candidate.nonHomeLedger.userNetFlow == 0, IncorrectNodeNetFlow());
+        require(candidate.nonHomeLedger.userNetFlow == 0, IncorrectUserNetFlow());
         uint256 withdrawalAmount = candidate.nonHomeLedger.nodeAllocation;
         require(candidate.nonHomeLedger.nodeNetFlow == withdrawalAmount.toInt256(), NodeAllocationAndNetFlowMismatch());
 

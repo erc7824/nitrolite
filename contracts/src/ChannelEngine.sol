@@ -14,7 +14,6 @@ import {WadMath} from "./WadMath.sol";
 library ChannelEngine {
     using SafeCast for int256;
     using SafeCast for uint256;
-    using {Utils.isEmpty} for Ledger;
     using WadMath for uint256;
     using WadMath for int256;
 
@@ -100,7 +99,7 @@ library ChannelEngine {
     function _validateUniversal(TransitionContext memory ctx, State memory candidate) internal view {
         // homeLedger always represents current chain
         require(candidate.homeLedger.chainId == block.chainid, IncorrectHomeChainId());
-        require(candidate.version > ctx.prevState.version || ctx.prevState.version == 0, IncorrectStateVersion());
+        require(candidate.version > ctx.prevState.version || Utils.isEmpty(ctx.prevState), IncorrectStateVersion());
 
         // Validate token decimals for homeLedger
         Utils.validateTokenDecimals(candidate.homeLedger);
@@ -114,10 +113,10 @@ library ChannelEngine {
                 || candidate.intent == StateIntent.INITIATE_MIGRATION
                 || candidate.intent == StateIntent.FINALIZE_MIGRATION
         ) {
-            require(!candidate.nonHomeLedger.isEmpty(), NonHomeStateRequired());
+            require(!Utils.isEmpty(candidate.nonHomeLedger), NonHomeStateRequired());
             require(candidate.nonHomeLedger.chainId != block.chainid, IncorrectNonHomeChainId());
         } else {
-            require(candidate.nonHomeLedger.isEmpty(), NonHomeStateMustBeEmpty());
+            require(Utils.isEmpty(candidate.nonHomeLedger), NonHomeStateMustBeEmpty());
         }
 
         uint256 allocsSum = candidate.homeLedger.userAllocation + candidate.homeLedger.nodeAllocation;
@@ -504,8 +503,8 @@ library ChannelEngine {
             // Special delta calculation: previous state was swapped during INITIATE_MIGRATION
             // So prevState.homeLedger represents new home (current chain)
             // Calculate deltas normally - no special handling needed since state was swapped on storage
-            require(userNfDelta == 0, IncorrectUserNetFlow());
-            require(nodeNfDelta == 0, IncorrectNodeNetFlow());
+            require(userNfDelta == 0, IncorrectUserNetFlowDelta());
+            require(nodeNfDelta == 0, IncorrectNodeNetFlowDelta());
 
             // Calculate effects - just status change
             effects.newStatus = ChannelStatus.OPERATING;

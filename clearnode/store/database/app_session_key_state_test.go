@@ -248,7 +248,7 @@ func TestDBStore_GetLastAppSessionKeyState(t *testing.T) {
 		assert.Nil(t, result)
 	})
 
-	t.Run("Returns nil for expired key", func(t *testing.T) {
+	t.Run("Returns expired key (newer version always supersedes)", func(t *testing.T) {
 		db, cleanup := SetupTestDB(t)
 		defer cleanup()
 
@@ -265,10 +265,11 @@ func TestDBStore_GetLastAppSessionKeyState(t *testing.T) {
 
 		result, err := store.GetLastAppSessionKeyState(testUser1, testSessionKey)
 		require.NoError(t, err)
-		assert.Nil(t, result)
+		require.NotNil(t, result)
+		assert.Equal(t, uint64(1), result.Version)
 	})
 
-	t.Run("Ignores expired versions and returns latest non-expired", func(t *testing.T) {
+	t.Run("Returns latest version even if expired (newer always supersedes)", func(t *testing.T) {
 		db, cleanup := SetupTestDB(t)
 		defer cleanup()
 
@@ -298,8 +299,9 @@ func TestDBStore_GetLastAppSessionKeyState(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		assert.Equal(t, uint64(1), result.Version)
-		assert.Equal(t, "0xsig_v1", result.UserSig)
+		// v2 is returned because newer version always supersedes, even if expired
+		assert.Equal(t, uint64(2), result.Version)
+		assert.Equal(t, "0xsig_v2", result.UserSig)
 	})
 }
 
@@ -344,7 +346,7 @@ func TestDBStore_GetLastAppSessionKeyVersion(t *testing.T) {
 		assert.Equal(t, uint64(0), version)
 	})
 
-	t.Run("Returns 0 when all versions expired", func(t *testing.T) {
+	t.Run("Returns version even when expired (newer always supersedes)", func(t *testing.T) {
 		db, cleanup := SetupTestDB(t)
 		defer cleanup()
 
@@ -361,7 +363,7 @@ func TestDBStore_GetLastAppSessionKeyVersion(t *testing.T) {
 
 		version, err := store.GetLastAppSessionKeyVersion(testUser1, testSessionKey)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(0), version)
+		assert.Equal(t, uint64(3), version)
 	})
 }
 
@@ -460,7 +462,7 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 		assert.Equal(t, testKeyA, results[0].SessionKey)
 	})
 
-	t.Run("Excludes expired keys", func(t *testing.T) {
+	t.Run("Returns all keys including expired (newer always supersedes)", func(t *testing.T) {
 		db, cleanup := SetupTestDB(t)
 		defer cleanup()
 
@@ -489,8 +491,8 @@ func TestDBStore_GetLastAppSessionKeyStates(t *testing.T) {
 		results, err := store.GetLastAppSessionKeyStates(testUser1, nil)
 		require.NoError(t, err)
 
-		assert.Len(t, results, 1)
-		assert.Equal(t, testKeyA, results[0].SessionKey)
+		// Both keys returned — caller is responsible for checking expiration
+		assert.Len(t, results, 2)
 	})
 
 	t.Run("Returns empty for non-existent user", func(t *testing.T) {

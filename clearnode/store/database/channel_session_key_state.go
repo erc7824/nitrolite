@@ -88,7 +88,7 @@ func (s *DBStore) GetLastChannelSessionKeyStates(wallet string, sessionKey *stri
 
 	subQuery := s.db.Model(&ChannelSessionKeyStateV1{}).
 		Select("user_address, session_key, MAX(version) as max_version").
-		Where("user_address = ? AND expires_at > ?", wallet, time.Now().UTC()).
+		Where("user_address = ?", wallet).
 		Group("user_address, session_key")
 
 	if sessionKey != nil && *sessionKey != "" {
@@ -116,7 +116,7 @@ func (s *DBStore) GetLastChannelSessionKeyStates(wallet string, sessionKey *stri
 	return states, nil
 }
 
-// GetLastChannelSessionKeyVersion returns the latest version of a non-expired channel session key state.
+// GetLastChannelSessionKeyVersion returns the latest version of a channel session key state.
 // Returns 0 if no state exists.
 func (s *DBStore) GetLastChannelSessionKeyVersion(wallet, sessionKey string) (uint64, error) {
 	wallet = strings.ToLower(wallet)
@@ -127,7 +127,7 @@ func (s *DBStore) GetLastChannelSessionKeyVersion(wallet, sessionKey string) (ui
 	}
 	err := s.db.Model(&ChannelSessionKeyStateV1{}).
 		Select("version").
-		Where("user_address = ? AND session_key = ? AND expires_at > ?", wallet, sessionKey, time.Now().UTC()).
+		Where("user_address = ? AND session_key = ?", wallet, sessionKey).
 		Order("version DESC").
 		Take(&result).Error
 
@@ -157,7 +157,7 @@ func (s *DBStore) ValidateChannelSessionKeyForAsset(wallet, sessionKey, asset, m
 
 	maxVersionSubQ := s.db.Model(&ChannelSessionKeyStateV1{}).
 		Select("MAX(version)").
-		Where("user_address = ? AND session_key = ? AND expires_at > ?", wallet, sessionKey, now)
+		Where("user_address = ? AND session_key = ?", wallet, sessionKey)
 
 	var count int64
 	err := s.db.Model(&ChannelSessionKeyStateV1{}).

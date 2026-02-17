@@ -285,6 +285,7 @@ func (h *Handler) createEscrowChannel(tx Store, incomingState core.State) error 
 	newEscrowChannel := core.NewChannel(
 		escrowChannelID,
 		incomingState.UserWallet,
+		incomingState.Asset,
 		core.ChannelTypeEscrow,
 		incomingState.EscrowLedger.BlockchainID,
 		incomingState.EscrowLedger.TokenAddress,

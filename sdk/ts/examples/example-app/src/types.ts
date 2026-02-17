@@ -8,13 +8,24 @@ export interface SessionKeyState {
   active: boolean;      // whether client currently uses this signer
 }
 
+export interface NetworkConfig {
+  chainId: string;
+  name: string;
+  rpcUrl: string;
+}
+
+export interface ClearnodeConfig {
+  name: string;
+  url: string;
+}
+
 export interface AppState {
   client: Client | null;
   address: string | null;
   connected: boolean;
   nodeUrl: string;
-  rpcConfigs: Record<string, string>; // chainId -> rpc url
-  homeBlockchains: Record<string, string>; // asset -> chainId
+  selectedChainId: string;
+  selectedAsset: string;
   sessionKey: SessionKeyState | null;
 }
 

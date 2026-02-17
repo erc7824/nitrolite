@@ -119,6 +119,40 @@ export class EthereumRawSigner implements TransactionSigner {
 }
 
 /**
+ * ChannelDefaultSigner wraps a StateSigner and prepends the 0x00 type byte
+ * to signatures.
+ * Corresponds to Go SDK's core.ChannelDefaultSigner.
+ *
+ * This signer wraps any StateSigner implementation and prepends the
+ * ChannelSignerType_Default (0x00) byte to the resulting signature,
+ * which is required by the Nitrolite protocol for signature validation.
+ *
+ * @example
+ * ```typescript
+ * const msgSigner = new EthereumMsgSigner(privateKey);
+ * const channelSigner = new ChannelDefaultSigner(msgSigner);
+ * const client = await Client.create(wsURL, channelSigner, txSigner);
+ * ```
+ */
+export class ChannelDefaultSigner implements StateSigner {
+  private inner: StateSigner;
+
+  constructor(inner: StateSigner) {
+    this.inner = inner;
+  }
+
+  getAddress(): Address {
+    return this.inner.getAddress();
+  }
+
+  async signMessage(hash: Hex): Promise<Hex> {
+    const sig = await this.inner.signMessage(hash);
+    // Prepend 0x00 type byte (ChannelSignerType_Default)
+    return `0x00${sig.slice(2)}` as Hex;
+  }
+}
+
+/**
  * ChannelSessionKeyStateSigner implements StateSigner for session key delegation.
  * Corresponds to Go SDK's core.ChannelSessionKeySignerV1.
  *
@@ -222,7 +256,7 @@ export function createSigners(privateKey: Hex): {
 } {
   const account = privateKeyToAccount(privateKey);
   return {
-    stateSigner: new EthereumMsgSigner(account),
+    stateSigner: new ChannelDefaultSigner(new EthereumMsgSigner(account)),
     txSigner: new EthereumRawSigner(account),
   };
 }

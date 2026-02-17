@@ -269,6 +269,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	homeChannel := core.Channel{
 		ChannelID:         homeChannelID,
 		UserWallet:        userWallet,
+		Asset:             "usdc",
 		Type:              core.ChannelTypeHome,
 		BlockchainID:      1,
 		TokenAddress:      "0xTokenAddress",
@@ -836,6 +837,7 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	homeChannel := core.Channel{
 		ChannelID:         homeChannelID,
 		UserWallet:        userWallet,
+		Asset:             "usdc",
 		Type:              core.ChannelTypeHome,
 		BlockchainID:      1,
 		TokenAddress:      "0xTokenAddress",

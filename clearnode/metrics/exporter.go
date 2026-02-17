@@ -13,6 +13,11 @@ import (
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
+const (
+	// MetricNamespace is the common namespace for all ClearNode metrics.
+	MetricNamespace = "clearnode"
+)
+
 var (
 	_ RuntimeMetricExporter = (*runtimeMetricExporter)(nil)
 	_ StoreMetricExporter   = (*storeMetricExporter)(nil)
@@ -26,12 +31,14 @@ type storeMetricExporter struct {
 func NewStoreMetricExporter(reg prometheus.Registerer) (StoreMetricExporter, error) {
 	m := &storeMetricExporter{
 		appSessionsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: "app_sessions_active",
-			Help: "Current total number of app sessions",
+			Namespace: MetricNamespace,
+			Name:      "app_sessions_active",
+			Help:      "Current total number of app sessions",
 		}, []string{"application", "status"}),
 		channelsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: "channels_active",
-			Help: "Current total number of channels",
+			Namespace: MetricNamespace,
+			Name:      "channels_active",
+			Help:      "Current total number of channels",
 		}, []string{"asset", "status"}),
 	}
 
@@ -89,69 +96,83 @@ func NewRuntimeMetricExporter(reg prometheus.Registerer) (RuntimeMetricExporter,
 	m := &runtimeMetricExporter{
 		// Shared
 		userStatesTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "user_states_total",
-			Help: "Total number of user states",
+			Namespace: MetricNamespace,
+			Name:      "user_states_total",
+			Help:      "Total number of user states",
 		}, []string{"asset", "home_blockchain_id", "transition"}),
 		transactionsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "transactions_total",
-			Help: "Total number of transactions",
+			Namespace: MetricNamespace,
+			Name:      "transactions_total",
+			Help:      "Total number of transactions",
 		}, []string{"asset", "tx_type"}),
 		transactionsAmountTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "transactions_amount_total",
-			Help: "Total amount of transactions processed",
+			Namespace: MetricNamespace,
+			Name:      "transactions_amount_total",
+			Help:      "Total amount of transactions processed",
 		}, []string{"asset", "tx_type"}),
 		channelSessionKeysTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "channel_session_keys_total",
-			Help: "Total number of channel session keys issued",
+			Namespace: MetricNamespace,
+			Name:      "channel_session_keys_total",
+			Help:      "Total number of channel session keys issued",
 		}),
 		appSessionKeysTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "app_session_keys_total",
-			Help: "Total number of app session keys issued",
+			Namespace: MetricNamespace,
+			Name:      "app_session_keys_total",
+			Help:      "Total number of app session keys issued",
 		}),
 		channelStateSigValidationsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "channel_state_sig_validations_total",
-			Help: "Total number of channel state signature validations",
+			Namespace: MetricNamespace,
+			Name:      "channel_state_sig_validations_total",
+			Help:      "Total number of channel state signature validations",
 		}, []string{"sig_type", "result"}),
 
 		// api/rpc_router
 		rpcMessagesTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "rpc_messages_total",
-			Help: "Total number of RPC messages",
+			Namespace: MetricNamespace,
+			Name:      "rpc_messages_total",
+			Help:      "Total number of RPC messages",
 		}, []string{"msg_type", "method"}),
 		rpcRequestsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "rpc_requests_total",
-			Help: "Total number of RPC requests",
+			Namespace: MetricNamespace,
+			Name:      "rpc_requests_total",
+			Help:      "Total number of RPC requests",
 		}, []string{"method", "path", "status"}),
 		rpcRequestDurationSeconds: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Name:    "rpc_request_duration_seconds",
-			Help:    "Duration of RPC requests in seconds",
-			Buckets: []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+			Namespace: MetricNamespace,
+			Name:      "rpc_request_duration_seconds",
+			Help:      "Duration of RPC requests in seconds",
+			Buckets:   []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 		}, []string{"method", "path", "status"}),
 		rpcConnectionsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: "rpc_connections_active",
-			Help: "Current number of active RPC connections",
+			Namespace: MetricNamespace,
+			Name:      "rpc_connections_active",
+			Help:      "Current number of active RPC connections",
 		}, []string{"region", "origin"}),
 
 		// api/app_session_v1
 		appStateUpdates: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "app_state_updates_total",
-			Help: "Total number of app state updates",
+			Namespace: MetricNamespace,
+			Name:      "app_state_updates_total",
+			Help:      "Total number of app state updates",
 		}, []string{"application"}),
 		appSessionUpdateSigValidationsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "app_session_update_sig_validations_total",
-			Help: "Total number of app session update signature validations",
+			Namespace: MetricNamespace,
+			Name:      "app_session_update_sig_validations_total",
+			Help:      "Total number of app session update signature validations",
 		}, []string{"application", "sig_type", "result"}),
 
 		// Blockchain Worker
 		blockchainActionsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "blockchain_actions_total",
-			Help: "Total number of blockchain actions",
+			Namespace: MetricNamespace,
+			Name:      "blockchain_actions_total",
+			Help:      "Total number of blockchain actions",
 		}, []string{"asset", "blockchain_id", "action_type", "result"}),
 
 		// Event Listener
 		blockchainEventsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "blockchain_events_total",
-			Help: "Total number of blockchain events processed",
+			Namespace: MetricNamespace,
+			Name:      "blockchain_events_total",
+			Help:      "Total number of blockchain events processed",
 		}, []string{"blockchain_id", "process_result"}),
 	}
 

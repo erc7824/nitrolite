@@ -45,6 +45,7 @@ func TestGetEscrowChannel_Success(t *testing.T) {
 	escrowChannel := core.Channel{
 		ChannelID:         escrowChannelID,
 		UserWallet:        userWallet,
+		Asset:             "usdc",
 		Type:              core.ChannelTypeEscrow,
 		BlockchainID:      2,
 		TokenAddress:      "0xTokenAddress",

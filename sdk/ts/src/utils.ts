@@ -118,6 +118,7 @@ export function transformChannel(channel: ChannelV1): core.Channel {
   const result: core.Channel = {
     channelId: channel.channel_id,
     userWallet: channel.user_wallet as Address,
+    asset: channel.asset,
     type: parseChannelType(channel.type),
     blockchainId: BigInt(channel.blockchain_id),
     tokenAddress: channel.token_address as Address,

@@ -14,6 +14,7 @@ func databaseChannelToCore(dbChannel *Channel) *core.Channel {
 	return &core.Channel{
 		ChannelID:             dbChannel.ChannelID,
 		UserWallet:            dbChannel.UserWallet,
+		Asset:                 dbChannel.Asset,
 		Type:                  dbChannel.Type,
 		BlockchainID:          dbChannel.BlockchainID,
 		TokenAddress:          dbChannel.Token,

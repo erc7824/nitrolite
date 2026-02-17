@@ -20,6 +20,8 @@ export interface ChannelV1 {
   channel_id: string;
   /** User wallet address */
   user_wallet: Address;
+  /** Asset symbol (e.g. usdc, eth) */
+  asset: string;
   /** Type of the channel (home, escrow) */
   type: string;
   /** Unique identifier for the blockchain */

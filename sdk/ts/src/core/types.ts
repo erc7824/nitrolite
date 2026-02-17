@@ -80,6 +80,7 @@ export interface ChannelDefinition {
 export interface Channel {
   channelId: string; // Unique identifier for the channel
   userWallet: Address; // User wallet address
+  asset: string; // Asset symbol (e.g. usdc, eth)
   type: ChannelType; // Type of the channel (home, escrow)
   blockchainId: bigint; // uint64 - Unique identifier for the blockchain
   tokenAddress: Address; // Address of the token used in the channel
@@ -257,11 +258,12 @@ export interface EscrowWithdrawalDataResponse {
 
 /**
  * NewChannel creates a new Channel instance
- * Matches: func NewChannel(channelID, userWallet string, ChType ChannelType, blockchainID uint64, tokenAddress string, nonce uint64, challenge uint32) *Channel
+ * Matches: func NewChannel(channelID, userWallet, asset string, ChType ChannelType, blockchainID uint64, tokenAddress string, nonce uint64, challenge uint32) *Channel
  */
 export function newChannel(
   channelId: string,
   userWallet: Address,
+  asset: string,
   type: ChannelType,
   blockchainId: bigint,
   tokenAddress: Address,
@@ -272,6 +274,7 @@ export function newChannel(
   return {
     channelId,
     userWallet,
+    asset,
     type,
     blockchainId,
     tokenAddress,

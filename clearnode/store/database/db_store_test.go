@@ -270,6 +270,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         homeChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -325,6 +326,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         homeChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -382,6 +384,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:         homeChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -396,6 +399,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		escrowChannel := core.Channel{
 			ChannelID:         escrowChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeEscrow,
 			BlockchainID:      137,
 			TokenAddress:      "0xtoken456",
@@ -459,6 +463,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:         homeChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -473,6 +478,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		escrowChannel := core.Channel{
 			ChannelID:         escrowChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeEscrow,
 			BlockchainID:      137,
 			TokenAddress:      "0xtoken456",
@@ -537,6 +543,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		escrowChannel := core.Channel{
 			ChannelID:         escrowChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeEscrow,
 			BlockchainID:      137,
 			TokenAddress:      "0xtoken456",
@@ -597,6 +604,7 @@ func TestDBStore_EnsureNoOngoingStateTransitions(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         homeChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",

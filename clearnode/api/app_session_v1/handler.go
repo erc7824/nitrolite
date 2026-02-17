@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/shopspring/decimal"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
@@ -22,6 +23,7 @@ type Handler struct {
 	stateAdvancer core.StateAdvancer
 	statePacker   core.StatePacker
 	nodeAddress   string // Node's wallet address
+	metrics       metrics.RuntimeMetricExporter
 }
 
 // NewHandler creates a new Handler instance with the provided dependencies.
@@ -32,6 +34,7 @@ func NewHandler(
 	stateAdvancer core.StateAdvancer,
 	statePacker core.StatePacker,
 	nodeAddress string,
+	m metrics.RuntimeMetricExporter,
 ) *Handler {
 	return &Handler{
 		useStoreInTx:  useStoreInTx,
@@ -40,10 +43,11 @@ func NewHandler(
 		stateAdvancer: stateAdvancer,
 		statePacker:   statePacker,
 		nodeAddress:   nodeAddress,
+		metrics:       m,
 	}
 }
 
-func (h *Handler) verifyQuorum(tx Store, appSessionId string, participantWeights map[string]uint8, requiredQuorum uint8, data []byte, signatures []string) error {
+func (h *Handler) verifyQuorum(tx Store, appSessionId, applicationID string, participantWeights map[string]uint8, requiredQuorum uint8, data []byte, signatures []string) error {
 	// Verify signatures and calculate quorum
 	signedWeights := make(map[string]bool)
 	var achievedQuorum uint8
@@ -60,10 +64,13 @@ func (h *Handler) verifyQuorum(tx Store, appSessionId string, participantWeights
 			return rpc.Errorf("failed to decode signature: %v", err)
 		}
 
+		sigType := app.AppSessionSignerTypeV1(sigBytes[0])
 		userWallet, err := appSessionSignerValidator.Recover(data, sigBytes)
 		if err != nil {
+			h.metrics.IncAppSessionUpdateSigValidation(applicationID, sigType, false)
 			return rpc.Errorf("failed to recover user wallet: %v", err)
 		}
+		h.metrics.IncAppSessionUpdateSigValidation(applicationID, sigType, true)
 		userWallet = strings.ToLower(userWallet)
 
 		// Check if signer is a participant

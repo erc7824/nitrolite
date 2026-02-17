@@ -171,6 +171,14 @@ type DatabaseStore interface {
 	// and matches the metadata hash.
 	ValidateChannelSessionKeyForAsset(wallet, sessionKey, asset, metadataHash string) (bool, error)
 
+	// --- Metric Aggregation ---
+
+	// CountAppSessionsByStatus returns app session counts grouped by (application, status).
+	CountAppSessionsByStatus() ([]AppSessionCount, error)
+
+	// CountChannelsByStatus returns channel counts grouped by (asset, status).
+	CountChannelsByStatus() ([]ChannelCount, error)
+
 	// --- Contract Event Operations ---
 
 	// StoreContractEvent stores a blockchain event to prevent duplicate processing.

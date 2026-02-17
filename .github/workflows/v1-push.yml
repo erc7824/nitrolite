@@ -2,7 +2,7 @@ name: Push on release/v1.0.0 branch
 
 on:
   push:
-    branches: [ release/v1.0.0 ]
+    branches: [ release/v1.0.0, feat-v1/metrics ]
 
 permissions:
   contents: read

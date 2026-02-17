@@ -14,6 +14,7 @@ import (
 )
 
 func TestChannelSessionKeySignerV1(t *testing.T) {
+	t.Parallel()
 	// 1. Setup User Wallet
 	userSigner, userAddress := createSigner(t)
 
@@ -69,6 +70,7 @@ func TestChannelSessionKeySignerV1(t *testing.T) {
 }
 
 func TestValidateChannelSessionKeyAuthSigV1(t *testing.T) {
+	t.Parallel()
 	// 1. Setup User Wallet
 	userSigner, userAddress := createSigner(t)
 
@@ -85,10 +87,10 @@ func TestValidateChannelSessionKeyAuthSigV1(t *testing.T) {
 	// 4. Create valid signature
 	metadataHash, err := GetChannelSessionKeyAuthMetadataHashV1(version, assets, expiresAt.Unix())
 	require.NoError(t, err)
-	
+
 	packed, err := PackChannelKeyStateV1(sessionKeyAddr, metadataHash)
 	require.NoError(t, err)
-	
+
 	authSig, err := userSigner.Sign(packed)
 	require.NoError(t, err)
 
@@ -108,7 +110,7 @@ func TestValidateChannelSessionKeyAuthSigV1(t *testing.T) {
 	// 6. Test Invalid Signature (wrong signer)
 	wrongSigner, _ := createSigner(t)
 	wrongSig, _ := wrongSigner.Sign(packed)
-	
+
 	state.UserSig = hexutil.Encode(wrongSig)
 	err = ValidateChannelSessionKeyAuthSigV1(state)
 	assert.Error(t, err)
@@ -116,12 +118,13 @@ func TestValidateChannelSessionKeyAuthSigV1(t *testing.T) {
 
 	// 7. Test Invalid Signature (wrong data)
 	state.UserSig = hexutil.Encode(authSig) // Reset sig
-	state.Version = 2 // Change data
+	state.Version = 2                       // Change data
 	err = ValidateChannelSessionKeyAuthSigV1(state)
 	assert.Error(t, err) // Hash mismatch leads to recover address mismatch
 }
 
 func TestGenerateSessionKeyStateIDV1(t *testing.T) {
+	t.Parallel()
 	userAddr := common.HexToAddress("0x1111111111111111111111111111111111111111")
 	sessionKey := common.HexToAddress("0x2222222222222222222222222222222222222222")
 	version := uint64(1)
@@ -142,6 +145,7 @@ func TestGenerateSessionKeyStateIDV1(t *testing.T) {
 }
 
 func TestEncodeDecodeChannelSessionKeySignature(t *testing.T) {
+	t.Parallel()
 	skAuth := channelSessionKeyAuthorization{
 		SessionKey:    common.HexToAddress("0xSessionKey"),
 		MetadataHash:  [32]byte{1, 2, 3},
@@ -155,7 +159,7 @@ func TestEncodeDecodeChannelSessionKeySignature(t *testing.T) {
 
 	decodedAuth, decodedSig, err := decodeChannelSessionKeySignature(encoded)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, skAuth.SessionKey, decodedAuth.SessionKey)
 	assert.Equal(t, skAuth.MetadataHash, decodedAuth.MetadataHash)
 	assert.Equal(t, skAuth.AuthSignature, decodedAuth.AuthSignature)
@@ -170,15 +174,16 @@ func TestEncodeDecodeChannelSessionKeySignature(t *testing.T) {
 // I will create a helper or use hex.
 
 func createSigner(t *testing.T) (sign.Signer, string) {
+	t.Helper()
 	pk, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	pkHex := hexutil.Encode(crypto.FromECDSA(pk))
-	
+
 	rawSigner, err := sign.NewEthereumRawSigner(pkHex)
 	require.NoError(t, err)
-	
+
 	msgSigner, err := sign.NewEthereumMsgSignerFromRaw(rawSigner)
 	require.NoError(t, err)
-	
+
 	return msgSigner, rawSigner.PublicKey().Address().String()
 }

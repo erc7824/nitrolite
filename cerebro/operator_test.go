@@ -115,7 +115,8 @@ func TestOperator_BuildStateSigner(t *testing.T) {
 	require.NoError(t, err)
 
 	// Recover public key from signature
-	sessionPrivateKey, _ := crypto.HexToECDSA(sessionPK[2:]) // remove 0x
+	sessionPrivateKey, err1 := crypto.HexToECDSA(sessionPK[2:]) // remove 0x
+	require.NoError(t, err1)
 	pubKey := sessionPrivateKey.Public().(*ecdsa.PublicKey)
 	addr := crypto.PubkeyToAddress(*pubKey)
 

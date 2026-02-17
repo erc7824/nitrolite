@@ -16,9 +16,7 @@ func main() {
 	log.SetPrefix("clearnode-cli: ")
 	log.SetOutput(os.Stderr)
 	if len(os.Args) < 2 {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: clearnode-cli <clearnode_ws_url>\n")
-		_, _ = fmt.Fprintf(os.Stderr, "Example: clearnode-cli wss://clearnode.example.com/ws\n")
-		log.Fatalln("invalid arguments")
+log.Fatalf("Usage: clearnode-cli <clearnode_ws_url>\nExample: clearnode-cli wss://clearnode.example.com/ws")
 	}
 
 	wsURL := os.Args[1]

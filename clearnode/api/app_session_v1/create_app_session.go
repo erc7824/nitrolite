@@ -106,7 +106,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 			return rpc.Errorf("failed to create app session: %v", err)
 		}
 
-		if err := h.verifyQuorum(tx, appSessionID, participantWeights, appDef.Quorum, packedRequest, reqPayload.QuorumSigs); err != nil {
+		if err := h.verifyQuorum(tx, appSessionID, appDef.Application, participantWeights, appDef.Quorum, packedRequest, reqPayload.QuorumSigs); err != nil {
 			return err
 		}
 

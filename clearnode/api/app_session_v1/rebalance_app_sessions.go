@@ -113,7 +113,7 @@ func (h *Handler) RebalanceAppSessions(c *rpc.Context) {
 				return rpc.Errorf("failed to pack app state update for session %s: %v", update.AppStateUpdate.AppSessionID, err)
 			}
 
-			if err := h.verifyQuorum(tx, update.AppStateUpdate.AppSessionID, participantWeights, appSession.Quorum, packedStateUpdate, update.QuorumSigs); err != nil {
+			if err := h.verifyQuorum(tx, update.AppStateUpdate.AppSessionID, appSession.Application, participantWeights, appSession.Quorum, packedStateUpdate, update.QuorumSigs); err != nil {
 				return rpc.Errorf("quorum verification failed for session %s: %v", update.AppStateUpdate.AppSessionID, err)
 			}
 

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
@@ -34,6 +35,7 @@ func TestGetEscrowChannel_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data

@@ -32,6 +32,9 @@ type Connection interface {
 	// constant throughout the connection's lifetime.
 	ConnectionID() string
 
+	// Origin returns the origin of the connection, such as the client's IP address or other identifying information.
+	Origin() string
+
 	// RawRequests returns a read-only channel for receiving incoming raw request messages.
 	// Messages received on this channel are raw bytes that need to be unmarshaled
 	// into Request objects for processing. The channel is closed when the
@@ -78,6 +81,8 @@ type WebsocketConnection struct {
 	ctx context.Context
 	// connectionID is a unique identifier for this connection
 	connectionID string
+	// origin is the origin of the connection, such as the client's IP address
+	origin string
 	// websocketConn is the underlying WebSocket connection
 	websocketConn GorillaWsConnectionAdapter
 	// writeTimeout is the maximum duration to wait for a write to complete
@@ -103,6 +108,8 @@ type WebsocketConnection struct {
 type WebsocketConnectionConfig struct {
 	// ConnectionID is the unique identifier for this connection (required)
 	ConnectionID string
+	// Origin is the origin of the connection, such as the client's IP address (optional)
+	Origin string
 	// WebsocketConn is the underlying WebSocket connection (required)
 	WebsocketConn GorillaWsConnectionAdapter
 
@@ -125,6 +132,9 @@ func NewWebsocketConnection(config WebsocketConnectionConfig) (*WebsocketConnect
 	if config.ConnectionID == "" {
 		return nil, fmt.Errorf("connection ID cannot be empty")
 	}
+	if config.Origin == "" {
+		config.Origin = "unknown"
+	}
 	if config.WebsocketConn == nil {
 		return nil, fmt.Errorf("websocket connection cannot be nil")
 	}
@@ -146,6 +156,7 @@ func NewWebsocketConnection(config WebsocketConnectionConfig) (*WebsocketConnect
 
 	return &WebsocketConnection{
 		connectionID:  config.ConnectionID,
+		origin:        config.Origin,
 		websocketConn: config.WebsocketConn,
 		writeTimeout:  config.WriteTimeout,
 
@@ -227,6 +238,11 @@ func (conn *WebsocketConnection) Serve(parentCtx context.Context, handleClosure 
 // ConnectionID returns the unique identifier for this connection.
 func (conn *WebsocketConnection) ConnectionID() string {
 	return conn.connectionID
+}
+
+// Origin returns the origin of the connection, such as the client's IP address or other identifying information.
+func (conn *WebsocketConnection) Origin() string {
+	return conn.origin
 }
 
 // RawRequests returns the channel for processing incoming requests.

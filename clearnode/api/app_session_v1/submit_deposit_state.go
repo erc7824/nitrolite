@@ -106,8 +106,10 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		})
 		err = sigValidator.Verify(userState.UserWallet, packedUserState, userSigBytes)
 		if err != nil {
+			h.metrics.IncChannelStateSigValidation(sigType, false)
 			return rpc.Errorf("failed to validate signature: %v", err)
 		}
+		h.metrics.IncChannelStateSigValidation(sigType, true)
 
 		appSession, err := tx.GetAppSession(appStateUpd.AppSessionID)
 		if err != nil {
@@ -139,7 +141,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("failed to pack app state update: %v", err)
 		}
 
-		if err := h.verifyQuorum(tx, appStateUpd.AppSessionID, participantWeights, appSession.Quorum, packedStateUpdate, reqPayload.QuorumSigs); err != nil {
+		if err := h.verifyQuorum(tx, appStateUpd.AppSessionID, appSession.Application, participantWeights, appSession.Quorum, packedStateUpdate, reqPayload.QuorumSigs); err != nil {
 			return err
 		}
 

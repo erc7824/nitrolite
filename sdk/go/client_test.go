@@ -3,9 +3,15 @@ package sdk
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/sign"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -199,4 +205,265 @@ func TestClient_GetAppDefinition(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "0xApp", def.Application)
 	assert.Equal(t, uint64(1), def.Nonce)
+}
+
+func TestClient_CreateAppSession(t *testing.T) {
+	mockDialer := NewMockDialer()
+	mockDialer.Dial(context.Background(), "", nil)
+
+	mockResp := rpc.AppSessionsV1CreateAppSessionResponse{
+		AppSessionID: "0xSessionID",
+		Version:      "1",
+		Status:       "closed",
+	}
+	mockDialer.RegisterResponse(rpc.AppSessionsV1CreateAppSessionMethod.String(), mockResp)
+
+	client := &Client{
+		rpcClient: rpc.NewClient(mockDialer),
+	}
+
+	def := app.AppDefinitionV1{
+		Application: "chess-v1",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: "0xAlice", SignatureWeight: 1},
+			{WalletAddress: "0xBob", SignatureWeight: 1},
+		},
+		Quorum: 2,
+		Nonce:  1,
+	}
+
+	sessionID, version, status, err := client.CreateAppSession(context.Background(), def, "{}", []string{"sig1", "sig2"})
+	require.NoError(t, err)
+	assert.Equal(t, "0xSessionID", sessionID)
+	assert.Equal(t, "1", version)
+	assert.Equal(t, "closed", status)
+}
+
+func TestClient_SubmitAppSessionDeposit(t *testing.T) {
+	mockDialer := NewMockDialer()
+	mockDialer.Dial(context.Background(), "", nil)
+
+	// Mock assets for packing state
+	assetsResp := rpc.NodeV1GetAssetsResponse{
+		Assets: []rpc.AssetV1{
+			{
+				Name:                  "USDC",
+				Symbol:                "USDC",
+				Decimals:              6,
+				SuggestedBlockchainID: "137",
+				Tokens: []rpc.TokenV1{
+					{BlockchainID: "137", Address: "0xToken"},
+				},
+			},
+		},
+	}
+	mockDialer.RegisterResponse(rpc.NodeV1GetAssetsMethod.String(), assetsResp)
+
+	homeChannelID := "0xHomeChannel"
+	// Mock latest state
+	stateResp := rpc.ChannelsV1GetLatestStateResponse{
+		State: rpc.StateV1{
+			ID:            "0xStateID",
+			Epoch:         "1",
+			Version:       "1",
+			UserWallet:    "0xUser",
+			Asset:         "USDC",
+			HomeChannelID: &homeChannelID,
+			Transition: rpc.TransitionV1{
+				Type:   core.TransitionTypeTransferSend,
+				Amount: "0",
+			},
+			HomeLedger: rpc.LedgerV1{
+				BlockchainID: "137",
+				TokenAddress: "0xToken",
+				UserBalance:  "100.0",
+				UserNetFlow:  "0",
+				NodeBalance:  "0",
+				NodeNetFlow:  "0",
+			},
+		},
+	}
+	mockDialer.RegisterResponse(rpc.ChannelsV1GetLatestStateMethod.String(), stateResp)
+
+	// Mock deposit response
+	depositResp := rpc.AppSessionsV1SubmitDepositStateResponse{
+		StateNodeSig: "0xNodeSig",
+	}
+	mockDialer.RegisterResponse(rpc.AppSessionsV1SubmitDepositStateMethod.String(), depositResp)
+
+	// Setup client with signer
+	pk, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	pkHex := hexutil.Encode(crypto.FromECDSA(pk))
+	
+	rawSigner, err := sign.NewEthereumRawSigner(pkHex)
+	require.NoError(t, err)
+	
+	msgSigner, err := sign.NewEthereumMsgSignerFromRaw(rawSigner)
+	require.NoError(t, err)
+	
+	stateSigner, err := core.NewChannelDefaultSigner(msgSigner)
+	require.NoError(t, err)
+
+	client := &Client{
+		rpcClient:   rpc.NewClient(mockDialer),
+		stateSigner: stateSigner,
+		rawSigner:   rawSigner,
+	}
+	client.assetStore = newClientAssetStore(client)
+
+	appUpdate := app.AppStateUpdateV1{
+		AppSessionID: "0xSessionID",
+		Intent:       app.AppStateUpdateIntentDeposit,
+		Version:      1,
+		Allocations:  []app.AppAllocationV1{},
+	}
+
+	sig, err := client.SubmitAppSessionDeposit(context.Background(), appUpdate, []string{"sig1"}, "USDC", decimal.NewFromInt(10))
+	require.NoError(t, err)
+	assert.Equal(t, "0xNodeSig", sig)
+}
+
+func TestClient_SubmitAppState(t *testing.T) {
+	mockDialer := NewMockDialer()
+	mockDialer.Dial(context.Background(), "", nil)
+
+	mockResp := rpc.AppSessionsV1SubmitAppStateResponse{}
+	mockDialer.RegisterResponse(rpc.AppSessionsV1SubmitAppStateMethod.String(), mockResp)
+
+	client := &Client{
+		rpcClient: rpc.NewClient(mockDialer),
+	}
+
+	appUpdate := app.AppStateUpdateV1{
+		AppSessionID: "0xSessionID",
+		Intent:       app.AppStateUpdateIntentOperate,
+		Version:      2,
+		Allocations:  []app.AppAllocationV1{},
+	}
+
+	err := client.SubmitAppState(context.Background(), appUpdate, []string{"sig1"})
+	require.NoError(t, err)
+}
+
+func TestClient_RebalanceAppSessions(t *testing.T) {
+	mockDialer := NewMockDialer()
+	mockDialer.Dial(context.Background(), "", nil)
+
+	mockResp := rpc.AppSessionsV1RebalanceAppSessionsResponse{
+		BatchID: "0xBatchID",
+	}
+	mockDialer.RegisterResponse(rpc.AppSessionsV1RebalanceAppSessionsMethod.String(), mockResp)
+
+	client := &Client{
+		rpcClient: rpc.NewClient(mockDialer),
+	}
+
+	updates := []app.SignedAppStateUpdateV1{
+		{
+			AppStateUpdate: app.AppStateUpdateV1{AppSessionID: "0xS1"},
+			QuorumSigs:     []string{"sig1"},
+		},
+	}
+
+	batchID, err := client.RebalanceAppSessions(context.Background(), updates)
+	require.NoError(t, err)
+	assert.Equal(t, "0xBatchID", batchID)
+}
+
+func TestClient_SubmitAppSessionKeyState(t *testing.T) {
+	mockDialer := NewMockDialer()
+	mockDialer.Dial(context.Background(), "", nil)
+
+	mockResp := rpc.AppSessionsV1SubmitSessionKeyStateResponse{}
+	mockDialer.RegisterResponse(rpc.AppSessionsV1SubmitSessionKeyStateMethod.String(), mockResp)
+
+	client := &Client{
+		rpcClient: rpc.NewClient(mockDialer),
+	}
+
+	state := app.AppSessionKeyStateV1{
+		UserAddress: "0xUser",
+		SessionKey:  "0xKey",
+		Version:     1,
+		ExpiresAt:   time.Now().Add(time.Hour),
+		UserSig:     "0xSig",
+	}
+
+	err := client.SubmitAppSessionKeyState(context.Background(), state)
+	require.NoError(t, err)
+}
+
+func TestClient_GetLastAppKeyStates(t *testing.T) {
+	mockDialer := NewMockDialer()
+	mockDialer.Dial(context.Background(), "", nil)
+
+	now := time.Now().Unix()
+	mockResp := rpc.AppSessionsV1GetLastKeyStatesResponse{
+		States: []rpc.AppSessionKeyStateV1{
+			{
+				UserAddress: "0xUser",
+				SessionKey:  "0xKey",
+				Version:     "1",
+				ExpiresAt:   string(decimal.NewFromInt(now).String()),
+				UserSig:     "0xSig",
+			},
+		},
+	}
+	mockDialer.RegisterResponse(rpc.AppSessionsV1GetLastKeyStatesMethod.String(), mockResp)
+
+	client := &Client{
+		rpcClient: rpc.NewClient(mockDialer),
+	}
+
+	states, err := client.GetLastAppKeyStates(context.Background(), "0xUser", nil)
+	require.NoError(t, err)
+	assert.Len(t, states, 1)
+	assert.Equal(t, "0xkey", states[0].SessionKey)
+}
+
+func TestClient_SignSessionKeyState(t *testing.T) {
+	// Setup signer
+	pk, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	pkHex := hexutil.Encode(crypto.FromECDSA(pk))
+	
+	rawSigner, err := sign.NewEthereumRawSigner(pkHex)
+	require.NoError(t, err)
+	
+	msgSigner, err := sign.NewEthereumMsgSignerFromRaw(rawSigner)
+	require.NoError(t, err)
+	
+	stateSigner, err := core.NewChannelDefaultSigner(msgSigner)
+	require.NoError(t, err)
+
+	client := &Client{
+		stateSigner: stateSigner,
+		rawSigner:   rawSigner,
+	}
+
+	state := app.AppSessionKeyStateV1{
+		UserAddress:    rawSigner.PublicKey().Address().String(),
+		SessionKey:     "0xSessionKey",
+		Version:        1,
+		ApplicationIDs: []string{"app1"},
+		ExpiresAt:      time.Now().Add(time.Hour),
+	}
+
+	sig, err := client.SignSessionKeyState(state)
+	require.NoError(t, err)
+	assert.NotEmpty(t, sig)
+	
+	// Verify signature
+	sigBytes, err := hexutil.Decode(sig)
+	require.NoError(t, err)
+	
+	packed, err := app.PackAppSessionKeyStateV1(state)
+	require.NoError(t, err)
+	
+	recoverer, err := sign.NewAddressRecoverer(sign.TypeEthereumMsg)
+	require.NoError(t, err)
+	recoveredAddr, err := recoverer.RecoverAddress(packed, sigBytes)
+	require.NoError(t, err)
+	assert.Equal(t, rawSigner.PublicKey().Address().String(), recoveredAddr.String())
 }

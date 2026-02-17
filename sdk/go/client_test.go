@@ -17,6 +17,7 @@ import (
 )
 
 func TestClient_GetHomeChannel(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -44,6 +45,7 @@ func TestClient_GetHomeChannel(t *testing.T) {
 }
 
 func TestClient_GetEscrowChannel(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -71,6 +73,7 @@ func TestClient_GetEscrowChannel(t *testing.T) {
 }
 
 func TestClient_GetLatestState(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -107,6 +110,7 @@ func TestClient_GetLatestState(t *testing.T) {
 }
 
 func TestClient_GetBalances(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -129,6 +133,7 @@ func TestClient_GetBalances(t *testing.T) {
 }
 
 func TestClient_GetTransactions(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -154,6 +159,7 @@ func TestClient_GetTransactions(t *testing.T) {
 }
 
 func TestClient_GetAppSessions(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -184,6 +190,7 @@ func TestClient_GetAppSessions(t *testing.T) {
 }
 
 func TestClient_GetAppDefinition(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -208,6 +215,7 @@ func TestClient_GetAppDefinition(t *testing.T) {
 }
 
 func TestClient_CreateAppSession(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -240,6 +248,7 @@ func TestClient_CreateAppSession(t *testing.T) {
 }
 
 func TestClient_SubmitAppSessionDeposit(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -295,13 +304,13 @@ func TestClient_SubmitAppSessionDeposit(t *testing.T) {
 	pk, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	pkHex := hexutil.Encode(crypto.FromECDSA(pk))
-	
+
 	rawSigner, err := sign.NewEthereumRawSigner(pkHex)
 	require.NoError(t, err)
-	
+
 	msgSigner, err := sign.NewEthereumMsgSignerFromRaw(rawSigner)
 	require.NoError(t, err)
-	
+
 	stateSigner, err := core.NewChannelDefaultSigner(msgSigner)
 	require.NoError(t, err)
 
@@ -325,6 +334,7 @@ func TestClient_SubmitAppSessionDeposit(t *testing.T) {
 }
 
 func TestClient_SubmitAppState(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -347,6 +357,7 @@ func TestClient_SubmitAppState(t *testing.T) {
 }
 
 func TestClient_RebalanceAppSessions(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -372,6 +383,7 @@ func TestClient_RebalanceAppSessions(t *testing.T) {
 }
 
 func TestClient_SubmitAppSessionKeyState(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -395,6 +407,7 @@ func TestClient_SubmitAppSessionKeyState(t *testing.T) {
 }
 
 func TestClient_GetLastAppKeyStates(t *testing.T) {
+	t.Parallel()
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
 
@@ -423,17 +436,18 @@ func TestClient_GetLastAppKeyStates(t *testing.T) {
 }
 
 func TestClient_SignSessionKeyState(t *testing.T) {
+	t.Parallel()
 	// Setup signer
 	pk, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	pkHex := hexutil.Encode(crypto.FromECDSA(pk))
-	
+
 	rawSigner, err := sign.NewEthereumRawSigner(pkHex)
 	require.NoError(t, err)
-	
+
 	msgSigner, err := sign.NewEthereumMsgSignerFromRaw(rawSigner)
 	require.NoError(t, err)
-	
+
 	stateSigner, err := core.NewChannelDefaultSigner(msgSigner)
 	require.NoError(t, err)
 
@@ -453,14 +467,14 @@ func TestClient_SignSessionKeyState(t *testing.T) {
 	sig, err := client.SignSessionKeyState(state)
 	require.NoError(t, err)
 	assert.NotEmpty(t, sig)
-	
+
 	// Verify signature
 	sigBytes, err := hexutil.Decode(sig)
 	require.NoError(t, err)
-	
+
 	packed, err := app.PackAppSessionKeyStateV1(state)
 	require.NoError(t, err)
-	
+
 	recoverer, err := sign.NewAddressRecoverer(sign.TypeEthereumMsg)
 	require.NoError(t, err)
 	recoveredAddr, err := recoverer.RecoverAddress(packed, sigBytes)

@@ -11,10 +11,11 @@ import (
 )
 
 func TestClientAssetStore(t *testing.T) {
+	t.Parallel()
 	// Create mock dialer
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
-	
+
 	// Prepare mock response
 	mockResp := rpc.NodeV1GetAssetsResponse{
 		Assets: []rpc.AssetV1{
@@ -49,15 +50,15 @@ func TestClientAssetStore(t *testing.T) {
 	client := &Client{
 		rpcClient: rpcClient,
 	}
-	
+
 	// Create asset store
 	store := newClientAssetStore(client)
-	
+
 	// Test GetAssetDecimals
 	decimals, err := store.GetAssetDecimals("usdc")
 	require.NoError(t, err)
 	assert.Equal(t, uint8(6), decimals)
-	
+
 	// Test GetTokenDecimals
 	decimals, err = store.GetTokenDecimals(137, "0xToken137")
 	require.NoError(t, err)
@@ -67,21 +68,21 @@ func TestClientAssetStore(t *testing.T) {
 	addr, err := store.GetTokenAddress("USDC", 1)
 	require.NoError(t, err)
 	assert.Equal(t, "0xToken1", addr)
-	
+
 	// Test GetSuggestedBlockchainID
 	chainID, err := store.GetSuggestedBlockchainID("USDC")
 	require.NoError(t, err)
 	assert.Equal(t, uint64(137), chainID)
-	
+
 	// Test AssetExistsOnBlockchain
 	exists, err := store.AssetExistsOnBlockchain(137, "USDC")
 	require.NoError(t, err)
 	assert.True(t, exists)
-	
+
 	exists, err = store.AssetExistsOnBlockchain(999, "USDC")
 	require.NoError(t, err)
 	assert.False(t, exists)
-	
+
 	// Test not found cases
 	// Invalid asset
 	_, err = store.GetAssetDecimals("INVALID")
@@ -97,10 +98,11 @@ func TestClientAssetStore(t *testing.T) {
 }
 
 func TestClientAssetStore_Caching(t *testing.T) {
+	t.Parallel()
 	// Create mock dialer
 	mockDialer := NewMockDialer()
 	mockDialer.Dial(context.Background(), "", nil)
-	
+
 	// Prepare mock response
 	mockResp := rpc.NodeV1GetAssetsResponse{
 		Assets: []rpc.AssetV1{
@@ -109,7 +111,7 @@ func TestClientAssetStore_Caching(t *testing.T) {
 				Symbol:                "USDC",
 				Decimals:              6,
 				SuggestedBlockchainID: "137",
-				Tokens: []rpc.TokenV1{},
+				Tokens:                []rpc.TokenV1{},
 			},
 		},
 	}
@@ -134,6 +136,7 @@ func TestClientAssetStore_Caching(t *testing.T) {
 }
 
 func TestDefaultWebsocketDialerConfig(t *testing.T) {
+	t.Parallel()
 	assert.Equal(t, 5*time.Second, rpc.DefaultWebsocketDialerConfig.HandshakeTimeout)
 	assert.Equal(t, 5*time.Second, rpc.DefaultWebsocketDialerConfig.PingInterval)
 }

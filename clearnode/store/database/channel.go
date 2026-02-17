@@ -119,6 +119,29 @@ func (s *DBStore) CheckOpenChannel(wallet, asset string) (string, bool, error) {
 	return approvedSigValidators, true, nil
 }
 
+// ChannelCount holds the result of a COUNT() GROUP BY query on channels.
+type ChannelCount struct {
+	Asset  string             `gorm:"column:asset"`
+	Status core.ChannelStatus `gorm:"column:status"`
+	Count  uint64             `gorm:"column:count"`
+}
+
+// CountChannelsByStatus returns channel counts grouped by (asset, status).
+// Joins with channel_states to resolve the asset name for each channel.
+func (s *DBStore) CountChannelsByStatus() ([]ChannelCount, error) {
+	var results []ChannelCount
+	err := s.db.Raw(`
+		SELECT cs.asset, c.status, COUNT(DISTINCT c.channel_id) as count
+		FROM channels c
+		INNER JOIN channel_states cs ON cs.home_channel_id = c.channel_id
+		GROUP BY cs.asset, c.status
+	`).Scan(&results).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to count channels: %w", err)
+	}
+	return results, nil
+}
+
 // UpdateChannel persists changes to a channel's metadata (status, version, etc).
 func (s *DBStore) UpdateChannel(channel core.Channel) error {
 	updates := map[string]interface{}{

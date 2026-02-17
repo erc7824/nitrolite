@@ -20,6 +20,23 @@ const (
 	ActionTypeFinalizeEscrowWithdrawal BlockchainActionType = 21
 )
 
+func (t BlockchainActionType) String() string {
+	switch t {
+	case ActionTypeCheckpoint:
+		return "checkpoint"
+	case ActionTypeInitiateEscrowDeposit:
+		return "initiate_escrow_deposit"
+	case ActionTypeFinalizeEscrowDeposit:
+		return "finalize_escrow_deposit"
+	case ActionTypeInitiateEscrowWithdrawal:
+		return "initiate_escrow_withdrawal"
+	case ActionTypeFinalizeEscrowWithdrawal:
+		return "finalize_escrow_withdrawal"
+	default:
+		return fmt.Sprintf("unknown(%d)", t)
+	}
+}
+
 type BlockchainActionStatus uint8
 
 const (

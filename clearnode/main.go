@@ -14,8 +14,10 @@ import (
 
 	"github.com/erc7824/nitrolite/clearnode/api"
 	"github.com/erc7824/nitrolite/clearnode/event_handlers"
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/erc7824/nitrolite/pkg/blockchain/evm"
+	"github.com/erc7824/nitrolite/pkg/log"
 )
 
 func main() {
@@ -24,7 +26,7 @@ func main() {
 	ctx := context.Background()
 
 	api.NewRPCRouter(bb.NodeVersion, bb.ChannelMinChallengeDuration,
-		bb.RpcNode, bb.StateSigner, bb.DbStore, bb.MemoryStore, bb.Logger)
+		bb.RpcNode, bb.StateSigner, bb.DbStore, bb.MemoryStore, bb.RuntimeMetrics, bb.Logger)
 
 	rpcListenAddr := ":7824"
 	rpcListenEndpoint := "/ws"
@@ -61,6 +63,7 @@ func main() {
 			logger.Fatal("failed to connect to EVM Node")
 		}
 		reactor := evm.NewReactor(b.ID, eventHandlerService, bb.DbStore.StoreContractEvent)
+		reactor.SetOnEventProcessed(bb.RuntimeMetrics.IncBlockchainEvent)
 		l := evm.NewListener(common.HexToAddress(b.ChannelHubAddress), client, b.ID, b.BlockStep, logger, reactor.HandleEvent, bb.DbStore.GetLatestEvent)
 		l.Listen(ctx, func(err error) {
 			if err != nil {
@@ -81,13 +84,15 @@ func main() {
 			logger.Fatal("failed to create EVM client")
 		}
 
-		worker := NewBlockchainWorker(b.ID, blockchainClient, bb.DbStore, logger)
+		worker := NewBlockchainWorker(b.ID, blockchainClient, bb.DbStore, logger, bb.RuntimeMetrics)
 		worker.Start(ctx, func(err error) {
 			if err != nil {
 				logger.Fatal("blockchain worker stopped", "error", err, "blockchainID", b.ID)
 			}
 		})
 	}
+
+	go runStoreMetricsExporter(ctx, 10*time.Second, bb.DbStore, bb.StoreMetrics, logger)
 
 	metricsListenAddr := ":4242"
 	metricsEndpoint := "/metrics"
@@ -139,4 +144,41 @@ func main() {
 
 	// TODO: gracefully stop blockchain listeners and workers
 	logger.Info("shutdown complete")
+}
+
+func runStoreMetricsExporter(
+	ctx context.Context,
+	fetchInterval time.Duration,
+	store interface {
+		CountAppSessionsByStatus() ([]database.AppSessionCount, error)
+		CountChannelsByStatus() ([]database.ChannelCount, error)
+	},
+	metricExported metrics.StoreMetricExporter, logger log.Logger) {
+	logger = logger.WithName("store-metrics")
+	ticker := time.NewTicker(fetchInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if counts, err := store.CountAppSessionsByStatus(); err != nil {
+				logger.Error("failed to count app sessions", "error", err)
+			} else {
+				for _, c := range counts {
+					metricExported.SetAppSessions(c.Application, c.Status, c.Count)
+				}
+			}
+
+			if counts, err := store.CountChannelsByStatus(); err != nil {
+				logger.Error("failed to count channels", "error", err)
+			} else {
+				for _, c := range counts {
+					metricExported.SetChannels(c.Asset, c.Status, c.Count)
+				}
+			}
+		case <-ctx.Done():
+			logger.Info("stopping store metrics exporter")
+			return
+		}
+	}
 }

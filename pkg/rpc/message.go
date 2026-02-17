@@ -16,6 +16,21 @@ var (
 	MsgTypeRespErr MsgType = 4
 )
 
+func (t MsgType) String() string {
+	switch t {
+	case MsgTypeReq:
+		return "req"
+	case MsgTypeResp:
+		return "resp"
+	case MsgTypeEvent:
+		return "event"
+	case MsgTypeRespErr:
+		return "error"
+	default:
+		return fmt.Sprintf("unknown(%d)", t)
+	}
+}
+
 // Message represents the core data structure for RPC communication.
 // It contains all the information needed to process an RPC call, response, or event.
 //

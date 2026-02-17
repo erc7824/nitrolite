@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -32,6 +33,7 @@ func TestCreateAppSession_Success(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xnode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Create a real test wallet for participant1
@@ -130,6 +132,7 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xnode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Create real test wallets for participant1 and participant2
@@ -226,6 +229,7 @@ func TestCreateAppSession_ZeroNonce(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xnode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Test data
@@ -287,6 +291,7 @@ func TestCreateAppSession_QuorumExceedsTotalWeights(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xnode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Test data
@@ -354,6 +359,7 @@ func TestCreateAppSession_NoSignatures(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xnode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Test data
@@ -415,6 +421,7 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xnode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Create a wallet that is NOT a participant
@@ -491,6 +498,7 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xnode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Create a real wallet for participant1
@@ -581,6 +589,7 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xnode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Create a real wallet for participant1
@@ -668,6 +677,7 @@ func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xnode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Test data
@@ -731,6 +741,7 @@ func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xnode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Test data

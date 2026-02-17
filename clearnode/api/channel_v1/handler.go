@@ -3,6 +3,7 @@ package channel_v1
 import (
 	"context"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -17,6 +18,7 @@ type Handler struct {
 	statePacker   core.StatePacker
 	nodeAddress   string // Node's wallet address for channel ID calculation
 	minChallenge  uint32
+	metrics       metrics.RuntimeMetricExporter
 }
 
 // NewHandler creates a new Handler instance with the provided dependencies.
@@ -28,6 +30,7 @@ func NewHandler(
 	statePacker core.StatePacker,
 	nodeAddress string,
 	minChallenge uint32,
+	m metrics.RuntimeMetricExporter,
 ) *Handler {
 	return &Handler{
 		stateAdvancer: stateAdvancer,
@@ -37,6 +40,7 @@ func NewHandler(
 		nodeSigner:    nodeSigner,
 		nodeAddress:   nodeAddress,
 		minChallenge:  minChallenge,
+		metrics:       m,
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
@@ -39,6 +40,7 @@ func TestRequestCreation_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -186,6 +188,7 @@ func TestRequestCreation_Acknowledgement_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -325,6 +328,7 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data

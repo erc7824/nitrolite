@@ -5,6 +5,10 @@ import (
 	"sync"
 )
 
+const defaultConnectionRegion = "default"
+
+type ObserveConnectionsFn func(region, origin string, count uint32)
+
 // ConnectionHub provides centralized management of all active RPC connections.
 // It maintains thread-safe mappings between connection IDs and Connection instances,
 // as well as user IDs and their associated connections. This enables efficient
@@ -23,15 +27,22 @@ type ConnectionHub struct {
 	authMapping map[string]map[string]bool
 	// mu protects concurrent access to the maps
 	mu sync.RWMutex
+
+	// sourceMap is an optional mapping of connection sources (e.g., IP addresses or regions)
+	sourceMap map[string]uint32
+	// observeConnections is a callback function to monitor connection counts by region
+	observeConnections ObserveConnectionsFn
 }
 
 // NewConnectionHub creates a new ConnectionHub instance with initialized maps.
 // The hub is typically used internally by Node implementations to manage
 // the lifecycle of all active connections.
-func NewConnectionHub() *ConnectionHub {
+func NewConnectionHub(observeConnections ObserveConnectionsFn) *ConnectionHub {
 	return &ConnectionHub{
-		connections: make(map[string]Connection),
-		authMapping: make(map[string]map[string]bool),
+		connections:        make(map[string]Connection),
+		authMapping:        make(map[string]map[string]bool),
+		sourceMap:          make(map[string]uint32),
+		observeConnections: observeConnections,
 	}
 }
 
@@ -57,6 +68,10 @@ func (hub *ConnectionHub) Add(conn Connection) error {
 	}
 
 	hub.connections[connID] = conn
+
+	sourceID := getSourceID(conn.Origin())
+	hub.sourceMap[sourceID]++
+	hub.observeConnections(defaultConnectionRegion, conn.Origin(), uint32(hub.sourceMap[sourceID]))
 
 	return nil
 }
@@ -89,7 +104,21 @@ func (hub *ConnectionHub) Get(connID string) Connection {
 func (hub *ConnectionHub) Remove(connID string) {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
+
+	conn, exists := hub.connections[connID]
+	if !exists {
+		return // No connection to remove
+	}
 	delete(hub.connections, connID)
+
+	sourceID := getSourceID(conn.Origin())
+	if count, exists := hub.sourceMap[sourceID]; exists && count > 0 {
+		hub.sourceMap[sourceID]--
+		if hub.sourceMap[sourceID] == 0 {
+			delete(hub.sourceMap, sourceID)
+		}
+	}
+	hub.observeConnections(defaultConnectionRegion, conn.Origin(), uint32(hub.sourceMap[sourceID]))
 }
 
 // Publish broadcasts a message to all active connections for a specific user.
@@ -122,4 +151,8 @@ func (hub *ConnectionHub) Publish(userID string, response []byte) {
 		// Write the response to the connection's write sink
 		conn.WriteRawResponse(response)
 	}
+}
+
+func getSourceID(origin string) string {
+	return origin
 }

@@ -109,19 +109,8 @@ type WebsocketNodeConfig struct {
 	Logger log.Logger
 
 	// Connection lifecycle callbacks:
-
-	// OnConnectHandler is called when a new WebSocket connection is established.
-	// It receives a send function for pushing notifications to the new connection.
-	OnConnectHandler func(send SendResponseFunc)
-	// OnDisconnectHandler is called when a WebSocket connection is closed.
-	// It receives the UserID if the connection was authenticated.
-	OnDisconnectHandler func(userID string)
-	// OnMessageSentHandler is called after a message is successfully sent to a client.
-	// Useful for metrics and debugging.
-	OnMessageSentHandler func([]byte)
-	// OnAuthenticatedHandler is called when a connection successfully authenticates
-	// or re-authenticates with a different user.
-	OnAuthenticatedHandler func(userID string, send SendResponseFunc)
+	// ObserveConnections is called with the current number of active connections whenever a connection is established or closed.
+	ObserveConnections ObserveConnectionsFn
 
 	// WebSocket upgrader configuration:
 
@@ -157,17 +146,9 @@ func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 	}
 	config.Logger = config.Logger.WithName("rpc-node")
 
-	if config.OnConnectHandler == nil {
-		config.OnConnectHandler = func(send SendResponseFunc) {}
-	}
-	if config.OnDisconnectHandler == nil {
-		config.OnDisconnectHandler = func(userID string) {}
-	}
-	if config.OnMessageSentHandler == nil {
-		config.OnMessageSentHandler = func([]byte) {}
-	}
-	if config.OnAuthenticatedHandler == nil {
-		config.OnAuthenticatedHandler = func(userID string, send SendResponseFunc) {}
+	if config.ObserveConnections == nil {
+		// Default implementation does nothing, but can be overridden for monitoring
+		config.ObserveConnections = func(region, origin string, count uint32) {}
 	}
 	if config.WsUpgraderReadBufferSize <= 0 {
 		// It's the optimal default value as recommended
@@ -198,7 +179,7 @@ func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 		groupId:      nodeGroupHandlerPrefix + nodeGroupRoot,
 		handlerChain: make(map[string][]Handler),
 		routes:       make(map[string][]string),
-		connHub:      NewConnectionHub(),
+		connHub:      NewConnectionHub(config.ObserveConnections),
 	}
 
 	return node, nil
@@ -231,10 +212,10 @@ func (wn *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	connectionID := uuid.NewString()
 
 	connConfig := WebsocketConnectionConfig{
-		ConnectionID:         connectionID,
-		WebsocketConn:        wsConnection,
-		Logger:               wn.cfg.Logger,
-		OnMessageSentHandler: wn.cfg.OnMessageSentHandler,
+		ConnectionID:  connectionID,
+		Origin:        r.Header.Get("Origin"),
+		WebsocketConn: wsConnection,
+		Logger:        wn.cfg.Logger,
 	}
 	connection, err := NewWebsocketConnection(connConfig)
 	if err != nil {
@@ -246,14 +227,12 @@ func (wn *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wn.cfg.OnConnectHandler(wn.getSendResponseFunc(connection))
 	wn.cfg.Logger.Info("new WebSocket connection established", "connectionID", connectionID)
 
 	// Cleanup function executed when connection closes
 	defer func() {
 		wn.connHub.Remove(connectionID)
 
-		wn.cfg.OnDisconnectHandler("")
 		wn.cfg.Logger.Info("connection closed", "connectionID", connectionID)
 	}()
 

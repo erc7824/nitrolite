@@ -1219,7 +1219,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         if (amount == 0) return;
 
         if (token == address(0)) {
-            (bool success, ) = payable(to).call{value: amount}("");
+            (bool success,) = payable(to).call{value: amount}("");
             require(success, TransferFailed(to, address(0), amount));
         } else {
             IERC20(token).safeTransfer(to, amount);

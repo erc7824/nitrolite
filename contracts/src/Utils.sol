@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
-import {IERC20Metadata} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {WadMath} from "./WadMath.sol";
 import {ChannelDefinition, State, Ledger} from "./interfaces/Types.sol";
@@ -11,6 +11,10 @@ import {ChannelDefinition, State, Ledger} from "./interfaces/Types.sol";
 library Utils {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes;
+
+    error DecimalsExceedMaxPrecision();
+    error DecimalsMismatch();
+    error FailedToFetchDecimals();
 
     function getChannelId(ChannelDefinition memory def, uint8 version) internal pure returns (bytes32 channelId) {
         bytes32 baseId = keccak256(abi.encode(def));
@@ -30,25 +34,29 @@ library Utils {
         return keccak256(abi.encode(channelId, version));
     }
 
-    // ========== Cross-Chain State ==========
+    // ========== State ==========
 
-    function pack(State memory ccs, bytes32 channelId) internal pure returns (bytes memory) {
-        return abi.encode(channelId, toSigningData(ccs));
+    function pack(State memory state, bytes32 channelId) internal pure returns (bytes memory) {
+        return abi.encode(channelId, toSigningData(state));
     }
 
     function pack(bytes32 channelId, bytes memory signingData) internal pure returns (bytes memory) {
         return abi.encode(channelId, signingData);
     }
 
-    function toSigningData(State memory ccs) internal pure returns (bytes memory) {
+    function toSigningData(State memory state) internal pure returns (bytes memory) {
         return abi.encode(
-            ccs.version,
-            ccs.intent,
-            ccs.metadata,
-            ccs.homeLedger,
-            ccs.nonHomeLedger
+            state.version,
+            state.intent,
+            state.metadata,
+            state.homeLedger,
+            state.nonHomeLedger
             // omit signatures
         );
+    }
+
+    function isEmpty(State memory state) internal pure returns (bool) {
+        return state.homeLedger.chainId == 0 && state.nonHomeLedger.chainId == 0;
     }
 
     // ========== Ledger ==========
@@ -60,19 +68,19 @@ library Utils {
      */
     function validateTokenDecimals(Ledger memory ledger) internal view {
         if (ledger.decimals > WadMath.MAX_PRECISION) {
-            revert("decimals exceed max precision");
+            revert DecimalsExceedMaxPrecision();
         }
 
         if (ledger.chainId == block.chainid) {
             try IERC20Metadata(ledger.token).decimals() returns (uint8 tokenDecimals) {
-                require(ledger.decimals == tokenDecimals, "decimals mismatch");
+                require(ledger.decimals == tokenDecimals, DecimalsMismatch());
             } catch {
-                revert("failed to fetch decimals");
+                revert FailedToFetchDecimals();
             }
         }
     }
 
-    function isEmpty(Ledger memory state) internal pure returns (bool) {
-        return state.chainId == 0;
+    function isEmpty(Ledger memory ledger) internal pure returns (bool) {
+        return ledger.chainId == 0;
     }
 }

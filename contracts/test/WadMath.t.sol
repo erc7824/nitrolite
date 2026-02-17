@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Test} from "lib/forge-std/src/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {WadMath} from "../src/WadMath.sol";
 
 contract TestWadMath {
@@ -38,7 +38,7 @@ contract WadMathTest is Test {
     }
 
     function test_toWad_uint256_revert_withOverPrecision() public {
-        vm.expectRevert("decimals exceed max precision");
+        vm.expectRevert(WadMath.DecimalsExceedMaxPrecision.selector);
         wadMath.exposed_toWad_uint256(1000, 19);
     }
 
@@ -72,7 +72,7 @@ contract WadMathTest is Test {
     }
 
     function test_toWad_int256_revert_withOverPrecision() public {
-        vm.expectRevert("decimals exceed max precision");
+        vm.expectRevert(WadMath.DecimalsExceedMaxPrecision.selector);
         wadMath.exposed_toWad_int256(-1000, 19);
     }
 

@@ -2,51 +2,52 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 
 	"github.com/c-bata/go-prompt"
 	"golang.org/x/term"
 )
 
 func main() {
+	log.SetFlags(0)
+	log.SetPrefix("clearnode-cli: ")
+	log.SetOutput(os.Stderr)
 	if len(os.Args) < 2 {
-		fmt.Printf("Usage: clearnode-cli <clearnode_ws_url>\n")
-		fmt.Printf("Example: clearnode-cli wss://clearnode.example.com/ws\n")
-		return
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: clearnode-cli <clearnode_ws_url>\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Example: clearnode-cli wss://clearnode.example.com/ws\n")
+		log.Fatalln("invalid arguments")
 	}
 
 	wsURL := os.Args[1]
 
 	// Get config directory
-	userConfDir, err := os.UserConfigDir()
-	if err != nil {
-		fmt.Printf("Failed to get user config directory: %s\n", err.Error())
-		return
+	configDir := os.Getenv("CLEARNODE_CLI_CONFIG_DIR")
+	if configDir == "" {
+		userConfDir, err := os.UserConfigDir()
+		if err != nil {
+			log.Fatalf("failed to get user config directory: %v", err)
+		}
+		configDir = filepath.Join(userConfDir, "clearnode-cli")
 	}
-	configDir := path.Join(userConfDir, "clearnode-cli")
-	if customDir := os.Getenv("CLEARNODE_CLI_CONFIG_DIR"); customDir != "" {
-		configDir = customDir
-	}
+
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		fmt.Printf("Failed to create config directory: %s\n", err.Error())
-		return
+		log.Fatalf("failed to create config directory: %v", err)
 	}
 
 	// Initialize storage
-	storagePath := path.Join(configDir, "config.db")
+	storagePath := filepath.Join(configDir, "config.db")
 	store, err := NewStorage(storagePath)
 	if err != nil {
-		fmt.Printf("Failed to initialize storage: %s\n", err.Error())
-		return
+		log.Fatalf("failed to initialize storage: %v", err)
 	}
 
 	// Create operator
 	operator, err := NewOperator(wsURL, store)
 	if err != nil {
-		fmt.Printf("Failed to create operator: %s\n", err.Error())
-		return
+		log.Fatalf("failed to create operator: %v", err)
 	}
 
 	fmt.Println("Clearnode CLI - SDK Development Tool")
@@ -91,13 +92,13 @@ func main() {
 
 	select {
 	case <-operator.Wait():
-		fmt.Println("Connection closed.")
+		log.Println("connection closed.")
 	case <-promptExitCh:
-		fmt.Println("Session ended.")
+		log.Println("session ended.")
 	}
 
 	handleExit()
-	fmt.Println("Exiting.")
+	log.Println("exiting...")
 }
 
 func getStyleOptions() []prompt.Option {

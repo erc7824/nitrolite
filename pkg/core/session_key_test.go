@@ -1,0 +1,184 @@
+package core
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/erc7824/nitrolite/pkg/sign"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestChannelSessionKeySignerV1(t *testing.T) {
+	// 1. Setup User Wallet
+	userSigner, userAddress := createSigner(t)
+
+	// 2. Setup Session Key
+	sessionSigner, sessionKeyAddress := createSigner(t)
+
+	// 3. Define Metadata
+	version := uint64(1)
+	assets := []string{"USDC", "WETH"}
+	expiresAt := time.Now().Add(1 * time.Hour).Unix()
+
+	// 4. Compute Metadata Hash
+	metadataHash, err := GetChannelSessionKeyAuthMetadataHashV1(version, assets, expiresAt)
+	require.NoError(t, err)
+
+	// 5. Pack Data for Authorization (User signs this)
+	packedAuthData, err := PackChannelKeyStateV1(sessionKeyAddress, metadataHash)
+	require.NoError(t, err)
+
+	// 6. User Signs Authorization
+	authSig, err := userSigner.Sign(packedAuthData)
+	require.NoError(t, err)
+	authSigHex := hexutil.Encode(authSig)
+
+	// 7. Create ChannelSessionKeySignerV1
+	skSigner, err := NewChannelSessionKeySignerV1(sessionSigner, metadataHash.Hex(), authSigHex)
+	require.NoError(t, err)
+	assert.Equal(t, ChannelSignerType_SessionKey, skSigner.Type())
+
+	// 8. Sign arbitrary data with Session Key Signer
+	dataToSign := []byte("hello world")
+	signature, err := skSigner.Sign(dataToSign)
+	require.NoError(t, err)
+
+	// 9. Verify Signature using ChannelSigValidator
+	validator := NewChannelSigValidator(func(walletAddr, sessionKeyAddr, metadataHashStr string) (bool, error) {
+		// Mock permission check
+		if !strings.EqualFold(walletAddr, userAddress) {
+			return false, nil
+		}
+		if !strings.EqualFold(sessionKeyAddr, sessionKeyAddress) {
+			return false, nil
+		}
+		if metadataHashStr != metadataHash.Hex() {
+			return false, nil
+		}
+		return true, nil
+	})
+
+	recoveredWallet, err := validator.Recover(dataToSign, signature)
+	require.NoError(t, err)
+	assert.Equal(t, strings.ToLower(userAddress), strings.ToLower(recoveredWallet))
+}
+
+func TestValidateChannelSessionKeyAuthSigV1(t *testing.T) {
+	// 1. Setup User Wallet
+	userSigner, userAddress := createSigner(t)
+
+	// 2. Setup Session Key
+	// We just need address for validation logic, not the signer itself unless we sign with it (which we don't for auth sig)
+	// But let's use createSigner for consistency
+	_, sessionKeyAddr := createSigner(t)
+
+	// 3. Define State
+	version := uint64(1)
+	assets := []string{"USDC"}
+	expiresAt := time.Now().Add(1 * time.Hour)
+
+	// 4. Create valid signature
+	metadataHash, err := GetChannelSessionKeyAuthMetadataHashV1(version, assets, expiresAt.Unix())
+	require.NoError(t, err)
+	
+	packed, err := PackChannelKeyStateV1(sessionKeyAddr, metadataHash)
+	require.NoError(t, err)
+	
+	authSig, err := userSigner.Sign(packed)
+	require.NoError(t, err)
+
+	state := ChannelSessionKeyStateV1{
+		UserAddress: userAddress,
+		SessionKey:  sessionKeyAddr,
+		Version:     version,
+		Assets:      assets,
+		ExpiresAt:   expiresAt,
+		UserSig:     hexutil.Encode(authSig),
+	}
+
+	// 5. Validate
+	err = ValidateChannelSessionKeyAuthSigV1(state)
+	require.NoError(t, err)
+
+	// 6. Test Invalid Signature (wrong signer)
+	wrongSigner, _ := createSigner(t)
+	wrongSig, _ := wrongSigner.Sign(packed)
+	
+	state.UserSig = hexutil.Encode(wrongSig)
+	err = ValidateChannelSessionKeyAuthSigV1(state)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "does not match wallet")
+
+	// 7. Test Invalid Signature (wrong data)
+	state.UserSig = hexutil.Encode(authSig) // Reset sig
+	state.Version = 2 // Change data
+	err = ValidateChannelSessionKeyAuthSigV1(state)
+	assert.Error(t, err) // Hash mismatch leads to recover address mismatch
+}
+
+func TestGenerateSessionKeyStateIDV1(t *testing.T) {
+	userAddr := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	sessionKey := common.HexToAddress("0x2222222222222222222222222222222222222222")
+	version := uint64(1)
+
+	id1, err := GenerateSessionKeyStateIDV1(userAddr.String(), sessionKey.String(), version)
+	require.NoError(t, err)
+	assert.NotEmpty(t, id1)
+
+	// Same inputs -> Same ID
+	id2, err := GenerateSessionKeyStateIDV1(userAddr.String(), sessionKey.String(), version)
+	require.NoError(t, err)
+	assert.Equal(t, id1, id2)
+
+	// Different version -> Different ID
+	id3, err := GenerateSessionKeyStateIDV1(userAddr.String(), sessionKey.String(), version+1)
+	require.NoError(t, err)
+	assert.NotEqual(t, id1, id3)
+}
+
+func TestEncodeDecodeChannelSessionKeySignature(t *testing.T) {
+	skAuth := channelSessionKeyAuthorization{
+		SessionKey:    common.HexToAddress("0xSessionKey"),
+		MetadataHash:  [32]byte{1, 2, 3},
+		AuthSignature: []byte{4, 5, 6},
+	}
+	skSignature := []byte{7, 8, 9}
+
+	encoded, err := encodeChannelSessionKeySignature(skAuth, skSignature)
+	require.NoError(t, err)
+	assert.NotEmpty(t, encoded)
+
+	decodedAuth, decodedSig, err := decodeChannelSessionKeySignature(encoded)
+	require.NoError(t, err)
+	
+	assert.Equal(t, skAuth.SessionKey, decodedAuth.SessionKey)
+	assert.Equal(t, skAuth.MetadataHash, decodedAuth.MetadataHash)
+	assert.Equal(t, skAuth.AuthSignature, decodedAuth.AuthSignature)
+	assert.Equal(t, skSignature, decodedSig)
+}
+
+// Helper to create sign.Signer from ecdsa.PrivateKey since pkg/sign doesn't export NewEthereumRawSignerFromPrivateKey directly in the way I used it?
+// Wait, I used sign.NewEthereumRawSignerFromPrivateKey in the test but I am not sure if it exists.
+// Checking pkg/sign/eth_raw_signer.go...
+// It has NewEthereumRawSigner(privateKeyHex string)
+// It doesn't seem to have FromPrivateKey.
+// I will create a helper or use hex.
+
+func createSigner(t *testing.T) (sign.Signer, string) {
+	pk, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	pkHex := hexutil.Encode(crypto.FromECDSA(pk))
+	
+	rawSigner, err := sign.NewEthereumRawSigner(pkHex)
+	require.NoError(t, err)
+	
+	msgSigner, err := sign.NewEthereumMsgSignerFromRaw(rawSigner)
+	require.NoError(t, err)
+	
+	return msgSigner, rawSigner.PublicKey().Address().String()
+}

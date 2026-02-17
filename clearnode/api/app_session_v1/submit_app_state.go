@@ -75,7 +75,7 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 			return rpc.Errorf("failed to pack app state update: %v", err)
 		}
 
-		if err := h.verifyQuorum(tx, appStateUpd.AppSessionID, participantWeights, appSession.Quorum, packedStateUpdate, reqPayload.QuorumSigs); err != nil {
+		if err := h.verifyQuorum(tx, appStateUpd.AppSessionID, appSession.Application, participantWeights, appSession.Quorum, packedStateUpdate, reqPayload.QuorumSigs); err != nil {
 			return err
 		}
 

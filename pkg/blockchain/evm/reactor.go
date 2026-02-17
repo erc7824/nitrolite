@@ -39,6 +39,7 @@ type Reactor struct {
 	blockchainID       uint64
 	eventHandler       core.BlockchainEventHandler
 	storeContractEvent StoreContractEvent
+	onEventProcessed   func(blockchainID uint64, success bool)
 }
 
 func NewReactor(blockchainID uint64, eventHandler core.BlockchainEventHandler, storeContractEvent StoreContractEvent) *Reactor {
@@ -47,6 +48,11 @@ func NewReactor(blockchainID uint64, eventHandler core.BlockchainEventHandler, s
 		eventHandler:       eventHandler,
 		storeContractEvent: storeContractEvent,
 	}
+}
+
+// SetOnEventProcessed sets an optional callback invoked after each event is processed.
+func (r *Reactor) SetOnEventProcessed(fn func(blockchainID uint64, success bool)) {
+	r.onEventProcessed = fn
 }
 
 func (r *Reactor) HandleEvent(ctx context.Context, l types.Log) {
@@ -111,6 +117,9 @@ func (r *Reactor) HandleEvent(ctx context.Context, l types.Log) {
 		err = r.handleEscrowDepositsPurged(ctx, l)
 	default:
 		err = errors.New("unknown event: " + eventID.Hex())
+	}
+	if r.onEventProcessed != nil {
+		r.onEventProcessed(r.blockchainID, err == nil)
 	}
 	if err != nil {
 		logger.Warn("error processing event", "error", err)

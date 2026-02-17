@@ -12,6 +12,7 @@ import (
 )
 
 func TestOperator_ParseChainID(t *testing.T) {
+	t.Parallel()
 	op := &Operator{}
 
 	tests := []struct {

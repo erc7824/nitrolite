@@ -164,18 +164,18 @@ func TestStorage_FileCreation(t *testing.T) {
 	assert.Equal(t, 1, count)
 }
 
-func TestStorage_TransactionRollback(t *testing.T) {
-	t.Parallel()
-	s, err := NewStorage(":memory:")
-	require.NoError(t, err)
-	t.Cleanup(func() { s.Close() })
+//func TestStorage_TransactionRollback(t *testing.T) {
+//	t.Parallel()
+//	s, err := NewStorage(":memory:")
+//	require.NoError(t, err)
+//	t.Cleanup(func() { s.Close() })
 
-	// Manually insert partial data to simulate a corrupted state if we were not using transactions properly
-	// But here we want to test that SetSessionKey uses a transaction.
-	// We can't easily force a failure inside the transaction without mocking db,
-	// but we can verify that the method works as expected.
+// Manually insert partial data to simulate a corrupted state if we were not using transactions properly
+// But here we want to test that SetSessionKey uses a transaction.
+// We can't easily force a failure inside the transaction without mocking db,
+// but we can verify that the method works as expected.
 
-	// We can try to close the DB inside the transaction? No, that's too hacky.
-	// For now, we rely on the happy path test in TestStorage_SessionKey
-	// and trust the code uses tx.Rollback() (defer) and tx.Commit().
-}
+// We can try to close the DB inside the transaction? No, that's too hacky.
+// For now, we rely on the happy path test in TestStorage_SessionKey
+// and trust the code uses tx.Rollback() (defer) and tx.Commit().
+//}

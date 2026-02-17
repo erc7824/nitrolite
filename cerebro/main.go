@@ -16,7 +16,7 @@ func main() {
 	log.SetPrefix("clearnode-cli: ")
 	log.SetOutput(os.Stderr)
 	if len(os.Args) < 2 {
-log.Fatalf("Usage: clearnode-cli <clearnode_ws_url>\nExample: clearnode-cli wss://clearnode.example.com/ws")
+		log.Fatalf("Usage: clearnode-cli <clearnode_ws_url>\nExample: clearnode-cli wss://clearnode.example.com/ws")
 	}
 
 	wsURL := os.Args[1]
@@ -64,15 +64,15 @@ log.Fatalf("Usage: clearnode-cli <clearnode_ws_url>\nExample: clearnode-cli wss:
 		prompt.OptionPrefix("clearnode> "),
 		prompt.OptionAddKeyBind(prompt.KeyBind{
 			Key: prompt.ControlC,
-			Fn: func(buf *prompt.Buffer) {
-				fmt.Println("\nExiting Clearnode CLI")
+			Fn: func(_ *prompt.Buffer) {
+				log.Println("exiting Clearnode CLI")
 				handleExit()
 				os.Exit(0)
 			},
 		}),
 		prompt.OptionAddKeyBind(prompt.KeyBind{
 			Key: prompt.ControlD,
-			Fn:  func(buf *prompt.Buffer) {},
+			Fn:  func(_ *prompt.Buffer) {},
 		}),
 	)
 

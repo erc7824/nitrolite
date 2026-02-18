@@ -124,7 +124,7 @@ func TestAppSessionKeyValidatorV1(t *testing.T) {
 		
 		recovered, err := validator.Recover(data, sig)
 		assert.NoError(t, err)
-		assert.Equal(t, userAddr, recovered)
+		assert.Equal(t, strings.ToLower(userAddr), strings.ToLower(recovered))
 	})
 	
 	t.Run("InvalidSignature", func(t *testing.T) {

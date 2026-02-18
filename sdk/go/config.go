@@ -1,4 +1,3 @@
-// Package sdk provides a simple Go SDK for interacting with Clearnode instances.
 package sdk
 
 import (

@@ -30,6 +30,7 @@ func TestHandleHomeChannelCreated_Success(t *testing.T) {
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
+		Asset:        "usdc",
 		Type:         core.ChannelTypeHome,
 		Status:       core.ChannelStatusVoid,
 		StateVersion: 0,
@@ -75,6 +76,7 @@ func TestHandleHomeChannelCheckpointed_Success(t *testing.T) {
 	channel := &core.Channel{
 		ChannelID:          channelID,
 		UserWallet:         userWallet,
+		Asset:              "usdc",
 		Type:               core.ChannelTypeHome,
 		Status:             core.ChannelStatusChallenged,
 		StateVersion:       3,
@@ -121,6 +123,7 @@ func TestHandleHomeChannelChallenged_Success(t *testing.T) {
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
+		Asset:        "usdc",
 		Type:         core.ChannelTypeHome,
 		Status:       core.ChannelStatusOpen,
 		StateVersion: 3,
@@ -177,6 +180,7 @@ func TestHandleHomeChannelClosed_Success(t *testing.T) {
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
+		Asset:        "usdc",
 		Type:         core.ChannelTypeHome,
 		Status:       core.ChannelStatusOpen,
 		StateVersion: 5,
@@ -221,6 +225,7 @@ func TestHandleEscrowDepositInitiated_Success(t *testing.T) {
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
+		Asset:        "usdc",
 		Type:         core.ChannelTypeEscrow,
 		Status:       core.ChannelStatusVoid,
 		StateVersion: 0,
@@ -279,6 +284,7 @@ func TestHandleEscrowDepositChallenged_Success(t *testing.T) {
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
+		Asset:        "usdc",
 		Type:         core.ChannelTypeEscrow,
 		Status:       core.ChannelStatusOpen,
 		StateVersion: 1,
@@ -335,6 +341,7 @@ func TestHandleEscrowDepositFinalized_Success(t *testing.T) {
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
+		Asset:        "usdc",
 		Type:         core.ChannelTypeEscrow,
 		Status:       core.ChannelStatusOpen,
 		StateVersion: 3,
@@ -379,6 +386,7 @@ func TestHandleEscrowWithdrawalInitiated_Success(t *testing.T) {
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
+		Asset:        "usdc",
 		Type:         core.ChannelTypeEscrow,
 		Status:       core.ChannelStatusVoid,
 		StateVersion: 0,
@@ -424,6 +432,7 @@ func TestHandleEscrowWithdrawalChallenged_Success(t *testing.T) {
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
+		Asset:        "usdc",
 		Type:         core.ChannelTypeEscrow,
 		Status:       core.ChannelStatusOpen,
 		StateVersion: 1,
@@ -480,6 +489,7 @@ func TestHandleEscrowWithdrawalFinalized_Success(t *testing.T) {
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
+		Asset:        "usdc",
 		Type:         core.ChannelTypeEscrow,
 		Status:       core.ChannelStatusOpen,
 		StateVersion: 3,

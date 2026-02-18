@@ -279,7 +279,7 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 		assert.Equal(t, testKeyA, results[0].SessionKey)
 	})
 
-	t.Run("Excludes expired keys", func(t *testing.T) {
+	t.Run("Returns all keys including expired (newer always supersedes)", func(t *testing.T) {
 		db, cleanup := SetupTestDB(t)
 		defer cleanup()
 
@@ -308,8 +308,8 @@ func TestDBStore_GetLastChannelSessionKeyStates(t *testing.T) {
 		results, err := store.GetLastChannelSessionKeyStates(testUser1, nil)
 		require.NoError(t, err)
 
-		assert.Len(t, results, 1)
-		assert.Equal(t, testKeyA, results[0].SessionKey)
+		// Both keys returned — caller is responsible for checking expiration
+		assert.Len(t, results, 2)
 	})
 
 	t.Run("Returns empty for non-existent user", func(t *testing.T) {
@@ -396,7 +396,7 @@ func TestDBStore_GetLastChannelSessionKeyVersion(t *testing.T) {
 		assert.Equal(t, uint64(0), version)
 	})
 
-	t.Run("Returns 0 when all versions expired", func(t *testing.T) {
+	t.Run("Returns version even when expired (newer always supersedes)", func(t *testing.T) {
 		db, cleanup := SetupTestDB(t)
 		defer cleanup()
 
@@ -413,10 +413,10 @@ func TestDBStore_GetLastChannelSessionKeyVersion(t *testing.T) {
 
 		version, err := store.GetLastChannelSessionKeyVersion(testUser1, testSessionKey)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(0), version)
+		assert.Equal(t, uint64(3), version)
 	})
 
-	t.Run("Ignores expired versions and returns latest non-expired", func(t *testing.T) {
+	t.Run("Returns latest version even if expired (newer always supersedes)", func(t *testing.T) {
 		db, cleanup := SetupTestDB(t)
 		defer cleanup()
 
@@ -444,7 +444,8 @@ func TestDBStore_GetLastChannelSessionKeyVersion(t *testing.T) {
 
 		version, err := store.GetLastChannelSessionKeyVersion(testUser1, testSessionKey)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(1), version)
+		// v2 is returned because newer version always supersedes
+		assert.Equal(t, uint64(2), version)
 	})
 }
 

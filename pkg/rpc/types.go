@@ -24,6 +24,8 @@ type ChannelV1 struct {
 	ChannelID string `json:"channel_id"`
 	// UserWallet is the user wallet address
 	UserWallet string `json:"user_wallet"`
+	// Asset is the asset symbol (e.g. USDC, ETH)
+	Asset string `json:"asset"`
 	// Type is the type of the channel (home, escrow)
 	Type string `json:"type"`
 	// BlockchainID is the unique identifier for the blockchain

@@ -4,6 +4,7 @@
 CREATE TABLE channels (
     channel_id CHAR(66) PRIMARY KEY,
     user_wallet CHAR(42) NOT NULL,
+    asset VARCHAR(20) NOT NULL,
     type SMALLINT NOT NULL, -- ChannelType enum: 0=void, 1=home, 2=escrow
     blockchain_id NUMERIC(20,0) NOT NULL,
     token CHAR(42) NOT NULL,
@@ -17,8 +18,8 @@ CREATE TABLE channels (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_channels_user_wallet ON channels(user_wallet);
-CREATE INDEX idx_channels_status ON channels(status);
+CREATE INDEX idx_channels_wallet_asset_type_status ON channels(user_wallet, asset, type, status);
+CREATE INDEX idx_channels_asset_status ON channels(asset, status);
 
 -- Channel States table: Immutable state records
 CREATE TABLE channel_states (
@@ -287,6 +288,6 @@ DROP INDEX IF EXISTS idx_channel_states_latest_signed;
 DROP INDEX IF EXISTS idx_channel_states_latest;
 ALTER TABLE channel_states DROP CONSTRAINT IF EXISTS uq_channel_states_wallet_asset_epoch_version;
 DROP TABLE IF EXISTS channel_states;
-DROP INDEX IF EXISTS idx_channels_status;
-DROP INDEX IF EXISTS idx_channels_user_wallet;
+DROP INDEX IF EXISTS idx_channels_asset_status;
+DROP INDEX IF EXISTS idx_channels_wallet_asset_type_status;
 DROP TABLE IF EXISTS channels;

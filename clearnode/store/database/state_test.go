@@ -166,6 +166,7 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:    homeChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeHome,
 			BlockchainID: 1,
 			TokenAddress: "0xtoken123",
@@ -233,6 +234,7 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:    homeChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeHome,
 			BlockchainID: 1,
 			TokenAddress: "0xtoken123",
@@ -312,6 +314,7 @@ func TestDBStore_GetLastUserState(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:    homeChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeHome,
 			BlockchainID: 1,
 			TokenAddress: "0xtoken123",
@@ -380,6 +383,7 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:    homeChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeHome,
 			BlockchainID: 1,
 			TokenAddress: "0xtoken123",
@@ -427,6 +431,7 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:    homeChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeHome,
 			BlockchainID: 1,
 			TokenAddress: "0xtoken123",
@@ -438,6 +443,7 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 		escrowChannel := core.Channel{
 			ChannelID:    escrowChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeEscrow,
 			BlockchainID: 2,
 			TokenAddress: "0xtoken456",
@@ -495,6 +501,7 @@ func TestDBStore_GetLastStateByChannelID(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:    homeChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeHome,
 			BlockchainID: 1,
 			TokenAddress: "0xtoken123",
@@ -575,6 +582,7 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:    homeChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeHome,
 			BlockchainID: 1,
 			TokenAddress: "0xtoken123",
@@ -650,6 +658,7 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:    homeChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeHome,
 			BlockchainID: 1,
 			TokenAddress: "0xtoken123",
@@ -661,6 +670,7 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 		escrowChannel := core.Channel{
 			ChannelID:    escrowChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeEscrow,
 			BlockchainID: 2,
 			TokenAddress: "0xtoken456",
@@ -716,6 +726,7 @@ func TestDBStore_GetStateByChannelIDAndVersion(t *testing.T) {
 		homeChannel := core.Channel{
 			ChannelID:    homeChannelID,
 			UserWallet:   "0xuser123",
+			Asset:        "usdc",
 			Type:         core.ChannelTypeHome,
 			BlockchainID: 1,
 			TokenAddress: "0xtoken123",

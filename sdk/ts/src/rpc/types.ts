@@ -20,6 +20,8 @@ export interface ChannelV1 {
   channel_id: string;
   /** User wallet address */
   user_wallet: Address;
+  /** Asset symbol (e.g. usdc, eth) */
+  asset: string;
   /** Type of the channel (home, escrow) */
   type: string;
   /** Unique identifier for the blockchain */
@@ -64,8 +66,8 @@ export interface TransitionV1 {
   type: TransitionType;
   /** Transaction ID associated with the transition */
   tx_id: string;
-  /** Account identifier (varies based on transition type, may be undefined) */
-  account_id?: string;
+  /** Account identifier (varies based on transition type, may be empty string) */
+  account_id: string;
   /** Amount involved in the transition */
   amount: string;
 }

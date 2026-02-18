@@ -31,7 +31,7 @@ jobs:
           cache-dependency-path: 'go.sum'
 
       - name: Test
-        run: go test -race -cover -covermode=atomic -coverprofile=coverage.txt -v ./...
+        run: go test -race -cover -covermode=atomic -coverprofile=coverage.txt ./...
 
       - uses: codecov/codecov-action@v5
         with:

@@ -340,10 +340,6 @@ func TestTransformChannelSessionKeyState(t *testing.T) {
 		UserSig:     "0xSig",
 	}
 
-	// transformChannelSessionKeyState expects ExpiresAt to be a string representing unix timestamp
-	// Wait, the implementation uses strconv.ParseInt(state.ExpiresAt, 10, 64)
-	// So it expects an integer string.
-
 	state, err := transformChannelSessionKeyState(rpcState)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1), state.Version)

@@ -1,6 +1,6 @@
 [![Release Policy](https://img.shields.io/badge/release%20policy-v1.0-blue)](https://github.com/layer-3/release-process/blob/master/README.md)
 [![codecov](https://codecov.io/github/erc7824/nitrolite/graph/badge.svg?token=XASM4CIEFO)](https://codecov.io/github/erc7824/nitrolite)
-[![Go Reference](https://pkg.go.dev/badge/github.com/erc7824/nitrolite/clearnode.svg)](https://pkg.go.dev/github.com/erc7824/nitrolite/clearnode)
+[![Go Reference](https://pkg.go.dev/badge/github.com/erc7824/nitrolite.svg)](https://pkg.go.dev/github.com/erc7824/nitrolite)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/erc7824/nitrolite)](https://github.com/erc7824/nitrolite/releases)
 
 

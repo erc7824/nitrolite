@@ -18,9 +18,9 @@ var (
 	// defaultWsConnWriteTimeout is the default maximum duration to wait for a write to complete.
 	defaultWsConnWriteTimeout = 5 * time.Second
 	// defaultWsConnProcessBufferSize is the default size of the buffer for processing incoming messages.
-	defaultWsConnProcessBufferSize = 10
+	defaultWsConnProcessBufferSize = 64
 	// defaultWsConnWriteBufferSize is the default size of the buffer for outgoing messages.
-	defaultWsConnWriteBufferSize = 10
+	defaultWsConnWriteBufferSize = 64
 )
 
 // Connection represents an active RPC connection that handles bidirectional communication.
@@ -295,7 +295,21 @@ func (conn *WebsocketConnection) readMessages(handleClosure func(error)) {
 			conn.logger.Debug("received empty message, skipping")
 			continue // Skip empty messages
 		}
-		conn.processSink <- messageBytes // Send message to processing channel
+
+		select {
+		case conn.processSink <- messageBytes:
+			// ok
+		default:
+			conn.logger.Warn("incoming queue full; closing connection",
+				"queue_len", len(conn.processSink),
+				"queue_cap", cap(conn.processSink),
+			)
+			select {
+			case conn.closeConnCh <- struct{}{}:
+			default:
+			}
+			return
+		}
 	}
 }
 
@@ -309,7 +323,10 @@ func (conn *WebsocketConnection) writeMessages(ctx context.Context, handleClosur
 		case <-ctx.Done():
 			conn.logger.Debug("context done, stopping message writing")
 			return
-		case messageBytes := <-conn.writeSink:
+		case messageBytes, ok := <-conn.writeSink:
+			if !ok {
+				return // Channel closed, stop writing
+			}
 			if len(messageBytes) == 0 {
 				continue // Skip empty messages
 			}

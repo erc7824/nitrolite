@@ -29,7 +29,7 @@ func TestNewWebsocketConnection(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 	require.Equal(t, cfg.ConnectionID, conn.ConnectionID())
-	require.Equal(t, 10, cap(conn.RawRequests()))
+	require.Equal(t, 64, cap(conn.RawRequests()))
 
 	cfg.ProcessBufferSize = 20
 	conn, err = rpc.NewWebsocketConnection(cfg)

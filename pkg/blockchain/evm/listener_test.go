@@ -20,8 +20,9 @@ import (
 
 // MockSubscription implements ethereum.Subscription
 type MockSubscription struct {
-	errChan chan error
-	unsub   func()
+	errChan   chan error
+	unsub     func()
+	closeOnce sync.Once
 }
 
 func (m *MockSubscription) Err() <-chan error {
@@ -32,6 +33,9 @@ func (m *MockSubscription) Unsubscribe() {
 	if m.unsub != nil {
 		m.unsub()
 	}
+	m.closeOnce.Do(func() {
+		close(m.errChan)
+	})
 }
 
 func TestNewListener(t *testing.T) {
@@ -72,7 +76,7 @@ func TestListener_Listen_CurrentEvents(t *testing.T) {
 		unsub:   func() {},
 	}
 
-	// Mock HeaderByNumber
+	// Mock SubscribeFilterLogs: send a log immediately
 	mockClient.On("SubscribeFilterLogs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			ch := args.Get(2).(chan<- types.Log)

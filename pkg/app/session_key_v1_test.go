@@ -161,7 +161,7 @@ func TestAppSessionKeyValidatorV1(t *testing.T) {
 		// Should recover sessionKeyAddr, which != userAddr
 		err2 := validator.Verify(userAddr, data, sig)
 		assert.Error(t, err2)
-		assert.Contains(t, err.Error(), "invalid signature")
+		assert.Contains(t, err2.Error(), "invalid signature")
 	})
 }
 

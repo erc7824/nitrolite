@@ -1,7 +1,6 @@
 package evm
 
 import (
-	"crypto/ecdsa"
 	"math/big"
 	"strings"
 	"testing"
@@ -165,12 +164,11 @@ func TestClient_GetOpenChannels(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, mockEVMClient, mockAssetStore, mockSigner)
 }
 
-func setupMockSigner(t *testing.T, mockSigner *MockSigner) (*ecdsa.PrivateKey, common.Address, []byte) {
+func setupMockSigner(t *testing.T, mockSigner *MockSigner) {
 	t.Helper()
 	privKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	addr := crypto.PubkeyToAddress(privKey.PublicKey)
 	pubBytes := crypto.FromECDSAPub(&privKey.PublicKey)
 	mockSigner.On("PublicKey").Return(&MockPublicKey{addr: addr, pubBytes: pubBytes})
-	return privKey, addr, pubBytes
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -149,12 +150,12 @@ func TestListener_Listen_HistoricalAndCurrent(t *testing.T) {
 		return core.BlockchainEvent{BlockNumber: 100, LogIndex: 0}, nil
 	}
 
-	receivedCount := 0
+	var receivedCount int64
 	doneCh := make(chan struct{})
 
 	handleEvent := func(ctx context.Context, log types.Log) {
-		receivedCount++
-		if receivedCount >= 2 { // Expect 1 historical + 1 current
+		count := atomic.AddInt64(&receivedCount, 1)
+		if count >= 2 { // Expect 1 historical + 1 current
 			select {
 			case <-doneCh:
 			default:

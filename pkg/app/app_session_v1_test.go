@@ -83,6 +83,12 @@ func TestGenerateRebalanceBatchIDV1(t *testing.T) {
 	id2, err := GenerateRebalanceBatchIDV1(versions)
 	require.NoError(t, err)
 	assert.Equal(t, id1, id2)
+
+	// Different version should produce a different ID
+	versions[0].Version = 99
+	id3, err := GenerateRebalanceBatchIDV1(versions)
+	require.NoError(t, err)
+	assert.NotEqual(t, id1, id3)
 }
 
 func TestGenerateRebalanceTransactionIDV1(t *testing.T) {
@@ -93,7 +99,7 @@ func TestGenerateRebalanceTransactionIDV1(t *testing.T) {
 	id1, err := GenerateRebalanceTransactionIDV1(batchID, sessionID, asset)
 	require.NoError(t, err)
 	assert.NotEmpty(t, id1)
-	
+
 	id2, err := GenerateRebalanceTransactionIDV1(batchID, sessionID, asset)
 	require.NoError(t, err)
 	assert.Equal(t, id1, id2)

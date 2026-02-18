@@ -13,10 +13,11 @@ func TestNewChannel(t *testing.T) {
 	channelID := "0xChanID"
 	userWallet := "0xUser"
 	token := "0xToken"
-	ch := NewChannel(channelID, userWallet, ChannelTypeHome, 1, token, 1, 100, "0x1")
+	ch := NewChannel(channelID, userWallet, "USDC", ChannelTypeHome, 1, token, 1, 100, "0x1")
 
 	assert.Equal(t, channelID, ch.ChannelID)
 	assert.Equal(t, userWallet, ch.UserWallet)
+	assert.Equal(t, "USDC", ch.Asset)
 	assert.Equal(t, ChannelTypeHome, ch.Type)
 	assert.Equal(t, uint64(1), ch.BlockchainID)
 	assert.Equal(t, token, ch.TokenAddress)

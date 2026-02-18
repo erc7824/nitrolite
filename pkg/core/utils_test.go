@@ -11,6 +11,7 @@ import (
 )
 
 func TestValidateDecimalPrecision(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		amount      string
@@ -120,6 +121,7 @@ func TestValidateDecimalPrecision(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			amount, err := decimal.NewFromString(tt.amount)
 			assert.NoError(t, err, "Test setup error: invalid amount string")
 
@@ -136,19 +138,23 @@ func TestValidateDecimalPrecision(t *testing.T) {
 }
 
 func TestValidateDecimalPrecision_EdgeCases(t *testing.T) {
+	t.Parallel()
 	t.Run("negative_amount", func(t *testing.T) {
+		t.Parallel()
 		amount := decimal.NewFromFloat(-1.123456)
 		err := ValidateDecimalPrecision(amount, 6)
 		assert.NoError(t, err, "Negative amounts should be validated the same as positive")
 	})
 
 	t.Run("negative_amount_too_many_decimals", func(t *testing.T) {
+		t.Parallel()
 		amount := decimal.NewFromFloat(-1.1234567)
 		err := ValidateDecimalPrecision(amount, 6)
 		assert.Error(t, err, "Negative amount with too many decimals should fail")
 	})
 
 	t.Run("very_large_amount", func(t *testing.T) {
+		t.Parallel()
 		amount, err := decimal.NewFromString("999999999999999999.123456")
 		assert.NoError(t, err)
 		err = ValidateDecimalPrecision(amount, 6)
@@ -157,6 +163,7 @@ func TestValidateDecimalPrecision_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("zero_decimal_limit", func(t *testing.T) {
+		t.Parallel()
 		amount := decimal.NewFromInt(100)
 		err := ValidateDecimalPrecision(amount, 0)
 		assert.NoError(t, err, "Whole number should be valid for 0 decimal limit")
@@ -168,6 +175,7 @@ func TestValidateDecimalPrecision_EdgeCases(t *testing.T) {
 }
 
 func TestDecimalToBigInt(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		amount      string
@@ -284,6 +292,7 @@ func TestDecimalToBigInt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			amount, err := decimal.NewFromString(tt.amount)
 			assert.NoError(t, err, "Test setup error: invalid amount string")
 
@@ -299,7 +308,9 @@ func TestDecimalToBigInt(t *testing.T) {
 }
 
 func TestDecimalToBigInt_NegativeAmounts(t *testing.T) {
+	t.Parallel()
 	t.Run("negative_usdc", func(t *testing.T) {
+		t.Parallel()
 		amount := decimal.NewFromFloat(-1.23)
 		result, err := DecimalToBigInt(amount, 6)
 		assert.NoError(t, err)
@@ -308,6 +319,7 @@ func TestDecimalToBigInt_NegativeAmounts(t *testing.T) {
 	})
 
 	t.Run("negative_eth", func(t *testing.T) {
+		t.Parallel()
 		amount := decimal.NewFromFloat(-0.5)
 		result, err := DecimalToBigInt(amount, 18)
 		assert.NoError(t, err)
@@ -316,6 +328,7 @@ func TestDecimalToBigInt_NegativeAmounts(t *testing.T) {
 	})
 
 	t.Run("negative_zero", func(t *testing.T) {
+		t.Parallel()
 		amount := decimal.NewFromInt(0)
 		result, err := DecimalToBigInt(amount, 6)
 		assert.NoError(t, err)
@@ -325,7 +338,9 @@ func TestDecimalToBigInt_NegativeAmounts(t *testing.T) {
 }
 
 func TestDecimalToBigInt_EdgeCases(t *testing.T) {
+	t.Parallel()
 	t.Run("very_large_amount", func(t *testing.T) {
+		t.Parallel()
 		// Test with a very large amount
 		amount, err := decimal.NewFromString("999999999999999999.123456")
 		assert.NoError(t, err)
@@ -338,6 +353,7 @@ func TestDecimalToBigInt_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("very_small_amount", func(t *testing.T) {
+		t.Parallel()
 		// Test with an amount that has more decimals than supported
 		amount := decimal.NewFromFloat(0.0000001) // 7 decimals
 		_, err := DecimalToBigInt(amount, 6)      // Only 6 decimal precision
@@ -348,6 +364,7 @@ func TestDecimalToBigInt_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("max_uint8_decimals", func(t *testing.T) {
+		t.Parallel()
 		// Test with maximum uint8 value for decimals (not practical, but edge case)
 		amount := decimal.NewFromInt(1)
 		result, err := DecimalToBigInt(amount, 255)
@@ -358,6 +375,7 @@ func TestDecimalToBigInt_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("precision_preservation", func(t *testing.T) {
+		t.Parallel()
 		// Test that we don't lose precision during conversion
 		amount, err := decimal.NewFromString("123.456789")
 		assert.NoError(t, err)
@@ -370,7 +388,9 @@ func TestDecimalToBigInt_EdgeCases(t *testing.T) {
 }
 
 func TestDecimalToBigInt_RoundTrip(t *testing.T) {
+	t.Parallel()
 	t.Run("usdc_round_trip", func(t *testing.T) {
+		t.Parallel()
 		// Test that we can convert back and forth without losing precision
 		original := "1.123456"
 		amount, err := decimal.NewFromString(original)
@@ -388,7 +408,9 @@ func TestDecimalToBigInt_RoundTrip(t *testing.T) {
 }
 
 func TestGetHomeChannelID(t *testing.T) {
+	t.Parallel()
 	t.Run("match_solidity_implementation", func(t *testing.T) {
+		t.Parallel()
 		// Test values from contracts/test/Utils.t.sol:test_log_calculateChannelId
 		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
 		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
@@ -405,6 +427,7 @@ func TestGetHomeChannelID(t *testing.T) {
 	})
 
 	t.Run("different_versions_produce_different_ids", func(t *testing.T) {
+		t.Parallel()
 		// This test matches contracts/test/Utils.t.sol:test_channelId_forDifferentVersions_differ
 		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
 		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
@@ -450,6 +473,7 @@ func TestGetHomeChannelID(t *testing.T) {
 	})
 
 	t.Run("different_assets_produce_different_ids", func(t *testing.T) {
+		t.Parallel()
 		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
 		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
 		nonce := uint64(42)
@@ -465,6 +489,7 @@ func TestGetHomeChannelID(t *testing.T) {
 	})
 
 	t.Run("different_nonces_produce_different_ids", func(t *testing.T) {
+		t.Parallel()
 		node := "0x435d4B6b68e1083Cc0835D1F971C4739204C1d2a"
 		user := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
 		asset := "ether"
@@ -481,7 +506,9 @@ func TestGetHomeChannelID(t *testing.T) {
 }
 
 func TestGetEscrowChannelID(t *testing.T) {
+	t.Parallel()
 	t.Run("match_solidity_implementation", func(t *testing.T) {
+		t.Parallel()
 		// Test values from contracts-new/test/Utils.t.sol:test_log_calculateEscrowId
 		homeChannelID := "0xeac2bed767671a8ab77527e1e2fff00bb2e62de5467d9ba3a4105dad5c6e3d66"
 		version := uint64(42)
@@ -495,6 +522,7 @@ func TestGetEscrowChannelID(t *testing.T) {
 	})
 
 	t.Run("different_versions_produce_different_ids", func(t *testing.T) {
+		t.Parallel()
 		homeChannelID := "0xeac2bed767671a8ab77527e1e2fff00bb2e62de5467d9ba3a4105dad5c6e3d66"
 
 		escrowID1, err := GetEscrowChannelID(homeChannelID, 1)
@@ -507,6 +535,7 @@ func TestGetEscrowChannelID(t *testing.T) {
 	})
 
 	t.Run("different_channels_produce_different_ids", func(t *testing.T) {
+		t.Parallel()
 		version := uint64(42)
 
 		escrowID1, err := GetEscrowChannelID("0xeac2bed767671a8ab77527e1e2fff00bb2e62de5467d9ba3a4105dad5c6e3d66", version)
@@ -520,7 +549,9 @@ func TestGetEscrowChannelID(t *testing.T) {
 }
 
 func TestGenerateChannelMetadata(t *testing.T) {
+	t.Parallel()
 	t.Run("match_solidity_implementation", func(t *testing.T) {
+		t.Parallel()
 		// Test that metadata generation matches Solidity
 		asset := "ether"
 		metadata := GenerateChannelMetadata(asset)
@@ -539,6 +570,7 @@ func TestGenerateChannelMetadata(t *testing.T) {
 	})
 
 	t.Run("different_assets_produce_different_metadata", func(t *testing.T) {
+		t.Parallel()
 		metadata1 := GenerateChannelMetadata("ether")
 		metadata2 := GenerateChannelMetadata("usdc")
 
@@ -547,6 +579,7 @@ func TestGenerateChannelMetadata(t *testing.T) {
 }
 
 func TestTransitionToIntent_OperateIntents(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		transitionType TransitionType
@@ -560,6 +593,7 @@ func TestTransitionToIntent_OperateIntents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			transition := Transition{Type: tt.transitionType}
 			intent := TransitionToIntent(transition)
 			require.Equal(t, tt.expectedIntent, intent)
@@ -568,6 +602,7 @@ func TestTransitionToIntent_OperateIntents(t *testing.T) {
 }
 
 func TestTransitionToIntent_AllTransitionTypes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		transitionType TransitionType
@@ -585,6 +620,7 @@ func TestTransitionToIntent_AllTransitionTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			transition := &Transition{Type: tt.transitionType}
 			intent := TransitionToIntent(*transition)
 			require.Equal(t, tt.expectedIntent, intent)
@@ -593,7 +629,9 @@ func TestTransitionToIntent_AllTransitionTypes(t *testing.T) {
 }
 
 func TestGetStateTransitionsHash(t *testing.T) {
+	t.Parallel()
 	t.Run("print_hash_for_single_transition", func(t *testing.T) {
+		t.Parallel()
 		hash, err := GetStateTransitionHash(*NewTransition(TransitionTypeHomeDeposit,
 			"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef", // 32-byte txId
 			"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0",                         // 20-byte address
@@ -604,6 +642,7 @@ func TestGetStateTransitionsHash(t *testing.T) {
 	})
 
 	t.Run("print_hash_with_negative_amounts", func(t *testing.T) {
+		t.Parallel()
 		_, err := GetStateTransitionHash(*NewTransition(TransitionTypeHomeWithdrawal,
 			"0x4444444444444444444444444444444444444444444444444444444444444444", // 32-byte txId
 			"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0",                         // 20-byte address

@@ -9,7 +9,9 @@ import (
 )
 
 func TestPackState(t *testing.T) {
+	t.Parallel()
 	t.Run("pack_state_with_transitions", func(t *testing.T) {
+		t.Parallel()
 		// Setup mock asset store
 		assetStore := newMockAssetStore()
 		assetStore.AddToken(42, "0x90b7E285ab6cf4e3A2487669dba3E339dB8a3320", 8)
@@ -60,6 +62,7 @@ func TestPackState(t *testing.T) {
 	})
 
 	t.Run("pack_state_without_escrow", func(t *testing.T) {
+		t.Parallel()
 		// Setup mock asset store
 		assetStore := newMockAssetStore()
 		assetStore.AddToken(42, "0x90b7E285ab6cf4e3A2487669dba3E339dB8a3320", 8)

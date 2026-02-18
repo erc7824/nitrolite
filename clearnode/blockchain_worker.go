@@ -21,6 +21,10 @@ type BlockchainWorkerStore interface {
 	RecordAttempt(actionID int64, err string) error
 }
 
+type MetricsExporter interface {
+	IncBlockchainAction(asset string, blockchainID uint64, actionType string, success bool)
+}
+
 const (
 	// actionBatchSize determines how many blockchain actions to process at once
 	actionBatchSize = 20
@@ -37,14 +41,16 @@ type BlockchainWorker struct {
 	client       core.Client
 	store        BlockchainWorkerStore
 	logger       log.Logger
+	metrics      MetricsExporter
 }
 
-func NewBlockchainWorker(blockchainID uint64, client core.Client, store BlockchainWorkerStore, logger log.Logger) *BlockchainWorker {
+func NewBlockchainWorker(blockchainID uint64, client core.Client, store BlockchainWorkerStore, logger log.Logger, m MetricsExporter) *BlockchainWorker {
 	return &BlockchainWorker{
 		blockchainID: blockchainID,
 		client:       client,
 		store:        store,
 		logger:       logger.WithName("bw").WithKV("blockchainID", blockchainID),
+		metrics:      m,
 	}
 }
 
@@ -178,6 +184,7 @@ func (w *BlockchainWorker) processAction(_ context.Context, action database.Bloc
 
 	if err != nil {
 		w.handleActionError(action, err, logger)
+		w.metrics.IncBlockchainAction(state.Asset, w.blockchainID, action.Type.String(), false)
 		return false
 	}
 
@@ -185,6 +192,7 @@ func (w *BlockchainWorker) processAction(_ context.Context, action database.Bloc
 		logger.Error("failed to mark action as completed", "error", completeErr)
 		return false
 	}
+	w.metrics.IncBlockchainAction(state.Asset, w.blockchainID, action.Type.String(), true)
 	logger.Info("action completed successfully", "txHash", txHash)
 
 	return true

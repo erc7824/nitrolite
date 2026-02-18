@@ -114,8 +114,10 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 		}
 		sigValidator := h.getChannelSigValidator(tx, incomingState.Asset)
 		if err := sigValidator.Verify(incomingState.UserWallet, packedState, userSigBytes); err != nil {
+			h.metrics.IncChannelStateSigValidation(sigType, false)
 			return rpc.Errorf("invalid incoming state user signature: %v", err)
 		}
+		h.metrics.IncChannelStateSigValidation(sigType, true)
 
 		// Provide node's signature
 		_nodeSig, err := h.nodeSigner.Sign(packedState)
@@ -283,6 +285,7 @@ func (h *Handler) createEscrowChannel(tx Store, incomingState core.State) error 
 	newEscrowChannel := core.NewChannel(
 		escrowChannelID,
 		incomingState.UserWallet,
+		incomingState.Asset,
 		core.ChannelTypeEscrow,
 		incomingState.EscrowLedger.BlockchainID,
 		incomingState.EscrowLedger.TokenAddress,

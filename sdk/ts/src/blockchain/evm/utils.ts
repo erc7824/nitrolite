@@ -33,7 +33,7 @@ export function coreDefToContractDef(
     user: userWallet,
     node: nodeAddress,
     nonce: def.nonce,
-    approvedSignatureValidators: 0n,
+    approvedSignatureValidators: BigInt(def.approvedSigValidators || '0x00'),
     metadata: generateChannelMetadata(asset) as `0x${string}`,
   };
 }

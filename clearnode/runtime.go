@@ -13,7 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/erc7824/nitrolite/clearnode/store/memory"
 	"github.com/erc7824/nitrolite/pkg/blockchain/evm"
@@ -33,12 +35,14 @@ type Backbone struct {
 	ChannelMinChallengeDuration uint32
 	BlockchainRPCs              map[uint64]string
 
-	DbStore     database.DatabaseStore
-	MemoryStore memory.MemoryStore
-	RpcNode     rpc.Node
-	StateSigner sign.Signer
-	TxSigner    sign.Signer
-	Logger      log.Logger
+	DbStore        database.DatabaseStore
+	MemoryStore    memory.MemoryStore
+	RpcNode        rpc.Node
+	StateSigner    sign.Signer
+	TxSigner       sign.Signer
+	Logger         log.Logger
+	RuntimeMetrics metrics.RuntimeMetricExporter
+	StoreMetrics   metrics.StoreMetricExporter
 }
 
 type Config struct {
@@ -116,12 +120,29 @@ func InitBackbone() *Backbone {
 	logger.Info("signer initialized", "address", stateSigner.PublicKey().Address())
 
 	// ------------------------------------------------
+	// Metrics
+	// ------------------------------------------------
+
+	runtimeMetrics, err := metrics.NewRuntimeMetricExporter(prometheus.DefaultRegisterer)
+	if err != nil {
+		logger.Fatal("failed to initialize runtime metric exporter", "error", err)
+	}
+	storeMetrics, err := metrics.NewStoreMetricExporter(prometheus.DefaultRegisterer)
+	if err != nil {
+		logger.Fatal("failed to initialize store metric exporter", "error", err)
+	}
+
+	// ------------------------------------------------
 	// RPC Node
 	// ------------------------------------------------
 
 	rpcNode, err := rpc.NewWebsocketNode(rpc.WebsocketNodeConfig{
-		Logger: logger,
+		Logger:             logger,
+		ObserveConnections: runtimeMetrics.SetRPCConnections,
 	})
+	if err != nil {
+		logger.Fatal("failed to initialize RPC node", "error", err)
+	}
 
 	// ------------------------------------------------
 	// Blockchain RPCs
@@ -159,12 +180,14 @@ func InitBackbone() *Backbone {
 		ChannelMinChallengeDuration: conf.ChannelMinChallengeDuration,
 		BlockchainRPCs:              blockchainRPCs,
 
-		DbStore:     dbStore,
-		MemoryStore: memoryStore,
-		RpcNode:     rpcNode,
-		StateSigner: stateSigner,
-		TxSigner:    txSigner,
-		Logger:      logger,
+		DbStore:        dbStore,
+		MemoryStore:    memoryStore,
+		RpcNode:        rpcNode,
+		StateSigner:    stateSigner,
+		TxSigner:       txSigner,
+		Logger:         logger,
+		RuntimeMetrics: runtimeMetrics,
+		StoreMetrics:   storeMetrics,
 	}
 }
 

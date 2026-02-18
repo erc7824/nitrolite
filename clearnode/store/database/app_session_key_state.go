@@ -104,10 +104,9 @@ func (s *DBStore) StoreAppSessionKeyState(state app.AppSessionKeyStateV1) error 
 func (s *DBStore) GetLastAppSessionKeyStates(wallet string, sessionKey *string) ([]app.AppSessionKeyStateV1, error) {
 	wallet = strings.ToLower(wallet)
 
-	// Subquery to get the max version per session key for this user
 	subQuery := s.db.Model(&AppSessionKeyStateV1{}).
 		Select("user_address, session_key, MAX(version) as max_version").
-		Where("user_address = ? AND expires_at > ?", wallet, time.Now().UTC()).
+		Where("user_address = ?", wallet).
 		Group("user_address, session_key")
 
 	if sessionKey != nil && *sessionKey != "" {
@@ -136,7 +135,7 @@ func (s *DBStore) GetLastAppSessionKeyStates(wallet string, sessionKey *string) 
 	return states, nil
 }
 
-// GetLastAppSessionKeyVersion returns the latest version of a non-expired session key state for a user.
+// GetLastAppSessionKeyVersion returns the latest version of a session key state for a user.
 // Returns 0 if no state exists.
 func (s *DBStore) GetLastAppSessionKeyVersion(wallet, sessionKey string) (uint64, error) {
 	wallet = strings.ToLower(wallet)
@@ -147,7 +146,7 @@ func (s *DBStore) GetLastAppSessionKeyVersion(wallet, sessionKey string) (uint64
 	}
 	err := s.db.Model(&AppSessionKeyStateV1{}).
 		Select("version").
-		Where("user_address = ? AND session_key = ? AND expires_at > ?", wallet, sessionKey, time.Now().UTC()).
+		Where("user_address = ? AND session_key = ?", wallet, sessionKey).
 		Order("version DESC").
 		Take(&result).Error
 
@@ -162,6 +161,7 @@ func (s *DBStore) GetLastAppSessionKeyVersion(wallet, sessionKey string) (uint64
 }
 
 // GetLastAppSessionKeyState retrieves the latest version of a specific session key for a user.
+// A newer version always supersedes older ones, even if expired.
 // Returns nil if no state exists.
 func (s *DBStore) GetLastAppSessionKeyState(wallet, sessionKey string) (*app.AppSessionKeyStateV1, error) {
 	wallet = strings.ToLower(wallet)
@@ -169,7 +169,7 @@ func (s *DBStore) GetLastAppSessionKeyState(wallet, sessionKey string) (*app.App
 
 	var dbState AppSessionKeyStateV1
 	err := s.db.
-		Where("user_address = ? AND session_key = ? AND expires_at > ?", wallet, sessionKey, time.Now().UTC()).
+		Where("user_address = ? AND session_key = ?", wallet, sessionKey).
 		Order("version DESC").
 		Preload("ApplicationIDs").
 		Preload("AppSessionIDs").
@@ -187,7 +187,8 @@ func (s *DBStore) GetLastAppSessionKeyState(wallet, sessionKey string) (*app.App
 }
 
 // GetAppSessionKeyOwner returns the user_address that owns the given session key
-// authorized for the specified app session ID. Only non-expired, latest-version keys are considered.
+// authorized for the specified app session ID. Only the latest-version, non-expired key
+// with matching permissions is considered. A newer version always supersedes older ones.
 func (s *DBStore) GetAppSessionKeyOwner(sessionKey, appSessionId string) (string, error) {
 	sessionKey = strings.ToLower(sessionKey)
 	appSessionId = strings.ToLower(appSessionId)
@@ -195,13 +196,16 @@ func (s *DBStore) GetAppSessionKeyOwner(sessionKey, appSessionId string) (string
 	// Subquery to get the application ID from the app session
 	appSubQuery := s.db.Model(&AppSessionV1{}).Select("application").Where("id = ?", appSessionId)
 
+	maxVersionSubQ := s.db.Model(&AppSessionKeyStateV1{}).
+		Select("MAX(version)").
+		Where("session_key = ?", sessionKey)
+
 	var dbState AppSessionKeyStateV1
 	err := s.db.
 		Joins("LEFT JOIN app_session_key_app_sessions_v1 ON app_session_key_app_sessions_v1.session_key_state_id = app_session_key_states_v1.id").
 		Joins("LEFT JOIN app_session_key_applications_v1 ON app_session_key_applications_v1.session_key_state_id = app_session_key_states_v1.id").
-		Where("app_session_key_states_v1.session_key = ? AND (app_session_key_app_sessions_v1.app_session_id = ? OR app_session_key_applications_v1.application_id = (?)) AND app_session_key_states_v1.expires_at > ?",
-			sessionKey, appSessionId, appSubQuery, time.Now().UTC()).
-		Order("app_session_key_states_v1.version DESC").
+		Where("app_session_key_states_v1.session_key = ? AND app_session_key_states_v1.version = (?) AND app_session_key_states_v1.expires_at > ? AND (app_session_key_app_sessions_v1.app_session_id = ? OR app_session_key_applications_v1.application_id = (?))",
+			sessionKey, maxVersionSubQ, time.Now().UTC(), appSessionId, appSubQuery).
 		First(&dbState).Error
 
 	if err != nil {

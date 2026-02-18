@@ -13,6 +13,7 @@ import (
 type Channel struct {
 	ChannelID             string             `gorm:"column:channel_id;primaryKey;"`
 	UserWallet            string             `gorm:"column:user_wallet;not null"`
+	Asset                 string             `gorm:"column:asset;not null"`
 	Type                  core.ChannelType   `gorm:"column:type;not null"`
 	BlockchainID          uint64             `gorm:"column:blockchain_id;not null"`
 	Token                 string             `gorm:"column:token;not null"`
@@ -36,6 +37,7 @@ func (s *DBStore) CreateChannel(channel core.Channel) error {
 	dbChannel := Channel{
 		ChannelID:             strings.ToLower(channel.ChannelID),
 		UserWallet:            strings.ToLower(channel.UserWallet),
+		Asset:                 strings.ToLower(channel.Asset),
 		Type:                  channel.Type,
 		BlockchainID:          channel.BlockchainID,
 		Token:                 strings.ToLower(channel.TokenAddress),
@@ -80,10 +82,8 @@ func (s *DBStore) GetChannelByID(channelID string) (*core.Channel, error) {
 func (s *DBStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, error) {
 	var dbChannel Channel
 	err := s.db.
-		Joins("JOIN channel_states ON channel_states.home_channel_id = channels.channel_id").
-		Where("channel_states.user_wallet = ? AND channel_states.asset = ?", strings.ToLower(wallet), asset).
-		Where("channels.status <= ? AND channels.type = ?", core.ChannelStatusOpen, core.ChannelTypeHome).
-		Order("channel_states.epoch DESC, channel_states.version DESC").
+		Where("user_wallet = ? AND asset = ?", strings.ToLower(wallet), strings.ToLower(asset)).
+		Where("status <= ? AND type = ?", core.ChannelStatusOpen, core.ChannelTypeHome).
 		First(&dbChannel).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -100,15 +100,14 @@ func (s *DBStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, err
 func (s *DBStore) CheckOpenChannel(wallet, asset string) (string, bool, error) {
 	var approvedSigValidators string
 	result := s.db.Raw(`
-		SELECT c.approved_sig_validators
-		FROM channel_states s
-		INNER JOIN channels c ON c.channel_id = s.home_channel_id
-		WHERE s.user_wallet = ?
-			AND s.asset = ?
-			AND c.status <= ?
-			AND c.type = ?
+		SELECT approved_sig_validators
+		FROM channels
+		WHERE user_wallet = ?
+			AND asset = ?
+			AND status <= ?
+			AND type = ?
 		LIMIT 1
-	`, strings.ToLower(wallet), asset, core.ChannelStatusOpen, core.ChannelTypeHome).Scan(&approvedSigValidators)
+	`, strings.ToLower(wallet), strings.ToLower(asset), core.ChannelStatusOpen, core.ChannelTypeHome).Scan(&approvedSigValidators)
 	if result.Error != nil {
 		return "", false, fmt.Errorf("failed to check open channel: %w", result.Error)
 	}
@@ -117,6 +116,27 @@ func (s *DBStore) CheckOpenChannel(wallet, asset string) (string, bool, error) {
 	}
 
 	return approvedSigValidators, true, nil
+}
+
+// ChannelCount holds the result of a COUNT() GROUP BY query on channels.
+type ChannelCount struct {
+	Asset  string             `gorm:"column:asset"`
+	Status core.ChannelStatus `gorm:"column:status"`
+	Count  uint64             `gorm:"column:count"`
+}
+
+// CountChannelsByStatus returns channel counts grouped by (asset, status).
+func (s *DBStore) CountChannelsByStatus() ([]ChannelCount, error) {
+	var results []ChannelCount
+	err := s.db.Raw(`
+		SELECT asset, status, COUNT(*) as count
+		FROM channels
+		GROUP BY asset, status
+	`).Scan(&results).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to count channels: %w", err)
+	}
+	return results, nil
 }
 
 // UpdateChannel persists changes to a channel's metadata (status, version, etc).

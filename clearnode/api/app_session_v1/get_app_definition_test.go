@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -29,6 +30,7 @@ func TestGetAppDefinition_Success(t *testing.T) {
 		nodeAddress:   mockSigner.PublicKey().Address().String(),
 		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
 		statePacker:   mockStatePacker,
+		metrics:       metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data
@@ -112,6 +114,7 @@ func TestGetAppDefinition_NotFound(t *testing.T) {
 		nodeAddress:   mockSigner.PublicKey().Address().String(),
 		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
 		statePacker:   mockStatePacker,
+		metrics:       metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data

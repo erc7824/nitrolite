@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
@@ -39,6 +40,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive senderWallet from a user signer key
@@ -211,6 +213,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -266,6 +269,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	homeChannel := core.Channel{
 		ChannelID:         homeChannelID,
 		UserWallet:        userWallet,
+		Asset:             "usdc",
 		Type:              core.ChannelTypeHome,
 		BlockchainID:      1,
 		TokenAddress:      "0xTokenAddress",
@@ -363,6 +367,7 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -514,6 +519,7 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -643,6 +649,7 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -774,6 +781,7 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -829,6 +837,7 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	homeChannel := core.Channel{
 		ChannelID:         homeChannelID,
 		UserWallet:        userWallet,
+		Asset:             "usdc",
 		Type:              core.ChannelTypeHome,
 		BlockchainID:      1,
 		TokenAddress:      "0xTokenAddress",
@@ -926,6 +935,7 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -1079,6 +1089,7 @@ func TestSubmitState_Finalize_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -1216,6 +1227,7 @@ func TestSubmitState_Acknowledgement_Success(t *testing.T) {
 		nodeSigner:   nodeSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
+		metrics:      metrics.NewNoopRuntimeMetricExporter(),
 	}
 
 	// Test data - derive userWallet from a user signer key

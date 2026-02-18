@@ -25,6 +25,7 @@ func TestDBStore_CreateChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         "0xhomechannel123",
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -64,6 +65,7 @@ func TestDBStore_CreateChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         "0xescrowchannel456",
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeEscrow,
 			BlockchainID:      137,
 			TokenAddress:      "0xtoken456",
@@ -94,6 +96,7 @@ func TestDBStore_CreateChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         "0xchannel789",
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -121,6 +124,7 @@ func TestDBStore_CreateChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:          "0xchannel999",
 			UserWallet:         "0xuser123",
+			Asset:              "usdc",
 			Type:               core.ChannelTypeHome,
 			BlockchainID:       1,
 			TokenAddress:       "0xtoken123",
@@ -154,6 +158,7 @@ func TestDBStore_GetChannelByID(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         "0xhomechannel123",
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -201,6 +206,7 @@ func TestDBStore_GetActiveHomeChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         homeChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -261,6 +267,7 @@ func TestDBStore_GetActiveHomeChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         homeChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -306,6 +313,7 @@ func TestDBStore_GetActiveHomeChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         homeChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeEscrow,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -381,6 +389,7 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:             homeChannelID,
 			UserWallet:            "0xuser123",
+			Asset:                 "usdc",
 			Type:                  core.ChannelTypeHome,
 			BlockchainID:          1,
 			TokenAddress:          "0xtoken123",
@@ -440,6 +449,7 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         homeChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -486,6 +496,7 @@ func TestDBStore_CheckOpenChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         homeChannelID,
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -532,6 +543,7 @@ func TestDBStore_UpdateChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         "0xhomechannel123",
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -567,6 +579,7 @@ func TestDBStore_UpdateChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         "0xhomechannel123",
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -603,6 +616,7 @@ func TestDBStore_UpdateChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         "0xhomechannel123",
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",
@@ -638,6 +652,7 @@ func TestDBStore_UpdateChannel(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         "0xnonexistent",
 			UserWallet:        "0xuser123",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xtoken123",

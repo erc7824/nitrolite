@@ -147,6 +147,7 @@ func coreChannelToRPC(channel core.Channel) rpc.ChannelV1 {
 	return rpc.ChannelV1{
 		ChannelID:             channel.ChannelID,
 		UserWallet:            channel.UserWallet,
+		Asset:                 channel.Asset,
 		Type:                  channelTypeToString(channel.Type),
 		BlockchainID:          strconv.FormatUint(channel.BlockchainID, 10),
 		TokenAddress:          channel.TokenAddress,

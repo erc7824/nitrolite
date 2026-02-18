@@ -150,6 +150,7 @@ func transformChannel(channel rpc.ChannelV1) (core.Channel, error) {
 	return core.Channel{
 		ChannelID:             channel.ChannelID,
 		UserWallet:            channel.UserWallet,
+		Asset:                 channel.Asset,
 		Type:                  channelType,
 		BlockchainID:          blockchainID,
 		TokenAddress:          channel.TokenAddress,
@@ -183,8 +184,8 @@ func transformTransactions(transactions []rpc.TransactionV1) ([]core.Transaction
 			TxType:             tx.TxType,
 			FromAccount:        tx.FromAccount,
 			ToAccount:          tx.ToAccount,
-			SenderNewStateID:   nil, // Not in RPC
-			ReceiverNewStateID: nil, // Not in RPC
+			SenderNewStateID:   tx.SenderNewStateID,
+			ReceiverNewStateID: tx.ReceiverNewStateID,
 			Amount:             amount,
 			CreatedAt:          createdAt,
 		})

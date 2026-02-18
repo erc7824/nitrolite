@@ -38,6 +38,7 @@ func TestPostgres_ChannelOperations(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         "0x1234567890123456789012345678901234567890123456789012345678901234",
 			UserWallet:        "0x1234567890123456789012345678901234567890",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
@@ -64,6 +65,7 @@ func TestPostgres_ChannelOperations(t *testing.T) {
 		channel := core.Channel{
 			ChannelID:         "0x2234567890123456789012345678901234567890123456789012345678901234",
 			UserWallet:        "0x2234567890123456789012345678901234567890",
+			Asset:             "usdc",
 			Type:              core.ChannelTypeHome,
 			BlockchainID:      1,
 			TokenAddress:      "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",

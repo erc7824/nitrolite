@@ -1,4 +1,4 @@
-import { Address, encodeAbiParameters, keccak256, toHex, pad, slice } from 'viem';
+import { Address, Hex, encodeAbiParameters, keccak256, toHex, pad, slice } from 'viem';
 import Decimal from 'decimal.js';
 import {
   Transition,
@@ -16,6 +16,13 @@ import {
 
 // Configure Decimal.js for high precision arithmetic
 Decimal.set({ precision: 50 });
+
+/**
+ * ChannelHubVersion is the version of the ChannelHub contract.
+ * Encoded as the first byte of channelId to prevent replay attacks
+ * across different ChannelHub deployments on the same chain.
+ */
+export const CHANNEL_HUB_VERSION = 1;
 
 // ============================================================================
 // Intent Conversion
@@ -167,7 +174,13 @@ export function getHomeChannelId(
     ]
   );
 
-  return keccak256(packed);
+  // Calculate base channelId
+  const baseId = keccak256(packed);
+
+  // Set the first byte (most significant byte) to the ChannelHub version
+  // This matches Go's getHomeChannelID: versionedId[0] = channelHubVersion
+  const versionHex = CHANNEL_HUB_VERSION.toString(16).padStart(2, '0');
+  return `0x${versionHex}${baseId.slice(4)}` as Hex;
 }
 
 /**

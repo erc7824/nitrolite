@@ -142,12 +142,15 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 
 		sigValidator := h.getChannelSigValidator(tx, incomingState.Asset)
 		if err := sigValidator.Verify(incomingState.UserWallet, packedState, userSigBytes); err != nil {
+			h.metrics.IncChannelStateSigValidation(sigType, false)
 			return rpc.Errorf("invalid incoming state user signature: %v", err)
 		}
+		h.metrics.IncChannelStateSigValidation(sigType, true)
 
 		newHomeChannel := core.NewChannel(
 			homeChannelID,
 			incomingState.UserWallet,
+			incomingState.Asset,
 			core.ChannelTypeHome,
 			incomingState.HomeLedger.BlockchainID,
 			incomingState.HomeLedger.TokenAddress,

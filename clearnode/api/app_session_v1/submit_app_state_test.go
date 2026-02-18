@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -32,6 +33,7 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -141,6 +143,7 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -256,6 +259,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -364,6 +368,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -486,6 +491,7 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -579,6 +585,7 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -686,6 +693,7 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -791,6 +799,7 @@ func TestSubmitAppState_DepositIntent_Rejected(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -843,6 +852,7 @@ func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -907,6 +917,7 @@ func TestSubmitAppState_InvalidVersion_Rejected(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -971,6 +982,7 @@ func TestSubmitAppState_SessionNotFound_Rejected(t *testing.T) {
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -1028,6 +1040,7 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -1130,6 +1143,7 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -1228,6 +1242,7 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -46,6 +47,7 @@ func TestRebalanceAppSessions_Success_TwoSessions(t *testing.T) {
 		nil,
 		nil,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Create test wallets with real keys
@@ -208,6 +210,7 @@ func TestRebalanceAppSessions_Success_MultiAsset(t *testing.T) {
 		nil,
 		nil,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Create test wallets with real keys
@@ -359,6 +362,7 @@ func TestRebalanceAppSessions_Error_InsufficientSessions(t *testing.T) {
 		nil,
 		nil,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -414,6 +418,7 @@ func TestRebalanceAppSessions_Error_InvalidIntent(t *testing.T) {
 		nil,
 		nil,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -485,6 +490,7 @@ func TestRebalanceAppSessions_Error_DuplicateSession(t *testing.T) {
 		nil,
 		nil,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -558,6 +564,7 @@ func TestRebalanceAppSessions_Error_ConservationViolation(t *testing.T) {
 		nil,
 		nil,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	// Create test wallets with real keys
@@ -695,6 +702,7 @@ func TestRebalanceAppSessions_Error_SessionNotFound(t *testing.T) {
 		nil,
 		nil,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -773,6 +781,7 @@ func TestRebalanceAppSessions_Error_ClosedSession(t *testing.T) {
 		nil,
 		nil,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -856,6 +865,7 @@ func TestRebalanceAppSessions_Error_InvalidVersion(t *testing.T) {
 		nil,
 		nil,
 		"0xNode",
+		metrics.NewNoopRuntimeMetricExporter(),
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)

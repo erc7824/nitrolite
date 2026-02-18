@@ -31,6 +31,21 @@ var (
 	ChannelStatusClosed     ChannelStatus = 3
 )
 
+func (s ChannelStatus) String() string {
+	switch s {
+	case ChannelStatusVoid:
+		return "void"
+	case ChannelStatusOpen:
+		return "open"
+	case ChannelStatusChallenged:
+		return "challenged"
+	case ChannelStatusClosed:
+		return "closed"
+	default:
+		return "unknown"
+	}
+}
+
 const (
 	INTENT_OPERATE                    = 0
 	INTENT_CLOSE                      = 1
@@ -48,6 +63,7 @@ const (
 type Channel struct {
 	ChannelID             string        `json:"channel_id"`                     // Unique identifier for the channel
 	UserWallet            string        `json:"user_wallet"`                    // User wallet address
+	Asset                 string        `json:"asset"`                          // Asset symbol (e.g. USDC, ETH)
 	Type                  ChannelType   `json:"type"`                           // Type of the channel (home, escrow)
 	BlockchainID          uint64        `json:"blockchain_id"`                  // Unique identifier for the blockchain
 	TokenAddress          string        `json:"token_address"`                  // Address of the token used in the channel
@@ -59,10 +75,11 @@ type Channel struct {
 	StateVersion          uint64        `json:"state_version"`                  // On-chain state version of the channel
 }
 
-func NewChannel(channelID, userWallet string, ChType ChannelType, blockchainID uint64, tokenAddress string, nonce uint64, challenge uint32, approvedSigValidators string) *Channel {
+func NewChannel(channelID, userWallet, asset string, ChType ChannelType, blockchainID uint64, tokenAddress string, nonce uint64, challenge uint32, approvedSigValidators string) *Channel {
 	return &Channel{
 		ChannelID:             channelID,
 		UserWallet:            userWallet,
+		Asset:                 asset,
 		Type:                  ChType,
 		BlockchainID:          blockchainID,
 		TokenAddress:          tokenAddress,

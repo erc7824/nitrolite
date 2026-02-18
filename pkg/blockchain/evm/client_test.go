@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"crypto/ecdsa"
 	"math/big"
 	"strings"
 	"testing"
@@ -21,7 +22,11 @@ type MockSigner struct {
 
 func (m *MockSigner) Sign(data []byte) (sign.Signature, error) {
 	args := m.Called(data)
-	return args.Get(0).(sign.Signature), args.Error(1)
+	if v := args.Get(0); v != nil {
+		return v.(sign.Signature), args.Error(1)
+	}
+
+	return nil, args.Error(1)
 }
 
 func (m *MockSigner) PublicKey() sign.PublicKey {
@@ -49,12 +54,7 @@ func TestNewClient(t *testing.T) {
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := new(MockSigner)
 
-	// Setup mock signer
-	privKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	addr := crypto.PubkeyToAddress(privKey.PublicKey)
-	pubBytes := crypto.FromECDSAPub(&privKey.PublicKey)
-	mockSigner.On("PublicKey").Return(&MockPublicKey{addr: addr, pubBytes: pubBytes})
+	setupMockSigner(t, mockSigner)
 
 	contractAddress := common.HexToAddress("0x123")
 	nodeAddress := "0x456"
@@ -82,12 +82,7 @@ func TestClient_GetAccountsBalances(t *testing.T) {
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := new(MockSigner)
 
-	// Setup mock signer
-	privKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	addr := crypto.PubkeyToAddress(privKey.PublicKey)
-	pubBytes := crypto.FromECDSAPub(&privKey.PublicKey)
-	mockSigner.On("PublicKey").Return(&MockPublicKey{addr: addr, pubBytes: pubBytes})
+	setupMockSigner(t, mockSigner)
 
 	contractAddress := common.HexToAddress("0xContract")
 	client, err := NewClient(contractAddress, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
@@ -116,12 +111,7 @@ func TestClient_GetNodeBalance(t *testing.T) {
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := new(MockSigner)
 
-	// Setup mock signer
-	privKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	addr := crypto.PubkeyToAddress(privKey.PublicKey)
-	pubBytes := crypto.FromECDSAPub(&privKey.PublicKey)
-	mockSigner.On("PublicKey").Return(&MockPublicKey{addr: addr, pubBytes: pubBytes})
+	setupMockSigner(t, mockSigner)
 
 	client, err := NewClient(common.Address{}, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
 	require.NoError(t, err)
@@ -146,12 +136,7 @@ func TestClient_GetOpenChannels(t *testing.T) {
 	mockAssetStore := new(MockAssetStore)
 	mockSigner := new(MockSigner)
 
-	// Setup mock signer
-	privKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	addr := crypto.PubkeyToAddress(privKey.PublicKey)
-	pubBytes := crypto.FromECDSAPub(&privKey.PublicKey)
-	mockSigner.On("PublicKey").Return(&MockPublicKey{addr: addr, pubBytes: pubBytes})
+	setupMockSigner(t, mockSigner)
 
 	client, err := NewClient(common.Address{}, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
 	require.NoError(t, err)
@@ -178,4 +163,14 @@ func TestClient_GetOpenChannels(t *testing.T) {
 	assert.Equal(t, strings.ToLower(hexutil.Encode(chanID[:])), strings.ToLower(channels[0]))
 
 	mock.AssertExpectationsForObjects(t, mockEVMClient, mockAssetStore, mockSigner)
+}
+
+func setupMockSigner(t *testing.T, mockSigner *MockSigner) (*ecdsa.PrivateKey, common.Address, []byte) {
+	t.Helper()
+	privKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	addr := crypto.PubkeyToAddress(privKey.PublicKey)
+	pubBytes := crypto.FromECDSAPub(&privKey.PublicKey)
+	mockSigner.On("PublicKey").Return(&MockPublicKey{addr: addr, pubBytes: pubBytes})
+	return privKey, addr, pubBytes
 }

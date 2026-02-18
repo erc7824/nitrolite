@@ -15,17 +15,19 @@ import (
 )
 
 type Operator struct {
-	wsURL  string
-	store  *Storage
-	client *sdk.Client
-	exitCh chan struct{}
+	wsURL      string
+	store      *Storage
+	client     *sdk.Client
+	exitCh     chan struct{}
+	stressJobs *stressManager
 }
 
 func NewOperator(wsURL string, store *Storage) (*Operator, error) {
 	op := &Operator{
-		wsURL:  wsURL,
-		store:  store,
-		exitCh: make(chan struct{}),
+		wsURL:      wsURL,
+		store:      store,
+		exitCh:     make(chan struct{}),
+		stressJobs: newStressManager(),
 	}
 
 	if err := op.connect(); err != nil {
@@ -184,6 +186,12 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "create-app-session-key", Description: "Register app session key"},
 			{Text: "app-session-keys", Description: "List active app session keys"},
 
+			// Stress testing
+			{Text: "stress", Description: "Start stress test (runs in background)"},
+			{Text: "stress-status", Description: "Show running/completed stress tests"},
+			{Text: "stress-results", Description: "Show full report for a stress test"},
+			{Text: "stress-stop", Description: "Stop a running stress test"},
+
 			{Text: "exit", Description: "Exit the CLI"},
 		}
 	}
@@ -201,6 +209,21 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 		case "node":
 			return []prompt.Suggest{
 				{Text: "info", Description: "Get node configuration"},
+			}
+		case "stress":
+			return []prompt.Suggest{
+				{Text: "ping", Description: "Stress test ping"},
+				{Text: "get-config", Description: "Stress test get-config"},
+				{Text: "get-blockchains", Description: "Stress test get-blockchains"},
+				{Text: "get-assets", Description: "Stress test get-assets [chain_id]"},
+				{Text: "get-balances", Description: "Stress test get-balances [wallet]"},
+				{Text: "get-transactions", Description: "Stress test get-transactions [wallet]"},
+				{Text: "get-home-channel", Description: "Stress test get-home-channel [wallet] <asset>"},
+				{Text: "get-escrow-channel", Description: "Stress test get-escrow-channel <channel_id>"},
+				{Text: "get-latest-state", Description: "Stress test get-latest-state [wallet] <asset>"},
+				{Text: "get-channel-key-states", Description: "Stress test get-channel-key-states [addr]"},
+				{Text: "get-app-sessions", Description: "Stress test get-app-sessions"},
+				{Text: "get-app-key-states", Description: "Stress test get-app-key-states [addr]"},
 			}
 		}
 	}
@@ -489,6 +512,16 @@ func (o *Operator) Execute(s string) {
 			return
 		}
 		o.listAppSessionKeys(ctx, wallet)
+
+	// Stress testing
+	case "stress":
+		o.runStressCommand(args)
+	case "stress-status":
+		o.showStressStatus()
+	case "stress-results":
+		o.showStressResults(args)
+	case "stress-stop":
+		o.stopStressTest(args)
 
 	case "exit":
 		fmt.Println("Exiting...")

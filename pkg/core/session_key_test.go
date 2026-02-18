@@ -167,12 +167,7 @@ func TestEncodeDecodeChannelSessionKeySignature(t *testing.T) {
 	assert.Equal(t, skSignature, decodedSig)
 }
 
-// Helper to create sign.Signer from ecdsa.PrivateKey since pkg/sign doesn't export NewEthereumRawSignerFromPrivateKey directly in the way I used it?
-// Wait, I used sign.NewEthereumRawSignerFromPrivateKey in the test but I am not sure if it exists.
-// Checking pkg/sign/eth_raw_signer.go...
-// It has NewEthereumRawSigner(privateKeyHex string)
-// It doesn't seem to have FromPrivateKey.
-// I will create a helper or use hex.
+func createSigner(t *testing.T) (sign.Signer, string) {
 
 func createSigner(t *testing.T) (sign.Signer, string) {
 	t.Helper()

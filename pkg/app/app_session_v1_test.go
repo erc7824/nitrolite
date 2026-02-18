@@ -9,6 +9,7 @@ import (
 )
 
 func TestPackCreateAppSessionRequestV1(t *testing.T) {
+	t.Parallel()
 	def := AppDefinitionV1{
 		Application: "chess-v1",
 		Participants: []AppParticipantV1{
@@ -27,6 +28,7 @@ func TestPackCreateAppSessionRequestV1(t *testing.T) {
 }
 
 func TestPackAppStateUpdateV1(t *testing.T) {
+	t.Parallel()
 	update := AppStateUpdateV1{
 		AppSessionID: "0x3333333333333333333333333333333333333333333333333333333333333333",
 		Intent:       AppStateUpdateIntentDeposit,
@@ -44,6 +46,7 @@ func TestPackAppStateUpdateV1(t *testing.T) {
 }
 
 func TestGenerateAppSessionIDV1(t *testing.T) {
+	t.Parallel()
 	def := AppDefinitionV1{
 		Application: "chess-v1",
 		Participants: []AppParticipantV1{
@@ -70,6 +73,7 @@ func TestGenerateAppSessionIDV1(t *testing.T) {
 }
 
 func TestGenerateRebalanceBatchIDV1(t *testing.T) {
+	t.Parallel()
 	versions := []AppSessionVersionV1{
 		{SessionID: "0x1111111111111111111111111111111111111111111111111111111111111111", Version: 1},
 		{SessionID: "0x2222222222222222222222222222222222222222222222222222222222222222", Version: 2},
@@ -92,6 +96,7 @@ func TestGenerateRebalanceBatchIDV1(t *testing.T) {
 }
 
 func TestGenerateRebalanceTransactionIDV1(t *testing.T) {
+	t.Parallel()
 	batchID := "0x1111111111111111111111111111111111111111111111111111111111111111"
 	sessionID := "0x2222222222222222222222222222222222222222222222222222222222222222"
 	asset := "USDC"
@@ -106,6 +111,7 @@ func TestGenerateRebalanceTransactionIDV1(t *testing.T) {
 }
 
 func TestEnums(t *testing.T) {
+	t.Parallel()
 	assert.Equal(t, "operate", AppStateUpdateIntentOperate.String())
 	assert.Equal(t, "deposit", AppStateUpdateIntentDeposit.String())
 	assert.Equal(t, "withdraw", AppStateUpdateIntentWithdraw.String())

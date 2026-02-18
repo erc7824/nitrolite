@@ -82,12 +82,14 @@ func TestClient_GetAccountsBalances(t *testing.T) {
 	mockSigner := new(MockSigner)
 
 	// Setup mock signer
-	privKey, _ := crypto.GenerateKey()
+	privKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
 	addr := crypto.PubkeyToAddress(privKey.PublicKey)
 	mockSigner.On("PublicKey").Return(&MockPublicKey{addr: addr})
 
 	contractAddress := common.HexToAddress("0xContract")
-	client, _ := NewClient(contractAddress, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
+	client, err := NewClient(contractAddress, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
+	require.NoError(t, err)
 
 	accounts := []string{"0xUser1", "0xUser2"}
 	tokens := []string{"0xToken1"}

@@ -116,7 +116,12 @@ func NewClient(wsURL string, stateSigner core.ChannelSigner, rawSigner sign.Sign
 		if config.ErrorHandler != nil {
 			config.ErrorHandler(err)
 		}
-		close(client.exitCh)
+		select {
+		case <-client.exitCh:
+			// Already closed
+		default:
+			close(client.exitCh)
+		}
 	}
 
 	// Establish connection

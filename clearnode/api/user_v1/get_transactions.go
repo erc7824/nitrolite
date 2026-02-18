@@ -23,15 +23,11 @@ func (h *Handler) GetTransactions(c *rpc.Context) {
 	var transactions []core.Transaction
 	var metadata core.PaginationMetadata
 
-	err := h.useStoreInTx(func(store Store) error {
-		var err error
-		transactions, metadata, err = store.GetUserTransactions(req.Wallet, req.Asset, req.TxType, req.FromTime, req.ToTime, &paginationParams)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
+	transactions, metadata, err := h.store.GetUserTransactions(req.Wallet, req.Asset, req.TxType, req.FromTime, req.ToTime, &paginationParams)
+	if err != nil {
+		c.Fail(err, "failed to retrieve transactions")
+		return
+	}
 
 	response := rpc.UserV1GetTransactionsResponse{
 		Transactions: []rpc.TransactionV1{},
@@ -40,11 +36,6 @@ func (h *Handler) GetTransactions(c *rpc.Context) {
 
 	for _, tx := range transactions {
 		response.Transactions = append(response.Transactions, mapTransactionV1(tx))
-	}
-
-	if err != nil {
-		c.Fail(err, "failed to retrieve transactions")
-		return
 	}
 
 	payload, err := rpc.NewPayload(response)

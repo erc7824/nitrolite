@@ -60,9 +60,6 @@ func NewRPCRouter(
 	useAppSessionV1StoreInTx := func(h app_session_v1.StoreTxHandler) error {
 		return wrapWithMetrics(func(ms *metricStore) error { return h(ms) })
 	}
-	useUserV1StoreInTx := func(h user_v1.StoreTxHandler) error {
-		return dbStore.ExecuteInTransaction(func(s database.DatabaseStore) error { return h(s) })
-	}
 
 	nodeAddress := signer.PublicKey().Address().String()
 
@@ -77,7 +74,7 @@ func NewRPCRouter(
 	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, nodeChannelSigner, stateAdvancer, statePacker, nodeAddress, minChallenge, runtimeMetrics)
 	appSessionV1Handler := app_session_v1.NewHandler(useAppSessionV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, nodeAddress, runtimeMetrics)
 	nodeV1Handler := node_v1.NewHandler(memoryStore, nodeAddress, nodeVersion)
-	userV1Handler := user_v1.NewHandler(useUserV1StoreInTx)
+	userV1Handler := user_v1.NewHandler(dbStore)
 
 	appSessionV1Group := r.Node.NewGroup(rpc.AppSessionsV1Group.String())
 	appSessionV1Group.Handle(rpc.AppSessionsV1SubmitDepositStateMethod.String(), appSessionV1Handler.SubmitDepositState)

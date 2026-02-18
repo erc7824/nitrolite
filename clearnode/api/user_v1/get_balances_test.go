@@ -17,13 +17,7 @@ func TestGetBalances_Success(t *testing.T) {
 	mockStore := new(MockStore)
 
 	handler := &Handler{
-		useStoreInTx: func(handler StoreTxHandler) error {
-			err := handler(mockStore)
-			if err != nil {
-				return err
-			}
-			return nil
-		},
+		store: mockStore,
 	}
 
 	// Test data

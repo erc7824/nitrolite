@@ -168,8 +168,6 @@ func TestEncodeDecodeChannelSessionKeySignature(t *testing.T) {
 }
 
 func createSigner(t *testing.T) (sign.Signer, string) {
-
-func createSigner(t *testing.T) (sign.Signer, string) {
 	t.Helper()
 	pk, err := crypto.GenerateKey()
 	require.NoError(t, err)

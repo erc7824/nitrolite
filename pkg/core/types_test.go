@@ -356,12 +356,15 @@ func TestNewTransactionFromTransition(t *testing.T) {
 
 	// TransferSend
 	transition = Transition{Type: TransitionTypeTransferSend, Amount: decimal.NewFromInt(10), AccountID: "REC"}
-	// Requires receiver state or nil? implementation requires receiver state for TransferSend?
-	// Checking impl: if receiverState == nil { return nil, error }
 	receiverState := NewVoidState("A", "REC")
 	tx, err = NewTransactionFromTransition(senderState, receiverState, transition)
 	require.NoError(t, err)
 	assert.Equal(t, TransactionTypeTransfer, tx.TxType)
+
+	// TransferSend error: nil receiverState
+	_, err = NewTransactionFromTransition(senderState, nil, transition)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "receiver state must not be nil")
 
 	// Invalid
 	transition = Transition{Type: 255}

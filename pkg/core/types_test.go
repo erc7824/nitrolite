@@ -251,6 +251,7 @@ func TestState_ApplyEscrowLockTransition(t *testing.T) {
 }
 
 func TestState_ApplyEscrowWithdrawTransition(t *testing.T) {
+	t.Parallel()
 	state := NewVoidState("USDC", "0xUser")
 	state.ID = "0xStateID"
 

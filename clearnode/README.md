@@ -1,70 +1,50 @@
 # Clearnode
 
-[![codecov](https://codecov.io/github/erc7824/nitrolite/graph/badge.svg)](https://codecov.io/github/erc7824/nitrolite)
-[![Go Reference](https://pkg.go.dev/badge/github.com/erc7824/nitrolite/clearnode.svg)](https://pkg.go.dev/github.com/erc7824/nitrolite/clearnode)
-[![Go Report Card](https://goreportcard.com/badge/github.com/erc7824/nitrolite/clearnode)](https://goreportcard.com/report/github.com/erc7824/nitrolite/clearnode)
-
-Clearnode is the off-chain node implementation for the Nitrolite V1 protocol. It manages state channels, processes off-chain transactions, and coordinates state-channel state updates between users and to enable fast, low-cost payment channels and application sessions.
+Clearnode is the off-chain node implementation for the Nitrolite protocol. It manages state channels, processes off-chain transactions, and coordinates state updates between users and applications to enable fast, low-cost payment channels and complex application sessions.
 
 ## Overview
 
-Clearnode provides a WebSocket-based RPC service that allows users to:
+Clearnode provides a WebSocket-based RPC service that allows users and applications to:
 - Create and manage home and escrow channels on multiple blockchains
 - Perform instant off-chain transfers between users
-- Run application sessions with multiple participants
-- Deposit and withdraw assets across chains
-- Track balances and transaction history
+- Execute multi-party application sessions with arbitrary logic
+- Delegate signing authority via session keys
+- Atomically rebalance funds across multiple application sessions
+- Track balances and transaction history across all supported assets
 
-The node listens to blockchain events, validates state transitions, and ensures secure coordination between on-chain channels and off-chain state.
+The node monitors blockchain events, validates state transitions using a monotonic sequence logic, and ensures secure coordination between on-chain channels and off-chain state updates.
 
 ## Architecture
 
-Clearnode consists of several key components:
+Clearnode is built with a modular architecture:
 
-- **RPC Server**: WebSocket server (`:7824`) handling client requests
-- **Blockchain Listeners**: Monitor on-chain events from nitrolite contracts
-- **Event Handlers**: Process blockchain events and update internal state
-- **Database Store**: Persistent storage for channels, states, and transactions
-- **Memory Store**: In-memory configuration for blockchains and assets
-- **Blockchain Workers**: Coordinate on-chain operations (future use)
-- **Metrics Server**: Prometheus metrics endpoint (`:4242`)
+- **RPC Server**: WebSocket-based JSON-RPC server handling client requests.
+- **Blockchain Listeners**: Monitors on-chain events from Nitrolite `ChannelHub` contracts across multiple chains.
+- **Event Handlers**: Processes blockchain events to update internal channel and user states.
+- **Storage Layer**:
+  - **Database Store**: Persistent storage for channels, states, and transactions (supports SQLite and PostgreSQL).
+  - **Memory Store**: Fast in-memory access for node configuration, blockchains, and assets.
+- **Blockchain Workers**: Coordinates on-chain operations such as automated settlement or rebalancing.
+- **Metrics**: Built-in Prometheus exporter for monitoring node health and protocol performance.
 
 ### API Groups
 
-Clearnode exposes four main API groups via WebSocket RPC:
+The WebSocket RPC service exposes several API groups:
 
-1. **channel_v1**: Channel creation and state management
-   - `get_home_channel` - Retrieve home channel information
-   - `get_escrow_channel` - Retrieve escrow channel information
-   - `get_latest_state` - Get latest user state
-   - `request_creation` - Request channel creation signature
-   - `submit_state` - Submit signed state update
-
-2. **app_session_v1**: Application session management
-   - `create_app_session` - Create new application session
-   - `get_app_definition` - Get application session definition
-   - `get_app_sessions` - List user's application sessions
-   - `submit_deposit_state` - Submit deposit to app session
-   - `submit_app_state` - Submit app session state update
-   - `rebalance_app_sessions` - Rebalance across app sessions
-
-3. **user_v1**: User account queries
-   - `get_balances` - Retrieve user balances by asset
-   - `get_transactions` - Get transaction history
-
-4. **node_v1**: Node information
-   - `get_config` - Get node configuration
-   - `get_assets` - List supported assets
+1. **channel_v1**: Core payment channel management (Creation, State Submission, Latest State).
+2. **app_session_v1**: Advanced application session management (Creation, Deposits, Rebalancing).
+3. **user_v1**: User-specific queries (Balances, Transaction History).
+4. **node_v1**: Node-level information (Config, Supported Assets).
 
 For detailed API specifications, see [../docs/api.yaml](../docs/api.yaml).
 
 ## Configuration
 
-Clearnode uses YAML configuration files for blockchain and asset setup, combined with environment variables for runtime configuration.
+Clearnode uses YAML files for core configuration and environment variables for sensitive data and runtime overrides.
 
 ### Blockchain Configuration
 
-Create a `config/blockchains.yaml` file to define supported blockchains:
+Define supported chains in `config/blockchains.yaml`:
 
 ```yaml
 default_contract_address: "0x019B65A265EB3363822f2752141b3dF16131b262"
@@ -73,33 +53,23 @@ blockchains:
   - name: polygon_amoy
     id: 80002
     contract_address: "0x9d1E88627884e066B81A02d69BCB2437a520534C"
+    block_step: 1000
 
   - name: base_sepolia
     id: 84532
     contract_address: "0x33e57a8900882B8D5A038eC3Aa844c19Acfc539A"
 ```
 
-Configuration options:
-- `default_contract_address`: Default Nitrolite contract address for blockchains without overrides
-
-- `blockchains`: Array of blockchain configurations
-  - `name`: Blockchain identifier (lowercase, underscores allowed)
-  - `id`: Chain ID for validation
-  - `disabled`: Set to `true` to skip this blockchain
-  - `block_step`: Block range for event scanning (default: 10000)
-  - `contract_address`: Override default address per chain
-
-See [config/compose/example/blockchains.yaml](config/compose/example/blockchains.yaml) for a complete example.
-
 ### Asset Configuration
 
-Create a `config/assets.yaml` file to define supported assets and their token implementations:
+Define supported assets and their multi-chain token deployments in `config/assets.yaml`:
 
 ```yaml
 assets:
-  - name: "USD Coin"
+  - symbol: "USDC"
+    name: "USD Coin"
     decimals: 6
-    symbol: "USDC"
+    suggested_blockchain_id: 80002
     tokens:
       - blockchain_id: 80002
         address: "0xDB9F293e3898c9E5536A3be1b0C56c89d2b32DEb"
@@ -109,149 +79,44 @@ assets:
         decimals: 6
 ```
 
-Configuration options:
-- `name`: Human-readable asset name (optional, defaults to symbol)
-- `symbol`: Asset ticker symbol (required, case-sensitive)
-- `decimals`: Number of decimal places in YN (required)
-- `disabled`: Set to `true` to skip this asset
-- `tokens`: Array of token implementations across chains
-  - `blockchain_id`: Chain ID where token is deployed
-  - `address`: Token contract address
-  - `decimals`: Number of decimal places
-  - `name`: Token-specific name (optional, inherits from asset)
-  - `symbol`: Token-specific symbol (optional, inherits from asset)
-  - `disabled`: Set to `true` to skip this token
-
-See [config/compose/example/assets.yaml](config/compose/example/assets.yaml) for a complete example.
-
 ### Environment Variables
 
-Configure Clearnode using environment variables:
-
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `CLEARNODE_SIGNER_KEY` | Private key for signing node messages | Yes | - |
-| `CLEARNODE_DATABASE_DRIVER` | Database driver (`postgres` or `sqlite`) | No | `sqlite` |
-| `CLEARNODE_DATABASE_URL` | Database connection string | No | `clearnode.db` |
-| `CLEARNODE_LOG_LEVEL` | Logging level (`debug`, `info`, `warn`, `error`) | No | `info` |
-| `CLEARNODE_CONFIG_DIR_PATH` | Path to configuration directory | No | `.` |
-| `CLEARNODE_CHANNEL_MIN_CHALLENGE_DURATION` | Minimum channel challenge period (seconds) | No | `86400` |
-| `CLEARNODE_BLOCKCHAIN_RPC_<NAME>` | RPC endpoint for each blockchain | Yes (per blockchain) | - |
-
-#### Blockchain RPC Configuration
-
-For each enabled blockchain in `blockchains.yaml`, set an RPC endpoint:
-
-```bash
-# Format: CLEARNODE_BLOCKCHAIN_RPC_<BLOCKCHAIN_NAME_UPPERCASE>
-CLEARNODE_BLOCKCHAIN_RPC_POLYGON_AMOY=https://rpc-amoy.polygon.technology
-CLEARNODE_BLOCKCHAIN_RPC_BASE_SEPOLIA=https://sepolia.base.org
-```
-
-The blockchain name is converted to uppercase and prefixed with `CLEARNODE_BLOCKCHAIN_RPC_`.
-
-#### Database Configuration
-
-**SQLite** (default):
-```bash
-CLEARNODE_DATABASE_DRIVER=sqlite
-CLEARNODE_DATABASE_URL=clearnode.db
-```
-
-**PostgreSQL**:
-```bash
-CLEARNODE_DATABASE_DRIVER=postgres
-CLEARNODE_DATABASE_URL=postgresql://user:password@localhost:5432/clearnode?sslmode=disable
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CLEARNODE_SIGNER_KEY` | Private key for signing node state updates | (Required) |
+| `CLEARNODE_DATABASE_DRIVER` | `sqlite` or `postgres` | `sqlite` |
+| `CLEARNODE_DATABASE_URL` | Connection string or file path | `clearnode.db` |
+| `CLEARNODE_LOG_LEVEL` | `debug`, `info`, `warn`, `error` | `info` |
+| `CLEARNODE_BLOCKCHAIN_RPC_<NAME>` | RPC endpoint for a specific blockchain | (Required) |
 
 ## Running Clearnode
 
 ### Prerequisites
 
 - Go 1.25 or later
-- SQLite (for default database) or PostgreSQL
-- RPC access to configured blockchains
+- Access to blockchain RPC endpoints (e.g., Alchemy, Infura, or local Anvil)
 
-### Local Development
+### Quick Start (Local)
 
-1. Create configuration directory:
+1. Set up your configuration files in a `./config` directory.
+2. Set the required environment variables:
+   ```bash
+   export CLEARNODE_SIGNER_KEY=0x...
+   export CLEARNODE_BLOCKCHAIN_RPC_POLYGON_AMOY=https://...
+   ```
+3. Run the node:
+   ```bash
+   go run . --config-dir ./config
+   ```
 
-```bash
-mkdir -p config
-```
-
-2. Create `config/blockchains.yaml` and `config/assets.yaml` (see examples above)
-
-3. Create `config/.env` with required variables:
-
-```bash
-# Required
-CLEARNODE_SIGNER_KEY=0xYOUR_PRIVATE_KEY_HERE
-
-# Blockchain RPCs (add for each enabled blockchain)
-CLEARNODE_BLOCKCHAIN_RPC_POLYGON_AMOY=https://your-rpc-url
-CLEARNODE_BLOCKCHAIN_RPC_BASE_SEPOLIA=https://your-rpc-url
-
-# Optional
-CLEARNODE_LOG_LEVEL=debug
-```
-
-4. Run the server:
-
-```bash
-export CLEARNODE_CONFIG_DIR_PATH=./config
-go run .
-```
-
-The server will start on:
-- **WebSocket RPC**: `ws://localhost:7824/ws`
-- **Metrics**: `http://localhost:4242/metrics`
+The node will be available at `ws://localhost:7824/ws`.
 
 ### Docker
 
-Build and run with Docker:
-
 ```bash
-# Build
-docker build -t clearnode:latest .
-
-# Run
-docker run -p 7824:7824 -p 4242:4242 \
-  -v $(pwd)/config:/config \
-  -e CLEARNODE_CONFIG_DIR_PATH=/config \
-  -e CLEARNODE_SIGNER_KEY=0xYOUR_KEY \
-  -e CLEARNODE_BLOCKCHAIN_RPC_POLYGON_AMOY=https://rpc-url \
-  clearnode:latest
+docker build -t clearnode .
+docker run -p 7824:7824 -e CLEARNODE_SIGNER_KEY=... clearnode
 ```
-
-### Docker Compose
-
-Use the provided `docker-compose.yml` for a complete setup with PostgreSQL:
-
-```bash
-# Copy example configuration
-cp -r config/compose/example config/compose/local
-
-# Edit configuration files
-vim config/compose/local/blockchains.yaml
-vim config/compose/local/assets.yaml
-vim config/compose/local/.env
-
-# Start services
-docker-compose up
-```
-
-### Communication Flows
-
-Clearnode supports several key flows:
-
-- **Off-chain transfers**: Balance transfers between users
-- **Home channel creation**: Establish user's primary channel
-- **Home channel deposits/withdrawals**: Fund and withdraw from channels
-- **Escrow channel operations**: Cross-chain escrow management
-- **App session lifecycle**: Multi-party application sessions
-
-For detailed sequence diagrams, see [../docs/communication_flows/](../docs/communication_flows/).
 
 ## Development
 
@@ -259,66 +124,28 @@ For detailed sequence diagrams, see [../docs/communication_flows/](../docs/commu
 
 ```
 clearnode/
-├── api/                    # RPC API handlers
-│   ├── app_session_v1/    # App session endpoints
-│   ├── channel_v1/        # Channel endpoints
-│   ├── node_v1/           # Node info endpoints
-│   ├── user_v1/           # User query endpoints
-│   └── rpc_router.go      # RPC method routing
-├── config/                # Configuration files
-│   ├── compose/           # Docker compose configs
-│   └── migrations/        # Database migrations
-├── event_handlers/        # Blockchain event processing
-├── metrics/               # Prometheus metrics
-│   └── prometheus/
-├── nitrolite/             # Smart contract bindings
-├── store/                 # Data storage layer
-│   ├── database/          # Persistent storage (PostgreSQL/SQLite)
-│   └── memory/            # In-memory configuration store
-├── blockchain_worker.go   # Blockchain interaction coordinator
-├── main.go               # Application entry point
-└── runtime.go            # Initialization and configuration
+├── api/             # JSON-RPC request handlers
+├── config/          # Default configurations and migrations
+├── event_handlers/  # Logic for reacting to blockchain events
+├── metrics/         # Prometheus telemetry implementation
+├── store/           # Persistence layer (SQL and Memory)
+├── main.go          # Entry point
+└── runtime.go       # System initialization logic
 ```
 
-### Running Tests
+### Testing
 
 ```bash
-# Run all tests
-go test ./...
-
-# Run with coverage
-go test -cover ./...
-
-# Run specific package tests
-go test ./api/channel_v1/...
-```
-
-### Building
-
-```bash
-# Build binary
-go build -o bin/clearnode
-
-# Build with version
-go build -o bin/clearnode -ldflags "-X main.Version=1.0.0"
-
-# Build for production
-CGO_ENABLED=1 go build -o bin/clearnode -ldflags "-X main.Version=1.0.0"
+# Run all tests (requires GOCACHE redirection if in restricted environment)
+export GOCACHE=/tmp/gocache && go test -v ./...
 ```
 
 ## Documentation
 
-- [API Specification](../docs/api.yaml) - Complete RPC API reference
-- [Data Models](../docs/data_models.mmd) - Core data structures
-- [Communication Flows](../docs/communication_flows/) - Sequence diagrams
-- [Nitrolite V1 Specs](../docs/README.md) - Protocol specifications
+- [Nitrolite Protocol Overview](../protocol-description.md)
+- [Communication Flows](../docs/communication_flows/)
+- [API Reference](../docs/api.yaml)
 
 ## License
 
-See the main repository [LICENSE](../LICENSE) file for details.
-
-## Support
-
-For issues and questions:
-- GitHub Issues: [github.com/erc7824/nitrolite/issues](https://github.com/erc7824/nitrolite/issues)
-- Documentation: [github.com/erc7824/nitrolite/docs](https://github.com/erc7824/nitrolite/tree/main/docs)
+Part of the Nitrolite project. Licensed under the MIT License.

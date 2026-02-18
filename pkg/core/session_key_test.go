@@ -109,8 +109,9 @@ func TestValidateChannelSessionKeyAuthSigV1(t *testing.T) {
 
 	// 6. Test Invalid Signature (wrong signer)
 	wrongSigner, _ := createSigner(t)
-	wrongSig, _ := wrongSigner.Sign(packed)
-
+	wrongSig, err := wrongSigner.Sign(packed)
+	require.NoError(t, err)
+	
 	state.UserSig = hexutil.Encode(wrongSig)
 	err = ValidateChannelSessionKeyAuthSigV1(state)
 	assert.Error(t, err)

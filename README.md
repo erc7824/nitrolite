@@ -31,7 +31,7 @@ Nitrolite is a complete state channel infrastructure consisting of several main 
 This repository contains:
 
 - **[`/contracts`](/contracts)**: Solidity smart contracts for the state channel framework.
-- **[`/clearnode`](/clearnode)**: implementation of the Clearnode service.
+- **[`/clearnode`](/clearnode)**: Implementation of the Clearnode service.
 - **[`/sdk/go`](/sdk/go)**: Official Go SDK.
 - **[`/sdk/ts`](/sdk/ts)**: Official TypeScript SDK.
 - **[`/cerebro`](/cerebro)**: Clearnode CLI tool.

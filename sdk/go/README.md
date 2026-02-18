@@ -1,3 +1,5 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/erc7824/nitrolite/sdk/go.svg)](https://pkg.go.dev/github.com/erc7824/nitrolite/sdk/go)
+
 # Clearnode Go SDK
 
 Go SDK for Clearnode payment channels providing both high-level and low-level operations in a unified client:
@@ -67,12 +69,6 @@ client.WaitCh()                         // Connection monitor channel
 client.SignState(state)                 // Sign a state (advanced)
 client.GetUserAddress()                 // Get signer's address
 client.SetHomeBlockchain(asset, chainID) // Set default blockchain for asset
-```
-
-## Installation
-
-```bash
-go get github.com/erc7824/nitrolite/sdk/go
 ```
 
 ## Quick Start

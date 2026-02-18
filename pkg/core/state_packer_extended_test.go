@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPackChallengeState(t *testing.T) {
@@ -43,26 +44,12 @@ func TestPackChallengeState(t *testing.T) {
 
 	packer := NewStatePackerV1(assetStore)
 	packed, err := packer.PackChallengeState(state)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, packed)
-
-	// We expect the output to be slightly different from PackState due to "challenge" suffix
-	// Let's compare with PackState output + suffix logic if possible, or just verify it runs and produces valid hex
-	// Since we can't easily reproduce the exact hash without running the packing logic again (which is what we are testing),
-	// we will verify that PackChallengeState produces a different result than PackState for the same input.
-
 	packedState, err := packer.PackState(state)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.NotEqual(t, packedState, packed, "PackChallengeState should output different bytes than PackState")
-
-	// Verify length or prefix
-	// The output structure is abi.encode(channelID, signingData + "challenge")
-	// The length should be greater than PackState if it wasn't for the fact that abi.encode pads things.
-	// Actually, signingData is bytes, so appending to it increases length.
-	// But packWithChannelID takes bytes and abi encodes them as `bytes` type, which has length prefix.
-	// So the resulting byte array should definitely be different.
-
 	t.Logf("Packed Challenge State: %s", hexutil.Encode(packed))
 }
 
@@ -85,11 +72,6 @@ func TestPackState_Errors(t *testing.T) {
 
 	t.Run("asset_store_error", func(t *testing.T) {
 		t.Parallel()
-		// Do NOT add token to asset store, so GetTokenDecimals returns 0 (which might be fine if mock returns 0 and no error)
-		// Wait, the mock `GetTokenDecimals` in `testing.go` returns (0, nil) if not found?
-		// func (m *mockAssetStore) GetTokenDecimals... { ... return 0, nil }
-		// So it won't error. I need a mock that errors.
-
 		// Let's create a local failing mock
 		failingStore := &failingAssetStore{}
 
@@ -113,22 +95,22 @@ func TestPackState_Errors(t *testing.T) {
 
 type failingAssetStore struct{}
 
-func (f *failingAssetStore) GetAssetDecimals(asset string) (uint8, error) {
+func (f *failingAssetStore) GetAssetDecimals(_ string) (uint8, error) {
 	return 0, errors.New("mock error")
 }
 
-func (f *failingAssetStore) GetTokenDecimals(blockchainID uint64, tokenAddress string) (uint8, error) {
+func (f *failingAssetStore) GetTokenDecimals(_ uint64, _ string) (uint8, error) {
 	return 0, errors.New("mock error")
 }
 
-func (f *failingAssetStore) GetTokenAddress(asset string, blockchainID uint64) (string, error) {
+func (f *failingAssetStore) GetTokenAddress(_ string, _ uint64) (string, error) {
 	return "", errors.New("mock error")
 }
 
-func (f *failingAssetStore) GetSuggestedBlockchainID(asset string) (uint64, error) {
+func (f *failingAssetStore) GetSuggestedBlockchainID(_ string) (uint64, error) {
 	return 0, errors.New("mock error")
 }
 
-func (f *failingAssetStore) AssetExistsOnBlockchain(blockchainID uint64, asset string) (bool, error) {
+func (f *failingAssetStore) AssetExistsOnBlockchain(_ uint64, _ string) (bool, error) {
 	return false, errors.New("mock error")
 }

@@ -111,17 +111,16 @@ func TestValidateChannelSessionKeyAuthSigV1(t *testing.T) {
 	wrongSigner, _ := createSigner(t)
 	wrongSig, err := wrongSigner.Sign(packed)
 	require.NoError(t, err)
-	
+
 	state.UserSig = hexutil.Encode(wrongSig)
-	err = ValidateChannelSessionKeyAuthSigV1(state)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "does not match wallet")
+	err1 := ValidateChannelSessionKeyAuthSigV1(state)
+	require.Error(t, err1)
+	assert.Contains(t, err1.Error(), "does not match wallet")
 
 	// 7. Test Invalid Signature (wrong data)
-	state.UserSig = hexutil.Encode(authSig) // Reset sig
-	state.Version = 2                       // Change data
-	err = ValidateChannelSessionKeyAuthSigV1(state)
-	assert.Error(t, err) // Hash mismatch leads to recover address mismatch
+	state.UserSig = hexutil.Encode(authSig)                    // Reset sig
+	state.Version = 2                                          // Change data
+	assert.Error(t, ValidateChannelSessionKeyAuthSigV1(state)) // Hash mismatch leads to recover address mismatch
 }
 
 func TestGenerateSessionKeyStateIDV1(t *testing.T) {
@@ -130,18 +129,18 @@ func TestGenerateSessionKeyStateIDV1(t *testing.T) {
 	sessionKey := common.HexToAddress("0x2222222222222222222222222222222222222222")
 	version := uint64(1)
 
-	id1, err := GenerateSessionKeyStateIDV1(userAddr.String(), sessionKey.String(), version)
-	require.NoError(t, err)
+	id1, err1 := GenerateSessionKeyStateIDV1(userAddr.String(), sessionKey.String(), version)
+	require.NoError(t, err1)
 	assert.NotEmpty(t, id1)
 
 	// Same inputs -> Same ID
-	id2, err := GenerateSessionKeyStateIDV1(userAddr.String(), sessionKey.String(), version)
-	require.NoError(t, err)
+	id2, err2 := GenerateSessionKeyStateIDV1(userAddr.String(), sessionKey.String(), version)
+	require.NoError(t, err2)
 	assert.Equal(t, id1, id2)
 
 	// Different version -> Different ID
-	id3, err := GenerateSessionKeyStateIDV1(userAddr.String(), sessionKey.String(), version+1)
-	require.NoError(t, err)
+	id3, err3 := GenerateSessionKeyStateIDV1(userAddr.String(), sessionKey.String(), version+1)
+	require.NoError(t, err3)
 	assert.NotEqual(t, id1, id3)
 }
 

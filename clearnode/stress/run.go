@@ -78,7 +78,11 @@ func Run(args []string) int {
 			continue
 		}
 
-		poolSlice := clients[:spec.Connections]
+		conns := spec.Connections
+		if conns > len(clients) {
+			conns = len(clients)
+		}
+		poolSlice := clients[:conns]
 
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
 		results, totalTime := RunTest(ctx, spec.TotalReqs, poolSlice, fn)

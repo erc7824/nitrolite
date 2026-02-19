@@ -68,26 +68,6 @@ SESSION KEY MANAGEMENT
   create-app-session-key <session_key> <expires_hours> [app_ids] [session_ids]  Register app session key (IDs: comma-separated)
   app-session-keys                                                    List active app session keys
 
-STRESS TESTING (runs in background, multiple tests can run simultaneously)
-  stress <method> <total> <connections> [params]  Start a stress test (opens N WebSocket connections)
-  stress-status                                   Show all running/completed stress tests
-  stress-results [id]                             Show full report (all completed, or specific ID)
-  stress-stop <id>                                Stop a running stress test
-
-  Methods:
-    ping                                No extra params
-    get-config                          No extra params
-    get-blockchains                     No extra params
-    get-assets [chain_id]               Optional chain ID filter
-    get-balances [wallet]               Optional wallet (defaults to configured)
-    get-transactions [wallet]           Optional wallet (defaults to configured)
-    get-home-channel [wallet] <asset>   Asset required, wallet optional
-    get-escrow-channel <channel_id>     Channel ID required
-    get-latest-state [wallet] <asset>   Asset required, wallet optional
-    get-channel-key-states [addr]       Optional user address
-    get-app-sessions                    Uses configured wallet
-    get-app-key-states [addr]           Optional user address
-
 OTHER
   exit                          Exit the CLI
 
@@ -102,10 +82,7 @@ EXAMPLES
   chains
   generate-session-key                               # Step 1: generate/import
   create-channel-session-key 0xabcd... 24 usdc,weth  # Step 2: register + activate
-  create-app-session-key 0xabcd... 24 app1,app2
-  stress ping 1000 10                           # 1000 pings over 10 connections
-  stress get-balances 5000 50                  # 5000 balance queries over 50 connections
-  stress get-home-channel 2000 20 usdc         # 2000 queries over 20 connections`)
+  create-app-session-key 0xabcd... 24 app1,app2`)
 }
 
 func (o *Operator) showConfig(ctx context.Context) {

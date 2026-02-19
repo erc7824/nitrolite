@@ -87,6 +87,7 @@ func NewRPCRouter(
 	appSessionV1Group.Handle(rpc.AppSessionsV1GetLastKeyStatesMethod.String(), appSessionV1Handler.GetLastKeyStates)
 
 	channelV1Group := r.Node.NewGroup(rpc.ChannelV1Group.String())
+	channelV1Group.Handle(rpc.ChannelsV1GetChannelsMethod.String(), channelV1Handler.GetChannels)
 	channelV1Group.Handle(rpc.ChannelsV1GetEscrowChannelMethod.String(), channelV1Handler.GetEscrowChannel)
 	channelV1Group.Handle(rpc.ChannelsV1GetHomeChannelMethod.String(), channelV1Handler.GetHomeChannel)
 	channelV1Group.Handle(rpc.ChannelsV1GetLatestStateMethod.String(), channelV1Handler.GetLatestState)

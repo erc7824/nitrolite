@@ -1058,6 +1058,44 @@ export class Client {
   // ============================================================================
 
   /**
+   * GetChannels retrieves all channels for a user with optional filtering.
+   *
+   * @param wallet - The user's wallet address
+   * @param options - Optional filters: status, asset, pagination
+   * @returns Object with channels array and pagination metadata
+   *
+   * @example
+   * ```typescript
+   * const result = await client.getChannels('0x1234...');
+   * for (const ch of result.channels) {
+   *   console.log(`${ch.channelId}: ${ch.status}`);
+   * }
+   * ```
+   */
+  async getChannels(
+    wallet: Address,
+    options?: { status?: string; asset?: string; pagination?: core.PaginationParams }
+  ): Promise<{ channels: core.Channel[]; metadata: core.PaginationMetadata }> {
+    const req: API.ChannelsV1GetChannelsRequest = {
+      wallet,
+      status: options?.status,
+      asset: options?.asset,
+      pagination: options?.pagination
+        ? {
+            offset: options.pagination.offset,
+            limit: options.pagination.limit,
+            sort: options.pagination.sort,
+          }
+        : undefined,
+    };
+    const resp = await this.rpcClient.channelsV1GetChannels(req);
+    return {
+      channels: resp.channels.map(transformChannel),
+      metadata: transformPaginationMetadata(resp.metadata),
+    };
+  }
+
+  /**
    * GetHomeChannel retrieves home channel information for a user's asset.
    *
    * @param wallet - The user's wallet address

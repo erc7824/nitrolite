@@ -56,3 +56,6 @@ networking:
       enabled: true
 
 imagePullSecret: ghcr-pull
+
+stressTest:
+  enabled: true

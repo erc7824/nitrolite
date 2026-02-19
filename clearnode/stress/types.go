@@ -7,7 +7,11 @@ import (
 	sdk "github.com/erc7824/nitrolite/sdk/go"
 )
 
-// MethodFunc is the signature for a single stress test invocation.
+// Runner is the unified signature for executing a stress test.
+// Every method in the registry uses this — pool-based or custom.
+type Runner func(ctx context.Context, cfg *Config, spec TestSpec) (Report, error)
+
+// MethodFunc is the signature for a single stress test request against one client.
 type MethodFunc func(ctx context.Context, client *sdk.Client) error
 
 // Factory parses method-specific args and returns a MethodFunc.

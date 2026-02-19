@@ -10,20 +10,47 @@ import (
 )
 
 // MethodRegistry returns all available stress test methods.
-func MethodRegistry() map[string]Factory {
-	return map[string]Factory{
-		"ping":                   stressPing,
-		"get-config":             stressGetConfig,
-		"get-blockchains":        stressGetBlockchains,
-		"get-assets":             stressGetAssets,
-		"get-balances":           stressGetBalances,
-		"get-transactions":       stressGetTransactions,
-		"get-home-channel":       stressGetHomeChannel,
-		"get-escrow-channel":     stressGetEscrowChannel,
-		"get-latest-state":       stressGetLatestState,
-		"get-channel-key-states": stressGetLastChannelKeyStates,
-		"get-app-sessions":       stressGetAppSessions,
-		"get-app-key-states":     stressGetLastAppKeyStates,
+func MethodRegistry() map[string]Runner {
+	return map[string]Runner{
+		"ping":                   poolRunner(stressPing),
+		"get-config":             poolRunner(stressGetConfig),
+		"get-blockchains":        poolRunner(stressGetBlockchains),
+		"get-assets":             poolRunner(stressGetAssets),
+		"get-balances":           poolRunner(stressGetBalances),
+		"get-transactions":       poolRunner(stressGetTransactions),
+		"get-home-channel":       poolRunner(stressGetHomeChannel),
+		"get-escrow-channel":     poolRunner(stressGetEscrowChannel),
+		"get-latest-state":       poolRunner(stressGetLatestState),
+		"get-channel-key-states": poolRunner(stressGetLastChannelKeyStates),
+		"get-app-sessions":       poolRunner(stressGetAppSessions),
+		"get-app-key-states":     poolRunner(stressGetLastAppKeyStates),
+		"transfer-roundtrip":     RunTransferStress,
+	}
+}
+
+// poolRunner wraps a Factory into a Runner that creates a connection pool,
+// runs the test, and returns the report.
+func poolRunner(factory Factory) Runner {
+	return func(ctx context.Context, cfg *Config, spec TestSpec) (Report, error) {
+		walletAddress, err := cfg.WalletAddress()
+		if err != nil {
+			return Report{}, err
+		}
+
+		fn, err := factory(spec.ExtraArgs, walletAddress)
+		if err != nil {
+			return Report{}, err
+		}
+
+		fmt.Printf("Opening %d WebSocket connections to %s...\n", spec.Connections, cfg.WsURL)
+		clients, err := CreateClientPool(cfg.WsURL, cfg.PrivateKey, spec.Connections)
+		if err != nil {
+			return Report{}, fmt.Errorf("failed to create connection pool: %w", err)
+		}
+		defer CloseClientPool(clients)
+
+		results, totalTime := RunTest(ctx, spec.TotalReqs, clients, fn)
+		return ComputeReport(spec.Method, spec.TotalReqs, len(clients), results, totalTime), nil
 	}
 }
 

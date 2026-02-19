@@ -1,0 +1,64 @@
+{{- if .Values.stressTest.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "clearnode.common.fullname" . }}-stress-test
+  labels:
+    {{- include "clearnode.common.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  {{- with .Values.serviceAccount }}
+  serviceAccountName: {{ . }}
+  {{- end }}
+  restartPolicy: Never
+  containers:
+    - name: stress-test
+      image: {{ include "clearnode.component.image" .Values.image }}
+      args:
+        - clearnode
+        - stress-test
+        {{- range .Values.stressTest.specs }}
+        - {{ . | quote }}
+        {{- end }}
+      env:
+        - name: STRESS_WS_URL
+          value: {{ .Values.stressTest.wsURL | default (printf "ws://%s:%d/ws" (include "clearnode.common.fullname" .) (.Values.service.http.port | int)) }}
+        {{- if .Values.stressTest.privateKey }}
+        - name: STRESS_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "clearnode.common.fullname" . }}-stress-test
+              key: STRESS_PRIVATE_KEY
+        {{- end }}
+        {{- with .Values.stressTest.connections }}
+        - name: STRESS_CONNECTIONS
+          value: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.stressTest.timeout }}
+        - name: STRESS_TIMEOUT
+          value: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.stressTest.maxErrorRate }}
+        - name: STRESS_MAX_ERROR_RATE
+          value: {{ . | quote }}
+        {{- end }}
+  {{- include "clearnode.common.imagePullSecrets" . | nindent 2 }}
+  {{- include "clearnode.common.nodeSelectorLabels" . | nindent 2 }}
+  {{- include "clearnode.common.tolerations" . | nindent 2 }}
+---
+{{- if .Values.stressTest.privateKey }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "clearnode.common.fullname" . }}-stress-test
+  labels:
+    {{- include "clearnode.common.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation
+data:
+  STRESS_PRIVATE_KEY: {{ .Values.stressTest.privateKey | b64enc }}
+{{- end }}
+{{- end }}

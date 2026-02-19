@@ -128,6 +128,8 @@ func printUsage() {
 	fmt.Println("  clearnode stress-test get-balances:2000:20:0xWALLET")
 	fmt.Println("  clearnode stress-test transfer-roundtrip:10:100:usdc")
 	fmt.Println("  clearnode stress-test transfer-roundtrip:10:100:usdc:0.0001")
+	fmt.Println("  clearnode stress-test app-session-lifecycle:10:5:3:usdc")
+	fmt.Println("  clearnode stress-test app-session-lifecycle:10:5:3:usdc:0.000005")
 }
 
 func sortedMethodNames() []string {

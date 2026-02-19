@@ -25,6 +25,7 @@ func MethodRegistry() map[string]Runner {
 		"get-app-sessions":       poolRunner(stressGetAppSessions),
 		"get-app-key-states":     poolRunner(stressGetLastAppKeyStates),
 		"transfer-roundtrip":     RunTransferStress,
+		"app-session-lifecycle":  RunAppSessionLifecycleStress,
 	}
 }
 

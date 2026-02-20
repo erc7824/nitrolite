@@ -16,6 +16,7 @@ import (
 // ========= hexToBytes32 Tests =========
 
 func TestHexToBytes32_Success(t *testing.T) {
+	t.Parallel()
 	// Create a valid 32-byte hex string
 	expected := [32]byte{}
 	for i := 0; i < 32; i++ {
@@ -29,6 +30,7 @@ func TestHexToBytes32_Success(t *testing.T) {
 }
 
 func TestHexToBytes32_InvalidHex(t *testing.T) {
+	t.Parallel()
 	invalidHex := "zzzzz"
 	_, err := hexToBytes32(invalidHex)
 	require.Error(t, err)
@@ -36,6 +38,7 @@ func TestHexToBytes32_InvalidHex(t *testing.T) {
 }
 
 func TestHexToBytes32_InvalidLength(t *testing.T) {
+	t.Parallel()
 	// 16 bytes instead of 32
 	shortHex := hexutil.Encode(make([]byte, 16))
 	_, err := hexToBytes32(shortHex)
@@ -52,6 +55,7 @@ func TestHexToBytes32_InvalidLength(t *testing.T) {
 // ========= coreDefToContractDef Tests =========
 
 func TestCoreDefToContractDef_Success(t *testing.T) {
+	t.Parallel()
 	asset := "ETH"
 	userWallet := "0x1234567890123456789012345678901234567890"
 	nodeAddress := common.HexToAddress("0x9876543210987654321098765432109876543210")
@@ -80,6 +84,7 @@ func TestCoreDefToContractDef_Success(t *testing.T) {
 }
 
 func TestCoreDefToContractDef_EmptyValidators(t *testing.T) {
+	t.Parallel()
 	asset := "ETH"
 	userWallet := "0x1234567890123456789012345678901234567890"
 	nodeAddress := common.HexToAddress("0x9876543210987654321098765432109876543210")
@@ -98,6 +103,7 @@ func TestCoreDefToContractDef_EmptyValidators(t *testing.T) {
 // ========= coreLedgerToContractLedger Tests =========
 
 func TestCoreLedgerToContractLedger_Success(t *testing.T) {
+	t.Parallel()
 	tokenAddr := "0x1234567890123456789012345678901234567890"
 	coreLedger := core.Ledger{
 		BlockchainID: 1,
@@ -132,6 +138,7 @@ func TestCoreLedgerToContractLedger_Success(t *testing.T) {
 // ========= contractLedgerToCoreLedger Tests =========
 
 func TestContractLedgerToCoreLedger_Success(t *testing.T) {
+	t.Parallel()
 	tokenAddr := common.HexToAddress("0x1234567890123456789012345678901234567890")
 	decimals := uint8(18)
 
@@ -166,6 +173,7 @@ func TestContractLedgerToCoreLedger_Success(t *testing.T) {
 // ========= coreStateToContractState Tests =========
 
 func TestCoreStateToContractState_BasicState(t *testing.T) {
+	t.Parallel()
 	homeChannelID := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 	userSigHex := "0x1234567890abcdef"
 	nodeSigHex := "0xfedcba0987654321"
@@ -209,6 +217,7 @@ func TestCoreStateToContractState_BasicState(t *testing.T) {
 }
 
 func TestCoreStateToContractState_WithEscrowLedger(t *testing.T) {
+	t.Parallel()
 	homeChannelID := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 	escrowChannelID := "fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321"
 
@@ -257,6 +266,7 @@ func TestCoreStateToContractState_WithoutEscrowLedger(t *testing.T) {
 	// This test ensures that when there's no escrow ledger,
 	// the NonHomeState is initialized with proper empty values
 	// to prevent ABI encoding panics
+	t.Parallel()
 	homeChannelID := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 
 	coreState := core.State{
@@ -298,6 +308,7 @@ func TestCoreStateToContractState_WithoutEscrowLedger(t *testing.T) {
 }
 
 func TestCoreStateToContractState_InvalidUserSig(t *testing.T) {
+	t.Parallel()
 	homeChannelID := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 	invalidSigHex := "zzzzz"
 
@@ -328,6 +339,7 @@ func TestCoreStateToContractState_InvalidUserSig(t *testing.T) {
 // ========= contractStateToCoreState Tests =========
 
 func TestContractStateToCoreState_HomeOnly(t *testing.T) {
+	t.Parallel()
 	homeChannelID := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 
 	userAllocation, _ := new(big.Int).SetString("100000000000000000000", 10)
@@ -372,6 +384,7 @@ func TestContractStateToCoreState_HomeOnly(t *testing.T) {
 }
 
 func TestContractStateToCoreState_WithEscrow(t *testing.T) {
+	t.Parallel()
 	homeChannelID := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 	escrowChannelID := "fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321"
 
@@ -416,6 +429,7 @@ func TestContractStateToCoreState_WithEscrow(t *testing.T) {
 }
 
 func TestContractStateToCoreState_EmptyChannelID(t *testing.T) {
+	t.Parallel()
 	userAllocation, _ := new(big.Int).SetString("100000000000000000000", 10)
 	nodeAllocation, _ := new(big.Int).SetString("50000000000000000000", 10)
 
@@ -439,6 +453,7 @@ func TestContractStateToCoreState_EmptyChannelID(t *testing.T) {
 }
 
 func TestContractStateToCoreState_EmptySignatures(t *testing.T) {
+	t.Parallel()
 	homeChannelID := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 
 	userAllocation, _ := new(big.Int).SetString("100000000000000000000", 10)
@@ -469,6 +484,7 @@ func TestContractStateToCoreState_EmptySignatures(t *testing.T) {
 // ========= Round-trip Tests =========
 
 func TestLedgerConversion_RoundTrip(t *testing.T) {
+	t.Parallel()
 	original := core.Ledger{
 		BlockchainID: 1,
 		TokenAddress: "0x1234567890123456789012345678901234567890",

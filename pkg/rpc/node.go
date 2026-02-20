@@ -319,7 +319,11 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 			wn.cfg.Logger.Error("failed to marshal response", "error", err, "method", req.Method)
 			continue
 		}
-		conn.WriteRawResponse(responseBytes)
+
+		if !conn.WriteRawResponse(responseBytes) {
+			wn.cfg.Logger.Warn("write queue timeout", "connectionID", conn.ConnectionID(), "method", req.Method)
+			return // stop processing this conn; it's closing anyway
+		}
 	}
 }
 

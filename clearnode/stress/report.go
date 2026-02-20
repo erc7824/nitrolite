@@ -24,8 +24,8 @@ func ComputeReport(method string, totalReqs, connections int, results []Result, 
 			report.ErrorBreakdown[r.Err.Error()]++
 		} else {
 			report.Successful++
+			durations = append(durations, r.Duration)
 		}
-		durations = append(durations, r.Duration)
 	}
 
 	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
@@ -42,10 +42,9 @@ func ComputeReport(method string, totalReqs, connections int, results []Result, 
 		report.MedianLatency = durationPercentile(durations, 50)
 		report.P95Latency = durationPercentile(durations, 95)
 		report.P99Latency = durationPercentile(durations, 99)
-	}
-
-	if totalTime.Seconds() > 0 {
-		report.RequestsPerSec = float64(totalReqs) / totalTime.Seconds()
+		// Uses only successful request latencies so that timeouts and
+		// straggler failures don't deflate the measured server throughput.
+		report.RequestsPerSec = float64(connections) / report.AvgLatency.Seconds()
 	}
 
 	return report

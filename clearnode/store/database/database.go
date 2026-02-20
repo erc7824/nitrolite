@@ -71,9 +71,6 @@ func connectToPostgresql(cnf DatabaseConfig, embedMigrations embed.FS) (*gorm.DB
 		NamingStrategy: schema.NamingStrategy{
 			TablePrefix: cnf.Schema + ".", // schema name
 		},
-		// Skip GORM's implicit transaction wrapping for single Create/Update/Delete.
-		// We use explicit ExecuteInTransaction for all write operations.
-		SkipDefaultTransaction: true,
 		// Don't prepare statements, as it can cause issues with some Postgresql proxies like pgbouncer in transaction pooling mode.
 		PrepareStmt: false,
 		// Reduce log noise in production.

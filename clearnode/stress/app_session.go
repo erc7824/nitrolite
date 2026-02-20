@@ -349,8 +349,8 @@ func RunAppSessionLifecycleStress(ctx context.Context, cfg *Config, spec TestSpe
 			rs := allSigs[pipeIdx]
 			step := int64(totalOps)/20 + 1
 
-			record := func(idx int, start time.Time, err error) {
-				results[base+idx] = Result{Duration: time.Since(start), Err: err}
+			record := func(idx int, reqStart time.Time, err error) {
+				results[base+idx] = Result{Duration: time.Since(reqStart), Err: err}
 				c := atomic.AddInt64(&completed, 1)
 				if c%step == 0 || c == int64(totalOps) {
 					fmt.Printf("\r    Progress: %d/%d (%.0f%%)  ", c, totalOps, float64(c)/float64(totalOps)*100)

@@ -8,6 +8,7 @@ metadata:
   annotations:
     "helm.sh/hook": test
     "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "0"
 spec:
   {{- with .Values.serviceAccount }}
   serviceAccountName: {{ . }}
@@ -58,6 +59,7 @@ metadata:
   annotations:
     "helm.sh/hook": test
     "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "-1"
 data:
   STRESS_PRIVATE_KEY: {{ .Values.stressTest.privateKey | b64enc }}
 {{- end }}

@@ -42,8 +42,7 @@ func RunTest(ctx context.Context, totalReqs int, clients []*sdk.Client, fn Metho
 
 				reqStart := time.Now()
 				err := fn(ctx, client)
-				d := time.Since(reqStart)
-				results[idx] = Result{Duration: d, Err: err}
+				results[idx] = Result{Duration: time.Since(reqStart), Err: err}
 
 				c := atomic.AddInt64(&completed, 1)
 				step := int64(totalReqs)/20 + 1

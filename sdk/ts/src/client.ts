@@ -1084,7 +1084,6 @@ export class Client {
         ? {
             offset: options.pagination.offset,
             limit: options.pagination.limit,
-            sort: options.pagination.sort,
           }
         : undefined,
     };

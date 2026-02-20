@@ -216,7 +216,6 @@ export interface BalanceEntry {
 export interface PaginationParams {
   offset?: number; // uint32
   limit?: number; // uint32
-  sort?: string;
 }
 
 export interface PaginationMetadata {

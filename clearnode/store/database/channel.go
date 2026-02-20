@@ -123,7 +123,10 @@ func (s *DBStore) GetUserChannels(wallet string, status *string, asset *string, 
 	query := s.db.Model(&Channel{}).Where("user_wallet = ?", strings.ToLower(wallet))
 
 	if status != nil && *status != "" {
-		statusEnum := channelStatusFromString(*status)
+		statusEnum, err := channelStatusFromString(*status)
+		if err != nil {
+			return nil, 0, fmt.Errorf("invalid status filter: %w", err)
+		}
 		query = query.Where("status = ?", statusEnum)
 	}
 
@@ -134,10 +137,6 @@ func (s *DBStore) GetUserChannels(wallet string, status *string, asset *string, 
 	var totalCount int64
 	if err := query.Count(&totalCount).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to count user channels: %w", err)
-	}
-
-	if limit == 0 {
-		limit = 100
 	}
 
 	var dbChannels []Channel
@@ -153,18 +152,18 @@ func (s *DBStore) GetUserChannels(wallet string, status *string, asset *string, 
 	return channels, uint32(totalCount), nil
 }
 
-func channelStatusFromString(s string) core.ChannelStatus {
+func channelStatusFromString(s string) (core.ChannelStatus, error) {
 	switch strings.ToLower(s) {
 	case "void":
-		return core.ChannelStatusVoid
+		return core.ChannelStatusVoid, nil
 	case "open":
-		return core.ChannelStatusOpen
+		return core.ChannelStatusOpen, nil
 	case "challenged":
-		return core.ChannelStatusChallenged
+		return core.ChannelStatusChallenged, nil
 	case "closed":
-		return core.ChannelStatusClosed
+		return core.ChannelStatusClosed, nil
 	default:
-		return core.ChannelStatusVoid
+		return 0, fmt.Errorf("unknown channel status: %q", s)
 	}
 }
 

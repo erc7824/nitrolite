@@ -18,6 +18,8 @@ func (h *Handler) GetChannels(c *rpc.Context) {
 		return
 	}
 
+	const defaultLimit uint32 = 100
+
 	var limit, offset uint32
 	if req.Pagination != nil {
 		if req.Pagination.Limit != nil {
@@ -26,6 +28,9 @@ func (h *Handler) GetChannels(c *rpc.Context) {
 		if req.Pagination.Offset != nil {
 			offset = *req.Pagination.Offset
 		}
+	}
+	if limit == 0 {
+		limit = defaultLimit
 	}
 
 	var channels []core.Channel
@@ -50,17 +55,10 @@ func (h *Handler) GetChannels(c *rpc.Context) {
 		rpcChannels[i] = coreChannelToRPC(ch)
 	}
 
-	if limit == 0 {
-		limit = 100
-	}
-
-	pageCount := uint32(0)
-	if limit > 0 {
-		pageCount = (totalCount + limit - 1) / limit
-	}
+	pageCount := (totalCount + limit - 1) / limit
 
 	page := uint32(1)
-	if limit > 0 && offset > 0 {
+	if offset > 0 {
 		page = (offset / limit) + 1
 	}
 

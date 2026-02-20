@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -433,6 +434,73 @@ func TestClient_GetLastAppKeyStates(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, states, 1)
 	assert.Equal(t, "0xkey", states[0].SessionKey)
+}
+
+// TestDoCloseConcurrent verifies that calling doClose from multiple goroutines
+// simultaneously does not panic. Before the sync.Once fix, the select+close
+// pattern on exitCh could race: two goroutines could both see the channel as
+// open and both call close(), causing a "close of closed channel" panic.
+func TestDoCloseConcurrent(t *testing.T) {
+	t.Parallel()
+	client := &Client{
+		exitCh: make(chan struct{}),
+	}
+
+	const goroutines = 100
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			client.doClose()
+		}()
+	}
+
+	wg.Wait()
+
+	select {
+	case <-client.exitCh:
+		// ok
+	default:
+		t.Fatal("exitCh should be closed after doClose")
+	}
+}
+
+// TestCloseAndDoCloseConcurrent simulates the real race: Close() called by
+// the application while doClose() is called by the error handler
+func TestCloseAndDoCloseConcurrent(t *testing.T) {
+	t.Parallel()
+	client := &Client{
+		exitCh: make(chan struct{}),
+	}
+
+	const goroutines = 50
+	var wg sync.WaitGroup
+	wg.Add(goroutines * 2)
+
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			_ = client.Close()
+		}()
+	}
+
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			client.doClose()
+		}()
+	}
+
+	wg.Wait()
+
+	select {
+	case <-client.exitCh:
+		// ok
+	default:
+		t.Fatal("exitCh should be closed")
+	}
 }
 
 func TestClient_SignSessionKeyState(t *testing.T) {

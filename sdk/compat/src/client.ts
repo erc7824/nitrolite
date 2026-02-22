@@ -179,7 +179,7 @@ export class NitroliteClient {
     }
 
     private async ensureAssets(): Promise<void> {
-        if (this.assetsBySymbol.size === 0) await this.refreshAssets();
+        if (this.assetsByToken.size === 0) await this.refreshAssets();
     }
 
     private async getDecimalsForAsset(assetSymbol: string): Promise<number> {
@@ -211,6 +211,9 @@ export class NitroliteClient {
         await this.ensureAssets();
         const key = tokenAddress.toString().toLowerCase();
         const info = this.assetsByToken.get(key);
+        if (!info) {
+            console.warn(`[compat] Unknown token ${tokenAddress}, falling back to 6 decimals`);
+        }
         return info?.decimals ?? 6;
     }
 
@@ -224,17 +227,11 @@ export class NitroliteClient {
         return parseUnits(humanAmount, decimals);
     }
 
-    async resolveAssetDisplay(tokenAddress: Address | string, chainId?: number): Promise<{ symbol: string; decimals: number } | null> {
+    async resolveAssetDisplay(tokenAddress: Address | string, _chainId?: number): Promise<{ symbol: string; decimals: number } | null> {
         await this.ensureAssets();
         const key = tokenAddress.toString().toLowerCase();
         const info = this.assetsByToken.get(key);
         if (!info) return null;
-        if (chainId !== undefined && Number(info.chainId) !== chainId) {
-            const alt = Array.from(this.assetsByToken.values()).find(
-                (a) => a.tokenAddress === key && Number(a.chainId) === chainId,
-            );
-            return alt ? { symbol: alt.symbol, decimals: alt.decimals } : { symbol: info.symbol, decimals: info.decimals };
-        }
         return { symbol: info.symbol, decimals: info.decimals };
     }
 
@@ -266,7 +263,7 @@ export class NitroliteClient {
     static classifyError(error: unknown): Error {
         const msg = error instanceof Error ? error.message : String(error);
         const lower = msg.toLowerCase();
-        if (lower.includes('allowance') && lower.includes('sufficient')) return new AllowanceError(msg);
+        if (lower.includes('allowance') && lower.includes('insufficient')) return new AllowanceError(msg);
         if (lower.includes('user rejected') || lower.includes('user denied')) return new UserRejectedError(msg);
         if (lower.includes('insufficient funds') || lower.includes('exceeds balance')) return new InsufficientFundsError(msg);
         if (lower.includes('not initialized') || lower.includes('not connected')) return new NotInitializedError(msg);
@@ -688,6 +685,7 @@ export class NitroliteClient {
     // Transfer
     // -----------------------------------------------------------------------
 
+    /** Transfers are executed sequentially per allocation and are not atomic; a mid-loop failure leaves prior transfers committed. */
     async transfer(destination: Address, allocations: TransferAllocation[]): Promise<void> {
         for (const alloc of allocations) {
             const decimals = await this.getDecimalsForAsset(alloc.asset);

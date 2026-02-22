@@ -59,11 +59,13 @@ func (h *Handler) GetChannels(c *rpc.Context) {
 		rpcChannels[i] = coreChannelToRPC(ch)
 	}
 
-	pageCount := uint32((uint64(totalCount) + uint64(limit) - 1) / uint64(limit))
-
-	page := uint32(1)
-	if offset > 0 {
-		page = (offset / limit) + 1
+	var pageCount, page uint32
+	if totalCount > 0 {
+		pageCount = uint32((uint64(totalCount) + uint64(limit) - 1) / uint64(limit))
+		page = 1
+		if offset > 0 {
+			page = (offset / limit) + 1
+		}
 	}
 
 	response := rpc.ChannelsV1GetChannelsResponse{

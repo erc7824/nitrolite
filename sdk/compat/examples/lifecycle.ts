@@ -23,7 +23,11 @@ import { privateKeyToAccount } from 'viem/accounts';
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
 const WS_URL = process.env.CLEARNODE_WS_URL || 'ws://localhost:7824/ws';
-const CHAIN_ID = Number(process.env.CHAIN_ID || '11155111');
+const CHAIN_ID = parseInt(process.env.CHAIN_ID || '11155111', 10);
+if (Number.isNaN(CHAIN_ID)) {
+    console.error('CHAIN_ID must be a valid integer');
+    process.exit(1);
+}
 
 if (!PRIVATE_KEY) {
     console.error('Set PRIVATE_KEY env var (e.g. export PRIVATE_KEY=0x...)');
@@ -120,7 +124,7 @@ async function main() {
 
     try {
         const info = await client.getAccountInfo();
-        ok('getAccountInfo()', `available=${info.available}, channels=${info.channelCount}`);
+        ok('getAccountInfo()', `${info.balances.length} balance(s), channels=${info.channelCount}`);
     } catch (e: any) { fail('getAccountInfo()', e); }
 
     // ================================================================
@@ -163,13 +167,13 @@ async function main() {
         const assets = await client.getAssetsList();
         if (assets.length > 0) {
             const token = assets[0];
-            const resolved = client.resolveToken(token.token);
+            const resolved = await client.resolveToken(token.token);
             ok('resolveToken()', `${token.token.slice(0, 10)}... -> ${resolved.symbol}`);
 
-            const bySymbol = client.resolveAsset(resolved.symbol);
+            const bySymbol = await client.resolveAsset(resolved.symbol);
             ok('resolveAsset()', `${resolved.symbol} -> decimals=${bySymbol.decimals}`);
 
-            const decimals = client.getTokenDecimals(token.token);
+            const decimals = await client.getTokenDecimals(token.token);
             ok('getTokenDecimals()', `${decimals}`);
 
             const formatted = await client.formatAmount(token.token, 1000000n);

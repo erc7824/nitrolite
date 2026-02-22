@@ -1,0 +1,668 @@
+import {
+    Client,
+    ChannelDefaultSigner,
+    type StateSigner,
+    type TransactionSigner,
+} from '@erc7824/nitrolite';
+import type {
+    AppDefinitionV1,
+    AppParticipantV1,
+    AppAllocationV1,
+} from '@erc7824/nitrolite';
+import Decimal from 'decimal.js';
+import { Address, Hex, WalletClient, formatUnits, parseUnits } from 'viem';
+
+import type {
+    RPCBalance,
+    RPCChannelUpdate,
+    RPCAsset,
+    RPCAppDefinition,
+    RPCAppSessionAllocation,
+    TransferAllocation,
+    ContractAddresses,
+    AccountInfo,
+    LedgerChannel,
+    LedgerBalance,
+    LedgerEntry,
+    AppSession,
+    ClearNodeAsset,
+    SubmitAppStateRequestParams,
+    SubmitAppStateRequestParamsV04,
+    GetAppDefinitionResponseParams,
+    CreateAppSessionRequestParams,
+} from './types';
+import { RPCAppStateIntent } from './types';
+
+import { buildClientOptions, type CompatClientConfig } from './config';
+import { AllowanceError, InsufficientFundsError, NotInitializedError, UserRejectedError } from './errors';
+
+// ---------------------------------------------------------------------------
+// WalletClient-based signers for browser (MetaMask) environments
+// ---------------------------------------------------------------------------
+
+class WalletMsgSigner implements StateSigner {
+    constructor(private walletClient: WalletClient) {}
+
+    getAddress(): Address {
+        if (!this.walletClient.account?.address) throw new Error('Wallet has no account');
+        return this.walletClient.account.address;
+    }
+
+    async signMessage(hash: Hex): Promise<Hex> {
+        if (!this.walletClient.account) throw new Error('Wallet has no account');
+        return this.walletClient.signMessage({
+            account: this.walletClient.account,
+            message: { raw: hash },
+        });
+    }
+}
+
+class WalletTxSigner implements TransactionSigner {
+    constructor(private walletClient: WalletClient) {}
+
+    getAddress(): Address {
+        if (!this.walletClient.account?.address) throw new Error('Wallet has no account');
+        return this.walletClient.account.address;
+    }
+
+    async sendTransaction(_tx: any): Promise<Hex> {
+        throw new Error('Use the blockchain client for transactions');
+    }
+
+    async signMessage(message: { raw: Hex }): Promise<Hex> {
+        if (!this.walletClient.account) throw new Error('Wallet has no account');
+        return this.walletClient.signTypedData({
+            account: this.walletClient.account,
+            domain: { name: 'Nitrolite', version: '1', chainId: 1 },
+            types: { Message: [{ name: 'data', type: 'bytes32' }] },
+            primaryType: 'Message',
+            message: { data: message.raw },
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Asset resolution helper
+// ---------------------------------------------------------------------------
+
+interface AssetInfo {
+    symbol: string;
+    chainId: bigint;
+    decimals: number;
+    tokenAddress: string;
+}
+
+// ---------------------------------------------------------------------------
+// NitroliteClient compat facade
+// ---------------------------------------------------------------------------
+
+export interface NitroliteClientConfig {
+    wsURL: string;
+    walletClient: WalletClient;
+    chainId: number;
+    blockchainRPCs?: Record<number, string>;
+    /** @deprecated v0.5.3 compat -- ignored, addresses come from get_config */
+    addresses?: ContractAddresses;
+    /** @deprecated v0.5.3 compat -- ignored */
+    challengeDuration?: bigint;
+}
+
+export class NitroliteClient {
+    /** The underlying v1.0.0 SDK Client -- use for any functionality not wrapped by compat. */
+    readonly innerClient: Client;
+    readonly userAddress: Address;
+
+    private assetsByToken = new Map<string, AssetInfo>(); // lowercase tokenAddr -> info
+    private assetsBySymbol = new Map<string, AssetInfo>(); // lowercase symbol -> info
+    private _chainId: bigint;
+    private _lastChannels: LedgerChannel[] = [];
+
+    private constructor(client: Client, userAddress: Address, chainId: number) {
+        this.innerClient = client;
+        this.userAddress = userAddress;
+        this._chainId = BigInt(chainId);
+    }
+
+    // -----------------------------------------------------------------------
+    // Factory
+    // -----------------------------------------------------------------------
+
+    static async create(config: NitroliteClientConfig): Promise<NitroliteClient> {
+        const stateSigner = new ChannelDefaultSigner(new WalletMsgSigner(config.walletClient));
+        const txSigner = new WalletTxSigner(config.walletClient);
+
+        const opts = buildClientOptions({
+            wsURL: config.wsURL,
+            blockchainRPCs: config.blockchainRPCs,
+        });
+
+        const v1Client = await Client.create(config.wsURL, stateSigner, txSigner, ...opts);
+
+        const address = config.walletClient.account?.address;
+        if (!address) throw new Error('WalletClient must have an account');
+
+        const compat = new NitroliteClient(v1Client, address, config.chainId);
+
+        try {
+            await compat.refreshAssets();
+        } catch {
+            console.warn('[compat] Could not pre-load asset map; will retry on demand');
+        }
+
+        return compat;
+    }
+
+    // -----------------------------------------------------------------------
+    // Asset mapping
+    // -----------------------------------------------------------------------
+
+    async refreshAssets(): Promise<void> {
+        const assets = await this.innerClient.getAssets();
+        this.assetsByToken.clear();
+        this.assetsBySymbol.clear();
+
+        for (const asset of assets) {
+            for (const token of asset.tokens) {
+                const info: AssetInfo = {
+                    symbol: asset.symbol,
+                    chainId: token.blockchainId,
+                    decimals: asset.decimals,
+                    tokenAddress: token.address.toLowerCase(),
+                };
+                this.assetsByToken.set(info.tokenAddress, info);
+                if (token.blockchainId === this._chainId) {
+                    this.assetsBySymbol.set(asset.symbol.toLowerCase(), info);
+                }
+            }
+        }
+    }
+
+    resolveToken(tokenAddress: Address | string): AssetInfo {
+        const key = tokenAddress.toString().toLowerCase();
+        const info = this.assetsByToken.get(key);
+        if (!info) throw new Error(`Unknown token address: ${tokenAddress}`);
+        return info;
+    }
+
+    resolveAsset(symbol: string): AssetInfo {
+        const info = this.assetsBySymbol.get(symbol.toLowerCase());
+        if (!info) throw new Error(`Unknown asset: ${symbol}`);
+        return info;
+    }
+
+    // -----------------------------------------------------------------------
+    // Convenience helpers (reduce consumer-side boilerplate)
+    // -----------------------------------------------------------------------
+
+    getTokenDecimals(tokenAddress: Address | string): number {
+        const key = tokenAddress.toString().toLowerCase();
+        const info = this.assetsByToken.get(key);
+        return info?.decimals ?? 6;
+    }
+
+    formatAmount(tokenAddress: Address | string, rawAmount: bigint): string {
+        const decimals = this.getTokenDecimals(tokenAddress);
+        return formatUnits(rawAmount, decimals);
+    }
+
+    parseAmount(tokenAddress: Address | string, humanAmount: string): bigint {
+        const decimals = this.getTokenDecimals(tokenAddress);
+        return parseUnits(humanAmount, decimals);
+    }
+
+    resolveAssetDisplay(tokenAddress: Address | string, chainId?: number): { symbol: string; decimals: number } | null {
+        const key = tokenAddress.toString().toLowerCase();
+        const info = this.assetsByToken.get(key);
+        if (!info) return null;
+        if (chainId !== undefined && Number(info.chainId) !== chainId) {
+            const alt = Array.from(this.assetsByToken.values()).find(
+                (a) => a.tokenAddress === key && Number(a.chainId) === chainId,
+            );
+            return alt ? { symbol: alt.symbol, decimals: alt.decimals } : { symbol: info.symbol, decimals: info.decimals };
+        }
+        return { symbol: info.symbol, decimals: info.decimals };
+    }
+
+    findOpenChannel(tokenAddress: Address | string, chainId?: number): LedgerChannel | null {
+        const normalizedToken = tokenAddress.toString().toLowerCase();
+        return this._lastChannels.find((ch) => {
+            const statusMatch = ch.status === 'open' || ch.status === 'resizing';
+            const tokenMatch = ch.token.toLowerCase() === normalizedToken;
+            const chainMatch = chainId === undefined || ch.chain_id === chainId;
+            return statusMatch && tokenMatch && chainMatch;
+        }) ?? null;
+    }
+
+    async getAccountInfo(): Promise<AccountInfo> {
+        const balances = await this.getBalances();
+        const total = balances.reduce((sum, b) => sum + BigInt(b.amount || '0'), 0n);
+        return {
+            available: total,
+            channelCount: BigInt(this._lastChannels.length),
+        };
+    }
+
+    // -----------------------------------------------------------------------
+    // On-chain operations (v0.5.3 compat surface)
+    // -----------------------------------------------------------------------
+
+    private static readonly MAX_UINT256 = 2n ** 256n - 1n;
+
+    /** Classify raw SDK/wallet errors into typed compat errors. */
+    static classifyError(error: unknown): Error {
+        const msg = error instanceof Error ? error.message : String(error);
+        const lower = msg.toLowerCase();
+        if (lower.includes('allowance') && lower.includes('sufficient')) return new AllowanceError(msg);
+        if (lower.includes('user rejected') || lower.includes('user denied')) return new UserRejectedError(msg);
+        if (lower.includes('insufficient funds') || lower.includes('exceeds balance')) return new InsufficientFundsError(msg);
+        if (lower.includes('not initialized') || lower.includes('not connected')) return new NotInitializedError(msg);
+        return error instanceof Error ? error : new Error(msg);
+    }
+
+    private async checkpointWithApproval(symbol: string, chainId: bigint, tokenAddress: string): Promise<any> {
+        try {
+            return await this.innerClient.checkpoint(symbol);
+        } catch (err) {
+            if (!(err instanceof AllowanceError) && !(NitroliteClient.classifyError(err) instanceof AllowanceError)) throw NitroliteClient.classifyError(err);
+            console.log('[compat] Allowance insufficient, requesting token approval…');
+            await this.innerClient.approveToken(chainId, tokenAddress, NitroliteClient.MAX_UINT256);
+            return await this.innerClient.checkpoint(symbol);
+        }
+    }
+
+    private toHumanAmount(rawAmount: bigint, decimals: number): Decimal {
+        return new Decimal(rawAmount.toString()).div(new Decimal(10).pow(decimals));
+    }
+
+    async deposit(tokenAddress: Address, amount: bigint): Promise<any> {
+        const { symbol, chainId, decimals, tokenAddress: resolvedAddr } = this.resolveToken(tokenAddress);
+        await this.innerClient.setHomeBlockchain(symbol, chainId).catch(() => {});
+        const humanAmount = this.toHumanAmount(amount, decimals);
+        await this.innerClient.deposit(chainId, symbol, humanAmount);
+        return await this.checkpointWithApproval(symbol, chainId, resolvedAddr);
+    }
+
+    async depositAndCreateChannel(tokenAddress: Address, amount: bigint, _respParams?: any): Promise<any> {
+        return this.deposit(tokenAddress, amount);
+    }
+
+    async createChannel(_respParams?: any): Promise<any> {
+        console.warn('[compat] createChannel is implicit in v1.0.0 -- use deposit() instead');
+    }
+
+    async closeChannel(params?: { tokenAddress?: Address | string } | any): Promise<any> {
+        const tokenAddr = params?.tokenAddress?.toString().toLowerCase();
+
+        if (tokenAddr) {
+            const info = this.assetsByToken.get(tokenAddr);
+            if (!info) throw new Error(`Unknown token address for close: ${params.tokenAddress}`);
+
+            await this.innerClient.closeHomeChannel(info.symbol);
+            await this.checkpointWithApproval(info.symbol, info.chainId, info.tokenAddress);
+            return;
+        }
+
+        const assets = await this.innerClient.getAssets();
+
+        for (const asset of assets) {
+            try {
+                await this.innerClient.closeHomeChannel(asset.symbol);
+                const token = asset.tokens.find((t) => t.blockchainId === this._chainId);
+
+                if (token) {
+                    await this.checkpointWithApproval(asset.symbol, this._chainId, token.address);
+                } else {
+                    await this.innerClient.checkpoint(asset.symbol);
+                }
+            } catch {
+                // asset may not have a channel
+            }
+        }
+    }
+
+    async resizeChannel(params: { allocate_amount: bigint; token: Address }): Promise<any> {
+        return this.deposit(params.token, params.allocate_amount);
+    }
+
+    async challengeChannel(params: { state: any }): Promise<any> {
+        return this.innerClient.challenge(params.state);
+    }
+
+    async withdrawal(tokenAddress: Address, amount: bigint): Promise<any> {
+        const { symbol, chainId, decimals, tokenAddress: resolvedAddr } = this.resolveToken(tokenAddress);
+        await this.innerClient.setHomeBlockchain(symbol, chainId).catch(() => {});
+        const humanAmount = this.toHumanAmount(amount, decimals);
+        await this.innerClient.withdraw(chainId, symbol, humanAmount);
+        return await this.checkpointWithApproval(symbol, chainId, resolvedAddr);
+    }
+
+    async getChannelData(_channelId: string): Promise<any> {
+        const assets = await this.innerClient.getAssets();
+        for (const asset of assets) {
+            try {
+                const ch = await this.innerClient.getHomeChannel(this.userAddress, asset.symbol);
+                if (ch.channelId === _channelId) {
+                    return {
+                        channel: ch,
+                        state: await this.innerClient.getLatestState(this.userAddress, asset.symbol, false),
+                    };
+                }
+            } catch {
+                // no channel for this asset
+            }
+        }
+        throw new Error(`Channel ${_channelId} not found`);
+    }
+
+    // -----------------------------------------------------------------------
+    // Off-chain queries (for hooks to call directly)
+    // -----------------------------------------------------------------------
+
+    private static readonly STATUS_MAP: Record<number, string> = {
+        0: 'void',
+        1: 'open',
+        2: 'challenged',
+        3: 'closed',
+    };
+
+    async getChannels(): Promise<LedgerChannel[]> {
+        try {
+            this._lastChannels = await this.getChannelsViaRPC();
+        } catch {
+            this._lastChannels = await this.getChannelsViaAssetScan();
+        }
+        return this._lastChannels;
+    }
+
+    private async getChannelsViaRPC(): Promise<LedgerChannel[]> {
+        const { channels: sdkChannels } = await this.innerClient.getChannels(this.userAddress);
+        const result: LedgerChannel[] = [];
+
+        for (const ch of sdkChannels) {
+            let userBalance = 0n;
+
+            if (ch.status === 1) {
+                try {
+                    const state = await this.innerClient.getLatestState(this.userAddress, ch.asset, false);
+                    const raw = state.homeLedger?.userBalance;
+
+                    if (raw) {
+                        const info = this.assetsBySymbol.get(ch.asset.toLowerCase());
+                        const dec = info?.decimals ?? 6;
+                        userBalance = BigInt(raw.mul(new Decimal(10).pow(dec)).toFixed(0));
+                    }
+                } catch {
+                    // state not available yet
+                }
+            }
+
+            result.push({
+                channel_id: ch.channelId,
+                participant: ch.userWallet ?? this.userAddress,
+                status: NitroliteClient.STATUS_MAP[ch.status] ?? String(ch.status),
+                token: (ch.tokenAddress ?? '') as string,
+                amount: userBalance,
+                chain_id: Number(ch.blockchainId ?? 0),
+                adjudicator: '',
+                challenge: ch.challengeDuration ?? 0,
+                nonce: Number(ch.nonce ?? 0),
+                version: Number(ch.stateVersion ?? 0),
+                created_at: '',
+                updated_at: '',
+            });
+        }
+
+        return result;
+    }
+
+    private async getChannelsViaAssetScan(): Promise<LedgerChannel[]> {
+        const assets = await this.innerClient.getAssets();
+        const channels: LedgerChannel[] = [];
+
+        for (const asset of assets) {
+            try {
+                const ch = await this.innerClient.getHomeChannel(this.userAddress, asset.symbol);
+
+                if (ch.channelId) {
+                    let userBalance = 0n;
+
+                    try {
+                        const state = await this.innerClient.getLatestState(this.userAddress, asset.symbol, false);
+                        const raw = state.homeLedger?.userBalance;
+
+                        if (raw) {
+                            const info = this.assetsBySymbol.get(asset.symbol.toLowerCase());
+                            const dec = info?.decimals ?? asset.decimals;
+                            userBalance = BigInt(raw.mul(new Decimal(10).pow(dec)).toFixed(0));
+                        }
+                    } catch {
+                        // state not available yet
+                    }
+
+                    const chainId = Number(ch.blockchainId ?? asset.tokens?.[0]?.blockchainId ?? 0);
+                    channels.push({
+                        channel_id: ch.channelId,
+                        participant: this.userAddress,
+                        status: NitroliteClient.STATUS_MAP[ch.status] ?? String(ch.status),
+                        token: (ch.tokenAddress || asset.tokens?.[0]?.address || '') as string,
+                        amount: userBalance,
+                        chain_id: chainId,
+                        adjudicator: '',
+                        challenge: ch.challengeDuration ?? 0,
+                        nonce: Number(ch.nonce ?? 0),
+                        version: Number(ch.stateVersion ?? 0),
+                        created_at: '',
+                        updated_at: '',
+                    });
+                }
+            } catch {
+                // no channel for this asset
+            }
+        }
+
+        return channels;
+    }
+
+    async getBalances(wallet?: Address): Promise<LedgerBalance[]> {
+        const balances = await this.innerClient.getBalances(wallet ?? this.userAddress);
+        return balances.map((b) => {
+            const info = this.assetsBySymbol.get(b.asset.toLowerCase());
+            const dec = info?.decimals ?? 6;
+            const rawAmount = b.balance.mul(new Decimal(10).pow(dec)).toFixed(0);
+            return {
+                asset: b.asset,
+                amount: rawAmount,
+            };
+        });
+    }
+
+    async getLedgerEntries(wallet?: Address): Promise<LedgerEntry[]> {
+        const { transactions } = await this.innerClient.getTransactions(wallet ?? this.userAddress);
+        return transactions.map((tx, i) => ({
+            id: i,
+            account_id: (wallet ?? this.userAddress) as string,
+            account_type: 0,
+            asset: tx.asset,
+            participant: (wallet ?? this.userAddress) as string,
+            credit: tx.amount.greaterThanOrEqualTo(0) ? tx.amount.toString() : '0',
+            debit: tx.amount.lessThan(0) ? tx.amount.abs().toString() : '0',
+            created_at: tx.createdAt?.toISOString?.() ?? '',
+        }));
+    }
+
+    async getAppSessionsList(wallet?: Address, status?: string): Promise<AppSession[]> {
+        try {
+            const { sessions } = await this.innerClient.getAppSessions({
+                wallet: wallet ?? this.userAddress,
+                status: status ?? undefined,
+            });
+            return sessions.map((s) => ({
+                app_session_id: s.appSessionId,
+                nonce: Number(s.nonce ?? 0),
+                participants: s.participants.map((p) => p.walletAddress),
+                protocol: '',
+                quorum: s.quorum,
+                status: s.isClosed ? 'closed' : 'open',
+                version: Number(s.version ?? 0),
+                weights: s.participants.map((p) => p.signatureWeight),
+                allocations: s.allocations?.map((a) => ({
+                    participant: a.participant as Address,
+                    asset: a.asset,
+                    amount: a.amount?.toString() ?? '0',
+                })) ?? [],
+                sessionData: s.sessionData ?? '',
+            }));
+        } catch (err) {
+            console.warn('[compat] getAppSessionsList failed, returning empty:', (err as Error).message);
+            return [];
+        }
+    }
+
+    async getAssetsList(): Promise<ClearNodeAsset[]> {
+        const assets = await this.innerClient.getAssets();
+        const result: ClearNodeAsset[] = [];
+        for (const asset of assets) {
+            for (const token of asset.tokens) {
+                result.push({
+                    token: token.address as Address,
+                    chainId: Number(token.blockchainId),
+                    symbol: asset.name,
+                    decimals: asset.decimals,
+                });
+            }
+        }
+        return result;
+    }
+
+    async getConfig(): Promise<any> {
+        return this.innerClient.getConfig();
+    }
+
+    // -----------------------------------------------------------------------
+    // App session operations
+    // -----------------------------------------------------------------------
+
+    async createAppSession(
+        definitionOrParams: RPCAppDefinition | CreateAppSessionRequestParams,
+        allocations?: RPCAppSessionAllocation[],
+    ): Promise<{ appSessionId: string; version: string; status: string }> {
+        const def = 'definition' in definitionOrParams ? definitionOrParams.definition : definitionOrParams;
+        const allocs = 'definition' in definitionOrParams ? definitionOrParams.allocations : (allocations ?? []);
+        const sessionData = 'definition' in definitionOrParams
+            ? (definitionOrParams.session_data ?? JSON.stringify({ allocations: allocs }))
+            : JSON.stringify({ allocations: allocs });
+
+        const v1Def: AppDefinitionV1 = {
+            application: def.application ?? (def as any).protocol ?? '',
+            participants: def.participants.map((addr, i) => ({
+                walletAddress: addr as Address,
+                signatureWeight: def.weights[i] ?? 1,
+            })) as AppParticipantV1[],
+            quorum: def.quorum,
+            nonce: BigInt(def.nonce ?? Date.now()),
+        };
+
+        const result = await this.innerClient.createAppSession(v1Def, sessionData, []);
+        return { appSessionId: result.appSessionId, version: result.version, status: result.status };
+    }
+
+    async closeAppSession(
+        appSessionId: string,
+        _allocations: RPCAppSessionAllocation[],
+    ): Promise<{ appSessionId: string }> {
+        const { sessions } = await this.innerClient.getAppSessions({ appSessionId });
+        if (sessions.length === 0) throw new Error(`App session ${appSessionId} not found`);
+
+        const session = sessions[0];
+        const appUpdate = {
+            appSessionId,
+            intent: 3, // Close
+            version: session.version + 1n,
+            allocations: _allocations.map((a) => ({
+                participant: a.participant as Address,
+                asset: a.asset,
+                amount: new Decimal(a.amount),
+            })) as AppAllocationV1[],
+            sessionData: '',
+        };
+
+        await this.innerClient.submitAppState(appUpdate, []);
+        return { appSessionId };
+    }
+
+    async getAppDefinition(appSessionId: string): Promise<GetAppDefinitionResponseParams> {
+        const def = await this.innerClient.getAppDefinition(appSessionId);
+        return {
+            protocol: def.application,
+            participants: def.participants.map((p) => p.walletAddress),
+            weights: def.participants.map((p) => p.signatureWeight),
+            quorum: def.quorum,
+            challenge: 0,
+            nonce: Number(def.nonce ?? 0),
+        };
+    }
+
+    private static readonly INTENT_MAP: Record<string, number> = {
+        operate: 0,
+        deposit: 1,
+        withdraw: 2,
+        close: 3,
+    };
+
+    async submitAppState(
+        params: SubmitAppStateRequestParams,
+    ): Promise<{ appSessionId: string; version: number; status: string }> {
+        const isV04 = 'intent' in params;
+        const intentStr = isV04 ? (params as SubmitAppStateRequestParamsV04).intent : RPCAppStateIntent.Operate;
+        const intentNum = NitroliteClient.INTENT_MAP[intentStr] ?? 0;
+
+        const { sessions } = await this.innerClient.getAppSessions({ appSessionId: params.app_session_id });
+        if (sessions.length === 0) throw new Error(`App session ${params.app_session_id} not found`);
+        const session = sessions[0];
+
+        const version = isV04
+            ? BigInt((params as SubmitAppStateRequestParamsV04).version)
+            : session.version + 1n;
+
+        const appUpdate = {
+            appSessionId: params.app_session_id,
+            intent: intentNum,
+            version,
+            allocations: params.allocations.map((a) => ({
+                participant: a.participant as Address,
+                asset: a.asset,
+                amount: new Decimal(a.amount),
+            })) as AppAllocationV1[],
+            sessionData: params.session_data ?? '',
+        };
+
+        await this.innerClient.submitAppState(appUpdate, []);
+        return {
+            appSessionId: params.app_session_id,
+            version: Number(version),
+            status: intentNum === 3 ? 'closed' : 'open',
+        };
+    }
+
+    // -----------------------------------------------------------------------
+    // Transfer
+    // -----------------------------------------------------------------------
+
+    async transfer(destination: Address, allocations: TransferAllocation[]): Promise<void> {
+        for (const alloc of allocations) {
+            await this.innerClient.transfer(destination, alloc.asset, new Decimal(alloc.amount));
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Lifecycle
+    // -----------------------------------------------------------------------
+
+    async close(): Promise<void> {
+        await this.innerClient.close();
+    }
+
+    async ping(): Promise<void> {
+        await this.innerClient.ping();
+    }
+}

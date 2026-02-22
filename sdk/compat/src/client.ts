@@ -71,9 +71,10 @@ class WalletTxSigner implements TransactionSigner {
 
     async signMessage(message: { raw: Hex }): Promise<Hex> {
         if (!this.walletClient.account) throw new Error('Wallet has no account');
+        const chain = this.walletClient.chain;
         return this.walletClient.signTypedData({
             account: this.walletClient.account,
-            domain: { name: 'Nitrolite', version: '1', chainId: 1 },
+            domain: { name: 'Nitrolite', version: '1', chainId: chain?.id ?? 1 },
             types: { Message: [{ name: 'data', type: 'bytes32' }] },
             primaryType: 'Message',
             message: { data: message.raw },
@@ -177,14 +178,26 @@ export class NitroliteClient {
         }
     }
 
-    resolveToken(tokenAddress: Address | string): AssetInfo {
+    private async ensureAssets(): Promise<void> {
+        if (this.assetsBySymbol.size === 0) await this.refreshAssets();
+    }
+
+    private async getDecimalsForAsset(assetSymbol: string): Promise<number> {
+        await this.ensureAssets();
+        const info = this.assetsBySymbol.get(assetSymbol.toLowerCase());
+        return info?.decimals ?? 6;
+    }
+
+    async resolveToken(tokenAddress: Address | string): Promise<AssetInfo> {
+        await this.ensureAssets();
         const key = tokenAddress.toString().toLowerCase();
         const info = this.assetsByToken.get(key);
         if (!info) throw new Error(`Unknown token address: ${tokenAddress}`);
         return info;
     }
 
-    resolveAsset(symbol: string): AssetInfo {
+    async resolveAsset(symbol: string): Promise<AssetInfo> {
+        await this.ensureAssets();
         const info = this.assetsBySymbol.get(symbol.toLowerCase());
         if (!info) throw new Error(`Unknown asset: ${symbol}`);
         return info;
@@ -194,23 +207,25 @@ export class NitroliteClient {
     // Convenience helpers (reduce consumer-side boilerplate)
     // -----------------------------------------------------------------------
 
-    getTokenDecimals(tokenAddress: Address | string): number {
+    async getTokenDecimals(tokenAddress: Address | string): Promise<number> {
+        await this.ensureAssets();
         const key = tokenAddress.toString().toLowerCase();
         const info = this.assetsByToken.get(key);
         return info?.decimals ?? 6;
     }
 
-    formatAmount(tokenAddress: Address | string, rawAmount: bigint): string {
-        const decimals = this.getTokenDecimals(tokenAddress);
+    async formatAmount(tokenAddress: Address | string, rawAmount: bigint): Promise<string> {
+        const decimals = await this.getTokenDecimals(tokenAddress);
         return formatUnits(rawAmount, decimals);
     }
 
-    parseAmount(tokenAddress: Address | string, humanAmount: string): bigint {
-        const decimals = this.getTokenDecimals(tokenAddress);
+    async parseAmount(tokenAddress: Address | string, humanAmount: string): Promise<bigint> {
+        const decimals = await this.getTokenDecimals(tokenAddress);
         return parseUnits(humanAmount, decimals);
     }
 
-    resolveAssetDisplay(tokenAddress: Address | string, chainId?: number): { symbol: string; decimals: number } | null {
+    async resolveAssetDisplay(tokenAddress: Address | string, chainId?: number): Promise<{ symbol: string; decimals: number } | null> {
+        await this.ensureAssets();
         const key = tokenAddress.toString().toLowerCase();
         const info = this.assetsByToken.get(key);
         if (!info) return null;
@@ -235,9 +250,8 @@ export class NitroliteClient {
 
     async getAccountInfo(): Promise<AccountInfo> {
         const balances = await this.getBalances();
-        const total = balances.reduce((sum, b) => sum + BigInt(b.amount || '0'), 0n);
         return {
-            available: total,
+            balances,
             channelCount: BigInt(this._lastChannels.length),
         };
     }
@@ -275,7 +289,7 @@ export class NitroliteClient {
     }
 
     async deposit(tokenAddress: Address, amount: bigint): Promise<any> {
-        const { symbol, chainId, decimals, tokenAddress: resolvedAddr } = this.resolveToken(tokenAddress);
+        const { symbol, chainId, decimals, tokenAddress: resolvedAddr } = await this.resolveToken(tokenAddress);
         await this.innerClient.setHomeBlockchain(symbol, chainId).catch(() => {});
         const humanAmount = this.toHumanAmount(amount, decimals);
         await this.innerClient.deposit(chainId, symbol, humanAmount);
@@ -294,6 +308,7 @@ export class NitroliteClient {
         const tokenAddr = params?.tokenAddress?.toString().toLowerCase();
 
         if (tokenAddr) {
+            await this.ensureAssets();
             const info = this.assetsByToken.get(tokenAddr);
             if (!info) throw new Error(`Unknown token address for close: ${params.tokenAddress}`);
 
@@ -302,20 +317,24 @@ export class NitroliteClient {
             return;
         }
 
-        const assets = await this.innerClient.getAssets();
+        const channels = await this.getChannels();
+        const openChannels = channels.filter((ch) => ch.status === 'open' || ch.status === 'resizing');
 
-        for (const asset of assets) {
+        for (const ch of openChannels) {
             try {
-                await this.innerClient.closeHomeChannel(asset.symbol);
-                const token = asset.tokens.find((t) => t.blockchainId === this._chainId);
+                await this.ensureAssets();
+                const info = this.assetsByToken.get(ch.token.toLowerCase());
+                const symbol = info?.symbol;
+                if (!symbol) continue;
 
-                if (token) {
-                    await this.checkpointWithApproval(asset.symbol, this._chainId, token.address);
+                await this.innerClient.closeHomeChannel(symbol);
+                if (info) {
+                    await this.checkpointWithApproval(symbol, info.chainId, info.tokenAddress);
                 } else {
-                    await this.innerClient.checkpoint(asset.symbol);
+                    await this.innerClient.checkpoint(symbol);
                 }
             } catch {
-                // asset may not have a channel
+                // channel may already be closing
             }
         }
     }
@@ -329,7 +348,7 @@ export class NitroliteClient {
     }
 
     async withdrawal(tokenAddress: Address, amount: bigint): Promise<any> {
-        const { symbol, chainId, decimals, tokenAddress: resolvedAddr } = this.resolveToken(tokenAddress);
+        const { symbol, chainId, decimals, tokenAddress: resolvedAddr } = await this.resolveToken(tokenAddress);
         await this.innerClient.setHomeBlockchain(symbol, chainId).catch(() => {});
         const humanAmount = this.toHumanAmount(amount, decimals);
         await this.innerClient.withdraw(chainId, symbol, humanAmount);
@@ -505,11 +524,18 @@ export class NitroliteClient {
                 status: s.isClosed ? 'closed' : 'open',
                 version: Number(s.version ?? 0),
                 weights: s.participants.map((p) => p.signatureWeight),
-                allocations: s.allocations?.map((a) => ({
-                    participant: a.participant as Address,
-                    asset: a.asset,
-                    amount: a.amount?.toString() ?? '0',
-                })) ?? [],
+                allocations: s.allocations?.map((a) => {
+                    const info = this.assetsBySymbol.get(a.asset?.toLowerCase?.() ?? '');
+                    const dec = info?.decimals ?? 6;
+                    const rawAmount = a.amount
+                        ? a.amount.mul(new Decimal(10).pow(dec)).toFixed(0)
+                        : '0';
+                    return {
+                        participant: a.participant as Address,
+                        asset: a.asset,
+                        amount: rawAmount,
+                    };
+                }) ?? [],
                 sessionData: s.sessionData ?? '',
             }));
         } catch (err) {
@@ -574,15 +600,22 @@ export class NitroliteClient {
         if (sessions.length === 0) throw new Error(`App session ${appSessionId} not found`);
 
         const session = sessions[0];
+        const v1Allocations: AppAllocationV1[] = [];
+        for (const a of _allocations) {
+            const decimals = await this.getDecimalsForAsset(a.asset);
+            const humanAmount = new Decimal(a.amount).div(new Decimal(10).pow(decimals));
+            v1Allocations.push({
+                participant: a.participant as Address,
+                asset: a.asset,
+                amount: humanAmount,
+            });
+        }
+
         const appUpdate = {
             appSessionId,
             intent: 3, // Close
             version: session.version + 1n,
-            allocations: _allocations.map((a) => ({
-                participant: a.participant as Address,
-                asset: a.asset,
-                amount: new Decimal(a.amount),
-            })) as AppAllocationV1[],
+            allocations: v1Allocations,
             sessionData: '',
         };
 
@@ -624,15 +657,22 @@ export class NitroliteClient {
             ? BigInt((params as SubmitAppStateRequestParamsV04).version)
             : session.version + 1n;
 
+        const v1Allocations: AppAllocationV1[] = [];
+        for (const a of params.allocations) {
+            const decimals = await this.getDecimalsForAsset(a.asset);
+            const humanAmount = new Decimal(a.amount).div(new Decimal(10).pow(decimals));
+            v1Allocations.push({
+                participant: a.participant as Address,
+                asset: a.asset,
+                amount: humanAmount,
+            });
+        }
+
         const appUpdate = {
             appSessionId: params.app_session_id,
             intent: intentNum,
             version,
-            allocations: params.allocations.map((a) => ({
-                participant: a.participant as Address,
-                asset: a.asset,
-                amount: new Decimal(a.amount),
-            })) as AppAllocationV1[],
+            allocations: v1Allocations,
             sessionData: params.session_data ?? '',
         };
 
@@ -650,7 +690,9 @@ export class NitroliteClient {
 
     async transfer(destination: Address, allocations: TransferAllocation[]): Promise<void> {
         for (const alloc of allocations) {
-            await this.innerClient.transfer(destination, alloc.asset, new Decimal(alloc.amount));
+            const decimals = await this.getDecimalsForAsset(alloc.asset);
+            const humanAmount = new Decimal(alloc.amount).div(new Decimal(10).pow(decimals));
+            await this.innerClient.transfer(destination, alloc.asset, humanAmount);
         }
     }
 

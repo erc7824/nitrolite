@@ -266,7 +266,8 @@ export interface AppLogic<T = bigint> {
 // =============================================================================
 
 export interface AccountInfo {
-    available: bigint;
+    /** Per-asset balances in raw units (avoids incorrect cross-decimal summing). */
+    balances: LedgerBalance[];
     channelCount: bigint;
 }
 

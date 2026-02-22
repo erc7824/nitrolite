@@ -245,8 +245,6 @@ export interface PaginationParamsV1 {
   offset?: number; // uint32
   /** Number of items to return */
   limit?: number; // uint32
-  /** Sort order (asc/desc) */
-  sort?: string;
 }
 
 /**

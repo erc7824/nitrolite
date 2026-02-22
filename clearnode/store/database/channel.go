@@ -118,6 +118,55 @@ func (s *DBStore) CheckOpenChannel(wallet, asset string) (string, bool, error) {
 	return approvedSigValidators, true, nil
 }
 
+// GetUserChannels retrieves all channels for a user with optional status and asset filters.
+func (s *DBStore) GetUserChannels(wallet string, status *string, asset *string, limit, offset uint32) ([]core.Channel, uint32, error) {
+	query := s.db.Model(&Channel{}).Where("user_wallet = ?", strings.ToLower(wallet))
+
+	if status != nil && *status != "" {
+		statusEnum, err := channelStatusFromString(*status)
+		if err != nil {
+			return nil, 0, fmt.Errorf("invalid status filter: %w", err)
+		}
+		query = query.Where("status = ?", statusEnum)
+	}
+
+	if asset != nil && *asset != "" {
+		query = query.Where("asset = ?", strings.ToLower(*asset))
+	}
+
+	var totalCount int64
+	if err := query.Count(&totalCount).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to count user channels: %w", err)
+	}
+
+	var dbChannels []Channel
+	if err := query.Order("created_at DESC").Limit(int(limit)).Offset(int(offset)).Find(&dbChannels).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to get user channels: %w", err)
+	}
+
+	channels := make([]core.Channel, len(dbChannels))
+	for i := range dbChannels {
+		channels[i] = *databaseChannelToCore(&dbChannels[i])
+	}
+
+	return channels, uint32(totalCount), nil
+}
+
+func channelStatusFromString(s string) (core.ChannelStatus, error) {
+	switch strings.ToLower(s) {
+	case "void":
+		return core.ChannelStatusVoid, nil
+	case "open":
+		return core.ChannelStatusOpen, nil
+	case "challenged":
+		return core.ChannelStatusChallenged, nil
+	case "closed":
+		return core.ChannelStatusClosed, nil
+	default:
+		return 0, fmt.Errorf("unknown channel status: %q", s)
+	}
+}
+
 // ChannelCount holds the result of a COUNT() GROUP BY query on channels.
 type ChannelCount struct {
 	Asset  string             `gorm:"column:asset"`

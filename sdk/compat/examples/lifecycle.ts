@@ -172,13 +172,13 @@ async function main() {
             const decimals = client.getTokenDecimals(token.token);
             ok('getTokenDecimals()', `${decimals}`);
 
-            const formatted = client.formatAmount(token.token, 1000000n);
+            const formatted = await client.formatAmount(token.token, 1000000n);
             ok('formatAmount()', `1000000 raw -> ${formatted}`);
 
-            const parsed = client.parseAmount(token.token, '1.0');
+            const parsed = await client.parseAmount(token.token, '1.0');
             ok('parseAmount()', `1.0 -> ${parsed} raw`);
 
-            const display = client.resolveAssetDisplay(token.token);
+            const display = await client.resolveAssetDisplay(token.token);
             ok('resolveAssetDisplay()', display ? `${display.symbol} (${display.decimals} dec)` : 'null');
 
             const channel = client.findOpenChannel(token.token);

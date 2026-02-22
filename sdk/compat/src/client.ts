@@ -552,7 +552,7 @@ export class NitroliteClient {
                 result.push({
                     token: token.address as Address,
                     chainId: Number(token.blockchainId),
-                    symbol: asset.name,
+                    symbol: asset.symbol,
                     decimals: asset.decimals,
                 });
             }

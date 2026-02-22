@@ -4,7 +4,7 @@
 
 Compatibility layer that bridges the Nitrolite SDK **v0.5.3 API** to the **v1.0.0 runtime**, letting existing dApps upgrade to the new protocol with minimal code changes.
 
-```
+```text
 ┌─────────────────────┐
 │    Your dApp code    │  ← unchanged v0.5.3 imports
 ├─────────────────────┤
@@ -50,7 +50,7 @@ Or with a local `file:` reference (monorepo):
 
 ## Quick Start
 
-### 1. Initialise the client
+### 1. Initialize the client
 
 Replace `new Client(ws, signer)` with `NitroliteClient.create()`:
 
@@ -190,7 +190,7 @@ interface NitroliteClientConfig {
 
 `blockchainRPCsFromEnv()` reads `NEXT_PUBLIC_BLOCKCHAIN_RPCS`:
 
-```
+```text
 NEXT_PUBLIC_BLOCKCHAIN_RPCS=11155111:https://rpc.sepolia.io,1:https://mainnet.infura.io/v3/KEY
 ```
 

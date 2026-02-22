@@ -46,24 +46,26 @@ export class EventPoller {
     }
 
     private async poll(): Promise<void> {
-        try {
-            const [channels, balances, assets] = await Promise.allSettled([
-                this.client.getChannels(),
-                this.client.getBalances(),
-                this.client.getAssetsList(),
-            ]);
+        const [channels, balances, assets] = await Promise.allSettled([
+            this.client.getChannels(),
+            this.client.getBalances(),
+            this.client.getAssetsList(),
+        ]);
 
-            if (channels.status === 'fulfilled' && this.callbacks.onChannelUpdate) {
-                this.callbacks.onChannelUpdate(channels.value);
-            }
-            if (balances.status === 'fulfilled' && this.callbacks.onBalanceUpdate) {
-                this.callbacks.onBalanceUpdate(balances.value);
-            }
-            if (assets.status === 'fulfilled' && this.callbacks.onAssetsUpdate) {
-                this.callbacks.onAssetsUpdate(assets.value);
-            }
-        } catch (err) {
-            this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
+        if (channels.status === 'fulfilled') {
+            this.callbacks.onChannelUpdate?.(channels.value);
+        } else {
+            this.callbacks.onError?.(channels.reason instanceof Error ? channels.reason : new Error(String(channels.reason)));
+        }
+        if (balances.status === 'fulfilled') {
+            this.callbacks.onBalanceUpdate?.(balances.value);
+        } else {
+            this.callbacks.onError?.(balances.reason instanceof Error ? balances.reason : new Error(String(balances.reason)));
+        }
+        if (assets.status === 'fulfilled') {
+            this.callbacks.onAssetsUpdate?.(assets.value);
+        } else {
+            this.callbacks.onError?.(assets.reason instanceof Error ? assets.reason : new Error(String(assets.reason)));
         }
     }
 }

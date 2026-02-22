@@ -16,11 +16,16 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/event_handlers"
 	"github.com/erc7824/nitrolite/clearnode/metrics"
 	"github.com/erc7824/nitrolite/clearnode/store/database"
+	"github.com/erc7824/nitrolite/clearnode/stress"
 	"github.com/erc7824/nitrolite/pkg/blockchain/evm"
 	"github.com/erc7824/nitrolite/pkg/log"
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "stress-test" {
+		os.Exit(stress.Run(os.Args[2:]))
+	}
+
 	bb := InitBackbone()
 	logger := bb.Logger
 	ctx := context.Background()

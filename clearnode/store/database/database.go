@@ -4,15 +4,14 @@ import (
 	"embed"
 	"fmt"
 	"log"
-	"net/url"
-	"strconv"
-	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pressly/goose/v3"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 )
 
@@ -30,75 +29,12 @@ type DatabaseConfig struct {
 	Host     string `env:"CLEARNODE_DATABASE_HOST" env-default:"localhost"`
 	Port     string `env:"CLEARNODE_DATABASE_PORT" env-default:"5432"`
 	Retries  int    `env:"CLEARNODE_DATABASE_RETRIES" env-default:"5"`
-}
 
-// ParseConnectionString parses a PostgreSQL URI and returns a DatabaseConfig
-func ParseConnectionString(connStr string) (DatabaseConfig, error) {
-	log.Println("parsing db connection string")
-	// SQLite detection: starts with "file:"
-	if strings.HasPrefix(connStr, "file:") {
-		// Separate path from query
-		parts := strings.SplitN(connStr[5:], "?", 2)
-		dbName := parts[0]
-		return DatabaseConfig{
-			Name:    dbName,
-			Driver:  "sqlite",
-			Host:    "",
-			Port:    "",
-			Retries: 1,
-		}, nil
-	}
-
-	// Postgresql parsing
-	parsedURL, err := url.Parse(connStr)
-	if err != nil {
-		return DatabaseConfig{}, fmt.Errorf("invalid connection string: %w", err)
-	}
-
-	if parsedURL.Scheme != "postgres" && parsedURL.Scheme != "postgresql" {
-		return DatabaseConfig{}, fmt.Errorf("unsupported scheme: %s", parsedURL.Scheme)
-	}
-
-	user := parsedURL.User
-	username := ""
-	password := ""
-	if user != nil {
-		username = user.Username()
-		password, _ = user.Password()
-	}
-
-	host := parsedURL.Hostname()
-	port := parsedURL.Port()
-	if port == "" {
-		port = "5432" // default PostgreSQL port
-	}
-
-	dbName := strings.TrimPrefix(parsedURL.Path, "/")
-
-	// extract schema if present in query parameters
-	schema := ""
-	retries := 5
-
-	query := parsedURL.Query()
-	if s := query.Get("search_path"); s != "" {
-		schema = s
-	}
-	if r := query.Get("retries"); r != "" {
-		if retryVal, err := strconv.Atoi(r); err == nil {
-			retries = retryVal
-		}
-	}
-
-	return DatabaseConfig{
-		Name:     dbName,
-		Schema:   schema,
-		Driver:   "postgres",
-		Username: username,
-		Password: password,
-		Host:     host,
-		Port:     port,
-		Retries:  retries,
-	}, nil
+	// Connection pool settings
+	MaxOpenConns    int `env:"CLEARNODE_DATABASE_MAX_OPEN_CONNS" env-default:"100"`
+	MaxIdleConns    int `env:"CLEARNODE_DATABASE_MAX_IDLE_CONNS" env-default:"25"`
+	ConnMaxLifetime int `env:"CLEARNODE_DATABASE_CONN_MAX_LIFETIME_SEC" env-default:"300"`
+	ConnMaxIdleTime int `env:"CLEARNODE_DATABASE_CONN_MAX_IDLE_TIME_SEC" env-default:"60"`
 }
 
 func ConnectToDB(cnf DatabaseConfig, embedMigrations embed.FS) (*gorm.DB, error) {
@@ -134,10 +70,28 @@ func connectToPostgresql(cnf DatabaseConfig, embedMigrations embed.FS) (*gorm.DB
 	db, err := gorm.Open(dial, &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			TablePrefix: cnf.Schema + ".", // schema name
-		}})
+		},
+		// Don't prepare statements, as it can cause issues with some Postgresql proxies like pgbouncer in transaction pooling mode.
+		PrepareStmt: false,
+		// Reduce log noise in production.
+		Logger: logger.Default.LogMode(logger.Warn),
+	})
 	if err != nil {
 		return nil, err
 	}
+
+	// Configure connection pool.
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
+	}
+	sqlDB.SetMaxOpenConns(cnf.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cnf.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(cnf.ConnMaxLifetime) * time.Second)
+	sqlDB.SetConnMaxIdleTime(time.Duration(cnf.ConnMaxIdleTime) * time.Second)
+
+	log.Printf("DB pool configured: maxOpen=%d, maxIdle=%d, maxLifetime=%ds, maxIdleTime=%ds",
+		cnf.MaxOpenConns, cnf.MaxIdleConns, cnf.ConnMaxLifetime, cnf.ConnMaxIdleTime)
 
 	return db, nil
 }
@@ -156,7 +110,10 @@ func connectToSqlite(cnf DatabaseConfig) (*gorm.DB, error) {
 	db, err := gorm.Open(dial, &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			TablePrefix: cnf.Schema + ".", // schema name
-		}})
+		},
+		SkipDefaultTransaction: true,
+		PrepareStmt:            true,
+	})
 	if err != nil {
 		return nil, err
 	}

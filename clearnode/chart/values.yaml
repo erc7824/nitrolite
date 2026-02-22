@@ -147,3 +147,20 @@ affinity: {}
 
 # -- Additional labels to add to all resources
 extraLabels: {}
+
+stressTest:
+  # -- Enable stress test pod (helm test)
+  enabled: false
+  # -- Test specifications (method:total_requests:connections)
+  specs:
+    - "ping:100:5"
+  # -- WebSocket URL (defaults to in-cluster service)
+  wsURL: ""
+  # -- Private key for signing (optional, ephemeral key used if not set)
+  privateKey: ""
+  # -- Default number of connections per test
+  connections: 10
+  # -- Per-test timeout
+  timeout: "10m"
+  # -- Max error rate threshold (0.01 = 1%)
+  maxErrorRate: "0.01"

@@ -1,7 +1,6 @@
 package user_v1
 
 import (
-	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
@@ -13,13 +12,7 @@ func (h *Handler) GetBalances(c *rpc.Context) {
 		return
 	}
 
-	var balances []core.BalanceEntry
-	err := h.useStoreInTx(func(store Store) error {
-		var err error
-		balances, err = store.GetUserBalances(req.Wallet)
-		return err
-	})
-
+	balances, err := h.store.GetUserBalances(req.Wallet)
 	if err != nil {
 		c.Fail(err, "failed to retrieve balances")
 		return

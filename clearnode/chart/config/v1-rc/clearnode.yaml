@@ -3,12 +3,16 @@ config:
   logLevel: info
   database:
     driver: postgres
-    host: postgresql.core
+    host: pgbouncer
     port: 5432
     name: clearnode_v1_rc
     user: clearnode_v1_rc_admin
   envSecret: clearnode-secret-env
-  extraEnvs: {}
+  extraEnvs:
+    CLEARNODE_DATABASE_MAX_OPEN_CONNS: "10"
+    CLEARNODE_DATABASE_MAX_IDLE_CONNS: "2"
+    CLEARNODE_DATABASE_CONN_MAX_LIFETIME_SEC: "3600"
+    CLEARNODE_DATABASE_CONN_MAX_IDLE_TIME_SEC: "600"
 
 image:
   repository: ghcr.io/erc7824/nitrolite/clearnode
@@ -29,13 +33,13 @@ metrics:
 
 resources:
   limits:
-    cpu: 100m
-    memory: 256Mi
-    ephemeral-storage: 100Mi
+    cpu: 2000m
+    memory: 2Gi
+    ephemeral-storage: 256Mi
   requests:
-    cpu: 100m
-    memory: 256Mi
-    ephemeral-storage: 100Mi
+    cpu: 2000m
+    memory: 2Gi
+    ephemeral-storage: 256Mi
 
 autoscaling:
   enabled: false
@@ -52,3 +56,6 @@ networking:
       enabled: true
 
 imagePullSecret: ghcr-pull
+
+stressTest:
+  enabled: true

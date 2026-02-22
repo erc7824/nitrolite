@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/blockchain/evm"
@@ -49,6 +50,7 @@ type Client struct {
 	rpcClient         *rpc.Client
 	config            Config
 	exitCh            chan struct{}
+	closeOnce         sync.Once
 	blockchainClients map[uint64]core.Client
 	homeBlockchains   map[string]uint64
 	stateSigner       core.ChannelSigner
@@ -116,7 +118,7 @@ func NewClient(wsURL string, stateSigner core.ChannelSigner, rawSigner sign.Sign
 		if config.ErrorHandler != nil {
 			config.ErrorHandler(err)
 		}
-		close(client.exitCh)
+		client.doClose()
 	}
 
 	// Establish connection
@@ -181,14 +183,15 @@ func (c *Client) SetHomeBlockchain(asset string, blockchainId uint64) error {
 //	}
 //	defer client.Close()
 func (c *Client) Close() error {
-	// The dialer handles connection cleanup internally
-	select {
-	case <-c.exitCh:
-		// Already closed
-	default:
-		close(c.exitCh)
-	}
+	c.doClose()
 	return nil
+}
+
+// doClose closes exitCh exactly once, safe for concurrent callers.
+func (c *Client) doClose() {
+	c.closeOnce.Do(func() {
+		close(c.exitCh)
+	})
 }
 
 // WaitCh returns a channel that closes when the connection is lost or closed.

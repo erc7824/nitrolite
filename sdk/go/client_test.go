@@ -433,7 +433,7 @@ func TestClient_GetLastAppKeyStates(t *testing.T) {
 	states, err := client.GetLastAppKeyStates(context.Background(), "0xUser", nil)
 	require.NoError(t, err)
 	assert.Len(t, states, 1)
-	assert.Equal(t, "0xKey", states[0].SessionKey)
+	assert.Equal(t, "0xkey", states[0].SessionKey)
 }
 
 // TestDoCloseConcurrent verifies that calling doClose from multiple goroutines

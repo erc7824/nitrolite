@@ -417,7 +417,7 @@ func TestClient_GetLastAppKeyStates(t *testing.T) {
 		States: []rpc.AppSessionKeyStateV1{
 			{
 				UserAddress: "0xUser",
-				SessionKey:  "0xKey",
+				SessionKey:  "0xkey",
 				Version:     "1",
 				ExpiresAt:   decimal.NewFromInt(now).String(),
 				UserSig:     "0xSig",

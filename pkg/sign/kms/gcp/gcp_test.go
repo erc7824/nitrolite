@@ -4,7 +4,7 @@
 //
 //	export GCP_KMS_KEY_NAME="projects/{project}/locations/{location}/keyRings/{ring}/cryptoKeys/{key}/cryptoKeyVersions/{version}"
 //	export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
-//	go test -v -run TestIntegration ./pkg/sign/kms/gcpkms/
+//	go test -v -run TestIntegration ./pkg/sign/kms/gcp/
 //
 // The key must be EC_SIGN_SECP256K1_SHA256. The service account needs
 // roles/cloudkms.signerVerifier on the key.

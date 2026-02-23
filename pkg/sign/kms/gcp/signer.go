@@ -63,7 +63,12 @@ func NewSigner(ctx context.Context, keyResourceName string, opts ...option.Clien
 		return nil, fmt.Errorf("failed to create KMS client: %w", err)
 	}
 
-	return newSignerWithClient(ctx, client, keyResourceName)
+	signer, err := newSignerWithClient(ctx, client, keyResourceName)
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
+	return signer, nil
 }
 
 // newSignerWithClient creates a signer with an injected KMS client (for testing).
@@ -74,6 +79,14 @@ func newSignerWithClient(ctx context.Context, client *kms.KeyManagementClient, k
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get public key from KMS: %w", err)
+	}
+
+	// Verify CRC32C integrity of the public key PEM
+	if resp.PemCrc32C != nil {
+		expectedCRC := crc32c([]byte(resp.Pem))
+		if int64(expectedCRC) != resp.PemCrc32C.Value {
+			return nil, fmt.Errorf("KMS public key PEM CRC32C mismatch: got %d, expected %d", resp.PemCrc32C.Value, expectedCRC)
+		}
 	}
 
 	// Parse PEM-encoded public key

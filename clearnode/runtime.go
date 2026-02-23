@@ -129,14 +129,11 @@ func InitBackbone() *Backbone {
 		signerErr             error
 		closers               []func() error
 	)
+
 	switch conf.SignerType {
 	case "key":
 		if conf.SignerKey == "" {
 			logger.Fatal("CLEARNODE_SIGNER_KEY is required when CLEARNODE_SIGNER_TYPE=key")
-		}
-		stateSigner, signerErr = sign.NewEthereumMsgSigner(conf.SignerKey)
-		if signerErr != nil {
-			logger.Fatal("failed to initialise state signer", "error", signerErr)
 		}
 		txSigner, signerErr = sign.NewEthereumRawSigner(conf.SignerKey)
 		if signerErr != nil {
@@ -154,13 +151,14 @@ func InitBackbone() *Backbone {
 		}
 		closers = append(closers, kmsSigner.Close)
 		txSigner = kmsSigner
-		stateSigner, signerErr = sign.NewEthereumMsgSignerFromRaw(kmsSigner)
-		if signerErr != nil {
-			logger.Fatal("failed to wrap KMS signer as state signer", "error", signerErr)
-		}
 	default:
 		logger.Fatal("unsupported CLEARNODE_SIGNER_TYPE", "type", conf.SignerType)
 	}
+	stateSigner, signerErr = sign.NewEthereumMsgSignerFromRaw(txSigner)
+	if signerErr != nil {
+		logger.Fatal("failed to wrap KMS signer as state signer", "error", signerErr)
+	}
+
 	logger.Info("signer initialized", "type", conf.SignerType, "address", stateSigner.PublicKey().Address())
 
 	// ------------------------------------------------

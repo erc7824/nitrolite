@@ -162,13 +162,41 @@ Default validator supporting standard ECDSA signatures. Automatically tries both
 
 ---
 
+## SmartWalletValidator
+
+**Location:** `src/sigValidators/SmartWalletValidator.sol`
+
+### Description
+
+Validator supporting smart contract wallet signatures through ERC-4337 account abstraction standards. Enables contract-based accounts to sign states.
+
+### Signature Format
+
+Variable length signature that depends on the smart contract wallet's implementation. The validator handles both deployed and undeployed contracts.
+
+### Validation Logic
+
+1. Try ERC-6492 validation first (supports undeployed contracts via counterfactual verification)
+2. If contract is deployed, use ERC-1271 validation (`isValidSignature` method)
+3. Return `VALIDATION_SUCCESS` if signature is valid according to the contract's logic, `VALIDATION_FAILURE` otherwise
+
+### Use Cases
+
+- Smart contract wallets (Gnosis Safe, Argent, etc.)
+- ERC-4337 account abstraction wallets
+- Multi-signature contract accounts
+- Social recovery wallets
+- Any contract implementing ERC-1271
+
+---
+
 ## SessionKeyValidator
 
 **Location:** `src/sigValidators/SessionKeyValidator.sol`
 
 ### Description
 
-Enables delegation to temporary session keys. Useful for hot wallets, time-limited access, and gasless transactions.
+Enables delegation to temporary session keys. Useful for hot wallets, time-limited access, and gasless transactions. Supports both EOA and smart contract wallet signatures through ERC-4337 (via ERC-1271 and ERC-6492).
 
 ### Signature Format
 
@@ -176,7 +204,7 @@ Enables delegation to temporary session keys. Useful for hot wallets, time-limit
 struct SessionKeyAuthorization {
     address sessionKey;      // Delegated signer
     bytes32 metadataHash;    // Hashed expiration, permissions, etc.
-    bytes authSignature;     // Participant's authorization (65 bytes)
+    bytes authSignature;     // Participant's authorization signature
 }
 
 bytes sigBody = abi.encode(SessionKeyAuthorization, bytes sessionKeySignature)
@@ -189,7 +217,11 @@ bytes sigBody = abi.encode(SessionKeyAuthorization, bytes sessionKeySignature)
 1. Participant authorized the session key: `authData = abi.encode(sessionKey, metadataHash)`
 2. Session key signed the state
 
-Both use EIP-191 first, then raw ECDSA if that fails.
+Both authorization and session key signatures support multiple formats:
+- EIP-191 (standard wallet signatures)
+- Raw ECDSA (tried if EIP-191 fails)
+- ERC-1271 (smart contract wallet signatures)
+- ERC-6492 (undeployed contract signatures)
 
 ### Metadata
 

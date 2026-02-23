@@ -1,4 +1,4 @@
-package gcpkms
+package gcp
 
 import (
 	"crypto/ecdsa"
@@ -206,4 +206,3 @@ func TestGCPKMSSigner_PublicKey(t *testing.T) {
 	assert.Equal(t, key.PublicKey.X.Cmp(pub.X), 0)
 	assert.Equal(t, key.PublicKey.Y.Cmp(pub.Y), 0)
 }
-

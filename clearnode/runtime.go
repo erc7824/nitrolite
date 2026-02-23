@@ -23,7 +23,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/erc7824/nitrolite/pkg/sign"
-	"github.com/erc7824/nitrolite/pkg/sign/kms/gcpkms"
+	"github.com/erc7824/nitrolite/pkg/sign/kms/gcp"
 )
 
 //go:embed config/migrations/*/*.sql
@@ -61,9 +61,9 @@ func (b *Backbone) Close() error {
 type Config struct {
 	Database                    database.DatabaseConfig
 	ChannelMinChallengeDuration uint32 `yaml:"channel_min_challenge_duration" env:"CLEARNODE_CHANNEL_MIN_CHALLENGE_DURATION" env-default:"86400"` // 24 hours
-	SignerType                  string `yaml:"signer_type" env:"CLEARNODE_SIGNER_TYPE" env-default:"key"`    // "key" or "gcp-kms"
-	SignerKey                   string `yaml:"signer_key" env:"CLEARNODE_SIGNER_KEY"`                        // required when signer_type=key
-	GCPKMSKeyName               string `yaml:"gcp_kms_key_name" env:"CLEARNODE_GCP_KMS_KEY_NAME"`            // required when signer_type=gcp-kms
+	SignerType                  string `yaml:"signer_type" env:"CLEARNODE_SIGNER_TYPE" env-default:"key"`                                         // "key" or "gcp-kms"
+	SignerKey                   string `yaml:"signer_key" env:"CLEARNODE_SIGNER_KEY"`                                                             // required when signer_type=key
+	GCPKMSKeyName               string `yaml:"gcp_kms_key_name" env:"CLEARNODE_GCP_KMS_KEY_NAME"`                                                 // required when signer_type=gcp-kms
 }
 
 // InitBackbone initializes the backbone components of the application.
@@ -148,7 +148,7 @@ func InitBackbone() *Backbone {
 		}
 		kmsCtx, kmsCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer kmsCancel()
-		kmsSigner, kmsErr := gcpkms.NewSigner(kmsCtx, conf.GCPKMSKeyName)
+		kmsSigner, kmsErr := gcp.NewSigner(kmsCtx, conf.GCPKMSKeyName)
 		if kmsErr != nil {
 			logger.Fatal("failed to initialise GCP KMS signer", "error", kmsErr)
 		}

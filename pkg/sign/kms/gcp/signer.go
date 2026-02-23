@@ -2,7 +2,7 @@
 //
 // It wraps a GCP Cloud KMS asymmetric signing key (secp256k1) and converts
 // the KMS-produced DER signatures into Ethereum-compatible 65-byte format.
-package gcpkms
+package gcp
 
 import (
 	"context"
@@ -41,6 +41,9 @@ type GCPKMSSigner struct {
 //
 // keyResourceName must be the full key version resource name:
 // projects/{project}/locations/{location}/keyRings/{ring}/cryptoKeys/{key}/cryptoKeyVersions/{version}
+//
+// Authentication is handled automatically by the GCP SDK via Application Default
+// Credentials (GOOGLE_APPLICATION_CREDENTIALS env var, Workload Identity, etc.).
 func NewSigner(ctx context.Context, keyResourceName string) (*GCPKMSSigner, error) {
 	client, err := kms.NewKeyManagementClient(ctx)
 	if err != nil {

@@ -95,7 +95,7 @@ contract SessionKeyValidatorTest_Base is Test {
 }
 
 contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Base {
-    function test_success_withBothEip191() public view {
+    function test_success_withBothEip191() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, METADATA_HASH, USER_PK, true);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, SIGNING_DATA, SESSION_KEY1_PK, true);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -104,7 +104,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_SUCCESS));
     }
 
-    function test_success_withBothRaw() public view {
+    function test_success_withBothRaw() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, METADATA_HASH, USER_PK, false);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, SIGNING_DATA, SESSION_KEY1_PK, false);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -113,7 +113,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_SUCCESS));
     }
 
-    function test_success_withAuthEip191SkSigRaw() public view {
+    function test_success_withAuthEip191SkSigRaw() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, METADATA_HASH, USER_PK, true);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, SIGNING_DATA, SESSION_KEY1_PK, false);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -122,7 +122,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_SUCCESS));
     }
 
-    function test_success_withAuthRawSkSigEip191() public view {
+    function test_success_withAuthRawSkSigEip191() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, METADATA_HASH, USER_PK, false);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, SIGNING_DATA, SESSION_KEY1_PK, true);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -131,7 +131,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_SUCCESS));
     }
 
-    function test_failure_withSkAuthNotSignedByParticipant_eip191() public view {
+    function test_failure_withSkAuthNotSignedByParticipant_eip191() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, METADATA_HASH, OTHER_SIGNER_PK, true);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, SIGNING_DATA, SESSION_KEY1_PK, true);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -140,7 +140,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_FAILURE));
     }
 
-    function test_failure_withSkAuthNotSignedByParticipant_raw() public view {
+    function test_failure_withSkAuthNotSignedByParticipant_raw() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, METADATA_HASH, OTHER_SIGNER_PK, false);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, SIGNING_DATA, SESSION_KEY1_PK, false);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -149,7 +149,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_FAILURE));
     }
 
-    function test_failure_withSigningDataNotSignedBySessionKey_eip191() public view {
+    function test_failure_withSigningDataNotSignedBySessionKey_eip191() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, METADATA_HASH, USER_PK, true);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, SIGNING_DATA, SESSION_KEY2_PK, true);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -158,7 +158,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_FAILURE));
     }
 
-    function test_failure_withSigningDataNotSignedBySessionKey_raw() public view {
+    function test_failure_withSigningDataNotSignedBySessionKey_raw() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, METADATA_HASH, USER_PK, false);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, SIGNING_DATA, SESSION_KEY2_PK, false);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -167,7 +167,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_FAILURE));
     }
 
-    function test_failure_withOtherMetadataHash_eip191() public view {
+    function test_failure_withOtherMetadataHash_eip191() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, OTHER_METADATA_HASH, USER_PK, true);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, SIGNING_DATA, SESSION_KEY1_PK, true);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -179,7 +179,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_FAILURE));
     }
 
-    function test_failure_withOtherMetadataHash_raw() public view {
+    function test_failure_withOtherMetadataHash_raw() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, OTHER_METADATA_HASH, USER_PK, false);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, SIGNING_DATA, SESSION_KEY1_PK, false);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -191,7 +191,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_FAILURE));
     }
 
-    function test_failure_withOtherSigningData_eip191() public view {
+    function test_failure_withOtherSigningData_eip191() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, METADATA_HASH, USER_PK, true);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, OTHER_SIGNING_DATA, SESSION_KEY1_PK, true);
         bytes memory signature = abi.encode(skAuth, skSignature);
@@ -200,7 +200,7 @@ contract SessionKeyValidatorTest_validateSignature is SessionKeyValidatorTest_Ba
         assertEq(ValidationResult.unwrap(result), ValidationResult.unwrap(VALIDATION_FAILURE));
     }
 
-    function test_failure_withOtherSigningData_raw() public view {
+    function test_failure_withOtherSigningData_raw() public {
         SessionKeyAuthorization memory skAuth = createSkAuth(sessionKey1, METADATA_HASH, USER_PK, false);
         bytes memory skSignature = signStateWithSk(CHANNEL_ID, OTHER_SIGNING_DATA, SESSION_KEY1_PK, false);
         bytes memory signature = abi.encode(skAuth, skSignature);

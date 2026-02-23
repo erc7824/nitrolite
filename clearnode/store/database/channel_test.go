@@ -702,7 +702,7 @@ func TestDBStore_GetUserChannels(t *testing.T) {
 		require.NoError(t, store.CreateChannel(ch1))
 		require.NoError(t, store.CreateChannel(ch2))
 
-		channels, total, err := store.GetUserChannels("0xuser_gc", nil, nil, 100, 0)
+		channels, total, err := store.GetUserChannels("0xuser_gc", nil, nil, nil, 100, 0)
 		require.NoError(t, err)
 		assert.Len(t, channels, 2)
 		assert.Equal(t, uint32(2), total)
@@ -727,8 +727,8 @@ func TestDBStore_GetUserChannels(t *testing.T) {
 			Status: core.ChannelStatusClosed, StateVersion: 1,
 		}))
 
-		status := "closed"
-		channels, total, err := store.GetUserChannels("0xuser_sf", &status, nil, 100, 0)
+		status := core.ChannelStatusClosed
+		channels, total, err := store.GetUserChannels("0xuser_sf", &status, nil, nil, 100, 0)
 		require.NoError(t, err)
 		assert.Len(t, channels, 1)
 		assert.Equal(t, uint32(1), total)
@@ -755,11 +755,38 @@ func TestDBStore_GetUserChannels(t *testing.T) {
 		}))
 
 		asset := "usdc"
-		channels, total, err := store.GetUserChannels("0xuser_af", nil, &asset, 100, 0)
+		channels, total, err := store.GetUserChannels("0xuser_af", nil, &asset, nil, 100, 0)
 		require.NoError(t, err)
 		assert.Len(t, channels, 1)
 		assert.Equal(t, uint32(1), total)
 		assert.Equal(t, "usdc", channels[0].Asset)
+	})
+
+	t.Run("Success - Filter by channel type", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		require.NoError(t, store.CreateChannel(core.Channel{
+			ChannelID: "0xch_home", UserWallet: "0xuser_tf",
+			Asset: "usdc", Type: core.ChannelTypeHome, BlockchainID: 1,
+			TokenAddress: "0xt", ChallengeDuration: 86400, Nonce: 1,
+			Status: core.ChannelStatusOpen, StateVersion: 0,
+		}))
+		require.NoError(t, store.CreateChannel(core.Channel{
+			ChannelID: "0xch_escrow", UserWallet: "0xuser_tf",
+			Asset: "usdc", Type: core.ChannelTypeEscrow, BlockchainID: 1,
+			TokenAddress: "0xt", ChallengeDuration: 86400, Nonce: 2,
+			Status: core.ChannelStatusOpen, StateVersion: 0,
+		}))
+
+		homeType := core.ChannelTypeHome
+		channels, total, err := store.GetUserChannels("0xuser_tf", nil, nil, &homeType, 100, 0)
+		require.NoError(t, err)
+		assert.Len(t, channels, 1)
+		assert.Equal(t, uint32(1), total)
+		assert.Equal(t, core.ChannelTypeHome, channels[0].Type)
 	})
 
 	t.Run("Success - Pagination limits results", func(t *testing.T) {
@@ -777,7 +804,7 @@ func TestDBStore_GetUserChannels(t *testing.T) {
 			}))
 		}
 
-		channels, total, err := store.GetUserChannels("0xuser_pg", nil, nil, 2, 0)
+		channels, total, err := store.GetUserChannels("0xuser_pg", nil, nil, nil, 2, 0)
 		require.NoError(t, err)
 		assert.Len(t, channels, 2)
 		assert.Equal(t, uint32(5), total)
@@ -789,21 +816,9 @@ func TestDBStore_GetUserChannels(t *testing.T) {
 
 		store := NewDBStore(db)
 
-		channels, total, err := store.GetUserChannels("0xnonexistent", nil, nil, 100, 0)
+		channels, total, err := store.GetUserChannels("0xnonexistent", nil, nil, nil, 100, 0)
 		require.NoError(t, err)
 		assert.Len(t, channels, 0)
 		assert.Equal(t, uint32(0), total)
-	})
-
-	t.Run("Error - Invalid status filter", func(t *testing.T) {
-		db, cleanup := SetupTestDB(t)
-		defer cleanup()
-
-		store := NewDBStore(db)
-
-		status := "invalid_status"
-		_, _, err := store.GetUserChannels("0xuser", &status, nil, 100, 0)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid status filter")
 	})
 }

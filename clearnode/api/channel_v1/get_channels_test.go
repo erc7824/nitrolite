@@ -64,7 +64,7 @@ func TestGetChannels_Success(t *testing.T) {
 		},
 	}
 
-	mockTxStore.On("GetUserChannels", userWallet, (*string)(nil), (*string)(nil), uint32(100), uint32(0)).
+	mockTxStore.On("GetUserChannels", userWallet, (*core.ChannelStatus)(nil), (*string)(nil), (*core.ChannelType)(nil), uint32(100), uint32(0)).
 		Return(channels, uint32(2), nil)
 
 	reqPayload := rpc.ChannelsV1GetChannelsRequest{
@@ -106,7 +106,7 @@ func TestGetChannels_WithStatusFilter(t *testing.T) {
 	handler := newGetChannelsHandler(mockTxStore)
 
 	userWallet := "0x1234567890123456789012345678901234567890"
-	statusFilter := "closed"
+	statusClosed := core.ChannelStatusClosed
 
 	closedChannel := core.Channel{
 		ChannelID:    "0xChannel2",
@@ -118,12 +118,13 @@ func TestGetChannels_WithStatusFilter(t *testing.T) {
 		StateVersion: 5,
 	}
 
-	mockTxStore.On("GetUserChannels", userWallet, &statusFilter, (*string)(nil), uint32(100), uint32(0)).
+	mockTxStore.On("GetUserChannels", userWallet, &statusClosed, (*string)(nil), (*core.ChannelType)(nil), uint32(100), uint32(0)).
 		Return([]core.Channel{closedChannel}, uint32(1), nil)
 
+	statusFilterStr := "closed"
 	reqPayload := rpc.ChannelsV1GetChannelsRequest{
 		Wallet: userWallet,
-		Status: &statusFilter,
+		Status: &statusFilterStr,
 	}
 	payload, err := rpc.NewPayload(reqPayload)
 	require.NoError(t, err)
@@ -165,7 +166,7 @@ func TestGetChannels_WithPagination(t *testing.T) {
 		Status:       core.ChannelStatusOpen,
 	}
 
-	mockTxStore.On("GetUserChannels", userWallet, (*string)(nil), (*string)(nil), limit, offset).
+	mockTxStore.On("GetUserChannels", userWallet, (*core.ChannelStatus)(nil), (*string)(nil), (*core.ChannelType)(nil), limit, offset).
 		Return([]core.Channel{channel}, uint32(25), nil)
 
 	reqPayload := rpc.ChannelsV1GetChannelsRequest{
@@ -206,7 +207,7 @@ func TestGetChannels_EmptyResult(t *testing.T) {
 
 	userWallet := "0xNoChannelsUser"
 
-	mockTxStore.On("GetUserChannels", userWallet, (*string)(nil), (*string)(nil), uint32(100), uint32(0)).
+	mockTxStore.On("GetUserChannels", userWallet, (*core.ChannelStatus)(nil), (*string)(nil), (*core.ChannelType)(nil), uint32(100), uint32(0)).
 		Return([]core.Channel{}, uint32(0), nil)
 
 	reqPayload := rpc.ChannelsV1GetChannelsRequest{
@@ -263,7 +264,7 @@ func TestGetChannels_StoreError(t *testing.T) {
 
 	userWallet := "0x1234567890123456789012345678901234567890"
 
-	mockTxStore.On("GetUserChannels", userWallet, (*string)(nil), (*string)(nil), uint32(100), uint32(0)).
+	mockTxStore.On("GetUserChannels", userWallet, (*core.ChannelStatus)(nil), (*string)(nil), (*core.ChannelType)(nil), uint32(100), uint32(0)).
 		Return(nil, uint32(0), fmt.Errorf("database connection lost"))
 
 	reqPayload := rpc.ChannelsV1GetChannelsRequest{

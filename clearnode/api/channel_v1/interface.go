@@ -58,8 +58,8 @@ type Store interface {
 	// Returns nil if no home channel exists for the given wallet and asset.
 	GetActiveHomeChannel(wallet, asset string) (*core.Channel, error)
 
-	// GetUserChannels retrieves all channels for a user with optional status and asset filters.
-	GetUserChannels(wallet string, status *string, asset *string, limit, offset uint32) ([]core.Channel, uint32, error)
+	// GetUserChannels retrieves all channels for a user with optional status, asset, and type filters.
+	GetUserChannels(wallet string, status *core.ChannelStatus, asset *string, channelType *core.ChannelType, limit, offset uint32) ([]core.Channel, uint32, error)
 
 	// Session key state operations
 

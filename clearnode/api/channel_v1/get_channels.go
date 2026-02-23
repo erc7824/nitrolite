@@ -1,11 +1,40 @@
 package channel_v1
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
-// GetChannels retrieves all channels for a user with optional status/asset filtering and pagination.
+func channelStatusFromString(s string) (core.ChannelStatus, error) {
+	switch strings.ToLower(s) {
+	case "void":
+		return core.ChannelStatusVoid, nil
+	case "open":
+		return core.ChannelStatusOpen, nil
+	case "challenged":
+		return core.ChannelStatusChallenged, nil
+	case "closed":
+		return core.ChannelStatusClosed, nil
+	default:
+		return 0, fmt.Errorf("unknown channel status: %q", s)
+	}
+}
+
+func channelTypeFromString(s string) (core.ChannelType, error) {
+	switch strings.ToLower(s) {
+	case "home":
+		return core.ChannelTypeHome, nil
+	case "escrow":
+		return core.ChannelTypeEscrow, nil
+	default:
+		return 0, fmt.Errorf("unknown channel type: %q", s)
+	}
+}
+
+// GetChannels retrieves all channels for a user with optional status/asset/type filtering and pagination.
 func (h *Handler) GetChannels(c *rpc.Context) {
 	var req rpc.ChannelsV1GetChannelsRequest
 	if err := c.Request.Payload.Translate(&req); err != nil {
@@ -16,6 +45,26 @@ func (h *Handler) GetChannels(c *rpc.Context) {
 	if req.Wallet == "" {
 		c.Fail(rpc.Errorf("wallet is required"), "missing wallet")
 		return
+	}
+
+	var statusFilter *core.ChannelStatus
+	if req.Status != nil && *req.Status != "" {
+		s, err := channelStatusFromString(*req.Status)
+		if err != nil {
+			c.Fail(rpc.Errorf("invalid status: %v", err), "invalid status filter")
+			return
+		}
+		statusFilter = &s
+	}
+
+	var typeFilter *core.ChannelType
+	if req.ChannelType != nil && *req.ChannelType != "" {
+		t, err := channelTypeFromString(*req.ChannelType)
+		if err != nil {
+			c.Fail(rpc.Errorf("invalid channel_type: %v", err), "invalid channel type filter")
+			return
+		}
+		typeFilter = &t
 	}
 
 	const defaultLimit uint32 = 100
@@ -42,7 +91,7 @@ func (h *Handler) GetChannels(c *rpc.Context) {
 
 	err := h.useStoreInTx(func(tx Store) error {
 		var err error
-		channels, totalCount, err = tx.GetUserChannels(req.Wallet, req.Status, req.Asset, limit, offset)
+		channels, totalCount, err = tx.GetUserChannels(req.Wallet, statusFilter, req.Asset, typeFilter, limit, offset)
 		if err != nil {
 			return rpc.Errorf("failed to get channels: %v", err)
 		}

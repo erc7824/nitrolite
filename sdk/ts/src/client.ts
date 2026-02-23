@@ -1074,12 +1074,13 @@ export class Client {
    */
   async getChannels(
     wallet: Address,
-    options?: { status?: string; asset?: string; pagination?: core.PaginationParams }
+    options?: { status?: string; asset?: string; channelType?: string; pagination?: core.PaginationParams }
   ): Promise<{ channels: core.Channel[]; metadata: core.PaginationMetadata }> {
     const req: API.ChannelsV1GetChannelsRequest = {
       wallet,
       status: options?.status,
       asset: options?.asset,
+      channel_type: options?.channelType,
       pagination: options?.pagination
         ? {
             offset: options.pagination.offset,

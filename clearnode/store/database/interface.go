@@ -50,8 +50,8 @@ type DatabaseStore interface {
 	// UpdateChannel persists changes to a channel's metadata (status, version, etc).
 	UpdateChannel(channel core.Channel) error
 
-	// GetUserChannels retrieves all channels for a user with optional status and asset filters.
-	GetUserChannels(wallet string, status *string, asset *string, limit, offset uint32) ([]core.Channel, uint32, error)
+	// GetUserChannels retrieves all channels for a user with optional status, asset, and type filters.
+	GetUserChannels(wallet string, status *core.ChannelStatus, asset *string, channelType *core.ChannelType, limit, offset uint32) ([]core.Channel, uint32, error)
 
 	// --- State Management ---
 

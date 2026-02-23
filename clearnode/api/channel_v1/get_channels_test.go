@@ -258,6 +258,30 @@ func TestGetChannels_MissingWallet(t *testing.T) {
 	mockTxStore.AssertExpectations(t)
 }
 
+func TestGetChannels_InvalidStatus(t *testing.T) {
+	mockTxStore := new(MockStore)
+	handler := newGetChannelsHandler(mockTxStore)
+
+	garbage := "garbage"
+	reqPayload := rpc.ChannelsV1GetChannelsRequest{
+		Wallet: "0x1234567890123456789012345678901234567890",
+		Status: &garbage,
+	}
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpc.Message{Method: "channels.v1.get_channels", Payload: payload},
+	}
+
+	handler.GetChannels(ctx)
+
+	assert.Equal(t, rpc.MsgTypeRespErr, ctx.Response.Type, "invalid status should produce error response")
+
+	mockTxStore.AssertExpectations(t)
+}
+
 func TestGetChannels_StoreError(t *testing.T) {
 	mockTxStore := new(MockStore)
 	handler := newGetChannelsHandler(mockTxStore)

@@ -47,6 +47,8 @@ type ChannelsV1GetChannelsRequest struct {
 	Status *string `json:"status,omitempty"`
 	// Asset filters by asset
 	Asset *string `json:"asset,omitempty"`
+	// ChannelType filters by channel type ("home" or "escrow")
+	ChannelType *string `json:"channel_type,omitempty"`
 	// Pagination contains pagination parameters (offset, limit, sort)
 	Pagination *PaginationParamsV1 `json:"pagination,omitempty"`
 }

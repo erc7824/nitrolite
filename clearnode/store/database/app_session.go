@@ -98,10 +98,11 @@ func (s *DBStore) GetAppSessions(appSessionID *string, participant *string, stat
 	}
 
 	if participant != nil && *participant != "" {
-		// Join with participants table to filter by participant
-		query = query.Joins("JOIN app_session_participants_v1 ON app_sessions_v1.id = app_session_participants_v1.app_session_id").
-			Where("app_session_participants_v1.wallet_address = ?", strings.ToLower(*participant)).
-			Distinct("app_sessions_v1.id")
+		subQuery := s.db.Model(&AppSessionV1{}).
+			Select("app_sessions_v1.id").
+			Joins("JOIN app_session_participants_v1 ON app_sessions_v1.id = app_session_participants_v1.app_session_id").
+			Where("app_session_participants_v1.wallet_address = ?", strings.ToLower(*participant))
+		query = query.Where("id IN (?)", subQuery)
 	}
 
 	if status != app.AppSessionStatusVoid {

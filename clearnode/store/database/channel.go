@@ -118,6 +118,40 @@ func (s *DBStore) CheckOpenChannel(wallet, asset string) (string, bool, error) {
 	return approvedSigValidators, true, nil
 }
 
+// GetUserChannels retrieves all channels for a user with optional status, asset, and type filters.
+func (s *DBStore) GetUserChannels(wallet string, status *core.ChannelStatus, asset *string, channelType *core.ChannelType, limit, offset uint32) ([]core.Channel, uint32, error) {
+	query := s.db.Model(&Channel{}).Where("user_wallet = ?", strings.ToLower(wallet))
+
+	if status != nil {
+		query = query.Where("status = ?", *status)
+	}
+
+	if asset != nil && *asset != "" {
+		query = query.Where("asset = ?", strings.ToLower(*asset))
+	}
+
+	if channelType != nil {
+		query = query.Where("type = ?", *channelType)
+	}
+
+	var totalCount int64
+	if err := query.Count(&totalCount).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to count user channels: %w", err)
+	}
+
+	var dbChannels []Channel
+	if err := query.Order("created_at DESC").Limit(int(limit)).Offset(int(offset)).Find(&dbChannels).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to get user channels: %w", err)
+	}
+
+	channels := make([]core.Channel, len(dbChannels))
+	for i := range dbChannels {
+		channels[i] = *databaseChannelToCore(&dbChannels[i])
+	}
+
+	return channels, uint32(totalCount), nil
+}
+
 // ChannelCount holds the result of a COUNT() GROUP BY query on channels.
 type ChannelCount struct {
 	Asset  string             `gorm:"column:asset"`

@@ -80,6 +80,14 @@ func (m *MockStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, e
 	return args.Get(0).(*core.Channel), args.Error(1)
 }
 
+func (m *MockStore) GetUserChannels(wallet string, status *core.ChannelStatus, asset *string, channelType *core.ChannelType, limit, offset uint32) ([]core.Channel, uint32, error) {
+	args := m.Called(wallet, status, asset, channelType, limit, offset)
+	if args.Get(0) == nil {
+		return nil, 0, args.Error(2)
+	}
+	return args.Get(0).([]core.Channel), args.Get(1).(uint32), args.Error(2)
+}
+
 func (m *MockStore) StoreChannelSessionKeyState(state core.ChannelSessionKeyStateV1) error {
 	args := m.Called(state)
 	return args.Error(0)

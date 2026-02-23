@@ -1,0 +1,49 @@
+{
+    "name": "@erc7824/nitrolite-compat",
+    "version": "0.1.0",
+    "description": "Compatibility layer bridging Nitrolite SDK v0.5.3 API to v1.0.0, minimising migration effort for existing dApps.",
+    "type": "module",
+    "sideEffects": false,
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc",
+        "build:prod": "tsc -p tsconfig.prod.json",
+        "typecheck": "tsc --noEmit",
+        "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+    },
+    "keywords": [
+        "erc7824",
+        "nitrolite",
+        "compat",
+        "migration",
+        "state-channels"
+    ],
+    "author": "Nitro Team",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/erc7824/nitrolite.git",
+        "directory": "sdk/compat"
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    },
+    "peerDependencies": {
+        "@erc7824/nitrolite": ">=0.5.3",
+        "viem": "^2.0.0"
+    },
+    "dependencies": {
+        "decimal.js": "^10.4.3"
+    },
+    "devDependencies": {
+        "@erc7824/nitrolite": "file:../ts",
+        "@types/node": "^25.3.0",
+        "typescript": "^5.9.3",
+        "viem": "^2.46.2"
+    }
+}

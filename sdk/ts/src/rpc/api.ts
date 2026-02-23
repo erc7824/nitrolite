@@ -60,6 +60,8 @@ export interface ChannelsV1GetChannelsRequest {
   status?: string;
   /** Asset filter */
   asset?: string;
+  /** Channel type filter ("home" or "escrow") */
+  channel_type?: string;
   /** Pagination parameters */
   pagination?: PaginationParamsV1;
 }

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -664,5 +665,160 @@ func TestDBStore_UpdateChannel(t *testing.T) {
 
 		err := store.UpdateChannel(channel)
 		require.NoError(t, err) // GORM doesn't return error for update with no rows affected
+	})
+}
+
+func TestDBStore_GetUserChannels(t *testing.T) {
+	t.Run("Success - Get all channels for user", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		ch1 := core.Channel{
+			ChannelID:         "0xchannel_a",
+			UserWallet:        "0xuser_gc",
+			Asset:             "usdc",
+			Type:              core.ChannelTypeHome,
+			BlockchainID:      1,
+			TokenAddress:      "0xtoken1",
+			ChallengeDuration: 86400,
+			Nonce:             1,
+			Status:            core.ChannelStatusOpen,
+			StateVersion:      1,
+		}
+		ch2 := core.Channel{
+			ChannelID:         "0xchannel_b",
+			UserWallet:        "0xuser_gc",
+			Asset:             "usdc",
+			Type:              core.ChannelTypeHome,
+			BlockchainID:      1,
+			TokenAddress:      "0xtoken1",
+			ChallengeDuration: 86400,
+			Nonce:             2,
+			Status:            core.ChannelStatusClosed,
+			StateVersion:      3,
+		}
+		require.NoError(t, store.CreateChannel(ch1))
+		require.NoError(t, store.CreateChannel(ch2))
+
+		channels, total, err := store.GetUserChannels("0xuser_gc", nil, nil, nil, 100, 0)
+		require.NoError(t, err)
+		assert.Len(t, channels, 2)
+		assert.Equal(t, uint32(2), total)
+	})
+
+	t.Run("Success - Filter by status", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		require.NoError(t, store.CreateChannel(core.Channel{
+			ChannelID: "0xch_open", UserWallet: "0xuser_sf",
+			Asset: "usdc", Type: core.ChannelTypeHome, BlockchainID: 1,
+			TokenAddress: "0xt", ChallengeDuration: 86400, Nonce: 1,
+			Status: core.ChannelStatusOpen, StateVersion: 0,
+		}))
+		require.NoError(t, store.CreateChannel(core.Channel{
+			ChannelID: "0xch_closed", UserWallet: "0xuser_sf",
+			Asset: "usdc", Type: core.ChannelTypeHome, BlockchainID: 1,
+			TokenAddress: "0xt", ChallengeDuration: 86400, Nonce: 2,
+			Status: core.ChannelStatusClosed, StateVersion: 1,
+		}))
+
+		status := core.ChannelStatusClosed
+		channels, total, err := store.GetUserChannels("0xuser_sf", &status, nil, nil, 100, 0)
+		require.NoError(t, err)
+		assert.Len(t, channels, 1)
+		assert.Equal(t, uint32(1), total)
+		assert.Equal(t, core.ChannelStatusClosed, channels[0].Status)
+	})
+
+	t.Run("Success - Filter by asset", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		require.NoError(t, store.CreateChannel(core.Channel{
+			ChannelID: "0xch_usdc", UserWallet: "0xuser_af",
+			Asset: "usdc", Type: core.ChannelTypeHome, BlockchainID: 1,
+			TokenAddress: "0xt1", ChallengeDuration: 86400, Nonce: 1,
+			Status: core.ChannelStatusOpen, StateVersion: 0,
+		}))
+		require.NoError(t, store.CreateChannel(core.Channel{
+			ChannelID: "0xch_weth", UserWallet: "0xuser_af",
+			Asset: "weth", Type: core.ChannelTypeHome, BlockchainID: 1,
+			TokenAddress: "0xt2", ChallengeDuration: 86400, Nonce: 1,
+			Status: core.ChannelStatusOpen, StateVersion: 0,
+		}))
+
+		asset := "usdc"
+		channels, total, err := store.GetUserChannels("0xuser_af", nil, &asset, nil, 100, 0)
+		require.NoError(t, err)
+		assert.Len(t, channels, 1)
+		assert.Equal(t, uint32(1), total)
+		assert.Equal(t, "usdc", channels[0].Asset)
+	})
+
+	t.Run("Success - Filter by channel type", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		require.NoError(t, store.CreateChannel(core.Channel{
+			ChannelID: "0xch_home", UserWallet: "0xuser_tf",
+			Asset: "usdc", Type: core.ChannelTypeHome, BlockchainID: 1,
+			TokenAddress: "0xt", ChallengeDuration: 86400, Nonce: 1,
+			Status: core.ChannelStatusOpen, StateVersion: 0,
+		}))
+		require.NoError(t, store.CreateChannel(core.Channel{
+			ChannelID: "0xch_escrow", UserWallet: "0xuser_tf",
+			Asset: "usdc", Type: core.ChannelTypeEscrow, BlockchainID: 1,
+			TokenAddress: "0xt", ChallengeDuration: 86400, Nonce: 2,
+			Status: core.ChannelStatusOpen, StateVersion: 0,
+		}))
+
+		homeType := core.ChannelTypeHome
+		channels, total, err := store.GetUserChannels("0xuser_tf", nil, nil, &homeType, 100, 0)
+		require.NoError(t, err)
+		assert.Len(t, channels, 1)
+		assert.Equal(t, uint32(1), total)
+		assert.Equal(t, core.ChannelTypeHome, channels[0].Type)
+	})
+
+	t.Run("Success - Pagination limits results", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		for i := 0; i < 5; i++ {
+			require.NoError(t, store.CreateChannel(core.Channel{
+				ChannelID: fmt.Sprintf("0xch_pg_%d", i), UserWallet: "0xuser_pg",
+				Asset: "usdc", Type: core.ChannelTypeHome, BlockchainID: 1,
+				TokenAddress: "0xt", ChallengeDuration: 86400, Nonce: uint64(i),
+				Status: core.ChannelStatusOpen, StateVersion: 0,
+			}))
+		}
+
+		channels, total, err := store.GetUserChannels("0xuser_pg", nil, nil, nil, 2, 0)
+		require.NoError(t, err)
+		assert.Len(t, channels, 2)
+		assert.Equal(t, uint32(5), total)
+	})
+
+	t.Run("Success - Empty result for unknown user", func(t *testing.T) {
+		db, cleanup := SetupTestDB(t)
+		defer cleanup()
+
+		store := NewDBStore(db)
+
+		channels, total, err := store.GetUserChannels("0xnonexistent", nil, nil, nil, 100, 0)
+		require.NoError(t, err)
+		assert.Len(t, channels, 0)
+		assert.Equal(t, uint32(0), total)
 	})
 }

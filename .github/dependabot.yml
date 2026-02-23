@@ -6,7 +6,13 @@
 version: 2
 updates:
   - package-ecosystem: "npm" # See documentation for possible values
-    directory: "/sdk/ts/" # Location of package manifests
+    directories:
+      - "/sdk/ts"
+      - "/erc7824-docs"
+      - "/sdk/compat"
+      - "/test/integration"
+      - "/sdk/ts"
+      - "/sdk/ts/examples/*app*"
     schedule:
       interval: "weekly"
     commit-message:

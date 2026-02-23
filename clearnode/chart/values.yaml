@@ -41,22 +41,22 @@ replicaCount: 1
 
 image:
   # -- Docker image repository
-  repository: ghcr.io/erc7824/clearnode
+  repository: ghcr.io/erc7824/nitrolite/clearnode
   # -- Docker image tag
-  tag: 0.0.1
+  tag: v1.0.0-rc.0
 
 service:
   http:
     # -- Enable HTTP service
     enabled: true
     # -- HTTP service port
-    port: 8000
+    port: 7824
     # -- HTTP service path
     path: /
 
 metrics:
   # -- Enable Prometheus metrics
-  enabled: true
+  enabled: false
   podmonitoring:
     # -- Enable PodMonitoring for Managed Prometheus
     enabled: false
@@ -147,3 +147,20 @@ affinity: {}
 
 # -- Additional labels to add to all resources
 extraLabels: {}
+
+stressTest:
+  # -- Enable stress test pod (helm test)
+  enabled: false
+  # -- Test specifications (method:total_requests:connections)
+  specs:
+    - "ping:100:5"
+  # -- WebSocket URL (defaults to in-cluster service)
+  wsURL: ""
+  # -- Private key for signing (optional, ephemeral key used if not set)
+  privateKey: ""
+  # -- Default number of connections per test
+  connections: 10
+  # -- Per-test timeout
+  timeout: "10m"
+  # -- Max error rate threshold (0.01 = 1%)
+  maxErrorRate: "0.01"

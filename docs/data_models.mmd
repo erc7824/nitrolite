@@ -1,0 +1,151 @@
+classDiagram
+    class ChannelStatus {
+        open
+        closed
+        challenged
+    }
+
+    class ChannelType {
+        escrow
+        home
+    }
+
+    class Channel {
+        +string ChannelID // should be different for home and escrow channels
+        +string UserWallet // better than ParticipantWallet, because we won't have more than one participant
+        +ChannelType Type
+        +uint32 BlockchainID
+        +string Token
+        +uint64 Challenge
+        +uint64 Nonce
+        +ChannelStatus Status
+        +uint64 OnChainStateVersion
+
+        +time.Time CreatedAt
+        +time.Time UpdatedAt
+    }
+
+    class State { // Immutable
+        +[64]char ID // Deterministic: Hash(UserWallet, Asset, UserCycleIndex, Version)
+
+        +string Data
+        +string Asset
+        +string UserWallet
+        +uint64 CycleIndex
+
+        +uint64 Version
+
+        +string *HomeChannelID
+        +string *EscrowChannelID
+
+        // It seem to better not to use State array in SC in CrossChainState
+        // And CrossChainState now can be renamed to "State"
+
+        // Home Channel
+        +int256 HomeUserBalance
+        +int64 HomeUserNetFlow
+        +int256 HomeNodeBalance
+        +int64 HomeNodeNetFlow
+
+        // Escrow Channel
+        +int256 EscrowUserBalance
+        +int64 EscrowUserNetFlow
+        +int256 EscrowNodeBalance
+        +int64 EscrowNodeNetFlow
+
+        +bool IsFinal
+        %% TODO: Remove in the future if redundant 
+
+        +string UserSig
+        +string NodeSig
+
+        +time.Time CreatedAt
+    }
+
+    class ChannelOfTypeHome {
+    }
+
+    class ChannelOfTypeEscrow {
+    }
+
+    %% Relationships
+    Channel --> ChannelStatus
+    State --> ChannelOfTypeHome
+    State --> ChannelOfTypeEscrow
+    ChannelOfTypeHome --> Channel
+    ChannelOfTypeEscrow --> Channel
+    Channel --> ChannelType
+    Transaction --> TransactionType
+    Transaction --> SenderNewState
+    Transaction --> ReceiverNewState
+    SenderNewState --> State
+    ReceiverNewState --> State
+
+    class SenderNewState {
+        *Optional
+    }
+
+    class ReceiverNewState {
+        *Optional
+    }
+
+
+    class Transaction { // Immutable
+        +[64]char ID
+        // Deterministic:
+        // 1) Initiated by User: Hash(ToAccount, SenderNewStateID)
+        // 2) Initiated by Node: Hash(FromAccount, ReceiverNewStateID)
+
+        +TransactionType Type
+        +string AssetSymbol
+
+        +string FromAccount
+        +string ToAccount
+
+        +[64]char *SenderNewStateID
+        +[64]char *ReceiverNewStateID
+
+        +decimal.Decimal Amount
+        +time.Time CreatedAt
+    }
+
+    class TransactionType {
+        %% isWallet(ToAccount) && isWallet(FromAccount) -> transfer
+        transfer
+
+        %% ToAccount = AppSessionID -> commit
+        %% FromAccount = UserWallet -> commit
+        commit
+
+        %% ToAccount = UserWallet -> release
+        %% FromAccount = AppSessionID -> release
+        release
+
+        %% FromAccount = HomeChannelID -> home_deposit
+        %% ToAccount = UserWallet -> home_deposit
+        home_deposit
+
+        %% FromAccount = UserWallet -> home_withdrawal
+        %% ToAccount = HomeChannelID -> home_withdrawal
+        home_withdrawal
+
+        %% ToAccount = EscrowChannelID -> mutual_lock
+        %% FromAccount = HomeChannelID -> mutual_lock
+        mutual_lock
+
+        %% FromAccount = EscrowChannelID -> escrow_deposit
+        %% ToAccount = HomeChannelID -> escrow_deposit
+        escrow_deposit
+        
+        %% ToAccount = HomeChannelID -> escrow_lock
+        %% FromAccount = EscrowChannelID -> escrow_lock
+        escrow_lock
+
+        %% FromAccount = HomeChannelID -> escrow_withdraw
+        %% ToAccount = EscrowChannelID -> escrow_withdraw
+        escrow_withdraw
+
+        %% FromAccount = HomeChannelID -> migrate
+        %% ToAccount = EscrowChannelID -> migrate
+        migrate
+    }

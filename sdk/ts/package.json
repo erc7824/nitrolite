@@ -1,0 +1,88 @@
+{
+    "name": "@erc7824/nitrolite",
+    "version": "0.5.3",
+    "description": "The Nitrolite SDK empowers developers to build high-performance, scalable web3 applications using state channels. It's designed to provide near-instant transactions and significantly improved user experiences by minimizing direct blockchain interactions.",
+    "type": "module",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "npm run codegen && npm run test && tsc",
+        "build:prod": "npm run codegen && npm run test && npm run validate && tsc -p tsconfig.prod.json",
+        "build:full": "npm run validate && npm run build",
+        "codegen": "ts-node scripts/generate-abi.ts",
+        "docs": "ts-node scripts/generate-docs.ts",
+        "docs:tutorials": "ts-node scripts/generate-example-tutorials.ts",
+        "validate": "ts-node scripts/validate-types.ts",
+        "watch": "tsc --watch",
+        "clean": "rimraf dist docs/generated docs/tutorials test/integration/artifacts",
+        "lint": "eslint src --ext .ts",
+        "typecheck": "tsc --noEmit",
+        "test": "jest",
+        "test:types": "npm run validate",
+        "dev": "npm run codegen && npm run watch",
+        "dev:docs": "npm run docs:tutorials && npm run watch",
+        "prettier": "prettier --write .",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "test:integration": "jest --config jest.integration.config.js",
+        "test:integration:watch": "jest --config jest.integration.config.js --watch",
+        "test:integration:coverage": "jest --config jest.integration.config.js --coverage",
+        "test:nonregression": "npm run test:integration",
+        "test:all": "npm run test && npm run test:integration",
+        "prepublishOnly": "npm run clean && npm run build:prod"
+    },
+    "keywords": [
+        "erc7824",
+        "statechannels",
+        "chain abstraction",
+        "chain agnostic",
+        "state channels",
+        "ethereum",
+        "scaling",
+        "layer 2",
+        "layer 3",
+        "nitro",
+        "nitrolite",
+        "high-speed"
+    ],
+    "author": "Nitro Team",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/erc7824/nitrolite.git"
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    },
+    "dependencies": {
+        "abitype": "^1.2.3",
+        "decimal.js": "^10.4.3",
+        "viem": "^2.44.0",
+        "zod": "^4.3.6"
+    },
+    "devDependencies": {
+        "@ethereumjs/blockchain": "^10.0.0",
+        "@ethereumjs/common": "^10.0.0",
+        "@ethereumjs/evm": "^10.0.0",
+        "@ethereumjs/statemanager": "^10.0.0",
+        "@ethereumjs/util": "^10.0.0",
+        "@ethereumjs/vm": "^10.0.0",
+        "@types/jest": "30.0.0",
+        "@types/node": "^25.2.3",
+        "@typescript-eslint/eslint-plugin": "^8.55.0",
+        "@typescript-eslint/parser": "^8.55.0",
+        "eslint": "^10.0.0",
+        "ethers": "6.16.0",
+        "glob": "^13.0.3",
+        "jest": "^30.2.0",
+        "prettier": "3.8.1",
+        "rimraf": "^6.1.3",
+        "ts-jest": "^29.1.2",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.3.0"
+    }
+}

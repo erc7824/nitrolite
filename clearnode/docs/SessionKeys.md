@@ -243,6 +243,67 @@ To immediately invalidate a session key, use the `revoke_session_key` method:
 - Session key does not exist, belongs to another wallet, or is expired: `"operation denied: provided address is not an active session key of this user"`
 - Non-"clearnode" session key attempting to revoke another session key: `"operation denied: insufficient permissions for the active session key"`
 
+### Nitrolite V1 API
+
+The V1 API provides versioned session key state management with ABI-encoded signature verification, scoping to applications and app sessions, and versioned state updates.
+
+#### Submit Session Key State
+
+Register or update a session key state via `app_sessions.v1.submit_session_key_state`. Each update creates a new version. The state must be signed by the user's wallet.
+
+**State Fields:**
+
+- `user_address`: The wallet address owning the session key
+- `session_key`: The delegated key address
+- `version`: Sequential version (starts at 1, increments by 1)
+- `application_id`: Array of application IDs the key is authorized for
+- `app_session_id`: Array of app session IDs the key is authorized for
+- `expires_at`: Unix timestamp (seconds) for expiration
+- `user_sig`: ECDSA signature over ABI-encoded state (excluding user_sig)
+
+The signature is verified by ABI-encoding `(address, address, uint64, bytes32[], bytes32[], uint64)` and recovering the signer from the Keccak256 hash.
+
+#### Get Last Key States
+
+Retrieve active session key states via `app_sessions.v1.get_last_key_states`:
+
+- Returns the latest version per session key for a given user
+- Excludes expired states
+- Optionally filter by `session_key` address
+
 ### Nitrolite SDK
 
-The Nitrolite SDK provides a higher-level abstraction for managing session keys. For detailed information on using session keys with the Nitrolite SDK, please refer to the SDK documentation.
+The SDKs provide high-level methods for session key management:
+
+**Go SDK:**
+
+```go
+// Build, sign, and submit a session key state
+state, err := client.BuildSessionKeyState(ctx, "0xSessionKey...", appIDs, sessionIDs, expiresAt)
+sig, err := client.SignSessionKeyState(state)
+state.UserSig = sig
+err = client.SubmitSessionKeyState(ctx, state)
+
+// Query active session key states
+states, err := client.GetLastKeyStates(ctx, userAddress, nil)
+```
+
+**TypeScript SDK:**
+
+```typescript
+// Submit a session key state
+await client.submitSessionKeyState({
+  user_address: '0x1234...',
+  session_key: '0xabcd...',
+  version: '1',
+  application_id: ['app1'],
+  app_session_id: [],
+  expires_at: String(Math.floor(Date.now() / 1000) + 86400),
+  user_sig: '0x...',
+});
+
+// Query active session key states
+const states = await client.getLastKeyStates('0x1234...');
+```
+
+For detailed SDK documentation, refer to the [Go SDK README](../../sdk/go/README.md) and [TypeScript SDK README](../../sdk/ts/README.md).

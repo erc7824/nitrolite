@@ -2,16 +2,28 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/nitrolite"
-	"github.com/ethereum/go-ethereum/common"
-	"gorm.io/gorm"
+	"github.com/erc7824/nitrolite/clearnode/store/database"
+	"github.com/erc7824/nitrolite/pkg/core"
+	"github.com/erc7824/nitrolite/pkg/log"
 )
+
+type BlockchainWorkerStore interface {
+	GetActions(limit uint8, chainID uint64) ([]database.BlockchainAction, error)
+	GetStateByID(stateID string) (*core.State, error)
+	GetChannelByID(channelID string) (*core.Channel, error)
+	Complete(actionID int64, txHash string) error
+	Fail(actionID int64, err string) error
+	FailNoRetry(actionID int64, err string) error
+	RecordAttempt(actionID int64, err string) error
+}
+
+type MetricsExporter interface {
+	IncBlockchainAction(asset string, blockchainID uint64, actionType string, success bool)
+}
 
 const (
 	// actionBatchSize determines how many blockchain actions to process at once
@@ -20,149 +32,205 @@ const (
 	// maxActionRetries is the maximum number of times to retry a failed action
 	maxActionRetries = 5
 
-	// chainWorkerTickInterval is how frequently each chain worker checks for new actions
-	chainWorkerTickInterval = 30 * time.Second
-
-	unmarshalCheckpointDataError = "unmarshal checkpoint data"
+	// blockchainWorkerTickInterval is how frequently the worker checks for new actions
+	blockchainWorkerTickInterval = 30 * time.Second
 )
 
 type BlockchainWorker struct {
-	db      *gorm.DB
-	custody map[uint32]CustodyInterface
-	logger  Logger
+	blockchainID uint64
+	client       core.Client
+	store        BlockchainWorkerStore
+	logger       log.Logger
+	metrics      MetricsExporter
 }
 
-func NewBlockchainWorker(db *gorm.DB, custody map[uint32]CustodyInterface, logger Logger) *BlockchainWorker {
+func NewBlockchainWorker(blockchainID uint64, client core.Client, store BlockchainWorkerStore, logger log.Logger, m MetricsExporter) *BlockchainWorker {
 	return &BlockchainWorker{
-		db:      db,
-		custody: custody,
-		logger:  logger.NewSystem("blockchain-worker"),
+		blockchainID: blockchainID,
+		client:       client,
+		store:        store,
+		logger:       logger.WithName("bw").WithKV("blockchainID", blockchainID),
+		metrics:      m,
 	}
 }
 
-func (w *BlockchainWorker) Start(ctx context.Context) {
-	w.logger.Debug("starting blockchain worker with dedicated workers for each chain")
-	var wg sync.WaitGroup
-	for chainID := range w.custody {
-		wg.Add(1)
-		go w.runChainWorker(ctx, &wg, chainID)
+func (w *BlockchainWorker) Start(ctx context.Context, handleClosure func(err error)) {
+	w.logger.Info("starting blockchain worker")
+
+	childCtx, cancel := context.WithCancel(ctx)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	var closureErr error
+	var closureErrMu sync.Mutex
+	childHandleClosure := func(err error) {
+		closureErrMu.Lock()
+		defer closureErrMu.Unlock()
+
+		if err != nil && closureErr == nil {
+			closureErr = err
+		}
+
+		cancel()
+		wg.Done()
 	}
-	w.logger.Info("blockchain workers started")
-	<-ctx.Done()
-	w.logger.Debug("shutdown signal received, waiting for chain workers to stop...")
-	wg.Wait()
-	w.logger.Info("all chain workers have stopped")
+
+	go func() {
+		defer childHandleClosure(nil)
+		w.run(childCtx)
+	}()
+
+	go func() {
+		wg.Wait()
+
+		closureErrMu.Lock()
+		defer closureErrMu.Unlock()
+
+		handleClosure(closureErr)
+	}()
 }
 
-func (w *BlockchainWorker) runChainWorker(ctx context.Context, wg *sync.WaitGroup, chainID uint32) {
-	defer wg.Done()
-	chainLogger := w.logger.With("chain", chainID)
-	chainLogger.Info("chain worker started", "chainId", chainID)
-
-	ticker := time.NewTicker(chainWorkerTickInterval)
+func (w *BlockchainWorker) run(ctx context.Context) {
+	ticker := time.NewTicker(blockchainWorkerTickInterval)
 	defer ticker.Stop()
 
-	w.processActionsForChain(ctx, chainID, chainLogger)
+	// Process immediately on start
+	w.processActions(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
-			chainLogger.Debug("chain worker stopping")
-			defer chainLogger.Info("chain worker stopped")
+			w.logger.Info("blockchain worker stopped")
 			return
 		case <-ticker.C:
-			w.processActionsForChain(ctx, chainID, chainLogger)
+			for w.processActions(ctx) {
+			}
 		}
 	}
 }
 
-func (w *BlockchainWorker) processActionsForChain(ctx context.Context, chainID uint32, logger Logger) {
-	actions, err := getActionsForChain(w.db, chainID, actionBatchSize)
+func (w *BlockchainWorker) processActions(ctx context.Context) bool {
+	actions, err := w.store.GetActions(actionBatchSize, w.blockchainID)
 	if err != nil {
-		logger.Error("failed to get pending actions for chain", "error", err)
-		return
+		w.logger.Error("failed to get pending actions", "error", err)
+		return false
 	}
 	if len(actions) == 0 {
-		return
+		return false
 	}
 
-	logger.Debug("processing batch of actions", "count", len(actions))
+	w.logger.Debug("processing batch of actions", "count", len(actions))
+	allSuccess := true
 	for _, action := range actions {
 		if ctx.Err() != nil {
-			logger.Info("context cancelled, stopping batch processing")
-			return
+			w.logger.Info("context cancelled, stopping batch processing")
+			return false
 		}
-		w.processAction(ctx, action)
+
+		ok := w.processAction(ctx, action)
+		if !ok {
+			allSuccess = false
+		}
 	}
+
+	return allSuccess
 }
 
-func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainAction) {
+func (w *BlockchainWorker) processAction(_ context.Context, action database.BlockchainAction) bool {
 	logger := w.logger.
-		With("id", action.ID).
-		With("type", action.Type).
-		With("channel", action.ChannelID).
-		With("chain", action.ChainID).
-		With("attempt", action.Retries)
+		WithKV("actionID", action.ID).
+		WithKV("type", action.Type).
+		WithKV("state", action.StateID).
+		WithKV("attempt", action.Retries)
 
-	custody, exists := w.custody[action.ChainID]
-	if !exists {
-		err := fmt.Errorf("no custody client for chain %d", action.ChainID)
-		logger.Error("custody client not found, failing action", "error", err)
-		if err := action.Fail(w.db, err.Error()); err != nil {
-			logger.Error("failed to mark action as failed", "error", err)
+	state, err := w.store.GetStateByID(action.StateID)
+	if err != nil {
+		logger.Error("failed to get state for action", "error", err)
+		if failErr := w.store.FailNoRetry(action.ID, err.Error()); failErr != nil {
+			logger.Error("failed to mark action as failed", "error", failErr)
 		}
-		return
+		return false
+	}
+	if state == nil {
+		errMsg := fmt.Sprintf("state not found: %s", action.StateID)
+		logger.Error(errMsg)
+		if failErr := w.store.FailNoRetry(action.ID, errMsg); failErr != nil {
+			logger.Error("failed to mark action as failed", "error", failErr)
+		}
+		return false
 	}
 
-	var txHash common.Hash
-	var err error
+	var txHash string
 
 	switch action.Type {
-	case ActionTypeCheckpoint:
-		txHash, err = w.processCheckpoint(ctx, action, custody)
+	case database.ActionTypeCheckpoint:
+		txHash, err = w.client.Checkpoint(*state)
+
+	// case database.ActionTypeInitiateEscrowDeposit:
+	// 	txHash, err = w.processInitiateEscrow(state, w.client.InitiateEscrowDeposit)
+
+	// case database.ActionTypeFinalizeEscrowDeposit:
+	// 	txHash, err = w.client.FinalizeEscrowDeposit(*state)
+
+	// case database.ActionTypeInitiateEscrowWithdrawal:
+	// 	txHash, err = w.processInitiateEscrow(state, w.client.InitiateEscrowWithdrawal)
+
+	// case database.ActionTypeFinalizeEscrowWithdrawal:
+	// 	txHash, err = w.client.FinalizeEscrowWithdrawal(*state)
+
 	default:
-		err = fmt.Errorf("unknown action type: %s", action.Type)
+		err = fmt.Errorf("unknown action type: %d", action.Type)
 	}
 
 	if err != nil {
-		isFatalError := strings.Contains(err.Error(), unmarshalCheckpointDataError)
-
-		if isFatalError {
-			logger.Error("action failed due to fatal data error", "error", err)
-			if failErr := action.Fail(w.db, err.Error()); failErr != nil {
-				logger.Error("failed to mark action as permanently failed", "error", failErr)
-			}
-		} else {
-			if action.Retries >= maxActionRetries {
-				logger.Warn("action failed after reaching max retries", "error", err)
-				finalErr := fmt.Errorf("failed after %d retries: %w", action.Retries, err)
-
-				if saveErr := action.FailNoRetry(w.db, finalErr.Error()); saveErr != nil {
-					logger.Error("failed to mark action as permanently failed", "error", saveErr)
-				}
-			} else {
-				logger.Error("processing attempt failed, will retry later", "error", err)
-				if recordErr := action.RecordAttempt(w.db, err.Error()); recordErr != nil {
-					logger.Error("failed to record failed attempt", "error", recordErr)
-				}
-			}
-		}
-		return
+		w.handleActionError(action, err, logger)
+		w.metrics.IncBlockchainAction(state.Asset, w.blockchainID, action.Type.String(), false)
+		return false
 	}
 
-	// Success case
-	if err := action.Complete(w.db, txHash); err != nil {
-		logger.Error("failed to mark action as completed", "error", err)
-		return
+	if completeErr := w.store.Complete(action.ID, txHash); completeErr != nil {
+		logger.Error("failed to mark action as completed", "error", completeErr)
+		return false
 	}
-	logger.Info("action completed successfully", "txHash", txHash.Hex())
+	w.metrics.IncBlockchainAction(state.Asset, w.blockchainID, action.Type.String(), true)
+	logger.Info("action completed successfully", "txHash", txHash)
+
+	return true
 }
 
-func (w *BlockchainWorker) processCheckpoint(ctx context.Context, action BlockchainAction, custody CustodyInterface) (common.Hash, error) {
-	var data CheckpointData
-	if err := json.Unmarshal([]byte(action.Data), &data); err != nil {
-		return common.Hash{}, fmt.Errorf("%s: %w", unmarshalCheckpointDataError, err)
-	}
+// func (w *BlockchainWorker) processInitiateEscrow(state *core.State, initiate func(core.ChannelDefinition, core.State) (string, error)) (string, error) {
+// 	if state.EscrowChannelID == nil {
+// 		return "", fmt.Errorf("state has no escrow channel ID")
+// 	}
 
-	return custody.Checkpoint(action.ChannelID, data.State, data.UserSig, data.ServerSig, []nitrolite.State{})
+// 	channel, err := w.store.GetChannelByID(*state.EscrowChannelID)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to get escrow channel: %w", err)
+// 	}
+// 	if channel == nil {
+// 		return "", fmt.Errorf("escrow channel not found: %s", *state.EscrowChannelID)
+// 	}
+
+// 	def := core.ChannelDefinition{
+// 		Nonce:                 channel.Nonce,
+// 		Challenge:             channel.ChallengeDuration,
+// 		ApprovedSigValidators: channel.ApprovedSigValidators,
+// 	}
+
+// 	return initiate(def, *state)
+// }
+
+func (w *BlockchainWorker) handleActionError(action database.BlockchainAction, err error, logger log.Logger) {
+	if action.Retries >= maxActionRetries {
+		logger.Warn("action failed after reaching max retries", "error", err)
+		finalErr := fmt.Errorf("failed after %d retries: %w", action.Retries, err)
+		if saveErr := w.store.FailNoRetry(action.ID, finalErr.Error()); saveErr != nil {
+			logger.Error("failed to mark action as permanently failed", "error", saveErr)
+		}
+	} else {
+		logger.Error("processing attempt failed, will retry later", "error", err)
+		if recordErr := w.store.RecordAttempt(action.ID, err.Error()); recordErr != nil {
+			logger.Error("failed to record failed attempt", "error", recordErr)
+		}
+	}
 }

@@ -29,6 +29,13 @@
 | `resize_channel`            | Returns data and Broker signature to adjust channel capacity             | Private |
 | `cleanup_session_key_cache` | Clears the local session key cache                                       | Test    |
 
+**V1 App Session Key Endpoints** (new):
+
+| Method                                           | Description                                                              | Access  |
+| ------------------------------------------------ | ------------------------------------------------------------------------ | ------- |
+| `app_sessions.v1.submit_session_key_state`       | Submits a session key state for registration or update                   | Private |
+| `app_sessions.v1.get_last_key_states`            | Retrieves the latest session key states for a user                       | Private |
+
 ### Legenda
 
 | Access  | Description                         |
@@ -636,6 +643,102 @@ Revokes a session key by immediately invalidating it. The session key can no lon
 - After revocation, any operations attempted with the revoked session key will fail with a validation error
 - The revoked session key will no longer appear in the `get_session_keys` response
 - Revocation is useful for security purposes when a session key may have been compromised
+
+### Submit Session Key State (V1)
+
+Submits a session key state for registration or update via the V1 API. Unlike the legacy `auth_request`-based session key registration, this endpoint uses ABI-encoded signature verification and supports versioned session key states with scoping to specific applications and app sessions.
+
+**Method**: `app_sessions.v1.submit_session_key_state`
+
+**Request:**
+
+```json
+{
+  "state": {
+    "user_address": "0x1234567890abcdef...",
+    "session_key": "0x9876543210fedcba...",
+    "version": "1",
+    "application_id": ["app1", "app2"],
+    "app_session_id": ["0xSession1..."],
+    "expires_at": "1762417328",
+    "user_sig": "0xabcdef..."
+  }
+}
+```
+
+**Parameters:**
+
+- `user_address` (required): The wallet address that owns the session key
+- `session_key` (required): The address of the session key to register/update
+- `version` (required): Sequential version number (must be latest_version + 1, starting from 1)
+- `application_id` (optional): Array of application IDs this session key is authorized for
+- `app_session_id` (optional): Array of app session IDs this session key is authorized for
+- `expires_at` (required): Unix timestamp in seconds when this session key expires (must be in the future)
+- `user_sig` (required): The user's ECDSA signature over the ABI-encoded state (excluding user_sig itself)
+
+**Response:**
+
+```json
+{}
+```
+
+**Signature Generation:**
+
+The `user_sig` is created by ABI-encoding the state fields (excluding `user_sig`) and signing the Keccak256 hash:
+1. ABI-encode: `(address user_address, address session_key, uint64 version, bytes32[] application_ids, bytes32[] app_session_ids, uint64 expires_at)`
+2. Keccak256 hash the packed bytes
+3. Sign with the user's wallet private key (EIP-191 Ethereum Signed Message)
+
+**Error Cases:**
+
+- Invalid hex address for `user_address` or `session_key`
+- `version` is 0 or not sequential
+- `expires_at` is in the past
+- `user_sig` is empty or doesn't recover to `user_address`
+
+### Get Last Key States (V1)
+
+Retrieves the latest non-expired session key states for a user, with optional filtering by session key address.
+
+**Method**: `app_sessions.v1.get_last_key_states`
+
+**Request:**
+
+```json
+{
+  "user_address": "0x1234567890abcdef...",
+  "session_key": "0x9876543210fedcba..."
+}
+```
+
+**Parameters:**
+
+- `user_address` (required): The wallet address to query session key states for
+- `session_key` (optional): Filter by a specific session key address
+
+**Response:**
+
+```json
+{
+  "states": [
+    {
+      "user_address": "0x1234567890abcdef...",
+      "session_key": "0x9876543210fedcba...",
+      "version": "3",
+      "application_id": ["app1"],
+      "app_session_id": ["0xSession1..."],
+      "expires_at": "1762417328",
+      "user_sig": "0xabcdef..."
+    }
+  ]
+}
+```
+
+**Notes:**
+
+- Returns only the latest version per session key
+- Excludes expired session key states
+- If `session_key` is provided, returns at most one state for that specific key
 
 ### Transfer Funds
 

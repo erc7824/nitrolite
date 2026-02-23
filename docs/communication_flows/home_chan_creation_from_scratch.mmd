@@ -1,0 +1,36 @@
+sequenceDiagram
+        actor User
+        actor Client
+        actor Node
+        actor HomeChain
+        Note over Client: Connected to Node
+        User->>Client: deposit(blockchainId, asset, amount)
+        Client->>Node: GetLastState(UserWallet, asset)
+        Note right of Node: GetLastState(userWallet, asset) returns nil
+        Node->>Client: Returns an "empty state with 0 version" error
+        Note over Client: newChannelDefinition()
+        Note over Client: newEmptyState(asset) returns state
+        Note over Client: state.setID(CalculateStateID(state.userWallet, state.asset, cycleId, state.version))
+        Note over Client: GetTokenAddress(blockchainId, asset)
+        Note over Client: state.setHomeToken(blockchainId, tokenAddress)
+        Note over Client: NewTransition(depositT, state.ID(), userWallet, amount)
+        Note over Client: state.applyTransitions(transitions) returns true
+        Note over Client: signState(state) returns userSig
+        Client->>Node: RequestCreateChannel(channelDef, state, userSig)
+        Note right of Node: GetLastState(userWallet, asset) returns nil
+        Note right of Node: ValidateChannelDefinition(channelDef)
+        Note right of Node: ValidateStateTransition(nil, state)
+        Note right of Node: StoreChannel(channel)
+        Note right of Node: StoreState(state)
+        Node->>Client: Return node signature
+        Note over Client: GetChannelId(channelDef)
+        Note over Client: PackChannelDefinition(channelDef)
+        Note over Client: PackState(channelId, state)
+        Client->>HomeChain: createHomeChannel(packedChannelDef, packedState)
+        HomeChain->>Client: Return Tx Hash
+        HomeChain-->>Node: Emits HomeChannelCreated Event
+        Note right of Node: HandleHomeChannelCreated()
+        Note right of Node: UpdateChannel(channel)
+        Node-->>Client: Sends ChannelUpdate & BalanceUpdate
+        Client-->>User: Returns success
+        

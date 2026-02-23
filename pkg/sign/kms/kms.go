@@ -98,7 +98,7 @@ func RecoverV(hash []byte, r, s *big.Int, expectedPub *ecdsa.PublicKey) (uint8, 
 	copy(sig[32-len(rBytes):32], rBytes)
 	copy(sig[64-len(sBytes):64], sBytes)
 
-	for v := range uint8(2) {
+	for v := uint8(0); v < 2; v++ {
 		sig[64] = v
 		recovered, err := crypto.SigToPub(hash, sig)
 		if err != nil {

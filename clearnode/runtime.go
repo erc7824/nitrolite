@@ -44,6 +44,18 @@ type Backbone struct {
 	Logger         log.Logger
 	RuntimeMetrics metrics.RuntimeMetricExporter
 	StoreMetrics   metrics.StoreMetricExporter
+	closers        []func() error
+}
+
+// Close releases resources held by the backbone (e.g., KMS client connections).
+func (b *Backbone) Close() error {
+	var firstErr error
+	for _, fn := range b.closers {
+		if err := fn(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 type Config struct {
@@ -112,32 +124,39 @@ func InitBackbone() *Backbone {
 	// Signer
 	// ------------------------------------------------
 
-	var stateSigner, txSigner sign.Signer
+	var (
+		stateSigner, txSigner sign.Signer
+		signerErr             error
+		closers               []func() error
+	)
 	switch conf.SignerType {
 	case "key":
 		if conf.SignerKey == "" {
 			logger.Fatal("CLEARNODE_SIGNER_KEY is required when CLEARNODE_SIGNER_TYPE=key")
 		}
-		stateSigner, err = sign.NewEthereumMsgSigner(conf.SignerKey)
-		if err != nil {
-			logger.Fatal("failed to initialise state signer", "error", err)
+		stateSigner, signerErr = sign.NewEthereumMsgSigner(conf.SignerKey)
+		if signerErr != nil {
+			logger.Fatal("failed to initialise state signer", "error", signerErr)
 		}
-		txSigner, err = sign.NewEthereumRawSigner(conf.SignerKey)
-		if err != nil {
-			logger.Fatal("failed to initialise tx signer", "error", err)
+		txSigner, signerErr = sign.NewEthereumRawSigner(conf.SignerKey)
+		if signerErr != nil {
+			logger.Fatal("failed to initialise tx signer", "error", signerErr)
 		}
 	case "gcp-kms":
 		if conf.GCPKMSKeyName == "" {
 			logger.Fatal("CLEARNODE_GCP_KMS_KEY_NAME is required when CLEARNODE_SIGNER_TYPE=gcp-kms")
 		}
-		kmsSigner, kmsErr := gcpkms.NewSigner(context.Background(), conf.GCPKMSKeyName)
+		kmsCtx, kmsCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer kmsCancel()
+		kmsSigner, kmsErr := gcpkms.NewSigner(kmsCtx, conf.GCPKMSKeyName)
 		if kmsErr != nil {
 			logger.Fatal("failed to initialise GCP KMS signer", "error", kmsErr)
 		}
+		closers = append(closers, kmsSigner.Close)
 		txSigner = kmsSigner
-		stateSigner, err = sign.NewEthereumMsgSignerFromRaw(kmsSigner)
-		if err != nil {
-			logger.Fatal("failed to wrap KMS signer as state signer", "error", err)
+		stateSigner, signerErr = sign.NewEthereumMsgSignerFromRaw(kmsSigner)
+		if signerErr != nil {
+			logger.Fatal("failed to wrap KMS signer as state signer", "error", signerErr)
 		}
 	default:
 		logger.Fatal("unsupported CLEARNODE_SIGNER_TYPE", "type", conf.SignerType)
@@ -213,6 +232,7 @@ func InitBackbone() *Backbone {
 		Logger:         logger,
 		RuntimeMetrics: runtimeMetrics,
 		StoreMetrics:   storeMetrics,
+		closers:        closers,
 	}
 }
 

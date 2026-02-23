@@ -147,6 +147,11 @@ func main() {
 		logger.Error("failed to shut down RPC server", "error", err)
 	}
 
+	// Close backbone resources
+	if err := bb.Close(); err != nil {
+		logger.Error("failed to close backbone resources", "error", err)
+	}
+
 	// TODO: gracefully stop blockchain listeners and workers
 	logger.Info("shutdown complete")
 }

@@ -16,6 +16,7 @@ import (
 
 	kms "cloud.google.com/go/kms/apiv1"
 	"cloud.google.com/go/kms/apiv1/kmspb"
+	"google.golang.org/api/option"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
@@ -23,6 +24,9 @@ import (
 	"github.com/erc7824/nitrolite/pkg/sign"
 	kmssign "github.com/erc7824/nitrolite/pkg/sign/kms"
 )
+
+// crc32cTable is pre-computed once to avoid re-creating it on every Sign() call.
+var crc32cTable = crc32.MakeTable(crc32.Castagnoli)
 
 // GCPKMSSigner implements [sign.Signer] using a GCP Cloud KMS secp256k1 key.
 //
@@ -37,6 +41,11 @@ type GCPKMSSigner struct {
 	ecPublicKey *ecdsa.PublicKey
 }
 
+// DefaultGRPCPoolSize is the number of gRPC connections to open to KMS.
+// Multiple connections allow concurrent signing requests to avoid head-of-line
+// blocking on a single HTTP/2 connection.
+const DefaultGRPCPoolSize = 4
+
 // NewSigner creates a new GCP KMS signer.
 //
 // keyResourceName must be the full key version resource name:
@@ -44,8 +53,12 @@ type GCPKMSSigner struct {
 //
 // Authentication is handled automatically by the GCP SDK via Application Default
 // Credentials (GOOGLE_APPLICATION_CREDENTIALS env var, Workload Identity, etc.).
-func NewSigner(ctx context.Context, keyResourceName string) (*GCPKMSSigner, error) {
-	client, err := kms.NewKeyManagementClient(ctx)
+func NewSigner(ctx context.Context, keyResourceName string, opts ...option.ClientOption) (*GCPKMSSigner, error) {
+	// Default to a connection pool for better concurrent throughput.
+	allOpts := append([]option.ClientOption{
+		option.WithGRPCConnectionPool(DefaultGRPCPoolSize),
+	}, opts...)
+	client, err := kms.NewKeyManagementClient(ctx, allOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create KMS client: %w", err)
 	}
@@ -204,5 +217,5 @@ func parseECPublicKeyPEM(pemStr string) (*ecdsa.PublicKey, error) {
 
 // crc32c computes the CRC32C (Castagnoli) checksum of data.
 func crc32c(data []byte) uint32 {
-	return crc32.Checksum(data, crc32.MakeTable(crc32.Castagnoli))
+	return crc32.Checksum(data, crc32cTable)
 }

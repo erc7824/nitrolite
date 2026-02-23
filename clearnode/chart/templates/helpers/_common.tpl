@@ -87,6 +87,10 @@ Returns common environment variables
 - name: {{ $key | upper }}
   value: {{ $value | print | quote }}
 {{- end }}
+{{- if .Values.config.gcpSaSecret }}
+- name: GOOGLE_APPLICATION_CREDENTIALS
+  value: "/etc/gcp/credentials.json"
+{{- end }}
 {{- end }}
 
 {{/*

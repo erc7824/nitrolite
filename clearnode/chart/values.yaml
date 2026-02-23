@@ -23,10 +23,8 @@ config:
     password: changeme
     # -- Database SSL mode (disable, require, verify-ca, verify-full)
     sslmode: disable
-  # -- Signer type: "key" (default, uses CLEARNODE_SIGNER_KEY) or "gcp-kms" (uses GCP Cloud KMS)
-  # signerType: key
-  # -- GCP KMS key version resource name (required when signerType is "gcp-kms")
-  # gcpKmsKeyName: projects/{project}/locations/{location}/keyRings/{ring}/cryptoKeys/{key}/cryptoKeyVersions/{version}
+  # -- Name of the secret containing GCP SA Credentials (Optional)
+  gcpSaSecret: ""
   # -- Additional environment variables as key-value pairs
   extraEnvs: {}
     # KEY: VALUE

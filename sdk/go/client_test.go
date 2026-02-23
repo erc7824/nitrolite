@@ -419,7 +419,7 @@ func TestClient_GetLastAppKeyStates(t *testing.T) {
 				UserAddress: "0xUser",
 				SessionKey:  "0xKey",
 				Version:     "1",
-				ExpiresAt:   string(decimal.NewFromInt(now).String()),
+				ExpiresAt:   decimal.NewFromInt(now).String(),
 				UserSig:     "0xSig",
 			},
 		},

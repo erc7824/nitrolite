@@ -8,6 +8,7 @@ import {
     VALIDATION_FAILURE
 } from "../interfaces/ISignatureValidator.sol";
 import {EcdsaSignatureUtils} from "./EcdsaSignatureUtils.sol";
+import {SwSignatureUtils} from "./SwSignatureUtils.sol";
 import {Utils} from "../Utils.sol";
 
 /**
@@ -36,6 +37,7 @@ function toSigningData(SessionKeyAuthorization memory skAuth) pure returns (byte
  * @notice Validator supporting session key delegation for temporary signing authority
  * @dev Enables a participant to delegate signing authority to a session key with metadata.
  *      Useful for hot wallets, time-limited access, or gasless transactions.
+ *      Supports both EOA (ECDSA) and smart contract wallet (ERC-1271/ERC-6492) signatures.
  *
  * Authorization Flow:
  * 1. Participant signs a SessionKeyAuthorization to delegate to a session key
@@ -45,7 +47,10 @@ function toSigningData(SessionKeyAuthorization memory skAuth) pure returns (byte
  * Signature Format:
  * bytes sigBody = abi.encode(SessionKeyAuthorization skAuthorization, bytes signature)
  *
- * Where signature is a standard 65-byte EIP-191 or raw ECDSA signature of the packed state.
+ * Where signature can be:
+ * - Standard 65-byte EIP-191 or raw ECDSA signature (for EOAs)
+ * - ERC-1271 signature (for deployed smart wallets)
+ * - ERC-6492 signature (for undeployed smart wallets)
  *
  * Security Model:
  * - Off-chain enforcement (Clearnode) should validate session key expiration and usage limits
@@ -58,7 +63,8 @@ contract SessionKeyValidator is ISignatureValidator {
      * @dev Validates:
      *      1. participant signed the SessionKeyAuthorization (with channelId binding)
      *      2. sessionKey signed the full state message (channelId + signingData)
-     *      Tries EIP-191 recovery first, then raw ECDSA for both signatures.
+     *      Supports both EOA (ECDSA) and smart wallet (ERC-1271/ERC-6492) signatures.
+     *      Tries ECDSA validation first, then smart wallet validation for both signatures.
      * @param channelId The channel identifier to include in state messages
      * @param signingData The encoded state data (without channelId or signatures)
      * @param signature Encoded as abi.encode(SessionKeyAuthorization, bytes signature)
@@ -70,13 +76,13 @@ contract SessionKeyValidator is ISignatureValidator {
         bytes calldata signingData,
         bytes calldata signature,
         address participant
-    ) external pure returns (ValidationResult) {
+    ) external returns (ValidationResult) {
         (SessionKeyAuthorization memory skAuth, bytes memory skSignature) =
             abi.decode(signature, (SessionKeyAuthorization, bytes));
 
         // Step 1: Verify participant authorized this session key
         bytes memory authMessage = toSigningData(skAuth);
-        bool authResult = EcdsaSignatureUtils.validateEcdsaSigner(authMessage, skAuth.authSignature, participant);
+        bool authResult = _validateSigner(authMessage, skAuth.authSignature, participant);
 
         if (!authResult) {
             return VALIDATION_FAILURE;
@@ -84,10 +90,31 @@ contract SessionKeyValidator is ISignatureValidator {
 
         // Step 2: Verify session key signed the full state message
         bytes memory stateMessage = Utils.pack(channelId, signingData);
-        if (EcdsaSignatureUtils.validateEcdsaSigner(stateMessage, skSignature, skAuth.sessionKey)) {
+        if (_validateSigner(stateMessage, skSignature, skAuth.sessionKey)) {
             return VALIDATION_SUCCESS;
         } else {
             return VALIDATION_FAILURE;
         }
+    }
+
+    /**
+     * @notice Validates a signature for a given signer (EOA or smart wallet)
+     * @dev Tries ECDSA validation first, then smart wallet validation
+     * @param message The message that was signed
+     * @param signature The signature to validate
+     * @param signer The expected signer's address
+     * @return bool True if signature is valid, false otherwise
+     */
+    function _validateSigner(bytes memory message, bytes memory signature, address signer)
+        private
+        returns (bool)
+    {
+        // Try ECDSA validation first (for EOAs)
+        if (EcdsaSignatureUtils.validateEcdsaSigner(message, signature, signer)) {
+            return true;
+        }
+
+        // Try smart wallet validation (ERC-1271/ERC-6492)
+        return SwSignatureUtils.validateSmartWalletSigner(message, signature, signer);
     }
 }

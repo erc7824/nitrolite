@@ -7,12 +7,15 @@ config:
     port: 5432
     name: clearnode_v1_rc
     user: clearnode_v1_rc_admin
+  gcpSaSecret: gcp-kms-signer-sa
   envSecret: clearnode-secret-env
-  extraEnvs:
+  extraEnvs: 
     CLEARNODE_DATABASE_MAX_OPEN_CONNS: "10"
     CLEARNODE_DATABASE_MAX_IDLE_CONNS: "2"
     CLEARNODE_DATABASE_CONN_MAX_LIFETIME_SEC: "3600"
     CLEARNODE_DATABASE_CONN_MAX_IDLE_TIME_SEC: "600"
+    CLEARNODE_SIGNER_TYPE: "gcp-kms"
+    CLEARNODE_GCP_KMS_KEY_NAME: "projects/ynet-stage/locations/europe-central2/keyRings/clearnode-signers-eu/cryptoKeys/v1-rc-a/cryptoKeyVersions/1"
 
 image:
   repository: ghcr.io/erc7824/nitrolite/clearnode

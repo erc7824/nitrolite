@@ -49,6 +49,11 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /app/config
+            {{- if .Values.config.gcpSaSecret }}
+            - name: gcp-sa
+              mountPath: /etc/gcp
+              readOnly: true
+            {{- end }}
           {{- include "clearnode.component.ports" .Values.service | nindent 10 }}
           {{- include "clearnode.component.resources" .Values.resources | nindent 10 }}
           {{- include "clearnode.component.probes" . | nindent 10 }}
@@ -56,6 +61,11 @@ spec:
         - name: config
           configMap:
             name: {{ include "clearnode.common.fullname" . }}-config
+        {{- if .Values.config.gcpSaSecret }}
+        - name: gcp-sa
+          secret:
+            secretName: {{ .Values.config.gcpSaSecret }}
+        {{- end }}
       {{- include "clearnode.common.imagePullSecrets" . | nindent 6 }}
       {{- include "clearnode.common.nodeSelectorLabels" . | nindent 6 }}
       {{- include "clearnode.common.affinity" . | nindent 6 }}

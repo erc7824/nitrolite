@@ -23,6 +23,8 @@ config:
     password: changeme
     # -- Database SSL mode (disable, require, verify-ca, verify-full)
     sslmode: disable
+  # -- Name of the secret containing GCP SA Credentials (Optional)
+  gcpSaSecret: ""
   # -- Additional environment variables as key-value pairs
   extraEnvs: {}
     # KEY: VALUE

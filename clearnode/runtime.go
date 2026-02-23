@@ -23,6 +23,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/erc7824/nitrolite/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/sign/kms/gcpkms"
 )
 
 //go:embed config/migrations/*/*.sql
@@ -48,7 +49,9 @@ type Backbone struct {
 type Config struct {
 	Database                    database.DatabaseConfig
 	ChannelMinChallengeDuration uint32 `yaml:"channel_min_challenge_duration" env:"CLEARNODE_CHANNEL_MIN_CHALLENGE_DURATION" env-default:"86400"` // 24 hours
-	SignerKey                   string `yaml:"signer_key" env:"CLEARNODE_SIGNER_KEY,required"`
+	SignerType                  string `yaml:"signer_type" env:"CLEARNODE_SIGNER_TYPE" env-default:"key"`    // "key" or "gcp-kms"
+	SignerKey                   string `yaml:"signer_key" env:"CLEARNODE_SIGNER_KEY"`                        // required when signer_type=key
+	GCPKMSKeyName               string `yaml:"gcp_kms_key_name" env:"CLEARNODE_GCP_KMS_KEY_NAME"`            // required when signer_type=gcp-kms
 }
 
 // InitBackbone initializes the backbone components of the application.
@@ -109,15 +112,37 @@ func InitBackbone() *Backbone {
 	// Signer
 	// ------------------------------------------------
 
-	stateSigner, err := sign.NewEthereumMsgSigner(conf.SignerKey)
-	if err != nil {
-		logger.Fatal("failed to initialise state signer", "error", err)
+	var stateSigner, txSigner sign.Signer
+	switch conf.SignerType {
+	case "key":
+		if conf.SignerKey == "" {
+			logger.Fatal("CLEARNODE_SIGNER_KEY is required when CLEARNODE_SIGNER_TYPE=key")
+		}
+		stateSigner, err = sign.NewEthereumMsgSigner(conf.SignerKey)
+		if err != nil {
+			logger.Fatal("failed to initialise state signer", "error", err)
+		}
+		txSigner, err = sign.NewEthereumRawSigner(conf.SignerKey)
+		if err != nil {
+			logger.Fatal("failed to initialise tx signer", "error", err)
+		}
+	case "gcp-kms":
+		if conf.GCPKMSKeyName == "" {
+			logger.Fatal("CLEARNODE_GCP_KMS_KEY_NAME is required when CLEARNODE_SIGNER_TYPE=gcp-kms")
+		}
+		kmsSigner, kmsErr := gcpkms.NewSigner(context.Background(), conf.GCPKMSKeyName)
+		if kmsErr != nil {
+			logger.Fatal("failed to initialise GCP KMS signer", "error", kmsErr)
+		}
+		txSigner = kmsSigner
+		stateSigner, err = sign.NewEthereumMsgSignerFromRaw(kmsSigner)
+		if err != nil {
+			logger.Fatal("failed to wrap KMS signer as state signer", "error", err)
+		}
+	default:
+		logger.Fatal("unsupported CLEARNODE_SIGNER_TYPE", "type", conf.SignerType)
 	}
-	txSigner, err := sign.NewEthereumRawSigner(conf.SignerKey)
-	if err != nil {
-		logger.Fatal("failed to initialise tx signer", "error", err)
-	}
-	logger.Info("signer initialized", "address", stateSigner.PublicKey().Address())
+	logger.Info("signer initialized", "type", conf.SignerType, "address", stateSigner.PublicKey().Address())
 
 	// ------------------------------------------------
 	// Metrics

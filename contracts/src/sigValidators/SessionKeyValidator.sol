@@ -109,12 +109,11 @@ contract SessionKeyValidator is ISignatureValidator {
         private
         returns (bool)
     {
-        // Try ECDSA validation first (for EOAs)
-        if (EcdsaSignatureUtils.validateEcdsaSigner(message, signature, signer)) {
-            return true;
+        if (signer.code.length != 0 || SwSignatureUtils.isERC6492Signature(signature)) {
+            // If signer has code or signature is ERC-6492, treat as smart wallet
+            return SwSignatureUtils.validateSmartWalletSigner(message, signature, signer);
         }
 
-        // Try smart wallet validation (ERC-1271/ERC-6492)
-        return SwSignatureUtils.validateSmartWalletSigner(message, signature, signer);
+        return EcdsaSignatureUtils.validateEcdsaSigner(message, signature, signer);
     }
 }

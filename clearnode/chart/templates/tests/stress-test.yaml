@@ -1,66 +1,86 @@
 {{- if .Values.stressTest.enabled }}
+{{- $fullname := include "clearnode.common.fullname" . -}}
+{{- $defaults := .Values.stressTest -}}
+{{- $defaultWsURL := $defaults.wsURL | default (printf "ws://%s:%d/ws" $fullname (.Values.service.http.port | int)) -}}
+{{- $podCount := len .Values.stressTest.pods -}}
+---
 apiVersion: v1
-kind: Pod
+kind: ConfigMap
 metadata:
-  name: {{ include "clearnode.common.fullname" . }}-stress-test
+  name: {{ $fullname }}-stress-config
   labels:
-    {{- include "clearnode.common.labels" . | nindent 4 }}
+    {{- include "clearnode.common.labels" $ | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "-2"
+data:
+  {{- range $i, $pod := .Values.stressTest.pods }}
+  {{- $wsURL := $pod.wsURL | default $defaultWsURL }}
+  {{- $connections := $pod.connections | default $defaults.connections }}
+  {{- $timeout := $pod.timeout | default $defaults.timeout }}
+  {{- $maxErrorRate := $pod.maxErrorRate | default $defaults.maxErrorRate }}
+  pod-{{ $i }}.env: |
+    STRESS_SPECS={{ join " " $pod.specs }}
+    STRESS_WS_URL={{ $wsURL }}
+    STRESS_CONNECTIONS={{ $connections }}
+    STRESS_TIMEOUT={{ $timeout }}
+    STRESS_MAX_ERROR_RATE={{ $maxErrorRate }}
+    {{- $privateKey := $pod.privateKey | default $defaults.privateKey }}
+    {{- if $privateKey }}
+    STRESS_PRIVATE_KEY={{ $privateKey }}
+    {{- end }}
+  {{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $fullname }}-stress-test
+  labels:
+    {{- include "clearnode.common.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: stress-test
   annotations:
     "helm.sh/hook": test
     "helm.sh/hook-delete-policy": before-hook-creation
     "helm.sh/hook-weight": "0"
 spec:
-  {{- with .Values.serviceAccount }}
-  serviceAccountName: {{ . }}
-  {{- end }}
-  restartPolicy: Never
-  containers:
-    - name: stress-test
-      image: {{ include "clearnode.component.image" .Values.image }}
-      args:
-        - clearnode
-        - stress-test
-        {{- range .Values.stressTest.specs }}
-        - {{ . | quote }}
-        {{- end }}
-      env:
-        - name: STRESS_WS_URL
-          value: {{ .Values.stressTest.wsURL | default (printf "ws://%s:%d/ws" (include "clearnode.common.fullname" .) (.Values.service.http.port | int)) }}
-        {{- if .Values.stressTest.privateKey }}
-        - name: STRESS_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "clearnode.common.fullname" . }}-stress-test
-              key: STRESS_PRIVATE_KEY
-        {{- end }}
-        {{- with .Values.stressTest.connections }}
-        - name: STRESS_CONNECTIONS
-          value: {{ . | quote }}
-        {{- end }}
-        {{- with .Values.stressTest.timeout }}
-        - name: STRESS_TIMEOUT
-          value: {{ . | quote }}
-        {{- end }}
-        {{- with .Values.stressTest.maxErrorRate }}
-        - name: STRESS_MAX_ERROR_RATE
-          value: {{ . | quote }}
-        {{- end }}
-  {{- include "clearnode.common.imagePullSecrets" . | nindent 2 }}
-  {{- include "clearnode.common.nodeSelectorLabels" . | nindent 2 }}
-  {{- include "clearnode.common.tolerations" . | nindent 2 }}
----
-{{- if .Values.stressTest.privateKey }}
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ include "clearnode.common.fullname" . }}-stress-test
-  labels:
-    {{- include "clearnode.common.labels" . | nindent 4 }}
-  annotations:
-    "helm.sh/hook": test
-    "helm.sh/hook-delete-policy": before-hook-creation
-    "helm.sh/hook-weight": "-1"
-data:
-  STRESS_PRIVATE_KEY: {{ .Values.stressTest.privateKey | b64enc }}
-{{- end }}
+  completions: {{ $podCount }}
+  parallelism: {{ $podCount }}
+  completionMode: Indexed
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "clearnode.common.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: stress-test
+    spec:
+      {{- with $.Values.serviceAccount }}
+      serviceAccountName: {{ . }}
+      {{- end }}
+      restartPolicy: Never
+      containers:
+        - name: stress-test
+          image: {{ include "clearnode.component.image" $.Values.image }}
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              export $(cat /stress-config/pod-${JOB_COMPLETION_INDEX}.env | xargs)
+              exec clearnode stress-test $STRESS_SPECS
+          env:
+            - name: JOB_COMPLETION_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+          volumeMounts:
+            - name: stress-config
+              mountPath: /stress-config
+              readOnly: true
+      volumes:
+        - name: stress-config
+          configMap:
+            name: {{ $fullname }}-stress-config
+      {{- include "clearnode.common.imagePullSecrets" $ | nindent 6 }}
+      {{- include "clearnode.common.nodeSelectorLabels" $ | nindent 6 }}
+      {{- include "clearnode.common.tolerations" $ | nindent 6 }}
 {{- end }}

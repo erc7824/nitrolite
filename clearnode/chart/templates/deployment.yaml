@@ -14,6 +14,7 @@ spec:
   selector:
     matchLabels:
       {{- include "clearnode.common.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
   template:
     metadata:
       annotations:
@@ -24,6 +25,7 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
         {{- include "clearnode.common.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: server
     spec:
       {{- with .Values.serviceAccount }}
       serviceAccountName: {{ . }}

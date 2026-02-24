@@ -17,4 +17,5 @@ spec:
     {{- end }}
   selector:
     {{- include "clearnode.common.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
 {{- end }}

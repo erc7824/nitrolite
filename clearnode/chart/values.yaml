@@ -151,18 +151,30 @@ affinity: {}
 extraLabels: {}
 
 stressTest:
-  # -- Enable stress test pod (helm test)
+  # -- Enable stress test pods (helm test)
   enabled: false
-  # -- Test specifications (method:total_requests:connections)
-  specs:
-    - "ping:100:5"
-  # -- WebSocket URL (defaults to in-cluster service)
+  # -- Default WebSocket URL for all pods (defaults to in-cluster service)
   wsURL: ""
-  # -- Private key for signing (optional, ephemeral key used if not set)
+  # -- Default private key for signing (optional, ephemeral key used if not set)
   privateKey: ""
   # -- Default number of connections per test
   connections: 10
-  # -- Per-test timeout
+  # -- Default per-test timeout
   timeout: "10m"
-  # -- Max error rate threshold (0.01 = 1%)
+  # -- Default max error rate threshold (0.01 = 1%)
   maxErrorRate: "0.01"
+  # -- List of stress test pods to run. Each entry creates a separate pod.
+  # Per-pod fields: name (required), specs (required), wsURL, privateKey, connections, timeout, maxErrorRate
+  # Per-pod fields override the defaults above when set.
+  pods:
+    - name: ping
+      specs:
+        - "ping:100:5"
+    # - name: transfers
+    #   specs:
+    #     - "transfer-roundtrip:10:4:usdc"
+    #   wsURL: "wss://external-clearnode.example.com/ws"
+    #   privateKey: ""
+    #   connections: 20
+    #   timeout: "30m"
+    #   maxErrorRate: "0.05"

@@ -51,7 +51,21 @@ func createClient(wsURL, privateKey string) (*sdk.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx signer: %w", err)
 	}
-	return sdk.NewClient(wsURL, stateSigner, txSigner, sdk.WithErrorHandler(func(_ error) {}))
+
+	const maxRetries = 3
+	var client *sdk.Client
+	var connectErr error
+	for attempt := range maxRetries + 1 {
+		client, connectErr = sdk.NewClient(wsURL, stateSigner, txSigner, sdk.WithErrorHandler(func(_ error) {}))
+		if connectErr == nil {
+			return client, nil
+		}
+		if attempt < maxRetries {
+			backoff := time.Duration(100*(1<<attempt)) * time.Millisecond
+			time.Sleep(backoff)
+		}
+	}
+	return nil, connectErr
 }
 
 // RunTransferStress runs a parallel transfer stress test.

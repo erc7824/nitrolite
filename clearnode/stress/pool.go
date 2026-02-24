@@ -31,26 +31,47 @@ func CreateClientPool(wsURL, privateKey string, n int) ([]*sdk.Client, error) {
 		sdk.WithErrorHandler(func(_ error) {}),
 	}
 
+	const maxRetries = 3
+
 	clients := make([]*sdk.Client, 0, n)
 	var lastErr error
-	failed := 0
+	totalRetries := 0
+
 	for i := 0; i < n; i++ {
-		client, err := sdk.NewClient(wsURL, stateSigner, txSigner, opts...)
-		if err != nil {
-			lastErr = err
-			failed++
-			fmt.Printf("\r  Connections: %d/%d (failed: %d): %s", len(clients), n, failed, err.Error())
-			time.Sleep(50 * time.Millisecond)
+		var client *sdk.Client
+		var connectErr error
+
+		for attempt := range maxRetries + 1 {
+			client, connectErr = sdk.NewClient(wsURL, stateSigner, txSigner, opts...)
+			if connectErr == nil {
+				break
+			}
+			lastErr = connectErr
+			if attempt < maxRetries {
+				backoff := min(time.Duration(500*(1<<attempt))*time.Millisecond, 10*time.Second)
+				fmt.Printf("\r  Connections: %d/%d (retrying %d/%d, backoff %v)          ",
+					len(clients), n, attempt+1, maxRetries, backoff)
+				time.Sleep(backoff)
+				totalRetries++
+			}
+		}
+
+		if connectErr != nil {
+			fmt.Printf("\n  Connection %d/%d gave up after %d attempts: %s\n",
+				i+1, n, maxRetries+1, connectErr.Error())
 			continue
 		}
+
 		clients = append(clients, client)
-		if (i+1)%10 == 0 || i+1 == n {
-			fmt.Printf("\r  Connections: %d/%d  ", len(clients), i+1)
-		}
-		// Pace connection attempts to avoid overwhelming the server
+		fmt.Printf("\r  Connections: %d/%d  ", len(clients), n)
+		// Pace connection attempts to avoid overwhelming the server.
 		time.Sleep(10 * time.Millisecond)
 	}
 	fmt.Println()
+
+	if totalRetries > 0 {
+		fmt.Printf("  (%d retries during connection setup)\n", totalRetries)
+	}
 
 	if len(clients) == 0 {
 		return nil, fmt.Errorf("failed to open any connections: %w", lastErr)

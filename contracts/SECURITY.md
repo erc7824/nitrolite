@@ -250,3 +250,125 @@ When a **node** employs SessionKeyValidator (NOT RECOMMENDED):
    - User has no protection against misuse
 
 4. **Asymmetric security**: User-side session keys are safe (Clearnode validates), node-side session keys are unsafe (no user-side validator)
+
+---
+
+## ERC20 Transfer Failure Attack Vectors
+
+### Background
+
+ERC20 transfers can fail for reasons beyond insufficient balance:
+
+- **Token blacklists**: Centralized tokens (USDC, USDT) have admin-controlled blacklists
+- **Token hooks**: ERC777/ERC1363 tokens execute recipient hooks that can revert
+- **Token features**: Pausable, upgradeable, or custom token logic
+- **Malicious control**: Users may programmatically trigger blacklisting or control hook behavior
+
+The protocol cannot guarantee that ERC20 transfers to users will succeed, even when the ChannelHub is functioning correctly.
+
+---
+
+### Inbound Transfer Failures (User → ChannelHub)
+
+**Impact**: Low - Protocol is protected
+
+Inbound transfer failures occur during:
+
+- Channel deposits (DEPOSIT intent)
+- Escrow deposit initiation (INITIATE_ESCROW_DEPOSIT on non-home chain)
+
+**Mitigation**: The Clearnode only processes operations after observing successful on-chain events. If a user signs a deposit state but the transfer fails on-chain, the state is never enforced, and the Node does not provide services based on unconfirmed deposits.
+
+---
+
+### Outbound Transfer Failures (ChannelHub → User)
+
+**Impact**: CRITICAL - Multiple attack vectors
+
+Outbound transfer failures create two categories of attacks:
+
+#### 1. Channel Lifecycle Stuck
+
+Any operation requiring payment to the user will revert if the transfer fails, blocking:
+
+**Challenge response denial**:
+
+- User challenges with old state
+- Node attempts to respond with newer state requiring user payment
+- Transfer to user reverts → Node cannot respond
+- Node loses funds after challenge timeout
+
+**State enforcement denial**:
+
+- Node attempts to enforce withdrawal or closure
+- Transfer to user reverts → Operation fails
+- Channel state cannot advance
+
+**Cooperative closure rug pull**:
+
+- User signs CLOSE state
+- User blacklists themselves before execution
+- Closure transaction reverts → Node funds locked
+
+#### 2. Node Funds Lock Attack (Most Critical)
+
+**Attack scenario**: User forces Node to lock large funds with minimal capital
+
+**Execution flow**:
+
+0. User creates a channel with a small initial deposit (e.g., $0.000001)
+1. User initiates escrow deposit with any amount (it can even be successfully retrieved later) on non-home chain
+2. Node forced to lock equal liquidity on home chain
+3. State V+1 checkpointed on-chain (preparation phase complete)
+4. **User deliberately does NOT sign state V+2** (execution phase never completes)
+5. User blacklists themselves (or triggers token blacklist)
+6. User challenges escrow on non-home chain → Node cannot respond (no V+2 exists)
+7. Node attempts operations on home chain (closure, withdrawal, challenge response)
+8. **All operations requiring transfer to user REVERT**
+9. **Node's funds locked forever in channel allocation**
+10. User challenges escrow deposit on non-home chain after timeout → Node cannot respond (no V+2)
+
+---
+
+### Solution: Reclaim Pattern
+
+**Design**: Never revert on outbound transfer failure. Instead, accumulate failed transfers and allow later claims.
+
+---
+
+### Gas Depletion Attacks
+
+**Problem**: Gas depletion during outbound transfers creates the same attack vectors as transfer reverts, but through a different mechanism.
+
+When a transfer consumes all available gas, the transaction reverts, enabling:
+
+- Channel lifecycle stuck (preventing state enforcement, challenge responses, closures)
+- Node funds lock attacks (forcing Node to lock large funds with minimal user capital)
+
+**How it occurs:**
+
+**Native token (ETH) transfers**: Current implementation forwards all available gas to recipient. Malicious recipient contract can consume arbitrary gas in `receive()` or `fallback()` function.
+
+**ERC20 tokens with hooks**:
+
+- **ERC777** (most dangerous): Executes `tokensReceived()` hook on recipient even for standard `transfer()` calls
+- **ERC1363/ERC677** (lower risk): Include `transferAndCall()` methods that trigger recipient hooks
+
+**Why it matters**: Even if protocol primarily supports standard ERC20, human error can introduce vulnerable tokens:
+
+- Token implements ERC20 interface but has hidden hooks (ERC777)
+- Token upgrades to add hooks without interface change
+- Wrapped/bridge tokens add hook functionality
+- Future standards may introduce hooks
+
+**Solution**: Limit gas forwarded to recipient contracts (100,000 gas for both native and ERC20 transfers).
+
+**Why 100,000 gas is sufficient**:
+
+- Native ETH: Simple transfers (~21k-23k), smart wallets (6k-9k)
+- ERC20 standard: Base transfer (~50k), ERC777 hooks (~2.6k registry + <5k hook)
+- Covers >99% of legitimate use cases
+
+**Combined with reclaim pattern**: Gas limiting prevents depletion attacks; reclaim pattern handles all other failure modes (blacklists, paused tokens). Both protections are essential.
+
+---

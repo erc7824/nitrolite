@@ -530,6 +530,16 @@ This works because `prevStoredState` was swapped during `INITIATE_MIGRATION`.
   * challenges always resolve by enforcing the newest valid state,
   * stalled cross-chain operations can always be completed or reverted.
 
+* **Transfer failure resilience**: Outbound transfers (to users) never revert on failure:
+
+  * Failed transfers (due to blacklists, hooks, or token features) accumulate in a reclaim balance,
+  * Gas limiting (100k gas) prevents gas depletion attacks from malicious recipients or ERC777/ERC1363 hooks,
+  * Users can later claim accumulated funds to alternative addresses,
+  * This prevents two critical attack vectors:
+    1. **Channel lifecycle denial**: User blacklists prevent state enforcement, blocking Node operations,
+    2. **Node fund lock**: User forces Node to lock large funds via escrow deposit, then blocks all recovery operations with minimal capital.
+  * Combined gas limiting + reclaim pattern ensures channel operations continue regardless of transfer success.
+
 ---
 
 ## Signature validation

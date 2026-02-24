@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "strict": true,
+        "paths": {
+            "@erc7824/nitrolite": ["../../ts/src/index.ts"],
+            "@erc7824/nitrolite-compat": ["../src/index.ts"]
+        }
+    },
+    "include": ["./*.ts"]
+}

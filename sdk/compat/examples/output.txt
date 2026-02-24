@@ -1,0 +1,92 @@
+=== Compat Layer Comprehensive Lifecycle ===
+
+Wallet: 0x<YOUR_WALLET_ADDRESS>
+Clearnode: wss://clearnode-v1-rc.yellow.org/ws
+Chain: 11155111
+
+-- 1. Client Initialization --
+  PASS  NitroliteClient.create() -- address=0x<ADDR>...
+
+-- 2. Node Queries --
+  PASS  ping()
+  PASS  getConfig() -- blockchains=1, node=0x<NODE_ADDR>...
+  PASS  getAssetsList() -- 2 asset(s): usdc, weth
+  PASS  refreshAssets()
+
+-- 3. Balance & Ledger --
+  PASS  getBalances() -- N balance(s): <asset=amount, ...>
+  PASS  getLedgerEntries() -- N entry/entries
+
+-- 4. Channels --
+  PASS  getChannels() -- N total (N open, N closed)
+  PASS  getAccountInfo() -- N balance(s), channels=N
+  PASS  getChannelData() -- channel=0x<ID>..., status=<status>
+
+-- 5. Asset Helpers --
+  PASS  resolveToken() -- 0x<TOKEN>... -> usdc
+  PASS  resolveAsset() -- usdc -> decimals=6
+  PASS  getTokenDecimals() -- usdc -> 6
+  PASS  formatAmount() -- 1000000 raw -> 1 usdc
+  PASS  parseAmount() -- 1.0 usdc -> 1000000 raw
+  PASS  resolveAssetDisplay() -- usdc (6 dec)
+  PASS  findOpenChannel() -- found: 0x<ID>... | none
+
+-- 6. Transfer --
+  PASS  transfer() -- sent 0.01 USDC to 0x<RECIPIENT>...
+  (or)  transfer() (skipped) -- no USDC balance to transfer
+
+-- 7. App Sessions --
+  PASS  getAppSessionsList() -- N total
+  PASS  getAppSessionsList(status=open) -- N open
+  PASS  getAppSessionsList(status=closed) -- N closed
+  PASS  getAppDefinition() -- app=<NAME>, quorum=N, participants=N
+  PASS  createAppSession() -- id=0x<ID>..., status=open
+  PASS  submitAppState(operate) -- v2, intent=operate
+  PASS  closeAppSession() -- closed session 0x<ID>...
+  PASS  verify session closed -- status=closed
+
+-- 7b. Multi-party App Session (40+30+30 quorum) --
+  Bob:     0x<BOB_ADDR>
+  Charles: 0x<CHARLES_ADDR>
+  PASS  create (3 signers) -- id=0x<ID>..., status=open
+  PASS  getAppDefinition(multi) -- app=multi-party-lifecycle, quorum=100, participants=3
+  PASS  submitAppState(operate, 3 sigs) -- v2
+  PASS  submitAppState(operate, 3 sigs) -- v3
+  PASS  close (3 signers) -- closed 0x<ID>...
+  PASS  verify multi-session closed -- status=closed
+
+-- 8. EventPoller --
+  PASS  EventPoller.start()
+  PASS  EventPoller.stop() -- balances=N, assets=N, channels=N, errors=0
+  PASS  EventPoller.setInterval() -- changed to 5000ms
+
+-- 9. Error Classification --
+  PASS  classifyError(allowance) -- type=AllowanceError, is AllowanceError: true
+  PASS  classifyError(user rejected) -- type=UserRejectedError, is UserRejectedError: true
+  PASS  classifyError(insufficient funds) -- type=InsufficientFundsError, is InsufficientFundsError: true
+  PASS  classifyError(not initialized) -- type=NotInitializedError, is NotInitializedError: true
+  PASS  classifyError(generic) -- type=Error, message=some random error
+  PASS  getUserFacingMessage(AllowanceError) -- "Transaction was rejected..."
+  PASS  getUserFacingMessage(generic) -- "An unexpected error occurred..."
+
+-- 10. Signer Helpers --
+  PASS  WalletStateSigner() -- created for 0x<ADDR>...
+  PASS  createECDSAMessageSigner() -- session signer created
+
+-- 11. RPC Enums & Constants --
+  PASS  RPCMethod enum -- 15 methods accessible
+  PASS  RPCProtocolVersion -- NitroRPC_0_2=NitroRPC/0.2, NitroRPC_0_4=NitroRPC/0.4
+  PASS  RPCAppStateIntent -- Operate=operate, Deposit=deposit, Withdraw=withdraw
+
+-- 12. Inner Client Access --
+  PASS  innerClient -- accessible, type=Client
+
+-- 13. Cleanup --
+  PASS  close()
+
+=== Results: 49 passed, 0 failed ===
+
+NOTE: If the wallet has no ledger balance, section 6 (Transfer) will show
+"(skipped) -- no USDC balance to transfer" instead of a successful transfer.
+Sections 4 (Channels) and 7 (App Sessions) will show 0 counts but still PASS.
+Bob and Charles addresses in section 7b are randomly generated each run.

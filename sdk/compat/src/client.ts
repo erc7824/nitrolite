@@ -185,6 +185,9 @@ export class NitroliteClient {
     private async getDecimalsForAsset(assetSymbol: string): Promise<number> {
         await this.ensureAssets();
         const info = this.assetsBySymbol.get(assetSymbol.toLowerCase());
+        if (!info) {
+            console.warn(`[compat] Unknown asset symbol ${assetSymbol}, falling back to 6 decimals`);
+        }
         return info?.decimals ?? 6;
     }
 
@@ -274,7 +277,8 @@ export class NitroliteClient {
         try {
             return await this.innerClient.checkpoint(symbol);
         } catch (err) {
-            if (!(err instanceof AllowanceError) && !(NitroliteClient.classifyError(err) instanceof AllowanceError)) throw NitroliteClient.classifyError(err);
+            const classified = NitroliteClient.classifyError(err);
+            if (!(classified instanceof AllowanceError)) throw classified;
             console.log('[compat] Allowance insufficient, requesting token approval…');
             await this.innerClient.approveToken(chainId, tokenAddress, NitroliteClient.MAX_UINT256);
             return await this.innerClient.checkpoint(symbol);
@@ -325,11 +329,7 @@ export class NitroliteClient {
                 if (!symbol) continue;
 
                 await this.innerClient.closeHomeChannel(symbol);
-                if (info) {
-                    await this.checkpointWithApproval(symbol, info.chainId, info.tokenAddress);
-                } else {
-                    await this.innerClient.checkpoint(symbol);
-                }
+                await this.checkpointWithApproval(symbol, info.chainId, info.tokenAddress);
             } catch {
                 // channel may already be closing
             }
@@ -353,14 +353,14 @@ export class NitroliteClient {
     }
 
     async getChannelData(_channelId: string): Promise<any> {
-        const assets = await this.innerClient.getAssets();
-        for (const asset of assets) {
+        await this.ensureAssets();
+        for (const [, info] of this.assetsBySymbol) {
             try {
-                const ch = await this.innerClient.getHomeChannel(this.userAddress, asset.symbol);
+                const ch = await this.innerClient.getHomeChannel(this.userAddress, info.symbol);
                 if (ch.channelId === _channelId) {
                     return {
                         channel: ch,
-                        state: await this.innerClient.getLatestState(this.userAddress, asset.symbol, false),
+                        state: await this.innerClient.getLatestState(this.userAddress, info.symbol, false),
                     };
                 }
             } catch {
@@ -510,7 +510,7 @@ export class NitroliteClient {
         try {
             const { sessions } = await this.innerClient.getAppSessions({
                 wallet: wallet ?? this.userAddress,
-                status: status ?? undefined,
+                status,
             });
             return sessions.map((s) => ({
                 app_session_id: s.appSessionId,
@@ -610,7 +610,7 @@ export class NitroliteClient {
 
         const appUpdate = {
             appSessionId,
-            intent: 3, // Close
+            intent: NitroliteClient.INTENT_MAP['close'],
             version: session.version + 1n,
             allocations: v1Allocations,
             sessionData: '',

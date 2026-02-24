@@ -11,7 +11,7 @@ export { NitroliteClient, type NitroliteClientConfig } from './client';
 // --- Signers ---
 export { WalletStateSigner, createECDSAMessageSigner } from './signers';
 
-// --- Auth stubs ---
+// --- Auth helpers ---
 export {
     createAuthRequestMessage,
     createAuthVerifyMessage,
@@ -57,6 +57,7 @@ export {
     RPCChannelStatus,
     RPCProtocolVersion,
     RPCAppStateIntent,
+    EIP712AuthTypes,
     type MessageSigner,
     type NitroliteRPCMessage,
     type RPCResponse,
@@ -85,6 +86,12 @@ export {
     type Channel,
     type State,
     type AppLogic,
+    RPCTxType,
+    type RequestID,
+    type RPCTransaction,
+    type AuthChallengeResponse,
+    type TransferNotificationResponseParams,
+    type LedgerAccountType,
 } from './types';
 
 // --- Clearnode response types (used by consuming apps' stores) ---

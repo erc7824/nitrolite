@@ -39,7 +39,7 @@ func CreateClientPool(wsURL, privateKey string, n int) ([]*sdk.Client, error) {
 		if err != nil {
 			lastErr = err
 			failed++
-			fmt.Printf("\r  Connections: %d/%d (failed: %d)  ", len(clients), n, failed)
+			fmt.Printf("\r  Connections: %d/%d (failed: %d): %s", len(clients), n, failed, err.Error())
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}

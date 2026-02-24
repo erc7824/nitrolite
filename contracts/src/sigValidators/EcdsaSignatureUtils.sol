@@ -18,6 +18,7 @@ library EcdsaSignatureUtils {
      * @notice Validates that a signature was created by an expected signer
      * @dev Tries EIP-191 recovery first (with Ethereum signed message prefix), then raw ECDSA if that fails.
      *      Hashes the message internally before recovery.
+     *      Returns false for invalid signature formats (e.g., wrong length).
      * @param message The message that was signed (will be hashed internally)
      * @param signature The signature to validate (65 bytes ECDSA: r, s, v)
      * @param expectedSigner The address that should have signed the message
@@ -28,6 +29,12 @@ library EcdsaSignatureUtils {
         pure
         returns (bool)
     {
+        // ECDSA signatures must be exactly 65 bytes (r: 32, s: 32, v: 1)
+        // Return false for other lengths (e.g., ERC-6492 wrapped signatures)
+        if (signature.length != 65) {
+            return false;
+        }
+
         bytes32 eip191Digest = message.toEthSignedMessageHash();
         address recovered = eip191Digest.recover(signature);
 

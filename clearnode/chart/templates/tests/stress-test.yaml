@@ -51,8 +51,10 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "clearnode.common.labels" $ | nindent 8 }}
+        app.kubernetes.io/name: {{ $.Chart.Name }}-stress
+        app.kubernetes.io/instance: {{ $.Release.Name }}
         app.kubernetes.io/component: stress-test
+        app.kubernetes.io/managed-by: {{ $.Release.Service }}
     spec:
       {{- with $.Values.serviceAccount }}
       serviceAccountName: {{ . }}

@@ -7,7 +7,7 @@
 
 import { NitroliteRPC } from './rpc';
 import { RPCMethod, EIP712AuthTypes } from './types';
-import type { MessageSigner } from './types';
+import type { MessageSigner, MessageSignerPayload } from './types';
 
 export interface AuthRequestParams {
     address: string;
@@ -80,10 +80,14 @@ export function createEIP712AuthMessageSigner(
     },
     domain: { name: string },
 ): MessageSigner {
-    return async (payload: any) => {
+    return async (payload: MessageSignerPayload) => {
         const address = walletClient.account?.address;
         if (!address) {
             throw new Error('Wallet client is not connected or does not have an account.');
+        }
+
+        if (!Array.isArray(payload) || payload.length < 3) {
+            throw new Error('Invalid payload for AuthVerify: Expected an RPC request tuple.');
         }
 
         const method = payload[1];

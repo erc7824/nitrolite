@@ -23,7 +23,7 @@ The compat layer centralises this complexity into **~1,000 lines** that absorb t
 
 ## Build Size
 
-Measured on **February 24, 2026** from `sdk/compat` using:
+Measured on **February 24, 2026** from `sdk/ts-compat` using:
 
 ```bash
 npm run build:prod
@@ -59,7 +59,7 @@ Or with a local `file:` reference (monorepo):
 ```json
 {
   "dependencies": {
-    "@erc7824/nitrolite-compat": "file:../sdk/compat",
+    "@erc7824/nitrolite-compat": "file:../sdk/ts-compat",
     "@erc7824/nitrolite": "file:../sdk/ts"
   }
 }

@@ -560,17 +560,19 @@ export class NitroliteClient {
                         `[compat] getAppSessionsList retrying without status filter participant=${participant} status=${effectiveStatus}`,
                     );
                     const { sessions } = await this.innerClient.getAppSessions({ wallet: participant });
+                    const mapped = mapSessions(sessions);
+                    const filtered = mapped.filter((session) => session.status === effectiveStatus);
                     console.info(
-                        `[compat] getAppSessionsList success count=${sessions.length} (fallback without status)`,
+                        `[compat] getAppSessionsList success count=${filtered.length} (fallback without status)`,
                     );
                     this._lastAppSessionsListError = null;
-                    return mapSessions(sessions);
+                    return filtered;
                 } catch {
                     // fall through to the original failure handling
                 }
             }
 
-            const message = (err as Error).message;
+            const message = err instanceof Error ? err.message : String(err);
             this._lastAppSessionsListError = message;
             if (this._lastAppSessionsListErrorLogged !== message) {
                 console.warn(

@@ -45,7 +45,7 @@ export const NitroliteRPC = {
     },
 
     async signRequestMessage(msg: NitroliteRPCMessage, signer: MessageSigner): Promise<NitroliteRPCMessage> {
-        const signature = await signer(msg.req as any);
+        const signature = await signer(msg.req);
         return { ...msg, sig: signature };
     },
 };

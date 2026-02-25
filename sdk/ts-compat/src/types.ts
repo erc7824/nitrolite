@@ -65,11 +65,13 @@ export enum RPCTxType {
 // Wire types -- shapes the appstore expects from v0.5.3 SDK
 // =============================================================================
 
-export type MessageSigner = (payload: Uint8Array) => Promise<string>;
+export type NitroliteRPCRequest = [number, string, any, number];
+export type MessageSignerPayload = Uint8Array | NitroliteRPCRequest;
+export type MessageSigner = (payload: MessageSignerPayload) => Promise<string>;
 export type RequestID = number;
 
 export interface NitroliteRPCMessage {
-    req: [number, string, any, number];
+    req: NitroliteRPCRequest;
     sig: string;
 }
 

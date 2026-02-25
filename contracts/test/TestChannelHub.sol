@@ -12,6 +12,12 @@ contract TestChannelHub is ChannelHub {
     constructor(ISignatureValidator _defaultSigValidator) ChannelHub(_defaultSigValidator) {}
 
     /**
+     * @notice Marks this contract as a test contract for Forge
+     * @dev Prevents size limit checks from being enforced on this test harness
+     */
+    function IS_TEST() external pure {}
+
+    /**
      * @notice Exposed version of _pushFunds for testing
      */
     function exposed_pushFunds(address to, address token, uint256 amount) external payable {

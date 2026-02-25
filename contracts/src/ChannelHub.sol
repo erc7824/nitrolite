@@ -17,7 +17,6 @@ import {
     DEFAULT_SIG_VALIDATOR_ID,
     EscrowStatus,
     State,
-    Ledger,
     StateIntent,
     ParticipantIndex
 } from "./interfaces/Types.sol";
@@ -74,11 +73,13 @@ contract ChannelHub is IVault, ReentrancyGuard {
     event MigrationInFinalized(bytes32 indexed channelId, State state);
 
     event ValidatorRegistered(address indexed node, uint8 indexed validatorId, ISignatureValidator indexed validator);
+    event TransferFailed(address indexed recipient, address indexed token, uint256 amount);
+    event FundsClaimed(address indexed account, address indexed token, address indexed destination, uint256 amount);
 
     error InvalidAddress();
     error IncorrectAmount();
     error IncorrectValue();
-    error TransferFailed(address recepient, address token, uint256 amount);
+    error NativeTransferFailed(address to, uint256 amount);
     error AddressCollision(address collision);
     error IncorrectChallengeDuration();
 
@@ -141,6 +142,11 @@ contract ChannelHub is IVault, ReentrancyGuard {
     // but also not too large, to avoid hitting block gas limit during purge and incurring Denial-Of-Service attacks
     uint32 public constant MAX_DEPOSIT_ESCROW_PURGE = 64;
 
+    // Gas limit for outbound transfers to prevent gas depletion attacks
+    // Sufficient for: ETH transfers to smart wallets (6k-9k gas), ERC20 standard transfers (~50k gas),
+    // ERC777 hooks (~2.6k registry lookup + <5k hook execution)
+    uint256 public constant TRANSFER_GAS_LIMIT = 100000;
+
     mapping(bytes32 channelId => ChannelMeta meta) internal _channels;
     mapping(address user => EnumerableSet.Bytes32Set channelIds) internal _userChannels;
 
@@ -158,6 +164,11 @@ contract ChannelHub is IVault, ReentrancyGuard {
     // Validator IDs 0x01-0xFF are available for node-registered validators
     mapping(address node => mapping(uint8 validatorId => ISignatureValidator validator)) internal
         _nodeValidatorRegistry;
+
+    // Reclaim balances for failed outbound transfers
+    // Accumulates funds when transfers fail (blacklists, hooks, gas depletion)
+    // Users can claim these funds later via claimFunds()
+    mapping(address account => mapping(address token => uint256 amount)) internal _reclaims;
 
     // ========== Constructor ==========
 
@@ -259,6 +270,10 @@ contract ChannelHub is IVault, ReentrancyGuard {
         initState = meta.initState;
     }
 
+    function getReclaimBalance(address account, address token) external view returns (uint256) {
+        return _reclaims[account][token];
+    }
+
     // ========= IVault ==========
 
     function depositToVault(address node, address token, uint256 amount) external payable {
@@ -284,6 +299,32 @@ contract ChannelHub is IVault, ReentrancyGuard {
         _pushFunds(to, token, amount);
 
         emit Withdrawn(msg.sender, token, amount);
+    }
+
+    /**
+     * @notice Claim accumulated funds from failed outbound transfers
+     * @dev Allows users to claim funds that failed to transfer due to blacklists, gas depletion, or other reasons
+     * @param token The token address (address(0) for native ETH)
+     * @param destination The destination address to send funds to (can differ from msg.sender for blacklisted users)
+     */
+    function claimFunds(address token, address destination) external nonReentrant {
+        require(destination != address(0), InvalidAddress());
+
+        address account = msg.sender;
+        uint256 amount = _reclaims[account][token];
+        require(amount > 0, IncorrectAmount());
+
+        _reclaims[account][token] = 0;
+
+        // Transfer without gas limit or reclaim logic (user controls gas, accepts responsibility)
+        if (token == address(0)) {
+            (bool success,) = payable(destination).call{value: amount}("");
+            require(success, NativeTransferFailed(destination, amount));
+        } else {
+            IERC20(token).safeTransfer(destination, amount);
+        }
+
+        emit FundsClaimed(account, token, destination, amount);
     }
 
     // ========= Escrow Deposit Purge ==========
@@ -1219,10 +1260,31 @@ contract ChannelHub is IVault, ReentrancyGuard {
         if (amount == 0) return;
 
         if (token == address(0)) {
-            (bool success,) = payable(to).call{value: amount}("");
-            require(success, TransferFailed(to, address(0), amount));
+            // Native token: limit gas to prevent depletion attacks
+            (bool success,) = payable(to).call{value: amount, gas: TRANSFER_GAS_LIMIT}("");
+            if (!success) {
+                _reclaims[to][token] += amount;
+                emit TransferFailed(to, token, amount);
+                return;
+            }
         } else {
-            IERC20(token).safeTransfer(to, amount);
+            // ERC20: Use balance-checking approach for maximum robustness
+            uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+
+            // limit gas to prevent depletion attacks
+            (bool success,) =
+                address(token).call{gas: TRANSFER_GAS_LIMIT}(abi.encodeCall(IERC20.transfer, (to, amount)));
+
+            uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+
+            // Success criteria: call succeeded AND sufficient balance AND balance decreased by exactly the expected amount
+            // Check balanceBefore >= amount first to prevent underflow revert
+            bool transferSucceeded = success && balanceBefore >= amount && balanceAfter == balanceBefore - amount;
+
+            if (!transferSucceeded) {
+                _reclaims[to][token] += amount;
+                emit TransferFailed(to, token, amount);
+            }
         }
     }
 }

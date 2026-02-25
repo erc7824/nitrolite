@@ -17,7 +17,6 @@ import {
     DEFAULT_SIG_VALIDATOR_ID,
     EscrowStatus,
     State,
-    Ledger,
     StateIntent,
     ParticipantIndex
 } from "./interfaces/Types.sol";

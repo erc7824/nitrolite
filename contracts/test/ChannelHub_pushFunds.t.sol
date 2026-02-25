@@ -16,7 +16,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {ECDSAValidator} from "../src/sigValidators/ECDSAValidator.sol";
-import {ISignatureValidator} from "../src/interfaces/ISignatureValidator.sol";
 
 /**
  * @notice Simple contract that can receive ETH for testing normal transfers

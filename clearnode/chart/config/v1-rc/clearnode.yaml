@@ -67,3 +67,14 @@ imagePullSecret: ghcr-pull
 
 stressTest:
   enabled: true
+  pods:
+    - name: get-config-1
+      specs: ["get-config:10000:100"]
+    - name: get-config-2
+      specs: ["get-config:10000:100"]
+    - name: get-config-3
+      specs: ["get-config:10000:100"]
+    - name: get-config-4
+      specs: ["get-config:10000:100"]
+    - name: get-config-5
+      specs: ["get-config:10000:100"]

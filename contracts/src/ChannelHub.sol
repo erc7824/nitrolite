@@ -1276,8 +1276,9 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             uint256 balanceAfter = IERC20(token).balanceOf(address(this));
 
-            // Success criteria: call succeeded AND balance decreased by exactly the expected amount
-            bool transferSucceeded = success && balanceAfter == balanceBefore - amount;
+            // Success criteria: call succeeded AND sufficient balance AND balance decreased by exactly the expected amount
+            // Check balanceBefore >= amount first to prevent underflow revert
+            bool transferSucceeded = success && balanceBefore >= amount && balanceAfter == balanceBefore - amount;
 
             if (!transferSucceeded) {
                 _reclaims[to][token] += amount;

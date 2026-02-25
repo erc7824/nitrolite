@@ -882,7 +882,7 @@ export class Client {
     await this.initializeBlockchainClient(chainId);
     const blockchainClient = this.blockchainClients.get(chainId)!;
 
-    return await blockchainClient.approveToken(asset, amount);
+    return await blockchainClient.approve(asset, amount);
   }
 
   /**

@@ -208,6 +208,9 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			// state [wallet] <asset>, home-channel [wallet] <asset>
 			// Suggest asset first (common case), wallet can be typed manually
 			return o.getAssetSuggestions()
+		case "transfer":
+			// transfer <recipient> <asset> <amount>
+			return o.getWalletSuggestion()
 		case "balances", "transactions":
 			return o.getWalletSuggestion()
 		case "assets":

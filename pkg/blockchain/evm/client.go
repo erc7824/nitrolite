@@ -122,20 +122,20 @@ func (c *Client) getAllowance(asset string, owner string) (decimal.Decimal, erro
 	return decimal.NewFromBigInt(allowance, -int32(decimals)), nil
 }
 
-func (c *Client) GetTokenBalance(asset string, account string) (decimal.Decimal, error) {
+func (c *Client) GetTokenBalance(asset string, walletAddress string) (decimal.Decimal, error) {
 	tokenAddrHex, err := c.assetStore.GetTokenAddress(asset, c.blockchainID)
 	if err != nil {
 		return decimal.Zero, errors.Wrap(err, "failed to get token address")
 	}
 
 	tokenAddr := common.HexToAddress(tokenAddrHex)
-	accountAddr := common.HexToAddress(account)
+	walletAddr := common.HexToAddress(walletAddress)
 
 	// Native token (zero address) — query ETH balance directly
 	if tokenAddr == (common.Address{}) {
-		balance, err := c.evmClient.BalanceAt(context.Background(), accountAddr, nil)
+		balance, err := c.evmClient.BalanceAt(context.Background(), walletAddr, nil)
 		if err != nil {
-			return decimal.Zero, errors.Wrapf(err, "failed to get native balance for account %s", account)
+			return decimal.Zero, errors.Wrapf(err, "failed to get native balance for wallet %s", walletAddress)
 		}
 		// Native tokens use 18 decimals
 		return decimal.NewFromBigInt(balance, -18), nil
@@ -146,9 +146,9 @@ func (c *Client) GetTokenBalance(asset string, account string) (decimal.Decimal,
 		return decimal.Zero, errors.Wrap(err, "failed to instantiate token contract")
 	}
 
-	balance, err := tokenContract.BalanceOf(&bind.CallOpts{}, accountAddr)
+	balance, err := tokenContract.BalanceOf(&bind.CallOpts{}, walletAddr)
 	if err != nil {
-		return decimal.Zero, errors.Wrapf(err, "failed to get balance for account %s on token %s", account, tokenAddrHex)
+		return decimal.Zero, errors.Wrapf(err, "failed to get balance for wallet %s on token %s", walletAddress, tokenAddrHex)
 	}
 	decimals, err := c.assetStore.GetTokenDecimals(c.blockchainID, tokenAddrHex)
 	if err != nil {

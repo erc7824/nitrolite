@@ -109,18 +109,18 @@ export class Client {
     return new Decimal(allowance.toString()).div(Decimal.pow(10, decimals));
   }
 
-  private async getTokenBalance(asset: string, account: Address): Promise<Decimal> {
+  async getTokenBalance(asset: string, walletAddress: Address): Promise<Decimal> {
     const tokenAddress = await this.assetStore.getTokenAddress(asset, this.blockchainId);
 
     // Native token (zero address) — query ETH balance directly
     if (tokenAddress === zeroAddress) {
-      const balance = await this.evmClient.getBalance({ address: account });
+      const balance = await this.evmClient.getBalance({ address: walletAddress });
       // Native tokens use 18 decimals
       return new Decimal(balance.toString()).div(Decimal.pow(10, 18));
     }
 
     const erc20 = newERC20(tokenAddress, this.evmClient);
-    const balance = await erc20.balanceOf(account);
+    const balance = await erc20.balanceOf(walletAddress);
 
     const decimals = await this.assetStore.getTokenDecimals(this.blockchainId, tokenAddress);
     return new Decimal(balance.toString()).div(Decimal.pow(10, decimals));
@@ -138,7 +138,7 @@ export class Client {
   /**
    * Approve the contract to spend tokens for an asset
    */
-  async approveToken(asset: string, amount: Decimal): Promise<string> {
+  async approve(asset: string, amount: Decimal): Promise<string> {
     const tokenAddress = await this.assetStore.getTokenAddress(asset, this.blockchainId);
 
     if (tokenAddress === zeroAddress) {
@@ -168,13 +168,6 @@ export class Client {
     return await erc20.allowance(owner, this.contractAddress);
   }
 
-  private async getNativeDepositValue(asset: string, amount: Decimal): Promise<bigint | undefined> {
-    const tokenAddress = await this.assetStore.getTokenAddress(asset, this.blockchainId);
-    if (tokenAddress === zeroAddress) {
-      return decimalToBigInt(amount, 18);
-    }
-    return undefined;
-  }
 
   // ========= Getters - ChannelHub =========
 
@@ -393,10 +386,11 @@ export class Client {
     // Resolve native ETH value for deposit intents
     let nativeValue: bigint | undefined;
     if (
-      initState.transition.type === core.TransitionType.HomeDeposit ||
-      initState.transition.type === core.TransitionType.EscrowDeposit
+      (initState.transition.type === core.TransitionType.HomeDeposit ||
+        initState.transition.type === core.TransitionType.EscrowDeposit) &&
+      contractState.homeLedger.token === zeroAddress
     ) {
-      nativeValue = await this.getNativeDepositValue(initState.asset, initState.transition.amount);
+      nativeValue = decimalToBigInt(initState.transition.amount, contractState.homeLedger.decimals);
     }
 
     // Step 1: Simulate the transaction to validate it will succeed
@@ -466,7 +460,9 @@ export class Client {
         }
       }
 
-      const nativeValue = await this.getNativeDepositValue(candidate.asset, candidate.transition.amount);
+      const nativeValue = contractCandidate.homeLedger.token === zeroAddress
+        ? decimalToBigInt(candidate.transition.amount, contractCandidate.homeLedger.decimals)
+        : undefined;
 
       console.log('💳 EVM Client - Deposit to channel transaction:', {
         contractAddress: this.contractAddress,
@@ -606,7 +602,8 @@ export class Client {
 
   async challengeEscrowDeposit(
     _candidate: core.State,
-    _challengerSig: `0x${string}`
+    _challengerSig: `0x${string}`,
+    _challengerIdx: number = 0
   ): Promise<string> {
     throw new Error('challengeEscrowDeposit not implemented - needs contract ABI update');
   }
@@ -624,7 +621,8 @@ export class Client {
 
   async challengeEscrowWithdrawal(
     _candidate: core.State,
-    _challengerSig: `0x${string}`
+    _challengerSig: `0x${string}`,
+    _challengerIdx: number = 0
   ): Promise<string> {
     throw new Error('challengeEscrowWithdrawal not implemented - needs contract ABI update');
   }

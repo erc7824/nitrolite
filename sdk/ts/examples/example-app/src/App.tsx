@@ -17,8 +17,6 @@ const NETWORKS: NetworkConfig[] = [
   { chainId: '11155111', name: 'Sepolia', rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com' },
 ];
 
-const ASSETS = ['usdc', 'weth'];
-
 function App() {
   const [appState, setAppState] = useState<AppState>(() => {
     let sessionKey: SessionKeyState | null = null;
@@ -33,10 +31,11 @@ function App() {
       connected: false,
       nodeUrl: CLEARNODES[0].url,
       selectedChainId: NETWORKS[0].chainId,
-      selectedAsset: ASSETS[0],
+      selectedAsset: '',
       sessionKey,
     };
   });
+  const [assets, setAssets] = useState<string[]>([]);
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [walletClient, setWalletClient] = useState<WalletClient | null>(null);
   const [autoConnecting, setAutoConnecting] = useState(true);
@@ -86,6 +85,20 @@ function App() {
     return await Client.create(nodeUrl, stateSigner, txSigner, ...options);
   }, []);
 
+  const fetchAssets = useCallback(async (client: Client) => {
+    try {
+      const nodeAssets = await client.getAssets();
+      const symbols = nodeAssets.map(a => a.symbol.toLowerCase());
+      setAssets(symbols);
+      setAppState(prev => ({
+        ...prev,
+        selectedAsset: prev.selectedAsset || symbols[0] || '',
+      }));
+    } catch (error) {
+      console.error('Failed to fetch assets:', error);
+    }
+  }, []);
+
   // Auto-reconnect on page load
   useEffect(() => {
     const autoConnect = async () => {
@@ -123,6 +136,7 @@ function App() {
             }
 
             setAppState(prev => ({ ...prev, address, client: sdkClient, connected: true, sessionKey: storedSk }));
+            await fetchAssets(sdkClient);
           } catch (nodeError) {
             console.error('Auto node connection failed:', nodeError);
             setAppState(prev => ({ ...prev, address, connected: false }));
@@ -137,7 +151,7 @@ function App() {
     };
 
     autoConnect();
-  }, [showStatus, buildClient]);
+  }, [showStatus, buildClient, fetchAssets]);
 
   // Listen for account changes
   useEffect(() => {
@@ -194,6 +208,7 @@ function App() {
       try {
         const sdkClient = await buildClient(wc, appState.nodeUrl, appState.sessionKey, address);
         setAppState(prev => ({ ...prev, address, client: sdkClient, connected: true }));
+        await fetchAssets(sdkClient);
         const node = CLEARNODES.find(c => c.url === appState.nodeUrl);
         showStatus('success', `Connected to ${node?.name || 'Clearnode'}`);
       } catch (nodeError) {
@@ -204,7 +219,7 @@ function App() {
     } catch (error) {
       showStatus('error', 'Failed to connect wallet', error instanceof Error ? error.message : String(error));
     }
-  }, [showStatus, appState.nodeUrl, appState.sessionKey, buildClient]);
+  }, [showStatus, appState.nodeUrl, appState.sessionKey, buildClient, fetchAssets]);
 
   const disconnectWallet = useCallback(() => {
     localStorage.removeItem('metamask_connected');
@@ -237,7 +252,8 @@ function App() {
 
     const newClient = await buildClient(walletClient, appState.nodeUrl, sk, appState.address);
     setAppState(prev => ({ ...prev, client: newClient, connected: true, sessionKey: sk }));
-  }, [walletClient, appState.address, appState.client, appState.nodeUrl, buildClient]);
+    await fetchAssets(newClient);
+  }, [walletClient, appState.address, appState.client, appState.nodeUrl, buildClient, fetchAssets]);
 
   const clearSessionKey = useCallback(async () => {
     if (!walletClient || !appState.address) return;
@@ -250,7 +266,8 @@ function App() {
 
     const newClient = await buildClient(walletClient, appState.nodeUrl, null, appState.address);
     setAppState(prev => ({ ...prev, client: newClient, connected: true, sessionKey: null }));
-  }, [walletClient, appState.address, appState.client, appState.nodeUrl, buildClient]);
+    await fetchAssets(newClient);
+  }, [walletClient, appState.address, appState.client, appState.nodeUrl, buildClient, fetchAssets]);
 
   const currentNetwork = NETWORKS.find(n => n.chainId === appState.selectedChainId);
 
@@ -333,7 +350,7 @@ function App() {
             address={appState.address}
             chainId={appState.selectedChainId}
             asset={appState.selectedAsset}
-            assets={ASSETS}
+            assets={assets}
             sessionKey={appState.sessionKey}
             walletClient={walletClient}
             showStatus={showStatus}

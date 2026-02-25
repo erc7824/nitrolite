@@ -24,4 +24,12 @@ contract TestChannelHub is ChannelHub {
     function exposed_pullFunds(address from, address token, uint256 amount) external payable {
         _pullFunds(from, token, amount);
     }
+
+    /**
+     * @notice Workaround to set reclaim balance for testing
+     * @dev Allows tests to set up reclaim state without going through failed transfers
+     */
+    function workaround_setReclaim(address account, address token, uint256 amount) external {
+        _reclaims[account][token] = amount;
+    }
 }

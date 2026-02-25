@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import type { WalletClient } from 'viem';
+import Decimal from 'decimal.js';
 import {
   getChannelSessionKeyAuthMetadataHashV1,
   packChannelKeyStateV1,
@@ -55,7 +56,7 @@ function isAllowanceError(error: unknown): boolean {
   return msg.toLowerCase().includes('allowance') && msg.toLowerCase().includes('sufficient');
 }
 
-const MAX_UINT256 = 2n ** 256n - 1n;
+const MAX_APPROVE_AMOUNT = new Decimal('1e18');
 
 export default function WalletDashboard({
   client, address, chainId, asset, assets,
@@ -204,12 +205,7 @@ export default function WalletDashboard({
           client.getUserAddress() as `0x${string}`, asset, true,
         );
         const cid = state.homeLedger.blockchainId;
-        const assetList = await client.getAssets(cid);
-        const found = assetList.find((a: any) => a.symbol.toLowerCase() === asset.toLowerCase());
-        if (found) {
-          const token = (found as any).tokens?.find((t: any) => t.blockchainId === cid);
-          if (token) await client.approveToken(cid, token.address, MAX_UINT256);
-        }
+        await client.approveToken(cid, asset, MAX_APPROVE_AMOUNT);
         txHash = await client.checkpoint(asset);
       }
       showStatus('success', 'Checkpoint complete', `Tx: ${txHash}`);

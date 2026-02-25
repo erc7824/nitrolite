@@ -72,10 +72,14 @@ library Utils {
         }
 
         if (ledger.chainId == block.chainid) {
-            try IERC20Metadata(ledger.token).decimals() returns (uint8 tokenDecimals) {
-                require(ledger.decimals == tokenDecimals, DecimalsMismatch());
-            } catch {
-                revert FailedToFetchDecimals();
+            if (ledger.token == address(0)) {
+                require(ledger.decimals == 18, DecimalsMismatch());
+            } else {
+                try IERC20Metadata(ledger.token).decimals() returns (uint8 tokenDecimals) {
+                    require(ledger.decimals == tokenDecimals, DecimalsMismatch());
+                } catch {
+                    revert FailedToFetchDecimals();
+                }
             }
         }
     }

@@ -15,3 +15,12 @@ assets:
       - blockchain_id: 11155111
         address: "0x2A35728CADd8076dfD424fC3e20974A3CD03bFa5"
         decimals: 18
+  - name: "Ether"
+    symbol: "eth"
+    decimals: 18
+    suggested_blockchain_id: 11155111
+    tokens:
+      - blockchain_id: 11155111
+        address: "0x0000000000000000000000000000000000000000"
+        decimals: 18
+

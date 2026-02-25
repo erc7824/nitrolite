@@ -965,3 +965,48 @@ func (c *Client) SignChannelSessionKeyState(state core.ChannelSessionKeyStateV1)
 
 	return sig.String(), nil
 }
+
+// ApproveToken approves the ChannelHub contract to spend tokens on behalf of the user.
+// This is required before depositing ERC-20 tokens. Native tokens (e.g., ETH) do not
+// require approval and will return an error if attempted.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - chainID: The blockchain network ID (e.g., 11155111 for Sepolia)
+//   - asset: The asset symbol to approve (e.g., "usdc")
+//   - amount: The amount to approve for spending
+//
+// Returns:
+//   - Transaction hash of the approval transaction
+//   - Error if the operation fails or the asset is a native token
+func (c *Client) ApproveToken(ctx context.Context, chainID uint64, asset string, amount decimal.Decimal) (string, error) {
+	if err := c.initializeBlockchainClient(ctx, chainID); err != nil {
+		return "", err
+	}
+
+	blockchainClient := c.blockchainClients[chainID]
+	return blockchainClient.Approve(asset, amount)
+}
+
+// GetOnChainBalance queries the on-chain ERC20 token balance for a wallet on a specific blockchain.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - chainID: The blockchain ID to query (e.g., 80002 for Polygon Amoy)
+//   - asset: The asset symbol (e.g., "usdc", "weth")
+//   - wallet: The Ethereum address to check the balance for
+//
+// Returns:
+//   - The token balance as a decimal (already adjusted for token decimals)
+//   - Error if the query fails
+//
+// Requirements:
+//   - Blockchain RPC must be configured for the chain (use WithBlockchainRPC)
+func (c *Client) GetOnChainBalance(ctx context.Context, chainID uint64, asset string, wallet string) (decimal.Decimal, error) {
+	if err := c.initializeBlockchainClient(ctx, chainID); err != nil {
+		return decimal.Zero, err
+	}
+
+	blockchainClient := c.blockchainClients[chainID]
+	return blockchainClient.GetTokenBalance(asset, wallet)
+}

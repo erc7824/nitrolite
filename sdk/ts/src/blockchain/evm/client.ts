@@ -3,7 +3,7 @@
  * Main client for interacting with ChannelHub contract
  */
 
-import { Address, Hex, hexToBytes } from 'viem';
+import { Address, Hex, hexToBytes, zeroAddress } from 'viem';
 import Decimal from 'decimal.js';
 import * as core from '../../core/types';
 import { decimalToBigInt } from '../../core/utils';
@@ -96,6 +96,12 @@ export class Client {
 
   private async getAllowance(asset: string, owner: Address): Promise<Decimal> {
     const tokenAddress = await this.assetStore.getTokenAddress(asset, this.blockchainId);
+
+    // Native tokens don't require allowance
+    if (tokenAddress === zeroAddress) {
+      return new Decimal('1e18');
+    }
+
     const erc20 = newERC20(tokenAddress, this.evmClient);
     const allowance = await erc20.allowance(owner, this.contractAddress);
 
@@ -105,6 +111,14 @@ export class Client {
 
   private async getTokenBalance(asset: string, account: Address): Promise<Decimal> {
     const tokenAddress = await this.assetStore.getTokenAddress(asset, this.blockchainId);
+
+    // Native token (zero address) — query ETH balance directly
+    if (tokenAddress === zeroAddress) {
+      const balance = await this.evmClient.getBalance({ address: account });
+      // Native tokens use 18 decimals
+      return new Decimal(balance.toString()).div(Decimal.pow(10, 18));
+    }
+
     const erc20 = newERC20(tokenAddress, this.evmClient);
     const balance = await erc20.balanceOf(account);
 
@@ -126,6 +140,11 @@ export class Client {
    */
   async approveToken(asset: string, amount: Decimal): Promise<string> {
     const tokenAddress = await this.assetStore.getTokenAddress(asset, this.blockchainId);
+
+    if (tokenAddress === zeroAddress) {
+      throw new Error('Native tokens do not require approval');
+    }
+
     const decimals = await this.assetStore.getTokenDecimals(this.blockchainId, tokenAddress);
     const amountBig = decimalToBigInt(amount, decimals);
 
@@ -147,6 +166,14 @@ export class Client {
   async checkAllowanceByAddress(tokenAddress: Address, owner: Address): Promise<bigint> {
     const erc20 = newERC20(tokenAddress, this.evmClient);
     return await erc20.allowance(owner, this.contractAddress);
+  }
+
+  private async getNativeDepositValue(asset: string, amount: Decimal): Promise<bigint | undefined> {
+    const tokenAddress = await this.assetStore.getTokenAddress(asset, this.blockchainId);
+    if (tokenAddress === zeroAddress) {
+      return decimalToBigInt(amount, 18);
+    }
+    return undefined;
   }
 
   // ========= Getters - ChannelHub =========
@@ -238,6 +265,7 @@ export class Client {
         functionName: 'depositToVault',
         args: [node, token, amountBig],
         account: this.walletSigner.account!.address,
+        ...(token === zeroAddress ? { value: amountBig } : {}),
       });
 
       console.log('✅ Simulation successful - executing deposit...');
@@ -362,6 +390,15 @@ export class Client {
       walletChainName: this.walletSigner.chain?.name
     });
 
+    // Resolve native ETH value for deposit intents
+    let nativeValue: bigint | undefined;
+    if (
+      initState.transition.type === core.TransitionType.HomeDeposit ||
+      initState.transition.type === core.TransitionType.EscrowDeposit
+    ) {
+      nativeValue = await this.getNativeDepositValue(initState.asset, initState.transition.amount);
+    }
+
     // Step 1: Simulate the transaction to validate it will succeed
     console.log('🔍 Simulating transaction...');
     try {
@@ -371,6 +408,7 @@ export class Client {
         functionName: 'createChannel',
         args: [contractDef, contractState],
         account: this.walletSigner.account!.address,
+        ...(nativeValue != null ? { value: nativeValue } : {}),
       } as any)) as any;
 
       console.log('✅ Simulation successful - executing transaction...');
@@ -428,6 +466,8 @@ export class Client {
         }
       }
 
+      const nativeValue = await this.getNativeDepositValue(candidate.asset, candidate.transition.amount);
+
       console.log('💳 EVM Client - Deposit to channel transaction:', {
         contractAddress: this.contractAddress,
         blockchainId: this.blockchainId.toString(),
@@ -441,6 +481,7 @@ export class Client {
         functionName: 'depositToChannel',
         args: [channelIdBytes, contractCandidate],
         gas: 5000000n, // 5M gas limit
+        ...(nativeValue != null ? { value: nativeValue } : {}),
       } as any);
 
       console.log('✅ Deposit to channel transaction hash:', hash);

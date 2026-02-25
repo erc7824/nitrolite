@@ -869,20 +869,20 @@ export class Client {
   }
 
   /**
-   * Approve token spending for a specific chain and token
-   * @param chainId - The blockchain ID
-   * @param tokenAddress - The ERC20 token contract address
-   * @param amount - Amount to approve (in smallest unit, e.g., wei)
-   * @returns Transaction hash
+   * Approve the ChannelHub contract to spend tokens on behalf of the user.
+   * This is required before depositing ERC-20 tokens. Native tokens (e.g., ETH)
+   * do not require approval and will throw an error if attempted.
+   *
+   * @param chainId - The blockchain network ID (e.g., 11155111n for Sepolia)
+   * @param asset - The asset symbol to approve (e.g., "usdc")
+   * @param amount - The amount to approve for spending
+   * @returns Transaction hash of the approval transaction
    */
-  async approveToken(chainId: bigint, tokenAddress: string, amount: bigint): Promise<string> {
+  async approveToken(chainId: bigint, asset: string, amount: Decimal): Promise<string> {
     await this.initializeBlockchainClient(chainId);
     const blockchainClient = this.blockchainClients.get(chainId)!;
 
-    return await blockchainClient.approveTokenByAddress(
-      tokenAddress as `0x${string}`,
-      amount
-    );
+    return await blockchainClient.approveToken(asset, amount);
   }
 
   /**

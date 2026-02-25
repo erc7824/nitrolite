@@ -1270,9 +1270,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
             }
         } else {
             // ERC20: limit gas and handle non-returning tokens (mimic SafeERC20 logic)
-            (bool success, bytes memory returndata) = address(token).call{gas: TRANSFER_GAS_LIMIT}(
-                abi.encodeCall(IERC20.transfer, (to, amount))
-            );
+            (bool success, bytes memory returndata) =
+                address(token).call{gas: TRANSFER_GAS_LIMIT}(abi.encodeCall(IERC20.transfer, (to, amount)));
 
             // Success criteria (from SafeERC20._safeTransfer):
             // Call succeeded AND (return value is true OR returndata is empty for non-returning tokens)

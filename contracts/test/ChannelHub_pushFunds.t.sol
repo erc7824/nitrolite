@@ -154,9 +154,7 @@ contract ChannelHubTest_pushFunds is Test {
     }
 
     function test_succeeds_withNativeETH_toContract() public {
-        cHub.exposed_pushFunds(
-            address(simpleReceiver), address(0), TRANSFER_AMOUNT
-        );
+        cHub.exposed_pushFunds(address(simpleReceiver), address(0), TRANSFER_AMOUNT);
 
         _verifyTransferSuccess(address(simpleReceiver), address(0), TRANSFER_AMOUNT);
     }
@@ -167,9 +165,7 @@ contract ChannelHubTest_pushFunds is Test {
         vm.expectEmit(true, true, false, true);
         emit ChannelHub.TransferFailed(address(revertingReceiver), address(0), TRANSFER_AMOUNT);
 
-        cHub.exposed_pushFunds(
-            address(revertingReceiver), address(0), TRANSFER_AMOUNT
-        );
+        cHub.exposed_pushFunds(address(revertingReceiver), address(0), TRANSFER_AMOUNT);
 
         _verifyBalancesNotChanged(address(revertingReceiver), address(0), TRANSFER_AMOUNT);
     }
@@ -180,9 +176,7 @@ contract ChannelHubTest_pushFunds is Test {
         vm.expectEmit(true, true, false, true);
         emit ChannelHub.TransferFailed(address(gasConsumingReceiver), address(0), TRANSFER_AMOUNT);
 
-        cHub.exposed_pushFunds(
-            address(gasConsumingReceiver), address(0), TRANSFER_AMOUNT
-        );
+        cHub.exposed_pushFunds(address(gasConsumingReceiver), address(0), TRANSFER_AMOUNT);
 
         _verifyBalancesNotChanged(address(gasConsumingReceiver), address(0), TRANSFER_AMOUNT);
     }

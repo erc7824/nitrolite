@@ -30,6 +30,7 @@ import type {
     SubmitAppStateRequestParamsV04,
     GetAppDefinitionResponseParams,
     CreateAppSessionRequestParams,
+    CloseAppSessionRequestParams,
 } from './types';
 import { RPCAppStateIntent } from './types';
 
@@ -117,6 +118,8 @@ export class NitroliteClient {
     private assetsBySymbol = new Map<string, AssetInfo>(); // lowercase symbol -> info
     private _chainId: bigint;
     private _lastChannels: LedgerChannel[] = [];
+    private _lastAppSessionsListError: string | null = null;
+    private _lastAppSessionsListErrorLogged: string | null = null;
 
     private constructor(client: Client, userAddress: Address, chainId: number) {
         this.innerClient = client;
@@ -507,38 +510,80 @@ export class NitroliteClient {
     }
 
     async getAppSessionsList(wallet?: Address, status?: string): Promise<AppSession[]> {
+        const mapSessions = (sessions: any[]) => sessions.map((s) => ({
+            app_session_id: s.appSessionId,
+            nonce: Number(s.nonce ?? 0),
+            participants: s.participants.map((p: any) => p.walletAddress),
+            protocol: '',
+            quorum: s.quorum,
+            status: s.isClosed ? 'closed' : 'open',
+            version: Number(s.version ?? 0),
+            weights: s.participants.map((p: any) => p.signatureWeight),
+            allocations: s.allocations?.map((a: any) => {
+                const info = this.assetsBySymbol.get(a.asset?.toLowerCase?.() ?? '');
+                const dec = info?.decimals ?? 6;
+                const rawAmount = a.amount
+                    ? a.amount.mul(new Decimal(10).pow(dec)).toFixed(0)
+                    : '0';
+                return {
+                    participant: a.participant as Address,
+                    asset: a.asset,
+                    amount: rawAmount,
+                };
+            }) ?? [],
+            sessionData: s.sessionData ?? '',
+        }));
+
+        const participant = (wallet ?? this.userAddress).toLowerCase() as Address;
+        const normalizedStatus = status?.toLowerCase();
+        const effectiveStatus = normalizedStatus && normalizedStatus !== 'any'
+            ? normalizedStatus
+            : undefined;
+        const request = effectiveStatus
+            ? { wallet: participant, status: effectiveStatus }
+            : { wallet: participant };
+
         try {
-            const { sessions } = await this.innerClient.getAppSessions({
-                wallet: wallet ?? this.userAddress,
-                status,
+            console.info('[compat] getAppSessionsList request', {
+                participant,
+                status: effectiveStatus ?? 'any',
+                rawStatus: status ?? null,
             });
-            return sessions.map((s) => ({
-                app_session_id: s.appSessionId,
-                nonce: Number(s.nonce ?? 0),
-                participants: s.participants.map((p) => p.walletAddress),
-                protocol: '',
-                quorum: s.quorum,
-                status: s.isClosed ? 'closed' : 'open',
-                version: Number(s.version ?? 0),
-                weights: s.participants.map((p) => p.signatureWeight),
-                allocations: s.allocations?.map((a) => {
-                    const info = this.assetsBySymbol.get(a.asset?.toLowerCase?.() ?? '');
-                    const dec = info?.decimals ?? 6;
-                    const rawAmount = a.amount
-                        ? a.amount.mul(new Decimal(10).pow(dec)).toFixed(0)
-                        : '0';
-                    return {
-                        participant: a.participant as Address,
-                        asset: a.asset,
-                        amount: rawAmount,
-                    };
-                }) ?? [],
-                sessionData: s.sessionData ?? '',
-            }));
+            const { sessions } = await this.innerClient.getAppSessions(request);
+            console.info(`[compat] getAppSessionsList success count=${sessions.length}`);
+            this._lastAppSessionsListError = null;
+            return mapSessions(sessions);
         } catch (err) {
-            console.warn('[compat] getAppSessionsList failed, returning empty:', (err as Error).message);
+            if (effectiveStatus) {
+                try {
+                    console.warn(
+                        `[compat] getAppSessionsList retrying without status filter participant=${participant} status=${effectiveStatus}`,
+                    );
+                    const { sessions } = await this.innerClient.getAppSessions({ wallet: participant });
+                    console.info(
+                        `[compat] getAppSessionsList success count=${sessions.length} (fallback without status)`,
+                    );
+                    this._lastAppSessionsListError = null;
+                    return mapSessions(sessions);
+                } catch {
+                    // fall through to the original failure handling
+                }
+            }
+
+            const message = (err as Error).message;
+            this._lastAppSessionsListError = message;
+            if (this._lastAppSessionsListErrorLogged !== message) {
+                console.warn(
+                    `[compat] getAppSessionsList failed participant=${participant} status=${effectiveStatus ?? 'any'} error=${message}`,
+                );
+                this._lastAppSessionsListErrorLogged = message;
+            }
             return [];
         }
+    }
+
+    getLastAppSessionsListError(): string | null {
+        return this._lastAppSessionsListError;
     }
 
     async getAssetsList(): Promise<ClearNodeAsset[]> {
@@ -568,9 +613,13 @@ export class NitroliteClient {
     async createAppSession(
         definitionOrParams: RPCAppDefinition | CreateAppSessionRequestParams,
         allocations?: RPCAppSessionAllocation[],
+        quorumSigs?: string[],
     ): Promise<{ appSessionId: string; version: string; status: string }> {
         const def = 'definition' in definitionOrParams ? definitionOrParams.definition : definitionOrParams;
         const allocs = 'definition' in definitionOrParams ? definitionOrParams.allocations : (allocations ?? []);
+        const quorumSignatures = 'definition' in definitionOrParams
+            ? (definitionOrParams.quorum_sigs ?? [])
+            : (quorumSigs ?? []);
         const sessionData = 'definition' in definitionOrParams
             ? (definitionOrParams.session_data ?? JSON.stringify({ allocations: allocs }))
             : JSON.stringify({ allocations: allocs });
@@ -585,20 +634,37 @@ export class NitroliteClient {
             nonce: BigInt(def.nonce ?? Date.now()),
         };
 
-        const result = await this.innerClient.createAppSession(v1Def, sessionData, []);
+        const result = await this.innerClient.createAppSession(v1Def, sessionData, quorumSignatures);
         return { appSessionId: result.appSessionId, version: result.version, status: result.status };
     }
 
     async closeAppSession(
-        appSessionId: string,
-        _allocations: RPCAppSessionAllocation[],
+        appSessionIdOrParams: string | CloseAppSessionRequestParams,
+        allocations?: RPCAppSessionAllocation[],
+        quorumSigs: string[] = [],
     ): Promise<{ appSessionId: string }> {
+        const appSessionId = typeof appSessionIdOrParams === 'string'
+            ? appSessionIdOrParams
+            : appSessionIdOrParams.app_session_id;
+        const closeAllocations = typeof appSessionIdOrParams === 'string'
+            ? (allocations ?? [])
+            : appSessionIdOrParams.allocations;
+        const closeVersion = typeof appSessionIdOrParams === 'string'
+            ? undefined
+            : appSessionIdOrParams.version;
+        const closeSessionData = typeof appSessionIdOrParams === 'string'
+            ? undefined
+            : appSessionIdOrParams.session_data;
+        const closeQuorumSignatures = typeof appSessionIdOrParams === 'string'
+            ? quorumSigs
+            : (appSessionIdOrParams.quorum_sigs ?? quorumSigs);
+
         const { sessions } = await this.innerClient.getAppSessions({ appSessionId });
         if (sessions.length === 0) throw new Error(`App session ${appSessionId} not found`);
 
         const session = sessions[0];
         const v1Allocations: AppAllocationV1[] = [];
-        for (const a of _allocations) {
+        for (const a of closeAllocations) {
             const decimals = await this.getDecimalsForAsset(a.asset);
             const humanAmount = new Decimal(a.amount).div(new Decimal(10).pow(decimals));
             v1Allocations.push({
@@ -611,12 +677,12 @@ export class NitroliteClient {
         const appUpdate = {
             appSessionId,
             intent: NitroliteClient.INTENT_MAP['close'],
-            version: session.version + 1n,
+            version: closeVersion !== undefined ? BigInt(closeVersion) : session.version + 1n,
             allocations: v1Allocations,
-            sessionData: '',
+            sessionData: closeSessionData ?? '',
         };
 
-        await this.innerClient.submitAppState(appUpdate, []);
+        await this.innerClient.submitAppState(appUpdate, closeQuorumSignatures);
         return { appSessionId };
     }
 
@@ -645,6 +711,13 @@ export class NitroliteClient {
         const isV04 = 'intent' in params;
         const intentStr = isV04 ? (params as SubmitAppStateRequestParamsV04).intent : RPCAppStateIntent.Operate;
         const intentNum = NitroliteClient.INTENT_MAP[intentStr] ?? 0;
+        console.info('[compat] submitAppState request', {
+            appSessionId: params.app_session_id,
+            intent: intentStr,
+            allocationCount: params.allocations.length,
+            hasQuorumSigs: (params.quorum_sigs?.length ?? 0) > 0,
+            quorumSigCount: params.quorum_sigs?.length ?? 0,
+        });
 
         const { sessions } = await this.innerClient.getAppSessions({ appSessionId: params.app_session_id });
         if (sessions.length === 0) throw new Error(`App session ${params.app_session_id} not found`);
@@ -673,7 +746,77 @@ export class NitroliteClient {
             sessionData: params.session_data ?? '',
         };
 
-        await this.innerClient.submitAppState(appUpdate, []);
+        if (intentStr === RPCAppStateIntent.Deposit) {
+            const userAddress = this.userAddress.toLowerCase();
+            const currentByParticipantAndAsset = new Map<string, Decimal>();
+            for (const allocation of session.allocations ?? []) {
+                currentByParticipantAndAsset.set(
+                    `${allocation.participant.toLowerCase()}::${allocation.asset.toLowerCase()}`,
+                    allocation.amount,
+                );
+            }
+
+            type PositiveDelta = { participant: string; asset: string; amount: Decimal };
+            const positiveDeltas: PositiveDelta[] = [];
+            const negativeDeltas: PositiveDelta[] = [];
+
+            for (const allocation of v1Allocations) {
+                const key = `${allocation.participant.toLowerCase()}::${allocation.asset.toLowerCase()}`;
+                const currentAmount = currentByParticipantAndAsset.get(key) ?? new Decimal(0);
+                const delta = allocation.amount.minus(currentAmount);
+                if (delta.greaterThan(0)) {
+                    positiveDeltas.push({
+                        participant: allocation.participant.toLowerCase(),
+                        asset: allocation.asset,
+                        amount: delta,
+                    });
+                } else if (delta.lessThan(0)) {
+                    negativeDeltas.push({
+                        participant: allocation.participant.toLowerCase(),
+                        asset: allocation.asset,
+                        amount: delta,
+                    });
+                }
+            }
+
+            if (positiveDeltas.length === 0) {
+                throw new Error('Deposit intent requires at least one positive allocation delta');
+            }
+            if (positiveDeltas.length > 1) {
+                throw new Error('Deposit intent currently supports exactly one deposited asset delta');
+            }
+            if (negativeDeltas.length > 0) {
+                throw new Error('Deposit intent cannot decrease existing app-session allocations');
+            }
+
+            const [delta] = positiveDeltas;
+            if (delta.participant !== userAddress) {
+                throw new Error(
+                    `Deposit must be submitted by depositor ${delta.participant}; connected wallet is ${userAddress}`,
+                );
+            }
+            console.info('[compat] submitAppState deposit delta', {
+                appSessionId: params.app_session_id,
+                depositor: delta.participant,
+                asset: delta.asset,
+                amount: delta.amount.toString(),
+                negativeDeltaCount: negativeDeltas.length,
+            });
+
+            await this.innerClient.submitAppSessionDeposit(
+                appUpdate,
+                params.quorum_sigs ?? [],
+                delta.asset,
+                delta.amount,
+            );
+        } else {
+            await this.innerClient.submitAppState(appUpdate, params.quorum_sigs ?? []);
+        }
+        console.info('[compat] submitAppState success', {
+            appSessionId: params.app_session_id,
+            intent: intentStr,
+            version: Number(version),
+        });
         return {
             appSessionId: params.app_session_id,
             version: Number(version),

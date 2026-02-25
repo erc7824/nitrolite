@@ -195,19 +195,23 @@ export interface RPCAppSessionAllocation {
 export interface CloseAppSessionRequestParams {
     app_session_id: string;
     allocations: RPCAppSessionAllocation[];
+    version?: number;
     session_data?: string;
+    quorum_sigs?: string[];
 }
 
 export interface CreateAppSessionRequestParams {
     definition: RPCAppDefinition;
     allocations: RPCAppSessionAllocation[];
     session_data?: string;
+    quorum_sigs?: string[];
 }
 
 export interface SubmitAppStateRequestParamsV02 {
     app_session_id: Hex;
     allocations: RPCAppSessionAllocation[];
     session_data?: string;
+    quorum_sigs?: string[];
 }
 
 export interface SubmitAppStateRequestParamsV04 {
@@ -216,6 +220,7 @@ export interface SubmitAppStateRequestParamsV04 {
     version: number;
     allocations: RPCAppSessionAllocation[];
     session_data?: string;
+    quorum_sigs?: string[];
 }
 
 export type SubmitAppStateRequestParams = SubmitAppStateRequestParamsV02 | SubmitAppStateRequestParamsV04;

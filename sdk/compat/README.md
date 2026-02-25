@@ -148,10 +148,18 @@ await client.close();
 
 | Method | Description |
 |---|---|
-| `createAppSession(definition, allocations)` | Create an app session |
-| `closeAppSession(appSessionId, allocations)` | Close an app session |
-| `submitAppState(params)` | Submit state update (operate/deposit/withdraw) |
+| `createAppSession(definition, allocations, quorumSigs?)` | Create an app session (optionally with quorum signatures) |
+| `closeAppSession(appSessionId, allocations, quorumSigs?)` | Close an app session (optionally with quorum signatures) |
+| `submitAppState(params)` | Submit state update (operate/deposit/withdraw/close) with optional `quorum_sigs` |
 | `getAppDefinition(appSessionId)` | Get the definition for a session |
+
+### App Session Signing Helpers
+
+| Helper | Description |
+|---|---|
+| `packCreateAppSessionHash(params)` | Deterministic hash for `createAppSession` quorum signing |
+| `packSubmitAppStateHash(params)` | Deterministic hash for `submitAppState` quorum signing |
+| `toWalletQuorumSignature(signature)` | Prefixes wallet signature to compat app-session quorum format |
 
 ### Transfers
 

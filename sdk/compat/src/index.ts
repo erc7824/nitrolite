@@ -20,6 +20,17 @@ export {
     type AuthRequestParams,
 } from './auth';
 
+// --- App session signing helpers ---
+export {
+    packCreateAppSessionHash,
+    packSubmitAppStateHash,
+    toWalletQuorumSignature,
+    type CreateAppSessionHashParticipant,
+    type CreateAppSessionHashParams,
+    type SubmitAppStateHashAllocation,
+    type SubmitAppStateHashParams,
+} from './app-signing';
+
 // --- RPC helpers ---
 export {
     parseAnyRPCResponse,

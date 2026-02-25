@@ -140,7 +140,9 @@ contract ChannelHubTest_claimFunds is Test {
         cHub.workaround_setReclaim(claimer, address(0), RECLAIM_AMOUNT);
 
         vm.prank(claimer);
-        vm.expectRevert(abi.encodeWithSelector(ChannelHub.NativeTransferFailed.selector, address(revertingReceiver), RECLAIM_AMOUNT));
+        vm.expectRevert(
+            abi.encodeWithSelector(ChannelHub.NativeTransferFailed.selector, address(revertingReceiver), RECLAIM_AMOUNT)
+        );
         cHub.claimFunds(address(0), address(revertingReceiver));
     }
 

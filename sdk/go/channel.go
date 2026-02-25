@@ -988,7 +988,7 @@ func (c *Client) ApproveToken(ctx context.Context, chainID uint64, asset string,
 	return blockchainClient.Approve(asset, amount)
 }
 
-// GetOnChainBalance queries the on-chain ERC20 token balance for a wallet on a specific blockchain.
+// GetOnChainBalance queries the on-chain token balance (ERC-20 or native ETH) for a wallet on a specific blockchain.
 //
 // Parameters:
 //   - ctx: Context for the operation

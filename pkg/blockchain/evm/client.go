@@ -2,7 +2,6 @@ package evm
 
 import (
 	"context"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -360,24 +359,6 @@ func (c *Client) Approve(asset string, amount decimal.Decimal) (string, error) {
 	return tx.Hash().Hex(), nil
 }
 
-// nativeDepositValue returns the msg.value needed for native ETH deposits.
-// For ERC-20 tokens it returns nil (no value needed).
-func (c *Client) nativeDepositValue(asset string, amount decimal.Decimal) (*big.Int, error) {
-	tokenAddrHex, err := c.assetStore.GetTokenAddress(asset, c.blockchainID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get token address")
-	}
-	tokenAddr := common.HexToAddress(tokenAddrHex)
-	if tokenAddr == (common.Address{}) {
-		value, err := core.DecimalToBigInt(amount, 18)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to convert native amount to wei")
-		}
-		return value, nil
-	}
-	return nil, nil
-}
-
 // ========= Channel Lifecycle =========
 
 func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string, error) {
@@ -415,12 +396,14 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 			}
 		}
 
-		value, err := c.nativeDepositValue(initCCS.Asset, initCCS.Transition.Amount)
-		if err != nil {
-			return "", err
+		if contractState.HomeLedger.Token == (common.Address{}) {
+			value, err := core.DecimalToBigInt(initCCS.Transition.Amount, contractState.HomeLedger.Decimals)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to convert native deposit amount to wei")
+			}
+			c.transactOpts.Value = value
+			defer func() { c.transactOpts.Value = nil }()
 		}
-		c.transactOpts.Value = value
-		defer func() { c.transactOpts.Value = nil }()
 
 	default:
 		return "", errors.New("unsupported intent for create: " + string(contractState.Intent))
@@ -506,12 +489,14 @@ func (c *Client) Checkpoint(candidate core.State) (string, error) {
 			}
 		}
 
-		value, valueErr := c.nativeDepositValue(candidate.Asset, candidate.Transition.Amount)
-		if valueErr != nil {
-			return "", valueErr
+		if contractCandidate.HomeLedger.Token == (common.Address{}) {
+			value, valueErr := core.DecimalToBigInt(candidate.Transition.Amount, contractCandidate.HomeLedger.Decimals)
+			if valueErr != nil {
+				return "", errors.Wrap(valueErr, "failed to convert native deposit amount to wei")
+			}
+			c.transactOpts.Value = value
+			defer func() { c.transactOpts.Value = nil }()
 		}
-		c.transactOpts.Value = value
-		defer func() { c.transactOpts.Value = nil }()
 
 		tx, err = c.contract.DepositToChannel(c.transactOpts, channelIDBytes, contractCandidate)
 	case core.INTENT_WITHDRAW:

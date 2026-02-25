@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   ArrowDownToLine, ArrowUpFromLine, Send, XCircle,
   Shield, AlertTriangle, CheckCircle2, ArrowRightLeft,
   RefreshCw, Key, Loader2, ChevronDown, ChevronUp,
-  Users, Database,
+  Users, Database, Copy, Check,
 } from 'lucide-react';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import type { WalletClient } from 'viem';
@@ -74,11 +74,11 @@ export default function WalletDashboard({
 
   // UI state
   const [activeModal, setActiveModal] = useState<'deposit' | 'withdraw' | 'transfer' | 'close' | null>(null);
-  const [showAckModal, setShowAckModal] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
   const [checkpointing, setCheckpointing] = useState(false);
   const [skLoading, setSkLoading] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
 
   // Advanced section
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -91,8 +91,6 @@ export default function WalletDashboard({
   const [keyStatesLoading, setKeyStatesLoading] = useState(false);
   const [revokingKey, setRevokingKey] = useState<string | null>(null);
 
-  // Track dismissed acknowledge version to avoid re-showing
-  const lastAckDismissedVersion = useRef<string>('');
 
   // Fetch all wallet data
   const fetchData = useCallback(async (isManual = false) => {
@@ -140,17 +138,6 @@ export default function WalletDashboard({
     }
   })();
 
-  // Show acknowledge popup when needed
-  useEffect(() => {
-    if (needsAcknowledge && latestState) {
-      const ver = String(latestState.version);
-      if (lastAckDismissedVersion.current !== ver) {
-        setShowAckModal(true);
-      }
-    } else {
-      setShowAckModal(false);
-    }
-  }, [needsAcknowledge, latestState]);
 
   // Determine if optional checkpoint is available
   const canCheckpoint = (() => {
@@ -176,21 +163,12 @@ export default function WalletDashboard({
       setAcknowledging(true);
       await client.acknowledge(asset);
       showStatus('success', 'State acknowledged');
-      lastAckDismissedVersion.current = '';
       await fetchData();
     } catch (error) {
       showStatus('error', 'Acknowledge failed', error instanceof Error ? error.message : String(error));
     } finally {
       setAcknowledging(false);
-      setShowAckModal(false);
     }
-  };
-
-  const handleDismissAck = () => {
-    if (latestState) {
-      lastAckDismissedVersion.current = String(latestState.version);
-    }
-    setShowAckModal(false);
   };
 
   const handleCheckpoint = async () => {
@@ -450,8 +428,8 @@ export default function WalletDashboard({
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Acknowledge banner (shown when modal was dismissed) */}
-      {needsAcknowledge && !showAckModal && (
+      {/* Acknowledge banner */}
+      {needsAcknowledge && (
         <div className="bg-accent/10 border border-accent/30 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs">
             <AlertTriangle className="h-3.5 w-3.5 text-accent flex-shrink-0" />
@@ -499,6 +477,18 @@ export default function WalletDashboard({
             <div className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
               {asset.toUpperCase()} Balance
             </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(address);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              title={address}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2 font-mono"
+            >
+              {formatAddress(address)}
+              {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+            </button>
           </div>
 
           {/* Channel sync status */}
@@ -871,43 +861,6 @@ export default function WalletDashboard({
           </div>
         )}
       </div>
-
-      {/* Acknowledge Modal */}
-      {showAckModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-card border border-border p-6 max-w-sm w-full mx-4 animate-scale-in">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 flex items-center justify-center bg-accent/10 text-accent flex-shrink-0">
-                <AlertTriangle className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold uppercase tracking-wider">Action Required</div>
-                <div className="text-xs text-muted-foreground">New state needs acknowledgement</div>
-              </div>
-            </div>
-
-            <p className="text-sm text-muted-foreground mb-6">
-              A new channel state (v{latestState?.version?.toString()}) has been received.
-              Please acknowledge it to continue operations.
-            </p>
-
-            <div className="flex gap-3">
-              <Button
-                onClick={handleAcknowledge}
-                disabled={acknowledging}
-                className="flex-1"
-              >
-                {acknowledging ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Acknowledging...</>
-                ) : 'Acknowledge'}
-              </Button>
-              <Button onClick={handleDismissAck} variant="outline">
-                Later
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Transaction Detail Modal */}
       {selectedTx && (() => {

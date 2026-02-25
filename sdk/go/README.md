@@ -21,6 +21,9 @@ client.Acknowledge(ctx, asset)                        // Acknowledge received st
 ### Blockchain Settlement
 ```go
 client.Checkpoint(ctx, asset)                         // Settle latest state on-chain
+client.Challenge(ctx, state)                          // Submit on-chain challenge
+client.ApproveToken(ctx, chainID, asset, amount)      // Approve ChannelHub to spend tokens
+client.GetOnChainBalance(ctx, chainID, asset, wallet) // Query on-chain token balance
 ```
 
 ### Node Information
@@ -49,17 +52,23 @@ client.GetLatestState(ctx, wallet, asset, onlySigned) // Latest state
 client.GetAppSessions(ctx, opts)                              // List sessions
 client.GetAppDefinition(ctx, appSessionID)                    // Session definition
 client.CreateAppSession(ctx, definition, sessionData, sigs)   // Create session
-client.SubmitAppSessionDeposit(ctx, update, sigs, userState)  // Deposit to session
+client.SubmitAppSessionDeposit(ctx, update, sigs, asset, amount) // Deposit to session
 client.SubmitAppState(ctx, update, sigs)                      // Update session
 client.RebalanceAppSessions(ctx, signedUpdates)               // Atomic rebalance
 ```
 
-### Session Keys
+### Session Keys — App Sessions
 ```go
-client.SubmitSessionKeyState(ctx, state)                                          // Register/update session key
-client.GetLastKeyStates(ctx, userAddress, opts)                                   // Get active session key states
-client.SignSessionKeyState(state)                                                 // Sign a session key state
-client.BuildSessionKeyState(ctx, sessionKey, appIDs, sessionIDs, expiresAt)       // Build unsigned state with next version
+client.SignSessionKeyState(state)                                   // Sign an app session key state
+client.SubmitAppSessionKeyState(ctx, state)                         // Register/update app session key
+client.GetLastAppKeyStates(ctx, userAddress, opts)                  // Get active app session key states
+```
+
+### Session Keys — Channels
+```go
+client.SignChannelSessionKeyState(state)                            // Sign a channel session key state
+client.SubmitChannelSessionKeyState(ctx, state)                     // Register/update channel session key
+client.GetLastChannelKeyStates(ctx, userAddress, opts)              // Get active channel session key states
 ```
 
 ### Shared Utilities
@@ -80,6 +89,7 @@ package main
 
 import (
     "context"
+    "github.com/erc7824/nitrolite/pkg/core"
     "github.com/erc7824/nitrolite/pkg/sign"
     sdk "github.com/erc7824/nitrolite/sdk/go"
     "github.com/shopspring/decimal"
@@ -87,7 +97,8 @@ import (
 
 func main() {
     // Create signers from private key
-    stateSigner, _ := sign.NewEthereumMsgSigner(privateKeyHex)
+    msgSigner, _ := sign.NewEthereumMsgSigner(privateKeyHex)
+    stateSigner, _ := core.NewChannelDefaultSigner(msgSigner)
     txSigner, _ := sign.NewEthereumRawSigner(privateKeyHex)
 
     // Create unified client
@@ -127,8 +138,10 @@ sdk/go/
 ├── user.go           # User query methods
 ├── channel.go        # Channel and state management
 ├── app_session.go    # App session methods
+├── asset_cache.go    # Asset lookup and caching
 ├── config.go         # Configuration options
-└── utils.go      # Type conversions
+├── doc.go            # Package documentation
+└── utils.go          # Type conversions
 ```
 
 ## Client API
@@ -137,7 +150,13 @@ sdk/go/
 
 ```go
 // Step 1: Create signers from private key
-stateSigner, err := sign.NewEthereumMsgSigner("0x1234...")
+msgSigner, err := sign.NewEthereumMsgSigner("0x1234...")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Wrap with ChannelDefaultSigner (prepends 0x00 type byte)
+stateSigner, err := core.NewChannelDefaultSigner(msgSigner)
 if err != nil {
     log.Fatal(err)
 }
@@ -150,8 +169,8 @@ if err != nil {
 // Step 2: Create unified client
 client, err := sdk.NewClient(
     wsURL,
-    stateSigner,  // For signing channel states
-    txSigner,     // For signing blockchain transactions
+    stateSigner,  // core.ChannelSigner for signing channel states
+    txSigner,     // sign.Signer for signing blockchain transactions
     sdk.WithBlockchainRPC(chainID, rpcURL), // Required for Checkpoint
     sdk.WithHandshakeTimeout(10*time.Second),
     sdk.WithPingInterval(5*time.Second),
@@ -265,6 +284,43 @@ txHash, err := client.Checkpoint(ctx, "usdc")
 - A co-signed state must exist (call Deposit, Withdraw, etc. first)
 - Sufficient gas for the blockchain transaction
 
+#### `Challenge(ctx, state) (txHash, error)`
+
+Submits an on-chain challenge for a channel using a co-signed state. A challenge initiates a dispute period on-chain. If the counterparty does not respond with a higher-versioned state before the challenge period expires, the channel can be closed with the challenged state.
+
+```go
+state, err := client.GetLatestState(ctx, wallet, "usdc", true)
+txHash, err := client.Challenge(ctx, *state)
+```
+
+**Requirements:**
+- Blockchain RPC configured via `WithBlockchainRPC`
+- State must have both user and node signatures
+- State must have a HomeChannelID
+
+#### `ApproveToken(ctx, chainID, asset, amount) (txHash, error)`
+
+Approves the ChannelHub contract to spend ERC-20 tokens on behalf of the user. This is required before depositing ERC-20 tokens. Native tokens (e.g., ETH) do not require approval.
+
+```go
+txHash, err := client.ApproveToken(ctx, 80002, "usdc", decimal.NewFromInt(1000))
+```
+
+**Requirements:**
+- Blockchain RPC configured via `WithBlockchainRPC`
+
+#### `GetOnChainBalance(ctx, chainID, asset, wallet) (decimal.Decimal, error)`
+
+Queries the on-chain token balance (ERC-20 or native) for a wallet on a specific blockchain. The returned value is already adjusted for token decimals.
+
+```go
+balance, err := client.GetOnChainBalance(ctx, 80002, "usdc", "0x1234...")
+fmt.Printf("On-chain balance: %s\n", balance)
+```
+
+**Requirements:**
+- Blockchain RPC configured via `WithBlockchainRPC`
+
 ## Low-Level API
 
 All low-level RPC methods are available on the same Client instance.
@@ -301,23 +357,52 @@ state, err := client.GetLatestState(ctx, wallet, asset, onlySigned)
 sessions, meta, err := client.GetAppSessions(ctx, opts)
 def, err := client.GetAppDefinition(ctx, appSessionID)
 sessionID, version, status, err := client.CreateAppSession(ctx, def, data, sigs)
-nodeSig, err := client.SubmitAppSessionDeposit(ctx, update, sigs, userState)
+nodeSig, err := client.SubmitAppSessionDeposit(ctx, update, sigs, asset, amount)
 err := client.SubmitAppState(ctx, update, sigs)
 batchID, err := client.RebalanceAppSessions(ctx, signedUpdates)
 ```
 
-### Session Keys
+### Session Keys — App Sessions
 
 ```go
-// Build, sign, and submit a session key state
-state, err := client.BuildSessionKeyState(ctx, "0xSessionKey...", []string{"app1"}, nil, expiresAt)
+// Sign and submit an app session key state
+state := app.AppSessionKeyStateV1{
+    UserAddress:    client.GetUserAddress(),
+    SessionKey:     "0xSessionKey...",
+    Version:        1,
+    ApplicationIDs: []string{"app1"},
+    AppSessionIDs:  []string{},
+    ExpiresAt:      time.Now().Add(24 * time.Hour),
+}
 sig, err := client.SignSessionKeyState(state)
 state.UserSig = sig
-err = client.SubmitSessionKeyState(ctx, state)
+err = client.SubmitAppSessionKeyState(ctx, state)
 
-// Query active session key states
-states, err := client.GetLastKeyStates(ctx, userAddress, nil)
-states, err := client.GetLastKeyStates(ctx, userAddress, &sdk.GetLastKeyStatesOptions{
+// Query active app session key states
+states, err := client.GetLastAppKeyStates(ctx, userAddress, nil)
+states, err := client.GetLastAppKeyStates(ctx, userAddress, &sdk.GetLastKeyStatesOptions{
+    SessionKey: &sessionKeyAddr,
+})
+```
+
+### Session Keys — Channels
+
+```go
+// Sign and submit a channel session key state
+state := core.ChannelSessionKeyStateV1{
+    UserAddress: client.GetUserAddress(),
+    SessionKey:  "0xSessionKey...",
+    Version:     1,
+    Assets:      []string{"usdc", "weth"},
+    ExpiresAt:   time.Now().Add(24 * time.Hour),
+}
+sig, err := client.SignChannelSessionKeyState(state)
+state.UserSig = sig
+err = client.SubmitChannelSessionKeyState(ctx, state)
+
+// Query active channel session key states
+states, err := client.GetLastChannelKeyStates(ctx, userAddress, nil)
+states, err := client.GetLastChannelKeyStates(ctx, userAddress, &sdk.GetLastChannelKeyStatesOptions{
     SessionKey: &sessionKeyAddr,
 })
 ```
@@ -362,14 +447,46 @@ address := txSigner.PublicKey().Address().String()
 ```
 
 **Signing Process:**
-1. State → ABI Encode (via `core.PackState`)
-2. Packed State → Keccak256 Hash
-3. Hash → ECDSA Sign (via `signer.Sign`)
+1. State -> ABI Encode (via `core.PackState`)
+2. Packed State -> Keccak256 Hash
+3. Hash -> ECDSA Sign (via `signer.Sign`)
 4. Result: 65-byte signature (R || S || V)
 
 **Two Signer Types:**
 - `EthereumMsgSigner`: Signs channel state updates (off-chain signatures)
 - `EthereumRawSigner`: Signs blockchain transactions (on-chain operations)
+
+### Channel Signers (`pkg/core`)
+
+The SDK wraps raw signers with a `ChannelSigner` interface that prepends a type byte to every signature. This allows the on-chain contract to dispatch signature verification to the correct validator.
+
+```go
+// ChannelSigner interface (in pkg/core)
+type ChannelSigner interface {
+    sign.Signer
+    Type() ChannelSignerType
+}
+```
+
+**Two channel signer types:**
+
+| Type | Byte | Struct | Usage |
+|------|------|--------|-------|
+| Default | `0x00` | `core.ChannelDefaultSigner` | Main wallet signs directly. Signature = `0x00 \|\| EIP-191 sig`. |
+| Session Key | `0x01` | `core.ChannelSessionKeySignerV1` | Delegated session key signs on behalf of main wallet. Signature = `0x01 \|\| ABI-encoded auth + session key sig`. |
+
+**Creating a channel signer:**
+
+```go
+// Default signer (wraps EthereumMsgSigner with 0x00 prefix)
+msgSigner, _ := sign.NewEthereumMsgSigner(privateKeyHex)
+channelSigner, _ := core.NewChannelDefaultSigner(msgSigner)
+
+// Pass to NewClient as the stateSigner parameter
+client, _ := sdk.NewClient(wsURL, channelSigner, txSigner, opts...)
+```
+
+The `NewClient` constructor expects a `core.ChannelSigner` for the `stateSigner` parameter. When using `sign.NewEthereumMsgSigner` directly, it must first be wrapped with `core.NewChannelDefaultSigner` (or `core.ChannelSessionKeySignerV1` for session key operation).
 
 ### Channel Lifecycle
 
@@ -433,11 +550,11 @@ sdk.WithErrorHandler(func(error))          // Connection error handler
 
 Comprehensive example demonstrating app session lifecycle and operations.
 
-See [examples/app_sessions/app_session.go](examples/app_sessions/app_session.go)
+See [examples/app_sessions/lifecycle.go](examples/app_sessions/lifecycle.go)
 
 ```bash
 cd examples/app_sessions
-go run app_session.go
+go run lifecycle.go
 ```
 
 This example demonstrates:
@@ -464,11 +581,18 @@ core.Asset           // Asset info
 core.Token           // Token implementation
 core.Blockchain      // Blockchain info
 
+// Core channel session key types
+core.ChannelSessionKeyStateV1  // Channel session key state
+// Fields: UserAddress, SessionKey, Version (uint64), Assets []string,
+//         ExpiresAt (time.Time), UserSig string
+
 // App session types
 app.AppSessionInfoV1      // Session info
 app.AppDefinitionV1       // Session definition
 app.AppStateUpdateV1      // Session update
-app.AppSessionKeyStateV1  // Session key state
+app.AppSessionKeyStateV1  // App session key state
+// Fields: UserAddress, SessionKey, Version (uint64), ApplicationIDs []string,
+//         AppSessionIDs []string, ExpiresAt (time.Time), UserSig string
 ```
 
 ## Operation Internals
@@ -522,9 +646,9 @@ For understanding how operations work under the hood:
 2. Determine blockchain ID from state's home ledger
 3. Get on-chain channel status
 4. Route based on transition type + status:
-   - Void channel → `blockchainClient.Create()`
-   - Existing channel → `blockchainClient.Checkpoint()`
-   - Finalize → `blockchainClient.Close()`
+   - Void channel -> `blockchainClient.Create()`
+   - Existing channel -> `blockchainClient.Checkpoint()`
+   - Finalize -> `blockchainClient.Close()`
 5. Return transaction hash
 
 ## Requirements

@@ -79,6 +79,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
     error InvalidAddress();
     error IncorrectAmount();
     error IncorrectValue();
+    error NativeTransferFailed(address to, uint256 amount);
     error AddressCollision(address collision);
     error IncorrectChallengeDuration();
 
@@ -318,7 +319,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         // Transfer without gas limit or reclaim logic (user controls gas, accepts responsibility)
         if (token == address(0)) {
             (bool success,) = payable(destination).call{value: amount}("");
-            require(success, "ETH transfer failed");
+            require(success, NativeTransferFailed(destination, amount));
         } else {
             IERC20(token).safeTransfer(destination, amount);
         }

@@ -150,6 +150,8 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "set-home-blockchain", Description: "Set home blockchain for channels"},
 
 			// High-level operations
+			{Text: "token-balance", Description: "Check on-chain token balance"},
+			{Text: "approve", Description: "Approve token spending for deposits"},
 			{Text: "deposit", Description: "Deposit funds to channel"},
 			{Text: "withdraw", Description: "Withdraw funds from channel"},
 			{Text: "transfer", Description: "Transfer funds to another wallet"},
@@ -197,7 +199,22 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 				{Text: "rpc", Description: "Import blockchain RPC URL"},
 			}
 		case "set-home-blockchain", "close-channel", "acknowledge", "checkpoint":
+			// set-home-blockchain <asset> <chain_id>, others take <asset>
 			return o.getAssetSuggestions()
+		case "token-balance", "approve", "deposit", "withdraw":
+			// token-balance <chain_id> <asset>, approve/deposit/withdraw <chain_id> <asset> <amount>
+			return o.getChainSuggestions()
+		case "state", "home-channel":
+			// state [wallet] <asset>, home-channel [wallet] <asset>
+			// Suggest asset first (common case), wallet can be typed manually
+			return o.getAssetSuggestions()
+		case "transfer":
+			// transfer <recipient> <asset> <amount>
+			return o.getWalletSuggestion()
+		case "balances", "transactions":
+			return o.getWalletSuggestion()
+		case "assets":
+			return o.getChainSuggestions()
 		case "node":
 			return []prompt.Suggest{
 				{Text: "info", Description: "Get node configuration"},
@@ -213,47 +230,29 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 				return o.getChainSuggestions()
 			}
 		case "set-home-blockchain":
+			// set-home-blockchain <asset> <chain_id>
 			return o.getChainSuggestions()
-		case "deposit", "withdraw":
-			return o.getChainSuggestions()
-		case "balances", "transactions":
-			// Suggest wallet address
-			return o.getWalletSuggestion()
+		case "token-balance":
+			// token-balance <chain_id> <asset>
+			return o.getAssetSuggestions()
+		case "approve", "deposit", "withdraw":
+			// approve/deposit/withdraw <chain_id> <asset> <amount>
+			return o.getAssetSuggestions()
 		case "transfer":
-			// For transfer, third arg is recipient (no suggestion)
-			return nil
-		case "state":
-			// If user already typed wallet (or we have 2 args), suggest assets
-			// Otherwise suggest wallet address
-			if len(args) == 3 {
-				return o.getAssetSuggestions()
-			}
-			// Could be wallet or asset - suggest wallet first
-			return o.getWalletSuggestion()
-		case "home-channel":
-			// If user already typed wallet (or we have 2 args), suggest assets
-			// Otherwise suggest wallet address
-			if len(args) == 3 {
-				return o.getAssetSuggestions()
-			}
-			// Could be wallet or asset - suggest wallet first
-			return o.getWalletSuggestion()
+			// transfer <recipient> <asset> <amount>
+			return o.getAssetSuggestions()
+		case "state", "home-channel":
+			// state [wallet] <asset> — if wallet was explicitly provided, suggest asset
+			return o.getAssetSuggestions()
 		case "escrow-channel":
 			// Escrow channel ID (no suggestion)
 			return nil
-		case "assets":
-			return o.getChainSuggestions()
 		}
 	}
 
-	// Fourth level - assets or amounts
+	// Fourth level
 	if len(args) < 5 {
 		switch args[0] {
-		case "deposit", "withdraw", "transfer":
-			return o.getAssetSuggestions()
-		case "state", "home-channel":
-			// Asset for state/home-channel commands (when wallet was explicitly provided)
-			return o.getAssetSuggestions()
 		case "create-channel-session-key":
 			// Fourth arg is assets (comma-separated)
 			return o.getAssetSuggestions()
@@ -304,6 +303,18 @@ func (o *Operator) Execute(s string) {
 		}
 		o.setHomeBlockchain(ctx, args[1], args[2])
 	// High-level operations
+	case "token-balance":
+		if len(args) < 3 {
+			fmt.Println("ERROR: Usage: token-balance <chain_id> <asset>")
+			return
+		}
+		o.tokenBalance(ctx, args[1], args[2])
+	case "approve":
+		if len(args) < 4 {
+			fmt.Println("ERROR: Usage: approve <chain_id> <asset> <amount>")
+			return
+		}
+		o.approveToken(ctx, args[1], args[2], args[3])
 	case "deposit":
 		if len(args) < 4 {
 			fmt.Println("ERROR: Usage: deposit <chain_id> <asset> <amount>")

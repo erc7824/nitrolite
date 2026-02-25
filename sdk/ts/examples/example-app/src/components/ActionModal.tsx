@@ -6,7 +6,7 @@ import type { StatusMessage } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 
-const MAX_UINT256 = 2n ** 256n - 1n;
+const MAX_APPROVE_AMOUNT = new Decimal('1e18');
 
 type ModalType = 'deposit' | 'withdraw' | 'transfer' | 'close';
 
@@ -53,12 +53,7 @@ export default function ActionModal({
   const config = MODAL_CONFIG[type];
 
   const autoApprove = async (assetName: string, cid: bigint): Promise<void> => {
-    const assets = await client.getAssets(cid);
-    const found = assets.find(a => a.symbol.toLowerCase() === assetName.toLowerCase());
-    if (!found) throw new Error(`Asset ${assetName} not found`);
-    const token = found.tokens.find((t: any) => t.blockchainId === cid);
-    if (!token) throw new Error(`Token not found on chain ${cid}`);
-    await client.approveToken(cid, (token as any).address, MAX_UINT256);
+    await client.approveToken(cid, assetName, MAX_APPROVE_AMOUNT);
   };
 
   const handleSubmit = async () => {

@@ -14,6 +14,10 @@ type Client interface {
 	// Getters - IVault
 	GetAccountsBalances(accounts []string, tokens []string) ([][]decimal.Decimal, error)
 
+	// Getters - Token Balance & Approval
+	GetTokenBalance(asset string, walletAddress string) (decimal.Decimal, error)
+	Approve(asset string, amount decimal.Decimal) (string, error)
+
 	// Getters - ChannelsHub
 	GetNodeBalance(token string) (decimal.Decimal, error)
 	GetOpenChannels(user string) ([]string, error)

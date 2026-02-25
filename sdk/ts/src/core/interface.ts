@@ -53,6 +53,23 @@ export interface Client {
    */
   getAccountsBalances(accounts: Address[], tokens: Address[]): Promise<Decimal[][]>;
 
+  // ========= Getters - Token Balance & Approval =========
+
+  /**
+   * Get on-chain token balance (ERC-20 or native) for a wallet
+   * @param asset - Asset symbol (e.g., "usdc")
+   * @param walletAddress - Wallet address to check
+   */
+  getTokenBalance(asset: string, walletAddress: Address): Promise<Decimal>;
+
+  /**
+   * Approve the contract to spend tokens for an asset
+   * @param asset - Asset symbol (e.g., "usdc")
+   * @param amount - Amount to approve
+   * @returns Transaction hash
+   */
+  approve(asset: string, amount: Decimal): Promise<Hex>;
+
   // ========= Getters - ChannelsHub =========
 
   /**
@@ -119,35 +136,32 @@ export interface Client {
    * Migrate channel to this blockchain
    * @param def - Channel definition
    * @param candidate - Candidate state
-   * @param proof - Proof states
    * @returns Transaction hash
    */
-  migrateChannelHere(def: ChannelDefinition, candidate: State, proof: State[]): Promise<Hex>;
+  migrateChannelHere(def: ChannelDefinition, candidate: State): Promise<Hex>;
 
   /**
    * Checkpoint a channel state on-chain
    * @param candidate - Candidate state
-   * @param proofs - Proof states
    * @returns Transaction hash
    */
-  checkpoint(candidate: State, proofs: State[]): Promise<Hex>;
+  checkpoint(candidate: State): Promise<Hex>;
 
   /**
    * Challenge a channel state
    * @param candidate - Candidate state
-   * @param proofs - Proof states
    * @param challengerSig - Challenger signature
+   * @param challengerIdx - Challenger participant index
    * @returns Transaction hash
    */
-  challenge(candidate: State, proofs: State[], challengerSig: Uint8Array): Promise<Hex>;
+  challenge(candidate: State, challengerSig: Uint8Array, challengerIdx: number): Promise<Hex>;
 
   /**
    * Close a channel
    * @param candidate - Candidate state
-   * @param proofs - Proof states
    * @returns Transaction hash
    */
-  close(candidate: State, proofs: State[]): Promise<Hex>;
+  close(candidate: State): Promise<Hex>;
 
   // ========= Escrow deposit =========
 
@@ -162,23 +176,22 @@ export interface Client {
   /**
    * Challenge escrow deposit
    * @param candidate - Candidate state
-   * @param proof - Proof states
    * @param challengerSig - Challenger signature
+   * @param challengerIdx - Challenger participant index
    * @returns Transaction hash
    */
   challengeEscrowDeposit(
     candidate: State,
-    proof: State[],
-    challengerSig: Uint8Array
+    challengerSig: Uint8Array,
+    challengerIdx: number
   ): Promise<Hex>;
 
   /**
    * Finalize escrow deposit
    * @param candidate - Candidate state
-   * @param proof - Exactly 2 proof states
    * @returns Transaction hash
    */
-  finalizeEscrowDeposit(candidate: State, proof: [State, State]): Promise<Hex>;
+  finalizeEscrowDeposit(candidate: State): Promise<Hex>;
 
   // ========= Escrow withdrawal =========
 
@@ -193,14 +206,14 @@ export interface Client {
   /**
    * Challenge escrow withdrawal
    * @param candidate - Candidate state
-   * @param proof - Proof states
    * @param challengerSig - Challenger signature
+   * @param challengerIdx - Challenger participant index
    * @returns Transaction hash
    */
   challengeEscrowWithdrawal(
     candidate: State,
-    proof: State[],
-    challengerSig: Uint8Array
+    challengerSig: Uint8Array,
+    challengerIdx: number
   ): Promise<Hex>;
 
   /**

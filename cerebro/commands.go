@@ -34,6 +34,8 @@ SETUP COMMANDS
   import rpc <chain_id> <url>   Configure blockchain RPC endpoint
 
 HIGH-LEVEL OPERATIONS (Smart Client)
+  token-balance <chain_id> <asset>             Check on-chain token balance for your wallet
+  approve <chain_id> <asset> <amount>          Approve token spending for deposits
   deposit <chain_id> <asset> <amount>          Deposit to channel (auto-create if needed)
   withdraw <chain_id> <asset> <amount>         Withdraw from channel
   transfer <recipient> <asset> <amount>        Transfer to another wallet
@@ -74,6 +76,7 @@ OTHER
 EXAMPLES
   import wallet
   import rpc 80002 https://polygon-amoy.g.alchemy.com/v2/KEY
+  approve 80002 usdc 1000000
   deposit 80002 usdc 100
   transfer 0x1234... usdc 50
   balances              # Uses configured wallet
@@ -327,6 +330,30 @@ func (o *Operator) deposit(ctx context.Context, chainIDStr, asset, amountStr str
 	fmt.Printf("SUCCESS: Deposit state prepared. Run 'checkpoint %s' to submit to the blockchain.\n", asset)
 }
 
+func (o *Operator) tokenBalance(ctx context.Context, chainIDStr, asset string) {
+	chainID, err := o.parseChainID(chainIDStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	wallet := o.getImportedWalletAddress()
+	if wallet == "" {
+		fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
+		return
+	}
+
+	fmt.Printf("Querying on-chain %s balance on chain %d for %s...\n", asset, chainID, wallet)
+
+	balance, err := o.client.GetOnChainBalance(ctx, chainID, asset, wallet)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to get on-chain balance: %v\n", err)
+		return
+	}
+
+	fmt.Printf("On-chain %s balance: %s\n", asset, balance.String())
+}
+
 func (o *Operator) withdraw(ctx context.Context, chainIDStr, asset, amountStr string) {
 	chainID, err := o.parseChainID(chainIDStr)
 	if err != nil {
@@ -392,6 +419,31 @@ func (o *Operator) acknowledge(ctx context.Context, asset string) {
 	}
 
 	fmt.Printf("SUCCESS: Acknowledgement completed\n")
+}
+
+func (o *Operator) approveToken(ctx context.Context, chainIDStr, asset, amountStr string) {
+	chainID, err := o.parseChainID(chainIDStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	amount, err := o.parseAmount(amountStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Approving %s %s on chain %d...\n", amount.String(), asset, chainID)
+
+	txHash, err := o.client.ApproveToken(ctx, chainID, asset, amount)
+	if err != nil {
+		fmt.Printf("ERROR: Approve failed: %v\n", err)
+		return
+	}
+
+	fmt.Printf("SUCCESS: Token spending approved\n")
+	fmt.Printf("Transaction Hash: %s\n", txHash)
 }
 
 func (o *Operator) checkpoint(ctx context.Context, asset string) {

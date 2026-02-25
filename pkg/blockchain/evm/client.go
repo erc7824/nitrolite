@@ -98,6 +98,12 @@ func (c *Client) getAllowance(asset string, owner string) (decimal.Decimal, erro
 		return decimal.Zero, errors.Wrap(err, "failed to get token address")
 	}
 	tokenAddr := common.HexToAddress(tokenAddrHex)
+
+	// Native tokens don't require allowance
+	if tokenAddr == (common.Address{}) {
+		return decimal.New(1, 18), nil
+	}
+
 	ownerAddr := common.HexToAddress(owner)
 	erc20Contract, err := NewIERC20(tokenAddr, c.evmClient)
 	if err != nil {
@@ -116,22 +122,33 @@ func (c *Client) getAllowance(asset string, owner string) (decimal.Decimal, erro
 	return decimal.NewFromBigInt(allowance, -int32(decimals)), nil
 }
 
-func (c *Client) getTokenBalance(asset string, account string) (decimal.Decimal, error) {
+func (c *Client) GetTokenBalance(asset string, walletAddress string) (decimal.Decimal, error) {
 	tokenAddrHex, err := c.assetStore.GetTokenAddress(asset, c.blockchainID)
 	if err != nil {
 		return decimal.Zero, errors.Wrap(err, "failed to get token address")
 	}
 
 	tokenAddr := common.HexToAddress(tokenAddrHex)
-	accountAddr := common.HexToAddress(account)
+	walletAddr := common.HexToAddress(walletAddress)
+
+	// Native token (zero address) — query ETH balance directly
+	if tokenAddr == (common.Address{}) {
+		balance, err := c.evmClient.BalanceAt(context.Background(), walletAddr, nil)
+		if err != nil {
+			return decimal.Zero, errors.Wrapf(err, "failed to get native balance for wallet %s", walletAddress)
+		}
+		// Native tokens use 18 decimals
+		return decimal.NewFromBigInt(balance, -18), nil
+	}
+
 	tokenContract, err := NewIERC20(tokenAddr, c.evmClient)
 	if err != nil {
 		return decimal.Zero, errors.Wrap(err, "failed to instantiate token contract")
 	}
 
-	balance, err := tokenContract.BalanceOf(&bind.CallOpts{}, accountAddr)
+	balance, err := tokenContract.BalanceOf(&bind.CallOpts{}, walletAddr)
 	if err != nil {
-		return decimal.Zero, errors.Wrapf(err, "failed to get balance for account %s on token %s", account, tokenAddrHex)
+		return decimal.Zero, errors.Wrapf(err, "failed to get balance for wallet %s on token %s", walletAddress, tokenAddrHex)
 	}
 	decimals, err := c.assetStore.GetTokenDecimals(c.blockchainID, tokenAddrHex)
 	if err != nil {
@@ -260,6 +277,11 @@ func (c *Client) Deposit(node, token string, amount decimal.Decimal) (string, er
 		return "", errors.Wrapf(err, "failed to convert amount %s to big.Int", amount.String())
 	}
 
+	if tokenAddr == (common.Address{}) {
+		c.transactOpts.Value = amountBig
+		defer func() { c.transactOpts.Value = nil }()
+	}
+
 	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
 		return "", err
 	}
@@ -297,6 +319,46 @@ func (c *Client) Withdraw(node, token string, amount decimal.Decimal) (string, e
 	return tx.Hash().Hex(), nil
 }
 
+// ========= Getters - ERC20 =========
+
+func (c *Client) Approve(asset string, amount decimal.Decimal) (string, error) {
+	tokenAddrHex, err := c.assetStore.GetTokenAddress(asset, c.blockchainID)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get token address")
+	}
+
+	tokenAddr := common.HexToAddress(tokenAddrHex)
+	if tokenAddr == (common.Address{}) {
+		return "", errors.New("native tokens do not require approval")
+	}
+
+	decimals, err := c.assetStore.GetTokenDecimals(c.blockchainID, tokenAddrHex)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get token decimals for %s", asset)
+	}
+
+	amountBig, err := core.DecimalToBigInt(amount, decimals)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to convert amount %s to big.Int", amount.String())
+	}
+
+	erc20Contract, err := NewIERC20(tokenAddr, c.evmClient)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to instantiate token contract")
+	}
+
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return "", err
+	}
+
+	tx, err := erc20Contract.Approve(c.transactOpts, c.contractAddress, amountBig)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to approve token spending")
+	}
+
+	return tx.Hash().Hex(), nil
+}
+
 // ========= Channel Lifecycle =========
 
 func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string, error) {
@@ -314,7 +376,6 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 	case core.INTENT_OPERATE:
 	case core.INTENT_WITHDRAW:
 	case core.INTENT_DEPOSIT:
-		// TODO: check for native tokens
 		if c.requireCheckAllowance {
 			allowance, err := c.getAllowance(initCCS.Asset, initCCS.UserWallet)
 			if err != nil {
@@ -326,13 +387,22 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 
 		}
 		if c.requireCheckBalance {
-			tokenBalance, err := c.getTokenBalance(initCCS.Asset, initCCS.UserWallet)
+			tokenBalance, err := c.GetTokenBalance(initCCS.Asset, initCCS.UserWallet)
 			if err != nil {
 				return "", errors.Wrap(err, "failed to check token balance")
 			}
 			if tokenBalance.LessThan(initCCS.Transition.Amount) {
 				return "", errors.New("balance is not sufficient to cover the deposit amount")
 			}
+		}
+
+		if contractState.HomeLedger.Token == (common.Address{}) {
+			value, err := core.DecimalToBigInt(initCCS.Transition.Amount, contractState.HomeLedger.Decimals)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to convert native deposit amount to wei")
+			}
+			c.transactOpts.Value = value
+			defer func() { c.transactOpts.Value = nil }()
 		}
 
 	default:
@@ -399,7 +469,6 @@ func (c *Client) Checkpoint(candidate core.State) (string, error) {
 		// TODO: recheck proofs logic
 		tx, err = c.contract.CheckpointChannel(c.transactOpts, channelIDBytes, contractCandidate)
 	case core.INTENT_DEPOSIT:
-		// TODO: check for native tokens
 		if c.requireCheckAllowance {
 			allowance, err := c.getAllowance(candidate.Asset, candidate.UserWallet)
 			if err != nil {
@@ -411,13 +480,22 @@ func (c *Client) Checkpoint(candidate core.State) (string, error) {
 
 		}
 		if c.requireCheckBalance {
-			tokenBalance, err := c.getTokenBalance(candidate.Asset, candidate.UserWallet)
+			tokenBalance, err := c.GetTokenBalance(candidate.Asset, candidate.UserWallet)
 			if err != nil {
 				return "", errors.Wrap(err, "failed to check token balance")
 			}
 			if tokenBalance.LessThan(candidate.Transition.Amount) {
 				return "", errors.New("balance is not sufficient to cover the deposit amount")
 			}
+		}
+
+		if contractCandidate.HomeLedger.Token == (common.Address{}) {
+			value, valueErr := core.DecimalToBigInt(candidate.Transition.Amount, contractCandidate.HomeLedger.Decimals)
+			if valueErr != nil {
+				return "", errors.Wrap(valueErr, "failed to convert native deposit amount to wei")
+			}
+			c.transactOpts.Value = value
+			defer func() { c.transactOpts.Value = nil }()
 		}
 
 		tx, err = c.contract.DepositToChannel(c.transactOpts, channelIDBytes, contractCandidate)

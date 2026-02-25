@@ -307,7 +307,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
      * @param token The token address (address(0) for native ETH)
      * @param destination The destination address to send funds to (can differ from msg.sender for blacklisted users)
      */
-    function claimFunds(address token, address destination) external payable nonReentrant {
+    function claimFunds(address token, address destination) external nonReentrant {
         require(destination != address(0), InvalidAddress());
 
         address account = msg.sender;
@@ -1263,22 +1263,24 @@ contract ChannelHub is IVault, ReentrancyGuard {
             // Native token: limit gas to prevent depletion attacks
             (bool success,) = payable(to).call{value: amount, gas: TRANSFER_GAS_LIMIT}("");
             if (!success) {
-                // Transfer failed - accumulate in reclaim balance
                 _reclaims[to][token] += amount;
                 emit TransferFailed(to, token, amount);
                 return;
             }
         } else {
-            // ERC20: limit gas and handle non-returning tokens (mimic SafeERC20 logic)
-            (bool success, bytes memory returndata) =
+            // ERC20: Use balance-checking approach for maximum robustness
+            uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+
+            // limit gas to prevent depletion attacks
+            (bool success,) =
                 address(token).call{gas: TRANSFER_GAS_LIMIT}(abi.encodeCall(IERC20.transfer, (to, amount)));
 
-            // Success criteria (from SafeERC20._safeTransfer):
-            // Call succeeded AND (return value is true OR returndata is empty for non-returning tokens)
-            bool transferSucceeded = success && (returndata.length == 0 || abi.decode(returndata, (bool)));
+            uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+
+            // Success criteria: call succeeded AND balance decreased by exactly the expected amount
+            bool transferSucceeded = success && balanceAfter == balanceBefore - amount;
 
             if (!transferSucceeded) {
-                // Transfer failed - accumulate in reclaim balance
                 _reclaims[to][token] += amount;
                 emit TransferFailed(to, token, amount);
             }

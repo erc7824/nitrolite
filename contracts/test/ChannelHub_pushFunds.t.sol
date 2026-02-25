@@ -8,6 +8,7 @@ import {MockERC20} from "./mocks/MockERC20.sol";
 import {NonReturningERC20} from "./mocks/NonReturningERC20.sol";
 import {RevertingERC20} from "./mocks/RevertingERC20.sol";
 import {GasConsumingERC20} from "./mocks/GasConsumingERC20.sol";
+import {MalformedReturningERC20} from "./mocks/MalformedReturningERC20.sol";
 import {RevertingEthReceiver} from "./mocks/RevertingEthReceiver.sol";
 import {GasConsumingEthReceiver} from "./mocks/GasConsumingEthReceiver.sol";
 
@@ -30,6 +31,7 @@ contract ChannelHubTest_pushFunds is Test {
     NonReturningERC20 public nonReturningToken;
     RevertingERC20 public revertingToken;
     GasConsumingERC20 public gasConsumingToken;
+    MalformedReturningERC20 public malformedToken;
 
     SimpleReceiver public simpleReceiver;
     RevertingEthReceiver public revertingReceiver;
@@ -46,6 +48,7 @@ contract ChannelHubTest_pushFunds is Test {
         nonReturningToken = new NonReturningERC20();
         revertingToken = new RevertingERC20();
         gasConsumingToken = new GasConsumingERC20();
+        malformedToken = new MalformedReturningERC20();
 
         simpleReceiver = new SimpleReceiver();
         revertingReceiver = new RevertingEthReceiver();
@@ -59,6 +62,7 @@ contract ChannelHubTest_pushFunds is Test {
         nonReturningToken.mint(address(cHub), BALANCE_AMOUNT);
         revertingToken.mint(address(cHub), BALANCE_AMOUNT);
         gasConsumingToken.mint(address(cHub), BALANCE_AMOUNT);
+        malformedToken.mint(address(cHub), BALANCE_AMOUNT);
     }
 
     function _verifyTransferSuccess(address user, address tokenAddr, uint256 transferredAmount) internal view {
@@ -143,6 +147,17 @@ contract ChannelHubTest_pushFunds is Test {
         cHub.exposed_pushFunds(recipient, address(gasConsumingToken), TRANSFER_AMOUNT);
 
         _verifyBalancesNotChanged(recipient, address(gasConsumingToken), TRANSFER_AMOUNT);
+    }
+
+    // ========== Malformed Returning ERC20 Tests ==========
+
+    function test_accumulatesReclaims_whenERC20ReturnsMalformedData() public {
+        vm.expectEmit(true, true, false, true);
+        emit ChannelHub.TransferFailed(recipient, address(malformedToken), TRANSFER_AMOUNT);
+
+        cHub.exposed_pushFunds(recipient, address(malformedToken), TRANSFER_AMOUNT);
+
+        _verifyBalancesNotChanged(recipient, address(malformedToken), TRANSFER_AMOUNT);
     }
 
     // ========== Native ETH Tests ==========

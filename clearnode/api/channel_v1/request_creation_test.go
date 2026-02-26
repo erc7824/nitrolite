@@ -36,11 +36,12 @@ func TestRequestCreation_Success(t *testing.T) {
 			}
 			return nil
 		},
-		memoryStore:  mockMemoryStore,
-		nodeSigner:   nodeSigner,
-		nodeAddress:  nodeAddress,
-		minChallenge: minChallenge,
-		metrics:      metrics.NewNoopRuntimeMetricExporter(),
+		memoryStore:      mockMemoryStore,
+		nodeSigner:       nodeSigner,
+		nodeAddress:      nodeAddress,
+		minChallenge:     minChallenge,
+		metrics:          metrics.NewNoopRuntimeMetricExporter(),
+		maxSessionKeyIDs: 256,
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -184,11 +185,12 @@ func TestRequestCreation_Acknowledgement_Success(t *testing.T) {
 			}
 			return nil
 		},
-		memoryStore:  mockMemoryStore,
-		nodeSigner:   nodeSigner,
-		nodeAddress:  nodeAddress,
-		minChallenge: minChallenge,
-		metrics:      metrics.NewNoopRuntimeMetricExporter(),
+		memoryStore:      mockMemoryStore,
+		nodeSigner:       nodeSigner,
+		nodeAddress:      nodeAddress,
+		minChallenge:     minChallenge,
+		metrics:          metrics.NewNoopRuntimeMetricExporter(),
+		maxSessionKeyIDs: 256,
 	}
 
 	// Test data - derive userWallet from a user signer key
@@ -324,11 +326,12 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockTxStore)
 		},
-		memoryStore:  mockMemoryStore,
-		nodeSigner:   nodeSigner,
-		nodeAddress:  nodeAddress,
-		minChallenge: minChallenge,
-		metrics:      metrics.NewNoopRuntimeMetricExporter(),
+		memoryStore:      mockMemoryStore,
+		nodeSigner:       nodeSigner,
+		nodeAddress:      nodeAddress,
+		minChallenge:     minChallenge,
+		metrics:          metrics.NewNoopRuntimeMetricExporter(),
+		maxSessionKeyIDs: 256,
 	}
 
 	// Test data

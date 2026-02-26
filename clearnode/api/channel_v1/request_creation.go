@@ -7,6 +7,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
@@ -20,6 +21,11 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 	var reqPayload rpc.ChannelsV1RequestCreationRequest
 	if err := c.Request.Payload.Translate(&reqPayload); err != nil {
 		c.Fail(err, "failed to parse parameters")
+		return
+	}
+
+	if !common.IsHexAddress(reqPayload.State.UserWallet) {
+		c.Fail(rpc.Errorf("invalid user_wallet address"), "")
 		return
 	}
 

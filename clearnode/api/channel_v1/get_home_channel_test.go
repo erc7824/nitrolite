@@ -32,10 +32,11 @@ func TestGetHomeChannel_Success(t *testing.T) {
 			}
 			return nil
 		},
-		nodeSigner:   nodeSigner,
-		nodeAddress:  nodeAddress,
-		minChallenge: minChallenge,
-		metrics:      metrics.NewNoopRuntimeMetricExporter(),
+		nodeSigner:       nodeSigner,
+		nodeAddress:      nodeAddress,
+		minChallenge:     minChallenge,
+		metrics:          metrics.NewNoopRuntimeMetricExporter(),
+		maxSessionKeyIDs: 256,
 	}
 
 	// Test data
@@ -118,10 +119,11 @@ func TestGetHomeChannel_NotFound(t *testing.T) {
 			}
 			return nil
 		},
-		nodeSigner:   nodeSigner,
-		nodeAddress:  nodeAddress,
-		minChallenge: minChallenge,
-		metrics:      metrics.NewNoopRuntimeMetricExporter(),
+		nodeSigner:       nodeSigner,
+		nodeAddress:      nodeAddress,
+		minChallenge:     minChallenge,
+		metrics:          metrics.NewNoopRuntimeMetricExporter(),
+		maxSessionKeyIDs: 256,
 	}
 
 	// Test data

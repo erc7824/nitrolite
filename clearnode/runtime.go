@@ -35,6 +35,7 @@ type Backbone struct {
 	NodeVersion                 string
 	ChannelMinChallengeDuration uint32
 	BlockchainRPCs              map[uint64]string
+	ValidationLimits            ValidationLimits
 
 	DbStore        database.DatabaseStore
 	MemoryStore    memory.MemoryStore
@@ -60,10 +61,19 @@ func (b *Backbone) Close() error {
 
 type Config struct {
 	Database                    database.DatabaseConfig
-	ChannelMinChallengeDuration uint32 `yaml:"channel_min_challenge_duration" env:"CLEARNODE_CHANNEL_MIN_CHALLENGE_DURATION" env-default:"86400"` // 24 hours
-	SignerType                  string `yaml:"signer_type" env:"CLEARNODE_SIGNER_TYPE" env-default:"key"`                                         // "key" or "gcp-kms"
-	SignerKey                   string `yaml:"signer_key" env:"CLEARNODE_SIGNER_KEY"`                                                             // required when signer_type=key
-	GCPKMSKeyName               string `yaml:"gcp_kms_key_name" env:"CLEARNODE_GCP_KMS_KEY_NAME"`                                                 // required when signer_type=gcp-kms
+	ChannelMinChallengeDuration uint32           `yaml:"channel_min_challenge_duration" env:"CLEARNODE_CHANNEL_MIN_CHALLENGE_DURATION" env-default:"86400"` // 24 hours
+	SignerType                  string           `yaml:"signer_type" env:"CLEARNODE_SIGNER_TYPE" env-default:"key"`                                         // "key" or "gcp-kms"
+	SignerKey                   string           `yaml:"signer_key" env:"CLEARNODE_SIGNER_KEY"`                                                             // required when signer_type=key
+	GCPKMSKeyName               string           `yaml:"gcp_kms_key_name" env:"CLEARNODE_GCP_KMS_KEY_NAME"`                                                 // required when signer_type=gcp-kms
+	ValidationLimits            ValidationLimits `yaml:"validation_limits"`
+}
+
+// ValidationLimits defines configurable upper bounds for dynamic-length request fields.
+type ValidationLimits struct {
+	MaxParticipants   int `yaml:"max_participants" env:"CLEARNODE_MAX_PARTICIPANTS" env-default:"32"`
+	MaxSessionDataLen int `yaml:"max_session_data_len" env:"CLEARNODE_MAX_SESSION_DATA_LEN" env-default:"1024"`
+	MaxSessionKeyIDs  int `yaml:"max_session_key_ids" env:"CLEARNODE_MAX_SESSION_KEY_IDS" env-default:"256"`
+	MaxSignedUpdates  int `yaml:"max_signed_updates" env:"CLEARNODE_MAX_SIGNED_UPDATES" env-default:"0"`
 }
 
 // InitBackbone initializes the backbone components of the application.
@@ -221,6 +231,7 @@ func InitBackbone() *Backbone {
 		NodeVersion:                 Version,
 		ChannelMinChallengeDuration: conf.ChannelMinChallengeDuration,
 		BlockchainRPCs:              blockchainRPCs,
+		ValidationLimits:            conf.ValidationLimits,
 
 		DbStore:        dbStore,
 		MemoryStore:    memoryStore,

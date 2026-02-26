@@ -22,6 +22,19 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		return
 	}
 
+	if len(reqPayload.Definition.Participants) > h.maxParticipants {
+		c.Fail(rpc.Errorf("participants array exceeds maximum length of %d", h.maxParticipants), "")
+		return
+	}
+	if len(reqPayload.QuorumSigs) > len(reqPayload.Definition.Participants) {
+		c.Fail(rpc.Errorf("quorum_sigs count (%d) exceeds participants count (%d)", len(reqPayload.QuorumSigs), len(reqPayload.Definition.Participants)), "")
+		return
+	}
+	if len(reqPayload.SessionData) > h.maxSessionData {
+		c.Fail(rpc.Errorf("session_data exceeds maximum length of %d", h.maxSessionData), "")
+		return
+	}
+
 	appDef, err := unmapAppDefinitionV1(reqPayload.Definition)
 	if err != nil {
 		c.Fail(err, "invalid app definition")

@@ -25,11 +25,15 @@ func (h *Handler) RebalanceAppSessions(c *rpc.Context) {
 		return
 	}
 
+	if len(reqPayload.SignedUpdates) > h.maxSignedUpdates {
+		c.Fail(rpc.Errorf("signed_updates array exceeds maximum length of %d", h.maxSignedUpdates), "")
+		return
+	}
+
 	if len(reqPayload.SignedUpdates) < 2 {
 		c.Fail(rpc.Errorf("rebalancing requires at least 2 sessions"), "")
 		return
 	}
-
 	logger.Debug("processing app session rebalancing request", "sessionCount", len(reqPayload.SignedUpdates))
 
 	// Parse and validate all app state updates
@@ -37,6 +41,11 @@ func (h *Handler) RebalanceAppSessions(c *rpc.Context) {
 	seenSessions := make(map[string]bool)
 
 	for i, signedUpdate := range reqPayload.SignedUpdates {
+		if len(signedUpdate.AppStateUpdate.SessionData) > h.maxSessionData {
+			c.Fail(rpc.Errorf("signed_updates[%d].session_data exceeds maximum length of %d", i, h.maxSessionData), "")
+			return
+		}
+
 		update, err := unmapSignedAppStateUpdateV1(&signedUpdate)
 		if err != nil {
 			c.Fail(err, fmt.Sprintf("failed to parse app state update %d", i))
@@ -93,6 +102,9 @@ func (h *Handler) RebalanceAppSessions(c *rpc.Context) {
 			}
 			if appSession == nil {
 				return rpc.Errorf("app session not found: %s", update.AppStateUpdate.AppSessionID)
+			}
+			if len(update.QuorumSigs) > len(appSession.Participants) {
+				return rpc.Errorf("quorum_sigs count (%d) exceeds participants count (%d)", len(update.QuorumSigs), len(appSession.Participants))
 			}
 			if appSession.Status == app.AppSessionStatusClosed {
 				return rpc.Errorf("app session %s is already closed", update.AppStateUpdate.AppSessionID)

@@ -34,6 +34,7 @@ func TestCreateAppSession_Success(t *testing.T) {
 		mockStatePacker,
 		"0xnode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Create a real test wallet for participant1
@@ -133,6 +134,7 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 		mockStatePacker,
 		"0xnode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Create real test wallets for participant1 and participant2
@@ -230,6 +232,7 @@ func TestCreateAppSession_ZeroNonce(t *testing.T) {
 		mockStatePacker,
 		"0xnode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Test data
@@ -292,6 +295,7 @@ func TestCreateAppSession_QuorumExceedsTotalWeights(t *testing.T) {
 		mockStatePacker,
 		"0xnode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Test data
@@ -360,6 +364,7 @@ func TestCreateAppSession_NoSignatures(t *testing.T) {
 		mockStatePacker,
 		"0xnode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Test data
@@ -422,6 +427,7 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 		mockStatePacker,
 		"0xnode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Create a wallet that is NOT a participant
@@ -499,6 +505,7 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 		mockStatePacker,
 		"0xnode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Create a real wallet for participant1
@@ -590,6 +597,7 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 		mockStatePacker,
 		"0xnode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Create a real wallet for participant1
@@ -678,6 +686,7 @@ func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 		mockStatePacker,
 		"0xnode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Test data
@@ -742,6 +751,7 @@ func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 		mockStatePacker,
 		"0xnode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Test data

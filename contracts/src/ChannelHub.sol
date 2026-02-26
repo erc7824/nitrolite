@@ -534,11 +534,9 @@ contract ChannelHub is IVault, ReentrancyGuard {
     ) external payable {
         ChannelMeta storage meta = _channels[channelId];
         ChannelDefinition memory def = meta.definition;
+        ChannelStatus status = meta.status;
 
-        require(
-            meta.status == ChannelStatus.OPERATING || meta.status == ChannelStatus.MIGRATING_IN,
-            IncorrectChannelStatus()
-        );
+        require(status == ChannelStatus.OPERATING || status == ChannelStatus.MIGRATING_IN, IncorrectChannelStatus());
 
         State memory prevState = meta.lastState;
         require(candidate.version >= prevState.version, ChallengerVersionTooLow());
@@ -552,7 +550,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
             _validateSignatures(channelId, candidate, user, node, def.approvedSignatureValidators);
 
             ChannelEngine.TransitionContext memory ctx =
-                _buildChannelContext(channelId, _nodeBalances[def.node][candidate.homeLedger.token]);
+                _buildChannelContext(channelId, _nodeBalances[node][candidate.homeLedger.token]);
             ChannelEngine.TransitionEffects memory effects = ChannelEngine.validateTransition(ctx, candidate);
 
             _applyTransitionEffects(channelId, def, candidate, effects);
@@ -1242,7 +1240,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         return _channels[channelId].lastState.homeLedger.chainId == block.chainid;
     }
 
-    function _pullFunds(address from, address token, uint256 amount) internal nonReentrant {
+    function _pullFunds(address from, address token, uint256 amount) internal {
         if (amount == 0) return;
 
         if (token == address(0)) {
@@ -1256,7 +1254,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         }
     }
 
-    function _pushFunds(address to, address token, uint256 amount) internal nonReentrant {
+    function _pushFunds(address to, address token, uint256 amount) internal {
         if (amount == 0) return;
 
         if (token == address(0)) {

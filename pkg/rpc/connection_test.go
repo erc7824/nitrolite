@@ -188,3 +188,17 @@ func (m *gorillaWsConnMock) getCalledCloseCount() int {
 
 	return m.calledCloseCount
 }
+
+func (m *gorillaWsConnMock) WriteControl(messageType int, data []byte, deadline time.Time) error {
+	// No-op for mock
+	return nil
+}
+
+func (m *gorillaWsConnMock) SetPongHandler(h func(appData string) error) {
+	// No-op for mock
+}
+
+func (m *gorillaWsConnMock) SetReadDeadline(t time.Time) error {
+	// No-op for mock
+	return nil
+}

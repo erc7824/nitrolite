@@ -138,5 +138,5 @@ func TestClientAssetStore_Caching(t *testing.T) {
 func TestDefaultWebsocketDialerConfig(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, 5*time.Second, rpc.DefaultWebsocketDialerConfig.HandshakeTimeout)
-	assert.Equal(t, 5*time.Second, rpc.DefaultWebsocketDialerConfig.PingInterval)
+	assert.Equal(t, 15*time.Second, rpc.DefaultWebsocketDialerConfig.PingTimeout)
 }

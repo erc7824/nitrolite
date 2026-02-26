@@ -45,12 +45,9 @@ type WebsocketDialerConfig struct {
 	// HandshakeTimeout is the duration to wait for the WebSocket handshake to complete
 	HandshakeTimeout time.Duration
 
-	// PingInterval is how often to send ping messages to keep the connection alive
-	PingInterval time.Duration
-
-	// PingRequestID is the request ID used for ping messages
-	// This should be a reserved ID that won't conflict with regular requests
-	PingRequestID uint64
+	// PingTimeout is how long to wait for a ping from the server before considering the connection dead.
+	// The server sends periodic pings to keep connections alive and detect dead clients.
+	PingTimeout time.Duration
 
 	// EventChanSize is the buffer size for the event channel
 	// A larger buffer prevents blocking when processing many unsolicited events
@@ -60,8 +57,7 @@ type WebsocketDialerConfig struct {
 // DefaultWebsocketDialerConfig provides sensible defaults for WebSocket connections
 var DefaultWebsocketDialerConfig = WebsocketDialerConfig{
 	HandshakeTimeout: 5 * time.Second,
-	PingInterval:     5 * time.Second,
-	PingRequestID:    100,
+	PingTimeout:      15 * time.Second,
 	EventChanSize:    100,
 }
 
@@ -122,7 +118,16 @@ func (d *WebsocketDialer) Dial(parentCtx context.Context, url string, handleClos
 	// Create a cancelable context for managing goroutines
 	childCtx, cancel := context.WithCancel(parentCtx)
 	wg := sync.WaitGroup{}
-	wg.Add(3) // We'll start 3 goroutines
+	wg.Add(2) // We'll start 2 goroutines (context close handler, message reader)
+
+	// Set up ping handler to refresh read deadline when ping is received from server.
+	// The server sends periodic pings to detect dead clients; if we don't receive
+	// pings within the timeout, the connection is considered dead.
+	conn.SetPingHandler(func(appData string) error {
+		return conn.SetReadDeadline(time.Now().Add(d.cfg.PingTimeout))
+	})
+	// Set initial read deadline
+	_ = conn.SetReadDeadline(time.Now().Add(d.cfg.PingTimeout))
 
 	var closureErr error
 	var closureErrMu sync.Mutex
@@ -152,7 +157,6 @@ func (d *WebsocketDialer) Dial(parentCtx context.Context, url string, handleClos
 	// Start background goroutines
 	go d.closeOnContextDone(childCtx, childHandleClosure)
 	go d.readMessages(childCtx, childHandleClosure)
-	go d.pingPeriodically(childCtx, childHandleClosure)
 
 	// Wait for all goroutines to finish before calling the closure handler
 	go func() {
@@ -320,43 +324,6 @@ func (d *WebsocketDialer) Call(ctx context.Context, req *Message) (*Message, err
 		return nil, fmt.Errorf("%w for request %d", ErrNoResponse, req.RequestID)
 	}
 	return res, nil
-}
-
-// pingPeriodically sends ping requests at regular intervals to keep the connection alive
-func (d *WebsocketDialer) pingPeriodically(ctx context.Context, handleClosure func(err error)) {
-	// Cache logger to avoid repeated mutex access
-	d.mu.RLock()
-	lg := d.dialCtx.lg
-	d.mu.RUnlock()
-
-	ticker := time.NewTicker(d.cfg.PingInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			handleClosure(nil)
-			lg.Info("Ping loop exiting due to context done")
-			return
-		case <-ticker.C:
-			// Send ping request
-			var params Payload
-			req := NewRequest(d.cfg.PingRequestID, NodeV1PingMethod.String(), params)
-
-			// Use the connection context for ping requests
-			res, err := d.Call(ctx, &req)
-			if err != nil {
-				handleClosure(fmt.Errorf("%w: %w", ErrSendingPing, err))
-				lg.Error("Error sending ping", "error", err)
-				return
-			}
-
-			// Verify we got a ping response
-			if res.Method != NodeV1PingMethod.String() {
-				lg.Warn("Unexpected response to ping", "method", res.Method)
-			}
-		}
-	}
 }
 
 // EventCh returns a read-only channel for receiving unsolicited events.

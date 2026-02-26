@@ -94,7 +94,7 @@ func NewClient(wsURL string, stateSigner core.ChannelSigner, rawSigner sign.Sign
 	// Create WebSocket dialer with configuration
 	dialerConfig := rpc.DefaultWebsocketDialerConfig
 	dialerConfig.HandshakeTimeout = config.HandshakeTimeout
-	dialerConfig.PingInterval = config.PingInterval
+	dialerConfig.PingTimeout = config.PingTimeout
 
 	dialer := rpc.NewWebsocketDialer(dialerConfig)
 	rpcClient := rpc.NewClient(dialer)

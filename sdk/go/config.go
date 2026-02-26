@@ -14,8 +14,9 @@ type Config struct {
 	// HandshakeTimeout is the maximum time to wait for initial connection
 	HandshakeTimeout time.Duration
 
-	// PingInterval is the interval between keep-alive pings
-	PingInterval time.Duration
+	// PingTimeout is how long to wait for a ping from the server before considering the connection dead.
+	// The server sends periodic pings to detect dead clients.
+	PingTimeout time.Duration
 
 	// ErrorHandler is called when connection errors occur
 	ErrorHandler func(error)
@@ -31,7 +32,7 @@ type Option func(*Config)
 // DefaultConfig returns the default configuration with sensible defaults.
 var DefaultConfig = Config{
 	HandshakeTimeout: 5 * time.Second,
-	PingInterval:     5 * time.Second,
+	PingTimeout:      15 * time.Second,
 	ErrorHandler:     defaultErrorHandler,
 }
 
@@ -49,10 +50,10 @@ func WithHandshakeTimeout(d time.Duration) Option {
 	}
 }
 
-// WithPingInterval sets the interval between keep-alive pings.
-func WithPingInterval(d time.Duration) Option {
+// WithPingTimeout sets how long to wait for a ping from the server before considering the connection dead.
+func WithPingTimeout(d time.Duration) Option {
 	return func(c *Config) {
-		c.PingInterval = d
+		c.PingTimeout = d
 	}
 }
 

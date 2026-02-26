@@ -120,14 +120,21 @@ func (d *WebsocketDialer) Dial(parentCtx context.Context, url string, handleClos
 	wg := sync.WaitGroup{}
 	wg.Add(2) // We'll start 2 goroutines (context close handler, message reader)
 
-	// Set up ping handler to refresh read deadline when ping is received from server.
+	// Set up ping handler to respond with pong and refresh read deadline.
 	// The server sends periodic pings to detect dead clients; if we don't receive
 	// pings within the timeout, the connection is considered dead.
 	conn.SetPingHandler(func(appData string) error {
+		// Send pong response (WriteControl is safe to call concurrently)
+		if err := conn.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(d.cfg.HandshakeTimeout)); err != nil {
+			return err
+		}
+		// Refresh read deadline
 		return conn.SetReadDeadline(time.Now().Add(d.cfg.PingTimeout))
 	})
 	// Set initial read deadline
-	_ = conn.SetReadDeadline(time.Now().Add(d.cfg.PingTimeout))
+	if err := conn.SetReadDeadline(time.Now().Add(d.cfg.PingTimeout)); err != nil {
+		return err
+	}
 
 	var closureErr error
 	var closureErrMu sync.Mutex

@@ -47,17 +47,6 @@ export interface WebsocketDialerConfig {
   handshakeTimeout: number;
 
   /**
-   * PingInterval is how often to send ping messages to keep the connection alive (in milliseconds)
-   */
-  pingInterval: number;
-
-  /**
-   * PingRequestID is the request ID used for ping messages
-   * This should be a reserved ID that won't conflict with regular requests
-   */
-  pingRequestId: number;
-
-  /**
    * EventChanSize is the buffer size for the event channel
    * A larger buffer prevents blocking when processing many unsolicited events
    */
@@ -69,8 +58,6 @@ export interface WebsocketDialerConfig {
  */
 export const DefaultWebsocketDialerConfig: WebsocketDialerConfig = {
   handshakeTimeout: 5000, // 5 seconds
-  pingInterval: 5000, // 5 seconds
-  pingRequestId: 100,
   eventChanSize: 100,
 };
 
@@ -110,7 +97,6 @@ export class WebsocketDialer implements Dialer {
       ws.onopen = () => {
         clearTimeout(timeout);
         this.ws = ws;
-        this.startPingInterval();
         resolve();
       };
 
@@ -254,31 +240,6 @@ export class WebsocketDialer implements Dialer {
     }
   }
 
-  private startPingInterval(): void {
-    const interval = setInterval(() => {
-      if (!this.isConnected()) {
-        clearInterval(interval);
-        return;
-      }
-
-      // Send ping message
-      const pingMsg: Message = {
-        type: 1, // MsgType.Req
-        requestId: this.config.pingRequestId,
-        method: 'node.v1.ping',
-        payload: {},
-        timestamp: Date.now(),
-      };
-
-      try {
-        const data = marshalMessage(pingMsg);
-        this.ws!.send(data);
-      } catch (error) {
-        console.error('Failed to send ping:', error);
-        clearInterval(interval);
-      }
-    }, this.config.pingInterval);
-  }
 }
 
 /**

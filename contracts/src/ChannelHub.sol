@@ -1240,7 +1240,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         return _channels[channelId].lastState.homeLedger.chainId == block.chainid;
     }
 
-    function _pullFunds(address from, address token, uint256 amount) internal {
+    function _pullFunds(address from, address token, uint256 amount) internal nonReentrant {
         if (amount == 0) return;
 
         if (token == address(0)) {
@@ -1254,7 +1254,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         }
     }
 
-    function _pushFunds(address to, address token, uint256 amount) internal {
+    function _pushFunds(address to, address token, uint256 amount) internal nonReentrant {
         if (amount == 0) return;
 
         if (token == address(0)) {

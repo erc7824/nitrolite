@@ -22,6 +22,11 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		return
 	}
 
+	if len(reqPayload.AppStateUpdate.SessionData) > h.maxSessionData {
+		c.Fail(rpc.Errorf("session_data exceeds maximum length of %d", h.maxSessionData), "")
+		return
+	}
+
 	logger.Debug("processing app session deposit request",
 		"appSessionID", reqPayload.AppStateUpdate.AppSessionID,
 		"version", reqPayload.AppStateUpdate.Version)
@@ -117,6 +122,9 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		}
 		if appSession == nil {
 			return rpc.Errorf("app session not found")
+		}
+		if len(reqPayload.QuorumSigs) > len(appSession.Participants) {
+			return rpc.Errorf("quorum_sigs count (%d) exceeds participants count (%d)", len(reqPayload.QuorumSigs), len(appSession.Participants))
 		}
 		if appSession.Status == app.AppSessionStatusClosed {
 			return rpc.Errorf("app session is already closed")

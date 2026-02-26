@@ -48,6 +48,7 @@ func TestRebalanceAppSessions_Success_TwoSessions(t *testing.T) {
 		nil,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Create test wallets with real keys
@@ -211,6 +212,7 @@ func TestRebalanceAppSessions_Success_MultiAsset(t *testing.T) {
 		nil,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Create test wallets with real keys
@@ -363,6 +365,7 @@ func TestRebalanceAppSessions_Error_InsufficientSessions(t *testing.T) {
 		nil,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -419,6 +422,7 @@ func TestRebalanceAppSessions_Error_InvalidIntent(t *testing.T) {
 		nil,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -491,6 +495,7 @@ func TestRebalanceAppSessions_Error_DuplicateSession(t *testing.T) {
 		nil,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -565,6 +570,7 @@ func TestRebalanceAppSessions_Error_ConservationViolation(t *testing.T) {
 		nil,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	// Create test wallets with real keys
@@ -703,6 +709,7 @@ func TestRebalanceAppSessions_Error_SessionNotFound(t *testing.T) {
 		nil,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -782,6 +789,7 @@ func TestRebalanceAppSessions_Error_ClosedSession(t *testing.T) {
 		nil,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -794,6 +802,11 @@ func TestRebalanceAppSessions_Error_ClosedSession(t *testing.T) {
 		SessionID: sessionID1,
 		Status:    app.AppSessionStatusClosed, // Closed
 		Version:   1,
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: wallet1.Address, SignatureWeight: 1},
+			{WalletAddress: wallet2.Address, SignatureWeight: 1},
+		},
+		Quorum: 1,
 	}
 
 	appStateUpdate1 := app.AppStateUpdateV1{
@@ -866,6 +879,7 @@ func TestRebalanceAppSessions_Error_InvalidVersion(t *testing.T) {
 		nil,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	wallet1 := NewTestAppSessionWallet(t)
@@ -878,6 +892,11 @@ func TestRebalanceAppSessions_Error_InvalidVersion(t *testing.T) {
 		SessionID: sessionID1,
 		Status:    app.AppSessionStatusOpen,
 		Version:   5, // Current version is 5
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: wallet1.Address, SignatureWeight: 1},
+			{WalletAddress: wallet2.Address, SignatureWeight: 1},
+		},
+		Quorum: 1,
 	}
 
 	appStateUpdate1 := app.AppStateUpdateV1{

@@ -24,6 +24,15 @@ func (h *Handler) SubmitSessionKeyState(c *rpc.Context) {
 		return
 	}
 
+	if len(reqPayload.State.ApplicationIDs) > h.maxSessionKeyIDs {
+		c.Fail(rpc.Errorf("application_ids array exceeds maximum length of %d", h.maxSessionKeyIDs), "")
+		return
+	}
+	if len(reqPayload.State.AppSessionIDs) > h.maxSessionKeyIDs {
+		c.Fail(rpc.Errorf("app_session_ids array exceeds maximum length of %d", h.maxSessionKeyIDs), "")
+		return
+	}
+
 	logger.Debug("processing session key state submission",
 		"userAddress", reqPayload.State.UserAddress,
 		"sessionKey", reqPayload.State.SessionKey,

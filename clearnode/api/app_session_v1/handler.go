@@ -17,13 +17,17 @@ import (
 
 // Handler manages app session operations and provides RPC endpoints for app session management.
 type Handler struct {
-	useStoreInTx  StoreTxProvider
-	assetStore    AssetStore
-	signer        sign.Signer
-	stateAdvancer core.StateAdvancer
-	statePacker   core.StatePacker
-	nodeAddress   string // Node's wallet address
-	metrics       metrics.RuntimeMetricExporter
+	useStoreInTx     StoreTxProvider
+	assetStore       AssetStore
+	signer           sign.Signer
+	stateAdvancer    core.StateAdvancer
+	statePacker      core.StatePacker
+	nodeAddress      string // Node's wallet address
+	metrics          metrics.RuntimeMetricExporter
+	maxParticipants  int
+	maxSessionData   int
+	maxSessionKeyIDs int
+	maxSignedUpdates int
 }
 
 // NewHandler creates a new Handler instance with the provided dependencies.
@@ -35,15 +39,20 @@ func NewHandler(
 	statePacker core.StatePacker,
 	nodeAddress string,
 	m metrics.RuntimeMetricExporter,
+	maxParticipants, maxSessionData, maxSessionKeyIDs, maxSignedUpdates int,
 ) *Handler {
 	return &Handler{
-		useStoreInTx:  useStoreInTx,
-		assetStore:    assetStore,
-		signer:        signer,
-		stateAdvancer: stateAdvancer,
-		statePacker:   statePacker,
-		nodeAddress:   nodeAddress,
-		metrics:       m,
+		useStoreInTx:     useStoreInTx,
+		assetStore:       assetStore,
+		signer:           signer,
+		stateAdvancer:    stateAdvancer,
+		statePacker:      statePacker,
+		nodeAddress:      nodeAddress,
+		metrics:          m,
+		maxParticipants:  maxParticipants,
+		maxSessionData:   maxSessionData,
+		maxSessionKeyIDs: maxSessionKeyIDs,
+		maxSignedUpdates: maxSignedUpdates,
 	}
 }
 

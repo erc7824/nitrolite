@@ -26,10 +26,11 @@ func newGetChannelsHandler(mockTxStore *MockStore) *Handler {
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockTxStore)
 		},
-		nodeSigner:   nodeSigner,
-		nodeAddress:  nodeAddress,
-		minChallenge: uint32(3600),
-		metrics:      metrics.NewNoopRuntimeMetricExporter(),
+		nodeSigner:       nodeSigner,
+		nodeAddress:      nodeAddress,
+		minChallenge:     uint32(3600),
+		metrics:          metrics.NewNoopRuntimeMetricExporter(),
+		maxSessionKeyIDs: 256,
 	}
 }
 

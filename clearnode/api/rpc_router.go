@@ -31,6 +31,7 @@ func NewRPCRouter(
 	memoryStore memory.MemoryStore,
 	runtimeMetrics metrics.RuntimeMetricExporter,
 	logger log.Logger,
+	maxParticipants, maxSessionDataLen, maxRebalanceSignedUpdates, maxSessionKeyIDs int,
 ) *RPCRouter {
 	r := &RPCRouter{
 		Node:           node,
@@ -71,20 +72,23 @@ func NewRPCRouter(
 		panic("failed to create channel wallet signer: " + err.Error())
 	}
 
-	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, nodeChannelSigner, stateAdvancer, statePacker, nodeAddress, minChallenge, runtimeMetrics)
-	appSessionV1Handler := app_session_v1.NewHandler(useAppSessionV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, nodeAddress, runtimeMetrics)
+	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, nodeChannelSigner, stateAdvancer, statePacker, nodeAddress, minChallenge, runtimeMetrics, maxSessionKeyIDs)
+	appSessionV1Handler := app_session_v1.NewHandler(useAppSessionV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, nodeAddress, runtimeMetrics,
+		maxParticipants, maxSessionDataLen, maxSessionKeyIDs, maxRebalanceSignedUpdates)
 	nodeV1Handler := node_v1.NewHandler(memoryStore, nodeAddress, nodeVersion)
 	userV1Handler := user_v1.NewHandler(dbStore)
 
 	appSessionV1Group := r.Node.NewGroup(rpc.AppSessionsV1Group.String())
 	appSessionV1Group.Handle(rpc.AppSessionsV1SubmitDepositStateMethod.String(), appSessionV1Handler.SubmitDepositState)
 	appSessionV1Group.Handle(rpc.AppSessionsV1SubmitAppStateMethod.String(), appSessionV1Handler.SubmitAppState)
-	appSessionV1Group.Handle(rpc.AppSessionsV1RebalanceAppSessionsMethod.String(), appSessionV1Handler.RebalanceAppSessions)
 	appSessionV1Group.Handle(rpc.AppSessionsV1CreateAppSessionMethod.String(), appSessionV1Handler.CreateAppSession)
 	appSessionV1Group.Handle(rpc.AppSessionsV1GetAppDefinitionMethod.String(), appSessionV1Handler.GetAppDefinition)
 	appSessionV1Group.Handle(rpc.AppSessionsV1GetAppSessionsMethod.String(), appSessionV1Handler.GetAppSessions)
 	appSessionV1Group.Handle(rpc.AppSessionsV1SubmitSessionKeyStateMethod.String(), appSessionV1Handler.SubmitSessionKeyState)
 	appSessionV1Group.Handle(rpc.AppSessionsV1GetLastKeyStatesMethod.String(), appSessionV1Handler.GetLastKeyStates)
+	if maxRebalanceSignedUpdates >= 2 {
+		appSessionV1Group.Handle(rpc.AppSessionsV1RebalanceAppSessionsMethod.String(), appSessionV1Handler.RebalanceAppSessions)
+	}
 
 	channelV1Group := r.Node.NewGroup(rpc.ChannelV1Group.String())
 	channelV1Group.Handle(rpc.ChannelsV1GetChannelsMethod.String(), channelV1Handler.GetChannels)

@@ -34,6 +34,7 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -144,6 +145,7 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -260,6 +262,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -369,6 +372,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -492,6 +496,7 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -586,6 +591,7 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -694,6 +700,7 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -800,6 +807,7 @@ func TestSubmitAppState_DepositIntent_Rejected(t *testing.T) {
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -853,6 +861,7 @@ func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -918,6 +927,7 @@ func TestSubmitAppState_InvalidVersion_Rejected(t *testing.T) {
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -926,6 +936,10 @@ func TestSubmitAppState_InvalidVersion_Rejected(t *testing.T) {
 		SessionID: appSessionID,
 		Status:    app.AppSessionStatusOpen,
 		Version:   5, // Current version is 5
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: "0x1111111111111111111111111111111111111111", SignatureWeight: 1},
+		},
+		Quorum: 1,
 	}
 
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
@@ -983,6 +997,7 @@ func TestSubmitAppState_SessionNotFound_Rejected(t *testing.T) {
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -1041,6 +1056,7 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -1144,6 +1160,7 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -1243,6 +1260,7 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 		mockStatePacker,
 		"0xNode",
 		metrics.NewNoopRuntimeMetricExporter(),
+		32, 1024, 256, 16,
 	)
 
 	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"

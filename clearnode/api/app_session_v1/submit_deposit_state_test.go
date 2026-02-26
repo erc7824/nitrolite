@@ -34,9 +34,13 @@ func TestSubmitDepositState_Success(t *testing.T) {
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		signer:      mockSigner,
-		nodeAddress: nodeAddress,
-		metrics:     metrics.NewNoopRuntimeMetricExporter(),
+		signer:           mockSigner,
+		nodeAddress:      nodeAddress,
+		metrics:          metrics.NewNoopRuntimeMetricExporter(),
+		maxParticipants:  32,
+		maxSessionData:   1024,
+		maxSessionKeyIDs: 256,
+		maxSignedUpdates: 16,
 	}
 
 	// Test data - create one key for both app session and channel state signing
@@ -235,9 +239,13 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		signer:      mockSigner,
-		nodeAddress: nodeAddress,
-		metrics:     metrics.NewNoopRuntimeMetricExporter(),
+		signer:           mockSigner,
+		nodeAddress:      nodeAddress,
+		metrics:          metrics.NewNoopRuntimeMetricExporter(),
+		maxParticipants:  32,
+		maxSessionData:   1024,
+		maxSessionKeyIDs: 256,
+		maxSignedUpdates: 16,
 	}
 
 	// Test data
@@ -360,9 +368,13 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
-		signer:      mockSigner,
-		nodeAddress: nodeAddress,
-		metrics:     metrics.NewNoopRuntimeMetricExporter(),
+		signer:           mockSigner,
+		nodeAddress:      nodeAddress,
+		metrics:          metrics.NewNoopRuntimeMetricExporter(),
+		maxParticipants:  32,
+		maxSessionData:   1024,
+		maxSessionKeyIDs: 256,
+		maxSignedUpdates: 16,
 	}
 
 	// Test data - create one key for both app session and channel state signing

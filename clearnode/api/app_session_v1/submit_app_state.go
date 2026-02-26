@@ -23,6 +23,11 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 		return
 	}
 
+	if len(reqPayload.AppStateUpdate.SessionData) > h.maxSessionData {
+		c.Fail(rpc.Errorf("session_data exceeds maximum length of %d", h.maxSessionData), "")
+		return
+	}
+
 	logger.Debug("processing app session state update request",
 		"appSessionID", reqPayload.AppStateUpdate.AppSessionID,
 		"version", reqPayload.AppStateUpdate.Version,
@@ -58,6 +63,10 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 		}
 		if appSession.Status == app.AppSessionStatusClosed {
 			return rpc.Errorf("app session is already closed")
+		}
+
+		if len(reqPayload.QuorumSigs) > len(appSession.Participants) {
+			return rpc.Errorf("quorum_sigs count (%d) exceeds participants count (%d)", len(reqPayload.QuorumSigs), len(appSession.Participants))
 		}
 		if appStateUpd.Version != appSession.Version+1 {
 			return rpc.Errorf("invalid app session version: expected %d, got %d", appSession.Version+1, appStateUpd.Version)

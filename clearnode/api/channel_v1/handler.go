@@ -11,14 +11,15 @@ import (
 
 // Handler manages channel state transitions and provides RPC endpoints for state submission.
 type Handler struct {
-	useStoreInTx  StoreTxProvider
-	memoryStore   MemoryStore
-	nodeSigner    *core.ChannelDefaultSigner
-	stateAdvancer core.StateAdvancer
-	statePacker   core.StatePacker
-	nodeAddress   string // Node's wallet address for channel ID calculation
-	minChallenge  uint32
-	metrics       metrics.RuntimeMetricExporter
+	useStoreInTx     StoreTxProvider
+	memoryStore      MemoryStore
+	nodeSigner       *core.ChannelDefaultSigner
+	stateAdvancer    core.StateAdvancer
+	statePacker      core.StatePacker
+	nodeAddress      string // Node's wallet address for channel ID calculation
+	minChallenge     uint32
+	metrics          metrics.RuntimeMetricExporter
+	maxSessionKeyIDs int
 }
 
 // NewHandler creates a new Handler instance with the provided dependencies.
@@ -31,16 +32,18 @@ func NewHandler(
 	nodeAddress string,
 	minChallenge uint32,
 	m metrics.RuntimeMetricExporter,
+	maxSessionKeyIDs int,
 ) *Handler {
 	return &Handler{
-		stateAdvancer: stateAdvancer,
-		statePacker:   statePacker,
-		useStoreInTx:  useStoreInTx,
-		memoryStore:   memoryStore,
-		nodeSigner:    nodeSigner,
-		nodeAddress:   nodeAddress,
-		minChallenge:  minChallenge,
-		metrics:       m,
+		stateAdvancer:    stateAdvancer,
+		statePacker:      statePacker,
+		useStoreInTx:     useStoreInTx,
+		memoryStore:      memoryStore,
+		nodeSigner:       nodeSigner,
+		nodeAddress:      nodeAddress,
+		minChallenge:     minChallenge,
+		metrics:          m,
+		maxSessionKeyIDs: maxSessionKeyIDs,
 	}
 }
 

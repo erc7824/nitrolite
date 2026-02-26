@@ -30,8 +30,10 @@ func main() {
 	logger := bb.Logger
 	ctx := context.Background()
 
+	vl := bb.ValidationLimits
 	api.NewRPCRouter(bb.NodeVersion, bb.ChannelMinChallengeDuration,
-		bb.RpcNode, bb.StateSigner, bb.DbStore, bb.MemoryStore, bb.RuntimeMetrics, bb.Logger)
+		bb.RpcNode, bb.StateSigner, bb.DbStore, bb.MemoryStore, bb.RuntimeMetrics, bb.Logger,
+		vl.MaxParticipants, vl.MaxSessionDataLen, vl.MaxSignedUpdates, vl.MaxSessionKeyIDs)
 
 	rpcListenAddr := ":7824"
 	rpcListenEndpoint := "/ws"

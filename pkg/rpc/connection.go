@@ -21,6 +21,11 @@ var (
 	defaultWsConnProcessBufferSize = 64
 	// defaultWsConnWriteBufferSize is the default size of the buffer for outgoing messages.
 	defaultWsConnWriteBufferSize = 64
+	// defaultWsConnPingInterval is the default interval for sending WebSocket ping frames to clients.
+	defaultWsConnPingInterval = 5 * time.Second
+	// defaultWsConnPongTimeout is the default timeout for receiving pong responses from clients.
+	// If no pong is received within this duration after a ping, the connection is considered dead.
+	defaultWsConnPongTimeout = 10 * time.Second
 )
 
 // Connection represents an active RPC connection that handles bidirectional communication.
@@ -63,6 +68,13 @@ type GorillaWsConnectionAdapter interface {
 	NextWriter(messageType int) (io.WriteCloser, error)
 	// Close closes the WebSocket connection.
 	Close() error
+	// WriteControl writes a control message (ping, pong, close) to the connection.
+	WriteControl(messageType int, data []byte, deadline time.Time) error
+	// SetPongHandler sets the handler for pong messages received from the peer.
+	SetPongHandler(h func(appData string) error)
+	// SetReadDeadline sets the deadline for future Read calls.
+	// A zero value means reads will not time out.
+	SetReadDeadline(t time.Time) error
 }
 
 // WebsocketConnection implements the Connection interface using WebSocket transport.
@@ -76,6 +88,7 @@ type GorillaWsConnectionAdapter interface {
 //   - Buffered channels for message processing
 //   - Thread-safe user authentication state management
 //   - Graceful connection closure with proper resource cleanup
+//   - Native WebSocket ping/pong keepalive detection
 type WebsocketConnection struct {
 	// ctx is the parent context for managing goroutines
 	ctx context.Context
@@ -87,6 +100,10 @@ type WebsocketConnection struct {
 	websocketConn GorillaWsConnectionAdapter
 	// writeTimeout is the maximum duration to wait for a write to complete
 	writeTimeout time.Duration
+	// pingInterval is how often to send ping frames to clients
+	pingInterval time.Duration
+	// pongTimeout is the maximum duration to wait for a pong response from the client
+	pongTimeout time.Duration
 
 	// logger is used for logging events related to this connection
 	logger log.Logger
@@ -119,6 +136,11 @@ type WebsocketConnectionConfig struct {
 	WriteBufferSize int
 	// ProcessBufferSize is the capacity of the incoming message buffer (default: 10)
 	ProcessBufferSize int
+	// PingInterval is how often to send ping frames to clients (default: 5s).
+	PingInterval time.Duration
+	// PongTimeout is the maximum duration to wait for a pong response from the client (default: 10s).
+	// If no pong is received within this duration, the connection is considered dead.
+	PongTimeout time.Duration
 	// Logger for connection events (default: no-op logger)
 	Logger log.Logger
 	// OnMessageSentHandler is called after a message is successfully sent (optional)
@@ -150,6 +172,12 @@ func NewWebsocketConnection(config WebsocketConnectionConfig) (*WebsocketConnect
 	if config.ProcessBufferSize <= 0 {
 		config.ProcessBufferSize = defaultWsConnProcessBufferSize
 	}
+	if config.PingInterval <= 0 {
+		config.PingInterval = defaultWsConnPingInterval
+	}
+	if config.PongTimeout <= 0 {
+		config.PongTimeout = defaultWsConnPongTimeout
+	}
 	if config.OnMessageSentHandler == nil {
 		config.OnMessageSentHandler = func([]byte) {}
 	}
@@ -159,6 +187,8 @@ func NewWebsocketConnection(config WebsocketConnectionConfig) (*WebsocketConnect
 		origin:        config.Origin,
 		websocketConn: config.WebsocketConn,
 		writeTimeout:  config.WriteTimeout,
+		pingInterval:  config.PingInterval,
+		pongTimeout:   config.PongTimeout,
 
 		logger:               config.Logger.WithKV("connectionID", config.ConnectionID),
 		onMessageSentHandler: config.OnMessageSentHandler,
@@ -188,6 +218,16 @@ func (conn *WebsocketConnection) Serve(parentCtx context.Context, handleClosure 
 	}
 	conn.ctx = parentCtx
 	conn.mu.Unlock()
+
+	// Set up pong handler to refresh read deadline when pong is received from client.
+	// This enables detection of dead connections - if no pong arrives within the timeout
+	// after sending a ping, the read will fail and the connection will be closed.
+	conn.websocketConn.SetPongHandler(func(appData string) error {
+		// Refresh read deadline on each pong received
+		return conn.websocketConn.SetReadDeadline(time.Now().Add(conn.pongTimeout))
+	})
+	// Set initial read deadline
+	_ = conn.websocketConn.SetReadDeadline(time.Now().Add(conn.pongTimeout))
 
 	// Create a child context that can be cancelled to stop all goroutines
 	childCtx, cancel := context.WithCancel(parentCtx)
@@ -314,15 +354,25 @@ func (conn *WebsocketConnection) readMessages(handleClosure func(error)) {
 }
 
 // writeMessages handles outgoing messages to the WebSocket connection.
-// It reads from the message sink channel and writes to the WebSocket.
+// It reads from the message sink channel, writes to the WebSocket,
+// and sends periodic ping frames to detect dead connections.
 func (conn *WebsocketConnection) writeMessages(ctx context.Context, handleClosure func(error)) {
 	defer handleClosure(nil) // Stop other goroutines
+
+	pingTicker := time.NewTicker(conn.pingInterval)
+	defer pingTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			conn.logger.Debug("context done, stopping message writing")
 			return
+		case <-pingTicker.C:
+			// Send native WebSocket ping frame
+			if err := conn.websocketConn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(conn.writeTimeout)); err != nil {
+				conn.logger.Error("error sending ping", "error", err)
+				return
+			}
 		case messageBytes, ok := <-conn.writeSink:
 			if !ok {
 				return // Channel closed, stop writing

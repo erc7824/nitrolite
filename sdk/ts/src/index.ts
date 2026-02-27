@@ -20,7 +20,6 @@ export {
   DefaultConfig,
   type Option,
   withHandshakeTimeout,
-  withPingInterval,
   withErrorHandler,
   withBlockchainRPC
 } from './config';

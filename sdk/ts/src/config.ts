@@ -12,9 +12,6 @@ export interface Config {
   /** Maximum time to wait for initial connection (in milliseconds) */
   handshakeTimeout?: number;
 
-  /** Interval between keep-alive pings (in milliseconds) */
-  pingInterval?: number;
-
   /** Called when connection errors occur */
   errorHandler?: (error: Error) => void;
 
@@ -41,7 +38,6 @@ function defaultErrorHandler(err: Error): void {
  */
 export const DefaultConfig: Partial<Config> = {
   handshakeTimeout: 5000, // 5 seconds
-  pingInterval: 5000, // 5 seconds
   errorHandler: defaultErrorHandler,
   blockchainRPCs: new Map(),
 };
@@ -52,15 +48,6 @@ export const DefaultConfig: Partial<Config> = {
 export function withHandshakeTimeout(timeout: number): Option {
   return (config: Config) => {
     config.handshakeTimeout = timeout;
-  };
-}
-
-/**
- * WithPingInterval sets the interval between keep-alive pings.
- */
-export function withPingInterval(interval: number): Option {
-  return (config: Config) => {
-    config.pingInterval = interval;
   };
 }
 

@@ -9,7 +9,7 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, 5*time.Second, DefaultConfig.HandshakeTimeout)
-	assert.Equal(t, 5*time.Second, DefaultConfig.PingInterval)
+	assert.Equal(t, 15*time.Second, DefaultConfig.PingTimeout)
 	assert.NotNil(t, DefaultConfig.ErrorHandler)
 }
 
@@ -20,11 +20,11 @@ func TestWithHandshakeTimeout(t *testing.T) {
 	assert.Equal(t, 10*time.Second, c.HandshakeTimeout)
 }
 
-func TestWithPingInterval(t *testing.T) {
+func TestWithPingTimeout(t *testing.T) {
 	c := &Config{}
-	opt := WithPingInterval(20 * time.Second)
+	opt := WithPingTimeout(20 * time.Second)
 	opt(c)
-	assert.Equal(t, 20*time.Second, c.PingInterval)
+	assert.Equal(t, 20*time.Second, c.PingTimeout)
 }
 
 func TestWithErrorHandler(t *testing.T) {

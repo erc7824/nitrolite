@@ -26,6 +26,7 @@ library ChannelEngine {
     error IncorrectPreviousStateIntent();
     error IncorrectChannelStatus();
     error IncorrectStateVersion();
+    error ChallengeExpired();
 
     error IncorrectUserAllocation();
     error IncorrectNodeAllocation();
@@ -124,6 +125,11 @@ library ChannelEngine {
 
         require(netFlowsSum >= 0, NegativeNetFlowSum());
         require(allocsSum == netFlowsSum.toUint256(), IncorrectAllocationSum());
+
+        // If channel is DISPUTED, check that challenge hasn't expired
+        if (ctx.status == ChannelStatus.DISPUTED) {
+            require(block.timestamp <= ctx.challengeExpiry, ChallengeExpired());
+        }
     }
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========

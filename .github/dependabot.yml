@@ -11,7 +11,6 @@ updates:
       - "/erc7824-docs"
       - "/sdk/compat"
       - "/test/integration"
-      - "/sdk/ts"
       - "/sdk/ts/examples/*app*"
     schedule:
       interval: "weekly"

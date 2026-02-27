@@ -569,8 +569,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
     }
 
     function closeChannel(bytes32 channelId, State calldata candidate) external payable {
-        require(candidate.intent == StateIntent.CLOSE, IncorrectStateIntent());
-
         ChannelMeta storage meta = _channels[channelId];
         ChannelDefinition memory def = meta.definition;
         ChannelStatus status = meta.status;
@@ -595,6 +593,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         }
 
         // Path 2: Cooperative closure with signed CLOSE state
+        require(candidate.intent == StateIntent.CLOSE, IncorrectStateIntent());
         _validateSignatures(channelId, candidate, user, node, def.approvedSignatureValidators);
 
         ChannelEngine.TransitionContext memory ctx =

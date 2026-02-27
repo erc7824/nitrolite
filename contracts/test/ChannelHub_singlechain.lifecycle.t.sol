@@ -81,7 +81,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
         // Expected: user allocation = 958, user net flow = 1000, node allocation = 0, node net flow = -42
         vm.prank(alice);
         cHub.checkpointChannel(channelId, state);
-        verifyChannelState(channelId, 958, 1000, 0, -42, "after checkpoint");
+        verifyChannelState(channelId, [uint256(958), uint256(0)], [int256(1000), int256(-42)], "after checkpoint");
 
         // receive 24 (allocation increases by 24, node net flow increases by 24)
         state = nextState(state, StateIntent.OPERATE, [uint256(982), uint256(0)], [int256(1000), int256(-18)]);
@@ -95,7 +95,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
         vm.prank(alice);
         cHub.depositToChannel(channelId, state);
-        verifyChannelState(channelId, 1482, 1500, 0, -18, "after deposit");
+        verifyChannelState(channelId, [uint256(1482), uint256(0)], [int256(1500), int256(-18)], "after deposit");
 
         // Verify user balance after first deposit (deposited 500 more)
         assertEq(token.balanceOf(alice), INITIAL_BALANCE - 1500, "User balance after first deposit");
@@ -116,7 +116,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
         vm.prank(alice);
         cHub.withdrawFromChannel(channelId, state);
-        verifyChannelState(channelId, 1379, 1400, 0, -21, "after withdrawal");
+        verifyChannelState(channelId, [uint256(1379), uint256(0)], [int256(1400), int256(-21)], "after withdrawal");
 
         // Verify user balance after first withdrawal (withdrew 100)
         assertEq(token.balanceOf(alice), INITIAL_BALANCE - 1400, "User balance after first withdrawal");
@@ -137,7 +137,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
         vm.prank(alice);
         cHub.depositToChannel(channelId, state);
-        verifyChannelState(channelId, 1586, 1600, 0, -14, "after second deposit");
+        verifyChannelState(channelId, [uint256(1586), uint256(0)], [int256(1600), int256(-14)], "after second deposit");
 
         // Verify user balance after second deposit (deposited 200 more)
         assertEq(token.balanceOf(alice), INITIAL_BALANCE - 1600, "User balance after second deposit");
@@ -170,7 +170,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
 
         vm.prank(alice);
         cHub.withdrawFromChannel(channelId, state);
-        verifyChannelState(channelId, 1289, 1300, 0, -11, "after second withdrawal");
+        verifyChannelState(channelId, [uint256(1289), uint256(0)], [int256(1300), int256(-11)], "after second withdrawal");
 
         // Verify user balance after second withdrawal (withdrew 300)
         assertEq(token.balanceOf(alice), INITIAL_BALANCE - 1300, "User balance after second withdrawal");
@@ -259,7 +259,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
         cHub.createChannel(def, state);
 
         assertEq(token.balanceOf(alice), INITIAL_BALANCE, "User balance after OPERATE creation stays the same");
-        verifyChannelState(channelId, 1000, 0, 0, 1000, "after create with OPERATE intent");
+        verifyChannelState(channelId, [uint256(1000), uint256(0)], [int256(0), int256(1000)], "after create with OPERATE intent");
         (ChannelStatus status,, State memory latestState,, uint256 lockedFunds) = cHub.getChannelData(channelId);
         assertEq(
             uint8(status), uint8(ChannelStatus.OPERATING), "Channel created with OPERATE intent should be OPERATING"
@@ -324,7 +324,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
         cHub.createChannel(def, state);
 
         assertEq(token.balanceOf(alice), INITIAL_BALANCE - 500, "User balance after DEPOSIT creation decreases");
-        verifyChannelState(channelId, 1500, 500, 0, 1000, "after create with DEPOSIT intent");
+        verifyChannelState(channelId, [uint256(1500), uint256(0)], [int256(500), int256(1000)], "after create with DEPOSIT intent");
         (ChannelStatus status,, State memory latestState,, uint256 lockedFunds) = cHub.getChannelData(channelId);
         assertEq(
             uint8(status), uint8(ChannelStatus.OPERATING), "Channel created with DEPOSIT intent should be OPERATING"
@@ -389,7 +389,7 @@ contract ChannelHubTest_SingleChain_Lifecycle is ChannelHubTest_Base {
         cHub.createChannel(def, state);
 
         assertEq(token.balanceOf(alice), INITIAL_BALANCE + 500, "User balance after WITHDRAW creation increases");
-        verifyChannelState(channelId, 500, -500, 0, 1000, "after create with WITHDRAW intent");
+        verifyChannelState(channelId, [uint256(500), uint256(0)], [int256(-500), int256(1000)], "after create with WITHDRAW intent");
         (ChannelStatus status,, State memory latestState,, uint256 lockedFunds) = cHub.getChannelData(channelId);
         assertEq(
             uint8(status), uint8(ChannelStatus.OPERATING), "Channel created with WITHDRAW intent should be OPERATING"

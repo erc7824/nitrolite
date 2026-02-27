@@ -107,7 +107,7 @@ contract ChannelHubTest_Challenge_HomeChain_NormalOperation is ChannelHubTest_Ba
         cHub.challengeChannel(channelId, stateV2, challengerSig, ParticipantIndex.NODE);
 
         verifyChannelData(channelId, ChannelStatus.DISPUTED, 2, block.timestamp + CHALLENGE_DURATION, "State V2 should be enforced during challenge");
-        verifyChannelState(channelId, 850, 1000, 0, -150, "State V2 should be enforced during challenge");
+        verifyChannelState(channelId, [uint256(850), uint256(0)], [int256(1000), int256(-150)], "State V2 should be enforced during challenge");
     }
 
     function test_challengeWithExistingState_notEnforcedAgain() public {
@@ -129,7 +129,7 @@ contract ChannelHubTest_Challenge_HomeChain_NormalOperation is ChannelHubTest_Ba
         cHub.challengeChannel(channelId, stateV1, challengerSig, ParticipantIndex.NODE);
 
         verifyChannelData(channelId, ChannelStatus.DISPUTED, 1, block.timestamp + CHALLENGE_DURATION, "State V1 should be enforced during challenge");
-        verifyChannelState(channelId, 900, 1000, 0, -100, "State V1 should be enforced during challenge");
+        verifyChannelState(channelId, [uint256(900), uint256(0)], [int256(1000), int256(-100)], "State V1 should be enforced during challenge");
     }
 
     function test_challengeFinalization_afterTimeout() public {
@@ -187,7 +187,7 @@ contract ChannelHubTest_Challenge_HomeChain_NormalOperation is ChannelHubTest_Ba
         cHub.checkpointChannel(channelId, stateV2);
 
         verifyChannelData(channelId, ChannelStatus.OPERATING, 2, 0, "Channel should be OPERATING after resolving challenge with newer state");
-        verifyChannelState(channelId, 850, 1000, 0, -150, "State V2 should be enforced after resolving challenge with newer state");
+        verifyChannelState(channelId, [uint256(850), uint256(0)], [int256(1000), int256(-150)], "State V2 should be enforced after resolving challenge with newer state");
     }
 
     function test_revert_resolveChallenge_withOlderState_beforeTimeout() public {

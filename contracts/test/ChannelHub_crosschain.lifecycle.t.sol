@@ -109,7 +109,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         // Expected: user allocation = 958, user net flow = 1000, node allocation = 0, node net flow = -42
         vm.prank(alice);
         cHub.initiateEscrowDeposit(def, state);
-        verifyChannelState(channelId, 958, 1000, 500, 458, "after cross chain deposit");
+        verifyChannelState(channelId, [uint256(958), uint256(500)], [int256(1000), int256(458)], "after cross chain deposit");
 
         // finalize escrow deposit
         state = nextState(
@@ -141,7 +141,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         vm.prank(alice);
         cHub.withdrawFromChannel(channelId, state);
-        verifyChannelState(channelId, 1220, 750, 0, 470, "after withdrawal");
+        verifyChannelState(channelId, [uint256(1220), uint256(0)], [int256(750), int256(470)], "after withdrawal");
 
         // Verify user balance after withdrawal (withdrew 250)
         assertEq(token.balanceOf(alice), INITIAL_BALANCE - 750, "User balance after withdrawal");
@@ -199,7 +199,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         // checkpoint on home chain
         vm.prank(alice);
         cHub.checkpointChannel(channelId, state);
-        verifyChannelState(channelId, 477, 750, 0, -273, "after checkpoint");
+        verifyChannelState(channelId, [uint256(477), uint256(0)], [int256(750), int256(-273)], "after checkpoint");
 
         // Verify user balance hasn't changed
         assertEq(token.balanceOf(alice), INITIAL_BALANCE - 750, "User balance after checkpoint");
@@ -258,7 +258,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         cHub.finalizeMigration(channelId, state);
 
         // Verify channel is migrated out
-        verifyChannelState(channelId, 0, 750, 0, -750, "after migration");
+        verifyChannelState(channelId, [uint256(0), uint256(0)], [int256(750), int256(-750)], "after migration");
 
         // Verify user balance hasn't changed (migration doesn't move funds on home chain)
         assertEq(token.balanceOf(alice), INITIAL_BALANCE - 750, "User balance after migration");
@@ -773,7 +773,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
 
         vm.prank(bob);
         cHub.withdrawFromChannel(bobChannelId, state);
-        verifyChannelState(bobChannelId, 61, -400, 0, 461, "after withdrawal");
+        verifyChannelState(bobChannelId, [uint256(61), uint256(0)], [int256(-400), int256(461)], "after withdrawal");
 
         // Verify user balance after withdrawal (withdrew 400)
         assertEq(token.balanceOf(bob), userBalanceBefore + 400, "User balance after withdrawal");

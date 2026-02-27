@@ -77,6 +77,9 @@ var _ Dialer = (*WebsocketDialer)(nil)
 
 // NewWebsocketDialer creates a new WebSocket dialer with the given configuration
 func NewWebsocketDialer(cfg WebsocketDialerConfig) *WebsocketDialer {
+	if cfg.PingTimeout <= 0 {
+		cfg.PingTimeout = DefaultWebsocketDialerConfig.PingTimeout
+	}
 	return &WebsocketDialer{
 		cfg:           cfg,
 		eventCh:       make(chan *Message, cfg.EventChanSize),
@@ -133,6 +136,7 @@ func (d *WebsocketDialer) Dial(parentCtx context.Context, url string, handleClos
 	})
 	// Set initial read deadline
 	if err := conn.SetReadDeadline(time.Now().Add(d.cfg.PingTimeout)); err != nil {
+		cancel()
 		return err
 	}
 

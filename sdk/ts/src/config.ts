@@ -17,6 +17,8 @@ export interface Config {
 
   /** Maps blockchain IDs to their RPC endpoints */
   blockchainRPCs?: Map<bigint, string>;
+
+  pingInterval?: number;
 }
 
 /**

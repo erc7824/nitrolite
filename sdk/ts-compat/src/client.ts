@@ -296,6 +296,7 @@ export class NitroliteClient {
     // -----------------------------------------------------------------------
 
     private static readonly MAX_UINT256 = 2n ** 256n - 1n;
+    private static readonly DEFAULT_APPROVE_AMOUNT = new Decimal(100000);
 
     /** Classify raw SDK/wallet errors into typed compat errors. */
     static classifyError(error: unknown): Error {
@@ -315,7 +316,7 @@ export class NitroliteClient {
             const classified = NitroliteClient.classifyError(err);
             if (!(classified instanceof AllowanceError)) throw classified;
             console.log('[compat] Allowance insufficient, requesting token approval…');
-            await this.innerClient.approveToken(chainId, tokenAddress, NitroliteClient.MAX_UINT256);
+            await this.innerClient.approveToken(chainId, tokenAddress, NitroliteClient.DEFAULT_APPROVE_AMOUNT);
             return await this.innerClient.checkpoint(symbol);
         }
     }

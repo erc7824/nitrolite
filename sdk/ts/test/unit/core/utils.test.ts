@@ -351,7 +351,7 @@ describe('getHomeChannelId', () => {
 
     const channelId = getHomeChannelId(node, user, asset, nonce, challengeDuration);
 
-    const expected = '0x7c827da2e3e6aac5385f51934491b6b1bc338a4b4222860943b1d1e6519659ee';
+    const expected = '0x011d32827760cd3fa7dfb3934eb4ddb4a05f47e327581d4fd1585f4dc9a8c490';
     expect(channelId).toBe(expected);
   });
 

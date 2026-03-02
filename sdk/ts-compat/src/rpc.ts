@@ -1,15 +1,14 @@
 /**
- * RPC helper stubs -- v0.5.3 compat.
+ * RPC compatibility helpers for v0.5.3 imports.
  *
  * In v0.5.3, hooks used a create-sign-send-parse pattern:
  *   const msg = await createGetChannelsMessage(signer.sign, addr);
  *   const raw = await sendRequest(msg);
  *   const parsed = parseGetChannelsResponse(raw);
  *
- * In the compat layer, hooks call NitroliteClient methods directly. These
- * stubs exist so that any remaining import references compile. They are
- * intentionally no-ops / pass-throughs -- prefer using NitroliteClient
- * methods instead.
+ * In the compat layer, most apps should call NitroliteClient methods directly.
+ * The helpers below keep legacy import sites compiling; most create* helpers are
+ * lightweight placeholders while parse* helpers normalize response shapes.
  */
 
 import type { MessageSigner, RPCResponse, NitroliteRPCMessage } from './types';
@@ -45,13 +44,14 @@ export const NitroliteRPC = {
         };
     },
 
-    async signRequestMessage(msg: NitroliteRPCMessage, _signer: MessageSigner): Promise<NitroliteRPCMessage> {
-        return msg;
+    async signRequestMessage(msg: NitroliteRPCMessage, signer: MessageSigner): Promise<NitroliteRPCMessage> {
+        const signature = await signer(msg.req);
+        return { ...msg, sig: signature };
     },
 };
 
 // ---------------------------------------------------------------------------
-// create*Message / parse*Response stubs
+// create*Message / parse*Response compatibility helpers
 // ---------------------------------------------------------------------------
 
 const noop = async (..._args: any[]): Promise<string> =>

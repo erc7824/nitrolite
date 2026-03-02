@@ -1,10 +1,10 @@
 # Off-Chain Migration Guide
 
-This guide covers off-chain operations when migrating from v0.5.3 to the compat layer: authentication, app sessions, transfers, ledger queries, event polling, and RPC stubs.
+This guide covers off-chain operations when migrating from v0.5.3 to the compat layer: authentication, app sessions, transfers, ledger queries, event polling, and RPC compatibility helpers.
 
 ## 1. Authentication
 
-v1.0.0 handles authentication internally — there is no public auth API. The compat layer provides **stubs** so existing auth code compiles: `createAuthRequestMessage`, `createAuthVerifyMessage`, `createAuthVerifyMessageWithJWT`, `createEIP712AuthMessageSigner`. They are no-ops at runtime. You can remove auth flows; the client authenticates via the `WalletClient` when connecting.
+v1.0.0 handles authentication internally when using `NitroliteClient`. For legacy WebSocket-auth code paths, the compat layer keeps `createAuthRequestMessage`, `createAuthVerifyMessage`, `createAuthVerifyMessageWithJWT`, and `createEIP712AuthMessageSigner` available.
 
 ## 2. App Sessions
 
@@ -68,6 +68,6 @@ const poller = new EventPoller(client, {
 poller.start();
 ```
 
-## 6. RPC Stubs
+## 6. RPC Compatibility Helpers
 
-The `create*Message` and `parse*Response` functions still exist so existing imports compile. They are **no-ops** — prefer `NitroliteClient` methods directly. Examples: `createGetChannelsMessage`, `parseGetChannelsResponse`, `createTransferMessage`, `createAppSessionMessage`, `createCloseAppSessionMessage`, etc.
+The `create*Message` and `parse*Response` functions still exist so existing imports compile. Most `create*Message` helpers are transitional placeholders; prefer `NitroliteClient` methods directly for new code. Examples: `createGetChannelsMessage`, `parseGetChannelsResponse`, `createTransferMessage`, `createAppSessionMessage`, `createCloseAppSessionMessage`, etc.

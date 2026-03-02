@@ -47,7 +47,7 @@ const channels = await client.getChannels();
 
 - **Type shapes:** `AppSession`, `LedgerChannel`, `RPCAppDefinition`, `RPCBalance`, `RPCAsset`, etc.
 - **Response formats:** Balances, ledger entries, app sessions — same structure as v0.5.3.
-- **Auth stubs:** `createAuthRequestMessage`, `createAuthVerifyMessage` still exist for compilation; they are no-ops.
+- **Auth helpers:** `createAuthRequestMessage`, `createAuthVerifyMessage`, `createAuthVerifyMessageWithJWT`, and `createEIP712AuthMessageSigner` remain available for legacy auth flows.
 
 ## 6. What Changes
 

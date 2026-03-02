@@ -23,11 +23,16 @@ export class NotInitializedError extends CompatError {
     constructor(message: string) { super(message, 'NOT_INITIALIZED'); this.name = 'NotInitializedError'; }
 }
 
+export class OngoingStateTransitionError extends CompatError {
+    constructor(message: string) { super(message, 'ONGOING_STATE_TRANSITION'); this.name = 'OngoingStateTransitionError'; }
+}
+
 export function getUserFacingMessage(error: unknown): string {
-    if (error instanceof AllowanceError) return 'Transaction was rejected. Please approve the transaction in your wallet to continue.';
+    if (error instanceof AllowanceError) return 'Token approval is required. Please approve spending in your wallet, then retry.';
     if (error instanceof UserRejectedError) return 'You rejected the transaction. Please try again and approve in your wallet.';
     if (error instanceof InsufficientFundsError) return 'Insufficient funds for gas fees plus the requested amount.';
     if (error instanceof NotInitializedError) return 'Wallet connection issue. Please reconnect your wallet and try again.';
+    if (error instanceof OngoingStateTransitionError) return 'A previous add-funds action is still finalizing on-chain. Wait a few seconds and try again.';
     if (error instanceof CompatError) return `Operation failed: ${error.message}`;
     return 'An unexpected error occurred. Please try again.';
 }

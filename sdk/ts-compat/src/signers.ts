@@ -1,6 +1,6 @@
 import { Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import type { MessageSigner } from './types';
+import type { MessageSigner, MessageSignerPayload } from './types';
 
 /**
  * v0.5.3-compatible WalletStateSigner.
@@ -33,8 +33,18 @@ export class WalletStateSigner {
  */
 export function createECDSAMessageSigner(privateKey: Hex): MessageSigner {
     const account = privateKeyToAccount(privateKey);
+    const encoder = new TextEncoder();
 
-    return async (payload: Uint8Array): Promise<string> => {
-        return account.signMessage({ message: { raw: payload } });
+    const toSignableBytes = (payload: MessageSignerPayload): Uint8Array => {
+        if (payload instanceof Uint8Array) return payload;
+
+        const normalized = JSON.stringify(payload, (_key, value) =>
+            typeof value === 'bigint' ? value.toString() : value,
+        );
+        return encoder.encode(normalized);
+    };
+
+    return async (payload: MessageSignerPayload): Promise<string> => {
+        return account.signMessage({ message: { raw: toSignableBytes(payload) } });
     };
 }

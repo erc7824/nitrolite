@@ -21,6 +21,23 @@ The v1.0.0 protocol introduces breaking changes across 14 dimensions — wire fo
 
 The compat layer centralises this complexity into **~1,000 lines** that absorb the protocol differences, reducing per-app integration effort by an estimated **56–70%**.
 
+## Build Size
+
+Measured on **February 24, 2026** from `sdk/ts-compat` using:
+
+```bash
+npm run build:prod
+npm pack --dry-run --json
+```
+
+| Metric | Size |
+|---|---:|
+| npm tarball (`size`) | 16,503 bytes (16.1 KB) |
+| unpacked package (`unpackedSize`) | 73,292 bytes (71.6 KB) |
+| compiled JS in `dist/*.js` | 38,146 bytes (37.3 KB) |
+| type declarations in `dist/*.d.ts` | 20,293 bytes (19.8 KB) |
+| total emitted runtime + types (`.js` + `.d.ts`) | 58,439 bytes (57.1 KB) |
+
 ## Migration Guide
 
 Step-by-step guides for migrating from v0.5.3:
@@ -42,7 +59,7 @@ Or with a local `file:` reference (monorepo):
 ```json
 {
   "dependencies": {
-    "@erc7824/nitrolite-compat": "file:../sdk/compat",
+    "@erc7824/nitrolite-compat": "file:../sdk/ts-compat",
     "@erc7824/nitrolite": "file:../sdk/ts"
   }
 }
@@ -131,10 +148,18 @@ await client.close();
 
 | Method | Description |
 |---|---|
-| `createAppSession(definition, allocations)` | Create an app session |
-| `closeAppSession(appSessionId, allocations)` | Close an app session |
-| `submitAppState(params)` | Submit state update (operate/deposit/withdraw) |
+| `createAppSession(definition, allocations, quorumSigs?)` | Create an app session (optionally with quorum signatures) |
+| `closeAppSession(appSessionId, allocations, quorumSigs?)` | Close an app session (optionally with quorum signatures) |
+| `submitAppState(params)` | Submit state update (operate/deposit/withdraw/close) with optional `quorum_sigs` |
 | `getAppDefinition(appSessionId)` | Get the definition for a session |
+
+### App Session Signing Helpers
+
+| Helper | Description |
+|---|---|
+| `packCreateAppSessionHash(params)` | Deterministic hash for `createAppSession` quorum signing |
+| `packSubmitAppStateHash(params)` | Deterministic hash for `submitAppState` quorum signing |
+| `toWalletQuorumSignature(signature)` | Prefixes wallet signature to compat app-session quorum format |
 
 ### Transfers
 

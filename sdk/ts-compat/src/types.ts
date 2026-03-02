@@ -28,6 +28,9 @@ export enum RPCMethod {
     AuthChallenge = 'auth_challenge',
     AuthVerify = 'auth_verify',
     Error = 'error',
+    GetLedgerTransactions = 'get_ledger_transactions',
+    GetUserTag = 'get_user_tag',
+    TransferNotification = 'tr',
 }
 
 export enum RPCChannelStatus {
@@ -48,14 +51,27 @@ export enum RPCAppStateIntent {
     Withdraw = 'withdraw',
 }
 
+export enum RPCTxType {
+    Transfer = 'transfer',
+    Deposit = 'deposit',
+    Withdrawal = 'withdrawal',
+    AppDeposit = 'app_deposit',
+    AppWithdrawal = 'app_withdrawal',
+    EscrowLock = 'escrow_lock',
+    EscrowUnlock = 'escrow_unlock',
+}
+
 // =============================================================================
 // Wire types -- shapes the appstore expects from v0.5.3 SDK
 // =============================================================================
 
-export type MessageSigner = (payload: Uint8Array) => Promise<string>;
+export type NitroliteRPCRequest = [number, string, any, number];
+export type MessageSignerPayload = Uint8Array | NitroliteRPCRequest;
+export type MessageSigner = (payload: MessageSignerPayload) => Promise<string>;
+export type RequestID = number;
 
 export interface NitroliteRPCMessage {
-    req: [number, string, any, number];
+    req: NitroliteRPCRequest;
     sig: string;
 }
 
@@ -181,19 +197,23 @@ export interface RPCAppSessionAllocation {
 export interface CloseAppSessionRequestParams {
     app_session_id: string;
     allocations: RPCAppSessionAllocation[];
+    version?: number;
     session_data?: string;
+    quorum_sigs?: string[];
 }
 
 export interface CreateAppSessionRequestParams {
     definition: RPCAppDefinition;
     allocations: RPCAppSessionAllocation[];
     session_data?: string;
+    quorum_sigs?: string[];
 }
 
 export interface SubmitAppStateRequestParamsV02 {
     app_session_id: Hex;
     allocations: RPCAppSessionAllocation[];
     session_data?: string;
+    quorum_sigs?: string[];
 }
 
 export interface SubmitAppStateRequestParamsV04 {
@@ -202,6 +222,7 @@ export interface SubmitAppStateRequestParamsV04 {
     version: number;
     allocations: RPCAppSessionAllocation[];
     session_data?: string;
+    quorum_sigs?: string[];
 }
 
 export type SubmitAppStateRequestParams = SubmitAppStateRequestParamsV02 | SubmitAppStateRequestParamsV04;
@@ -321,3 +342,51 @@ export interface ClearNodeAsset {
     symbol: string;
     decimals: number;
 }
+
+// =============================================================================
+// v0.5.3 transaction / notification types (used by beatwav)
+// =============================================================================
+
+export type LedgerAccountType = Address | `0x${string}`;
+
+export interface RPCTransaction {
+    id: number;
+    txType: RPCTxType;
+    fromAccount: LedgerAccountType;
+    fromAccountTag?: string;
+    toAccount: LedgerAccountType;
+    toAccountTag?: string;
+    asset: string;
+    amount: string;
+    createdAt: Date;
+}
+
+export interface AuthChallengeResponse {
+    method: RPCMethod.AuthChallenge;
+    params: {
+        challengeMessage: string;
+    };
+}
+
+export interface TransferNotificationResponseParams {
+    transactions: RPCTransaction[];
+}
+
+// =============================================================================
+// EIP-712 Auth Types (v0.5.3 compatible)
+// =============================================================================
+
+export const EIP712AuthTypes = {
+    Policy: [
+        { name: 'challenge', type: 'string' },
+        { name: 'scope', type: 'string' },
+        { name: 'wallet', type: 'address' },
+        { name: 'session_key', type: 'address' },
+        { name: 'expires_at', type: 'uint64' },
+        { name: 'allowances', type: 'Allowance[]' },
+    ],
+    Allowance: [
+        { name: 'asset', type: 'string' },
+        { name: 'amount', type: 'string' },
+    ],
+} as const;

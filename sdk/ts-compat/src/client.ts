@@ -1,6 +1,7 @@
 import {
     Client,
     ChannelDefaultSigner,
+    ChannelSessionKeyStateSigner,
     type StateSigner,
     type TransactionSigner,
 } from '@erc7824/nitrolite';
@@ -8,6 +9,8 @@ import type {
     AppDefinitionV1,
     AppParticipantV1,
     AppAllocationV1,
+    AppSessionKeyStateV1,
+    ChannelSessionKeyStateV1,
 } from '@erc7824/nitrolite';
 import Decimal from 'decimal.js';
 import { Address, Hex, WalletClient, formatUnits, parseUnits } from 'viem';
@@ -30,11 +33,17 @@ import type {
     SubmitAppStateRequestParamsV04,
     GetAppDefinitionResponseParams,
     CreateAppSessionRequestParams,
+    CloseAppSessionRequestParams,
 } from './types';
 import { RPCAppStateIntent } from './types';
 
 import { buildClientOptions, type CompatClientConfig } from './config';
-import { AllowanceError, InsufficientFundsError, NotInitializedError, UserRejectedError } from './errors';
+import {
+    AllowanceError,
+    InsufficientFundsError,
+    NotInitializedError,
+    UserRejectedError,
+} from './errors';
 
 // ---------------------------------------------------------------------------
 // WalletClient-based signers for browser (MetaMask) environments
@@ -102,6 +111,12 @@ export interface NitroliteClientConfig {
     walletClient: WalletClient;
     chainId: number;
     blockchainRPCs?: Record<number, string>;
+    channelSessionKeySigner?: {
+        sessionKeyPrivateKey: Hex;
+        walletAddress: Address;
+        metadataHash: Hex;
+        authSig: Hex;
+    };
     /** @deprecated v0.5.3 compat -- ignored, addresses come from get_config */
     addresses?: ContractAddresses;
     /** @deprecated v0.5.3 compat -- ignored */
@@ -117,6 +132,8 @@ export class NitroliteClient {
     private assetsBySymbol = new Map<string, AssetInfo>(); // lowercase symbol -> info
     private _chainId: bigint;
     private _lastChannels: LedgerChannel[] = [];
+    private _lastAppSessionsListError: string | null = null;
+    private _lastAppSessionsListErrorLogged: string | null = null;
 
     private constructor(client: Client, userAddress: Address, chainId: number) {
         this.innerClient = client;
@@ -129,7 +146,28 @@ export class NitroliteClient {
     // -----------------------------------------------------------------------
 
     static async create(config: NitroliteClientConfig): Promise<NitroliteClient> {
-        const stateSigner = new ChannelDefaultSigner(new WalletMsgSigner(config.walletClient));
+        const walletAddress = config.walletClient.account?.address;
+        if (!walletAddress) throw new Error('WalletClient must have an account');
+
+        let stateSigner: StateSigner;
+        if (config.channelSessionKeySigner) {
+            const signerWallet = config.channelSessionKeySigner.walletAddress;
+            if (signerWallet.toLowerCase() !== walletAddress.toLowerCase()) {
+                throw new Error(
+                    `channelSessionKeySigner wallet ${signerWallet} does not match walletClient account ${walletAddress}`,
+                );
+            }
+
+            stateSigner = new ChannelSessionKeyStateSigner(
+                config.channelSessionKeySigner.sessionKeyPrivateKey,
+                signerWallet,
+                config.channelSessionKeySigner.metadataHash,
+                config.channelSessionKeySigner.authSig,
+            );
+        } else {
+            stateSigner = new ChannelDefaultSigner(new WalletMsgSigner(config.walletClient));
+        }
+
         const txSigner = new WalletTxSigner(config.walletClient);
 
         const opts = buildClientOptions({
@@ -139,10 +177,7 @@ export class NitroliteClient {
 
         const v1Client = await Client.create(config.wsURL, stateSigner, txSigner, ...opts);
 
-        const address = config.walletClient.account?.address;
-        if (!address) throw new Error('WalletClient must have an account');
-
-        const compat = new NitroliteClient(v1Client, address, config.chainId);
+        const compat = new NitroliteClient(v1Client, walletAddress, config.chainId);
 
         try {
             await compat.refreshAssets();
@@ -185,6 +220,9 @@ export class NitroliteClient {
     private async getDecimalsForAsset(assetSymbol: string): Promise<number> {
         await this.ensureAssets();
         const info = this.assetsBySymbol.get(assetSymbol.toLowerCase());
+        if (!info) {
+            console.warn(`[compat] Unknown asset symbol ${assetSymbol}, falling back to 6 decimals`);
+        }
         return info?.decimals ?? 6;
     }
 
@@ -274,7 +312,8 @@ export class NitroliteClient {
         try {
             return await this.innerClient.checkpoint(symbol);
         } catch (err) {
-            if (!(err instanceof AllowanceError) && !(NitroliteClient.classifyError(err) instanceof AllowanceError)) throw NitroliteClient.classifyError(err);
+            const classified = NitroliteClient.classifyError(err);
+            if (!(classified instanceof AllowanceError)) throw classified;
             console.log('[compat] Allowance insufficient, requesting token approval…');
             await this.innerClient.approveToken(chainId, tokenAddress, NitroliteClient.MAX_UINT256);
             return await this.innerClient.checkpoint(symbol);
@@ -325,11 +364,7 @@ export class NitroliteClient {
                 if (!symbol) continue;
 
                 await this.innerClient.closeHomeChannel(symbol);
-                if (info) {
-                    await this.checkpointWithApproval(symbol, info.chainId, info.tokenAddress);
-                } else {
-                    await this.innerClient.checkpoint(symbol);
-                }
+                await this.checkpointWithApproval(symbol, info.chainId, info.tokenAddress);
             } catch {
                 // channel may already be closing
             }
@@ -353,14 +388,14 @@ export class NitroliteClient {
     }
 
     async getChannelData(_channelId: string): Promise<any> {
-        const assets = await this.innerClient.getAssets();
-        for (const asset of assets) {
+        await this.ensureAssets();
+        for (const [, info] of this.assetsBySymbol) {
             try {
-                const ch = await this.innerClient.getHomeChannel(this.userAddress, asset.symbol);
+                const ch = await this.innerClient.getHomeChannel(this.userAddress, info.symbol);
                 if (ch.channelId === _channelId) {
                     return {
                         channel: ch,
-                        state: await this.innerClient.getLatestState(this.userAddress, asset.symbol, false),
+                        state: await this.innerClient.getLatestState(this.userAddress, info.symbol, false),
                     };
                 }
             } catch {
@@ -507,38 +542,82 @@ export class NitroliteClient {
     }
 
     async getAppSessionsList(wallet?: Address, status?: string): Promise<AppSession[]> {
+        const mapSessions = (sessions: any[]) => sessions.map((s) => ({
+            app_session_id: s.appSessionId,
+            nonce: Number(s.nonce ?? 0),
+            participants: s.participants.map((p: any) => p.walletAddress),
+            protocol: '',
+            quorum: s.quorum,
+            status: s.isClosed ? 'closed' : 'open',
+            version: Number(s.version ?? 0),
+            weights: s.participants.map((p: any) => p.signatureWeight),
+            allocations: s.allocations?.map((a: any) => {
+                const info = this.assetsBySymbol.get(a.asset?.toLowerCase?.() ?? '');
+                const dec = info?.decimals ?? 6;
+                const rawAmount = a.amount
+                    ? a.amount.mul(new Decimal(10).pow(dec)).toFixed(0)
+                    : '0';
+                return {
+                    participant: a.participant as Address,
+                    asset: a.asset,
+                    amount: rawAmount,
+                };
+            }) ?? [],
+            sessionData: s.sessionData ?? '',
+        }));
+
+        const participant = (wallet ?? this.userAddress).toLowerCase() as Address;
+        const normalizedStatus = status?.toLowerCase();
+        const effectiveStatus = normalizedStatus && normalizedStatus !== 'any'
+            ? normalizedStatus
+            : undefined;
+        const request = effectiveStatus
+            ? { wallet: participant, status: effectiveStatus }
+            : { wallet: participant };
+
         try {
-            const { sessions } = await this.innerClient.getAppSessions({
-                wallet: wallet ?? this.userAddress,
-                status: status ?? undefined,
+            console.info('[compat] getAppSessionsList request', {
+                participant,
+                status: effectiveStatus ?? 'any',
+                rawStatus: status ?? null,
             });
-            return sessions.map((s) => ({
-                app_session_id: s.appSessionId,
-                nonce: Number(s.nonce ?? 0),
-                participants: s.participants.map((p) => p.walletAddress),
-                protocol: '',
-                quorum: s.quorum,
-                status: s.isClosed ? 'closed' : 'open',
-                version: Number(s.version ?? 0),
-                weights: s.participants.map((p) => p.signatureWeight),
-                allocations: s.allocations?.map((a) => {
-                    const info = this.assetsBySymbol.get(a.asset?.toLowerCase?.() ?? '');
-                    const dec = info?.decimals ?? 6;
-                    const rawAmount = a.amount
-                        ? a.amount.mul(new Decimal(10).pow(dec)).toFixed(0)
-                        : '0';
-                    return {
-                        participant: a.participant as Address,
-                        asset: a.asset,
-                        amount: rawAmount,
-                    };
-                }) ?? [],
-                sessionData: s.sessionData ?? '',
-            }));
+            const { sessions } = await this.innerClient.getAppSessions(request);
+            console.info(`[compat] getAppSessionsList success count=${sessions.length}`);
+            this._lastAppSessionsListError = null;
+            return mapSessions(sessions);
         } catch (err) {
-            console.warn('[compat] getAppSessionsList failed, returning empty:', (err as Error).message);
+            if (effectiveStatus) {
+                try {
+                    console.warn(
+                        `[compat] getAppSessionsList retrying without status filter participant=${participant} status=${effectiveStatus}`,
+                    );
+                    const { sessions } = await this.innerClient.getAppSessions({ wallet: participant });
+                    const mapped = mapSessions(sessions);
+                    const filtered = mapped.filter((session) => session.status === effectiveStatus);
+                    console.info(
+                        `[compat] getAppSessionsList success count=${filtered.length} (fallback without status)`,
+                    );
+                    this._lastAppSessionsListError = null;
+                    return filtered;
+                } catch {
+                    // fall through to the original failure handling
+                }
+            }
+
+            const message = err instanceof Error ? err.message : String(err);
+            this._lastAppSessionsListError = message;
+            if (this._lastAppSessionsListErrorLogged !== message) {
+                console.warn(
+                    `[compat] getAppSessionsList failed participant=${participant} status=${effectiveStatus ?? 'any'} error=${message}`,
+                );
+                this._lastAppSessionsListErrorLogged = message;
+            }
             return [];
         }
+    }
+
+    getLastAppSessionsListError(): string | null {
+        return this._lastAppSessionsListError;
     }
 
     async getAssetsList(): Promise<ClearNodeAsset[]> {
@@ -562,15 +641,50 @@ export class NitroliteClient {
     }
 
     // -----------------------------------------------------------------------
+    // Session key operations
+    // -----------------------------------------------------------------------
+
+    async signChannelSessionKeyState(state: ChannelSessionKeyStateV1): Promise<Hex> {
+        return this.innerClient.signChannelSessionKeyState(state);
+    }
+
+    async submitChannelSessionKeyState(state: ChannelSessionKeyStateV1): Promise<void> {
+        await this.innerClient.submitChannelSessionKeyState(state);
+    }
+
+    async getLastChannelKeyStates(
+        userAddress: string,
+        sessionKey?: string,
+    ): Promise<ChannelSessionKeyStateV1[]> {
+        return this.innerClient.getLastChannelKeyStates(userAddress, sessionKey);
+    }
+
+    async signSessionKeyState(state: AppSessionKeyStateV1): Promise<Hex> {
+        return this.innerClient.signSessionKeyState(state);
+    }
+
+    async submitSessionKeyState(state: AppSessionKeyStateV1): Promise<void> {
+        await this.innerClient.submitSessionKeyState(state);
+    }
+
+    async getLastKeyStates(userAddress: string, sessionKey?: string): Promise<AppSessionKeyStateV1[]> {
+        return this.innerClient.getLastKeyStates(userAddress, sessionKey);
+    }
+
+    // -----------------------------------------------------------------------
     // App session operations
     // -----------------------------------------------------------------------
 
     async createAppSession(
         definitionOrParams: RPCAppDefinition | CreateAppSessionRequestParams,
         allocations?: RPCAppSessionAllocation[],
+        quorumSigs?: string[],
     ): Promise<{ appSessionId: string; version: string; status: string }> {
         const def = 'definition' in definitionOrParams ? definitionOrParams.definition : definitionOrParams;
         const allocs = 'definition' in definitionOrParams ? definitionOrParams.allocations : (allocations ?? []);
+        const quorumSignatures = 'definition' in definitionOrParams
+            ? (definitionOrParams.quorum_sigs ?? [])
+            : (quorumSigs ?? []);
         const sessionData = 'definition' in definitionOrParams
             ? (definitionOrParams.session_data ?? JSON.stringify({ allocations: allocs }))
             : JSON.stringify({ allocations: allocs });
@@ -585,20 +699,37 @@ export class NitroliteClient {
             nonce: BigInt(def.nonce ?? Date.now()),
         };
 
-        const result = await this.innerClient.createAppSession(v1Def, sessionData, []);
+        const result = await this.innerClient.createAppSession(v1Def, sessionData, quorumSignatures);
         return { appSessionId: result.appSessionId, version: result.version, status: result.status };
     }
 
     async closeAppSession(
-        appSessionId: string,
-        _allocations: RPCAppSessionAllocation[],
+        appSessionIdOrParams: string | CloseAppSessionRequestParams,
+        allocations?: RPCAppSessionAllocation[],
+        quorumSigs: string[] = [],
     ): Promise<{ appSessionId: string }> {
+        const appSessionId = typeof appSessionIdOrParams === 'string'
+            ? appSessionIdOrParams
+            : appSessionIdOrParams.app_session_id;
+        const closeAllocations = typeof appSessionIdOrParams === 'string'
+            ? (allocations ?? [])
+            : appSessionIdOrParams.allocations;
+        const closeVersion = typeof appSessionIdOrParams === 'string'
+            ? undefined
+            : appSessionIdOrParams.version;
+        const closeSessionData = typeof appSessionIdOrParams === 'string'
+            ? undefined
+            : appSessionIdOrParams.session_data;
+        const closeQuorumSignatures = typeof appSessionIdOrParams === 'string'
+            ? quorumSigs
+            : (appSessionIdOrParams.quorum_sigs ?? quorumSigs);
+
         const { sessions } = await this.innerClient.getAppSessions({ appSessionId });
         if (sessions.length === 0) throw new Error(`App session ${appSessionId} not found`);
 
         const session = sessions[0];
         const v1Allocations: AppAllocationV1[] = [];
-        for (const a of _allocations) {
+        for (const a of closeAllocations) {
             const decimals = await this.getDecimalsForAsset(a.asset);
             const humanAmount = new Decimal(a.amount).div(new Decimal(10).pow(decimals));
             v1Allocations.push({
@@ -610,13 +741,13 @@ export class NitroliteClient {
 
         const appUpdate = {
             appSessionId,
-            intent: 3, // Close
-            version: session.version + 1n,
+            intent: NitroliteClient.INTENT_MAP['close'],
+            version: closeVersion !== undefined ? BigInt(closeVersion) : session.version + 1n,
             allocations: v1Allocations,
-            sessionData: '',
+            sessionData: closeSessionData ?? '',
         };
 
-        await this.innerClient.submitAppState(appUpdate, []);
+        await this.innerClient.submitAppState(appUpdate, closeQuorumSignatures);
         return { appSessionId };
     }
 
@@ -645,6 +776,13 @@ export class NitroliteClient {
         const isV04 = 'intent' in params;
         const intentStr = isV04 ? (params as SubmitAppStateRequestParamsV04).intent : RPCAppStateIntent.Operate;
         const intentNum = NitroliteClient.INTENT_MAP[intentStr] ?? 0;
+        console.info('[compat] submitAppState request', {
+            appSessionId: params.app_session_id,
+            intent: intentStr,
+            allocationCount: params.allocations.length,
+            hasQuorumSigs: (params.quorum_sigs?.length ?? 0) > 0,
+            quorumSigCount: params.quorum_sigs?.length ?? 0,
+        });
 
         const { sessions } = await this.innerClient.getAppSessions({ appSessionId: params.app_session_id });
         if (sessions.length === 0) throw new Error(`App session ${params.app_session_id} not found`);
@@ -673,7 +811,94 @@ export class NitroliteClient {
             sessionData: params.session_data ?? '',
         };
 
-        await this.innerClient.submitAppState(appUpdate, []);
+        if (intentStr === RPCAppStateIntent.Deposit) {
+            const userAddress = this.userAddress.toLowerCase();
+            const currentByParticipantAndAsset = new Map<string, Decimal>();
+            for (const allocation of session.allocations ?? []) {
+                currentByParticipantAndAsset.set(
+                    `${allocation.participant.toLowerCase()}::${allocation.asset.toLowerCase()}`,
+                    allocation.amount,
+                );
+            }
+
+            type PositiveDelta = { participant: string; asset: string; amount: Decimal };
+            const positiveDeltas: PositiveDelta[] = [];
+            const negativeDeltas: PositiveDelta[] = [];
+
+            const nextByParticipantAndAsset = new Map<string, PositiveDelta>();
+            for (const allocation of v1Allocations) {
+                const key = `${allocation.participant.toLowerCase()}::${allocation.asset.toLowerCase()}`;
+                nextByParticipantAndAsset.set(key, {
+                    participant: allocation.participant.toLowerCase(),
+                    asset: allocation.asset,
+                    amount: allocation.amount,
+                });
+            }
+
+            const allKeys = new Set<string>([
+                ...currentByParticipantAndAsset.keys(),
+                ...nextByParticipantAndAsset.keys(),
+            ]);
+
+            for (const key of allKeys) {
+                const currentAmount = currentByParticipantAndAsset.get(key) ?? new Decimal(0);
+                const nextAllocation = nextByParticipantAndAsset.get(key);
+                const nextAmount = nextAllocation?.amount ?? new Decimal(0);
+                const [participant, asset] = key.split('::');
+                const delta = nextAmount.minus(currentAmount);
+                if (delta.greaterThan(0)) {
+                    positiveDeltas.push({
+                        participant,
+                        asset: nextAllocation?.asset ?? asset,
+                        amount: delta,
+                    });
+                } else if (delta.lessThan(0)) {
+                    negativeDeltas.push({
+                        participant,
+                        asset: nextAllocation?.asset ?? asset,
+                        amount: delta,
+                    });
+                }
+            }
+
+            if (positiveDeltas.length === 0) {
+                throw new Error('Deposit intent requires at least one positive allocation delta');
+            }
+            if (positiveDeltas.length > 1) {
+                throw new Error('Deposit intent currently supports exactly one deposited asset delta');
+            }
+            if (negativeDeltas.length > 0) {
+                throw new Error('Deposit intent cannot decrease existing app-session allocations');
+            }
+
+            const [delta] = positiveDeltas;
+            if (delta.participant !== userAddress) {
+                throw new Error(
+                    `Deposit must be submitted by depositor ${delta.participant}; connected wallet is ${userAddress}`,
+                );
+            }
+            console.info('[compat] submitAppState deposit delta', {
+                appSessionId: params.app_session_id,
+                depositor: delta.participant,
+                asset: delta.asset,
+                amount: delta.amount.toString(),
+                negativeDeltaCount: negativeDeltas.length,
+            });
+
+            await this.innerClient.submitAppSessionDeposit(
+                appUpdate,
+                params.quorum_sigs ?? [],
+                delta.asset,
+                delta.amount,
+            );
+        } else {
+            await this.innerClient.submitAppState(appUpdate, params.quorum_sigs ?? []);
+        }
+        console.info('[compat] submitAppState success', {
+            appSessionId: params.app_session_id,
+            intent: intentStr,
+            version: Number(version),
+        });
         return {
             appSessionId: params.app_session_id,
             version: Number(version),

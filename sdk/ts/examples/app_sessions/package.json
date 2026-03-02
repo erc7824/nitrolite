@@ -1,5 +1,5 @@
 {
-  "name": "@nitrolite/example-app-sessions",
+  "name": "@yellow-org/example-app-sessions",
   "version": "1.0.0",
   "description": "Nitrolite SDK App Sessions Lifecycle Example",
   "type": "module",
@@ -7,7 +7,7 @@
     "lifecycle": "tsx lifecycle.ts"
   },
   "dependencies": {
-    "@nitrolite/sdk": "file:../..",
+    "@yellow-org/sdk": "file:../..",
     "decimal.js": "^10.4.3",
     "viem": "^2.21.54"
   },

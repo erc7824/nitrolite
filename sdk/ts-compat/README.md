@@ -1,19 +1,11 @@
 # Nitrolite Compat SDK
 
-[![License](https://img.shields.io/npm/l/@erc7824/nitrolite.svg)](https://github.com/erc7824/nitrolite/blob/main/LICENSE)
+[![License](https://img.shields.io/npm/l/@yellow-org/sdk-compat.svg)](https://github.com/erc7824/nitrolite/blob/main/LICENSE)
 
 Compatibility layer that bridges the Nitrolite SDK **v0.5.3 API** to the **v1.0.0 runtime**, letting existing dApps upgrade to the new protocol with minimal code changes.
 
-```text
-┌─────────────────────┐
-│    Your dApp code    │  ← unchanged v0.5.3 imports
-├─────────────────────┤
-│  @erc7824/nitrolite  │
-│       -compat        │  ← this package (translation layer)
-├─────────────────────┤
-│  @erc7824/nitrolite  │  ← v1.0.0 SDK (actual runtime)
-└─────────────────────┘
-```
+- Keep v0.5.3-style app-facing calls in your code.
+- Run them through `@yellow-org/sdk-compat`, backed by `@yellow-org/sdk`.
 
 ## Why
 
@@ -23,7 +15,7 @@ The compat layer centralises this complexity into **~1,000 lines** that absorb t
 
 ## Build Size
 
-Measured on **February 24, 2026** from `sdk/ts-compat` using:
+Measured on **February 24, 2026** from the package directory using:
 
 ```bash
 npm run build:prod
@@ -49,20 +41,9 @@ Step-by-step guides for migrating from v0.5.3:
 ## Installation
 
 ```bash
-npm install @erc7824/nitrolite-compat
+npm install @yellow-org/sdk-compat
 # peer dependencies
-npm install @erc7824/nitrolite viem
-```
-
-Or with a local `file:` reference (monorepo):
-
-```json
-{
-  "dependencies": {
-    "@erc7824/nitrolite-compat": "file:../sdk/ts-compat",
-    "@erc7824/nitrolite": "file:../sdk/ts"
-  }
-}
+npm install @yellow-org/sdk viem
 ```
 
 ## Quick Start
@@ -72,7 +53,7 @@ Or with a local `file:` reference (monorepo):
 Replace `new Client(ws, signer)` with `NitroliteClient.create()`:
 
 ```typescript
-import { NitroliteClient, WalletStateSigner, blockchainRPCsFromEnv } from '@erc7824/nitrolite-compat';
+import { NitroliteClient, blockchainRPCsFromEnv } from '@yellow-org/sdk-compat';
 
 const client = await NitroliteClient.create({
   wsURL: 'wss://clearnode.example.com/ws',
@@ -143,6 +124,7 @@ await client.close();
 | `getAccountInfo()` | Aggregate balance + channel count |
 | `getConfig()` | Node configuration |
 | `getChannelData(channelId)` | Full channel + state for a specific channel |
+| `getLastAppSessionsListError()` | Last `getAppSessionsList()` error message (if any) |
 
 ### App Sessions
 
@@ -160,6 +142,18 @@ await client.close();
 | `packCreateAppSessionHash(params)` | Deterministic hash for `createAppSession` quorum signing |
 | `packSubmitAppStateHash(params)` | Deterministic hash for `submitAppState` quorum signing |
 | `toWalletQuorumSignature(signature)` | Prefixes wallet signature to compat app-session quorum format |
+| `toSessionKeyQuorumSignature(signature)` | Prefixes app-session key signature (`0xa2`) to compat quorum format |
+
+### Session Key Operations
+
+| Method | Description |
+|---|---|
+| `signChannelSessionKeyState(state)` | Sign a channel session-key state payload |
+| `submitChannelSessionKeyState(state)` | Register/submit a channel session-key state |
+| `getLastChannelKeyStates(userAddress, sessionKey?)` | Fetch channel session-key states for wallet/key |
+| `signSessionKeyState(state)` | Sign an app-session key state payload |
+| `submitSessionKeyState(state)` | Register/submit an app-session key state |
+| `getLastKeyStates(userAddress, sessionKey?)` | Fetch app-session key states for wallet/key |
 
 ### Transfers
 
@@ -206,6 +200,12 @@ interface NitroliteClientConfig {
   walletClient: WalletClient;              // viem WalletClient with account
   chainId: number;                         // Chain ID (e.g. 11155111 for Sepolia)
   blockchainRPCs?: Record<number, string>; // Optional chain ID → RPC URL map
+  channelSessionKeySigner?: {
+    sessionKeyPrivateKey: Hex;
+    walletAddress: Address;
+    metadataHash: Hex;
+    authSig: Hex;
+  };
   addresses?: ContractAddresses;           // Deprecated — ignored, addresses come from get_config
   challengeDuration?: bigint;              // Deprecated — ignored
 }
@@ -226,7 +226,7 @@ NEXT_PUBLIC_BLOCKCHAIN_RPCS=11155111:https://rpc.sepolia.io,1:https://mainnet.in
 A v0.5.3-compatible signer class that wraps a `WalletClient`. Actual state signing in v1.0.0 is handled internally by `ChannelDefaultSigner`; this class exists so existing store types compile:
 
 ```typescript
-import { WalletStateSigner } from '@erc7824/nitrolite-compat';
+import { WalletStateSigner } from '@yellow-org/sdk-compat';
 
 const signer = new WalletStateSigner(walletClient);
 ```
@@ -236,7 +236,7 @@ const signer = new WalletStateSigner(walletClient);
 Creates a `MessageSigner` function from a private key, compatible with the v0.5.3 signing pattern:
 
 ```typescript
-import { createECDSAMessageSigner } from '@erc7824/nitrolite-compat';
+import { createECDSAMessageSigner } from '@yellow-org/sdk-compat';
 
 const sign = createECDSAMessageSigner(privateKey);
 const signature = await sign(payload);
@@ -259,7 +259,7 @@ The compat layer provides typed error classes for common failure modes:
 Returns a human-friendly string suitable for UI display:
 
 ```typescript
-import { getUserFacingMessage, AllowanceError } from '@erc7824/nitrolite-compat';
+import { getUserFacingMessage, AllowanceError } from '@yellow-org/sdk-compat';
 
 try {
   await client.deposit(token, amount);
@@ -289,7 +289,7 @@ try {
 v0.5.3 used server-push WebSocket events. v1.0.0 uses a polling model. The `EventPoller` bridges this gap:
 
 ```typescript
-import { EventPoller } from '@erc7824/nitrolite-compat';
+import { EventPoller } from '@yellow-org/sdk-compat';
 
 const poller = new EventPoller(client, {
   onChannelUpdate: (channels) => updateUI(channels),
@@ -307,7 +307,9 @@ poller.setInterval(10000); // change interval
 
 ## RPC Stubs
 
-The following functions exist so that any remaining v0.5.3 `create*Message` / `parse*Response` imports compile. They are intentionally **no-ops** — prefer calling `NitroliteClient` methods directly:
+The following functions exist so that any remaining v0.5.3 `create*Message` / `parse*Response` imports compile.
+`create*` helpers are mostly placeholders; `parse*` helpers perform lightweight normalization of known response shapes.
+Prefer calling `NitroliteClient` methods directly for new integrations:
 
 ```typescript
 // These compile but do nothing meaningful:
@@ -324,20 +326,20 @@ convertRPCToClientChannel, convertRPCToClientState,
 parseAnyRPCResponse, NitroliteRPC
 ```
 
-## Auth Stubs
+## Auth Helpers
 
-v1.0.0 handles authentication internally — there is no public auth API. These stubs allow existing auth code to compile while doing nothing at runtime:
+Compat exports auth helpers for apps still using the v0.5.3 auth request/verify flow:
 
 ```typescript
-createAuthRequestMessage(params)            // → no-op JSON string
-createAuthVerifyMessage(signer, response)   // → no-op JSON string
-createAuthVerifyMessageWithJWT(jwt)         // → no-op JSON string
-createEIP712AuthMessageSigner(wallet, ...)  // → returns () => '0x'
+createAuthRequestMessage(params)            // builds auth_request RPC message
+createAuthVerifyMessage(signer, response)   // signs and builds auth_verify RPC message
+createAuthVerifyMessageWithJWT(jwt)         // builds JWT-based auth_verify RPC message
+createEIP712AuthMessageSigner(wallet, ...)  // creates EIP-712 signer for auth_verify challenge
 ```
 
 ## Types Reference
 
-All types previously imported from `@erc7824/nitrolite` (v0.5.3) are re-exported:
+All legacy compat types are re-exported from `@yellow-org/sdk-compat`:
 
 ### Enums
 
@@ -367,7 +369,7 @@ All types previously imported from `@erc7824/nitrolite` (v0.5.3) are re-exported
 
 ### App Session Types
 
-- `RPCAppDefinition` — `{ protocol, participants, weights, quorum, challenge, nonce }`
+- `RPCAppDefinition` — `{ application, protocol, participants, weights, quorum, challenge, nonce }`
 - `RPCAppSessionAllocation` — `{ participant, asset, amount }`
 - `CloseAppSessionRequestParams`
 
@@ -379,7 +381,7 @@ All types previously imported from `@erc7824/nitrolite` (v0.5.3) are re-exported
 
 ### Clearnode Response Types
 
-- `AccountInfo` — `{ available: bigint, channelCount: bigint }`
+- `AccountInfo` — `{ balances: LedgerBalance[], channelCount: bigint }`
 - `LedgerChannel` — Full ledger channel record (id, participant, status, token, amount, chain_id, etc.)
 - `LedgerBalance` — `{ asset, amount }`
 - `LedgerEntry` — Ledger entry with credit/debit
@@ -393,7 +395,7 @@ All types previously imported from `@erc7824/nitrolite` (v0.5.3) are re-exported
 Converts a `CompatClientConfig` into v1.0.0 `Option[]` values passed to `Client.create()`. Useful if you need to customise the underlying SDK client beyond what `NitroliteClient.create()` exposes:
 
 ```typescript
-import { buildClientOptions, type CompatClientConfig } from '@erc7824/nitrolite-compat';
+import { buildClientOptions, type CompatClientConfig } from '@yellow-org/sdk-compat';
 
 const opts = buildClientOptions({
   wsURL: 'wss://clearnode.example.com/ws',
@@ -409,23 +411,17 @@ When using the compat package in a Next.js app with Turbopack:
 
 ```typescript
 const nextConfig = {
-  transpilePackages: ['@erc7824/nitrolite', '@erc7824/nitrolite-compat'],
+  transpilePackages: ['@yellow-org/sdk', '@yellow-org/sdk-compat'],
 };
 ```
 
-2. **Use `--install-links`** when installing `file:` dependencies to avoid symlink issues:
-
-```bash
-npm install --install-links
-```
-
-3. The package declares `"sideEffects": false` in its `package.json`, enabling tree-shaking of unused exports.
+2. The package declares `"sideEffects": false` in its `package.json`, enabling tree-shaking of unused exports.
 
 ## Peer Dependencies
 
 | Package | Version |
 |---|---|
-| `@erc7824/nitrolite` | `>=0.5.3` |
+| `@yellow-org/sdk` | `>=1.0.0` |
 | `viem` | `^2.0.0` |
 
 ## License

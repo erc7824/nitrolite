@@ -1,4 +1,4 @@
-import { Client } from '@erc7824/nitrolite';
+import { Client } from '@yellow-org/sdk';
 
 export interface SessionKeyState {
   privateKey: string;   // hex private key

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Decimal from 'decimal.js';
 import { Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react';
-import type { Client } from '@erc7824/nitrolite';
+import type { Client } from '@yellow-org/sdk';
 import type { StatusMessage } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';

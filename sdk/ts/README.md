@@ -1,14 +1,15 @@
-# Clearnode TypeScript SDK
+# Yellow TypeScript SDK
 
-[![npm version](https://img.shields.io/npm/v/@erc7824/nitrolite.svg)](https://www.npmjs.com/package/@erc7824/nitrolite)
-[![License](https://img.shields.io/npm/l/@erc7824/nitrolite.svg)](https://github.com/erc7824/nitrolite/blob/main/LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-website-blue)](https://erc7824.org/quick_start)
+[![npm version](https://img.shields.io/npm/v/@yellow-org/sdk.svg)](https://www.npmjs.com/package/@yellow-org/sdk)
+[![License](https://img.shields.io/npm/l/@yellow-org/sdk.svg)](https://github.com/erc7824/nitrolite/blob/main/LICENSE)
 
 TypeScript SDK for Clearnode payment channels providing both high-level and low-level operations in a unified client:
 - **State Operations**: `deposit()`, `withdraw()`, `transfer()`, `closeHomeChannel()`, `acknowledge()` - build and co-sign states off-chain
 - **Blockchain Settlement**: `checkpoint()` - the single entry point for all on-chain transactions
 - **Low-Level Operations**: Direct RPC access for custom flows and advanced use cases
 - **Full Feature Parity**: 100% compatibility with Go SDK functionality
+
+> If you are migrating from `@erc7824/nitrolite@v0.5.3`, please consider using the [@yellow-org/sdk-compat](https://www.npmjs.com/package/@yellow-org/sdk-compat) package. It is a translation layer that uses this SDK underneath and maps the familiar v0.5.3 API surfaces to this SDK.
 
 ## Method Cheat Sheet
 
@@ -87,11 +88,11 @@ client.setHomeBlockchain(asset, chainId)    // Set default blockchain for asset
 ## Installation
 
 ```bash
-npm install @erc7824/nitrolite
+npm install @yellow-org/sdk
 # or
-yarn add @erc7824/nitrolite
+yarn add @yellow-org/sdk
 # or
-pnpm add @erc7824/nitrolite
+pnpm add @yellow-org/sdk
 ```
 
 ## Quick Start
@@ -99,7 +100,7 @@ pnpm add @erc7824/nitrolite
 ### Unified Client (High-Level + Low-Level)
 
 ```typescript
-import { Client, createSigners, withBlockchainRPC } from '@erc7824/nitrolite';
+import { Client, createSigners, withBlockchainRPC } from '@yellow-org/sdk';
 import Decimal from 'decimal.js';
 
 async function main() {
@@ -159,7 +160,7 @@ sdk/ts/src/
 ### Creating a Client
 
 ```typescript
-import { Client, createSigners, withBlockchainRPC } from '@erc7824/nitrolite';
+import { Client, createSigners, withBlockchainRPC } from '@yellow-org/sdk';
 
 // Step 1: Create signers from private key
 const { stateSigner, txSigner } = createSigners('0x1234...');
@@ -188,7 +189,7 @@ The SDK provides two signer types matching the Go SDK patterns:
 Signs channel state updates with EIP-191 "Ethereum Signed Message" prefix.
 
 ```typescript
-import { EthereumMsgSigner } from '@erc7824/nitrolite';
+import { EthereumMsgSigner } from '@yellow-org/sdk';
 import { privateKeyToAccount } from 'viem/accounts';
 
 // From private key
@@ -206,7 +207,7 @@ const signer2 = new EthereumMsgSigner(account);
 Signs raw hashes directly without prefix for on-chain operations.
 
 ```typescript
-import { EthereumRawSigner } from '@erc7824/nitrolite';
+import { EthereumRawSigner } from '@yellow-org/sdk';
 
 const signer = new EthereumRawSigner('0x...');
 ```
@@ -216,7 +217,7 @@ const signer = new EthereumRawSigner('0x...');
 #### Helper: createSigners()
 
 ```typescript
-import { createSigners } from '@erc7824/nitrolite';
+import { createSigners } from '@yellow-org/sdk';
 
 // Creates both signers at once
 const { stateSigner, txSigner } = createSigners('0x...');
@@ -591,7 +592,7 @@ import {
   withHandshakeTimeout,
   withPingInterval,
   withErrorHandler
-} from '@erc7824/nitrolite';
+} from '@yellow-org/sdk';
 
 const client = await Client.create(
   wsURL,
@@ -609,7 +610,7 @@ const client = await Client.create(
 ### Example 1: Basic Deposit and Transfer
 
 ```typescript
-import { Client, createSigners, withBlockchainRPC } from '@erc7824/nitrolite';
+import { Client, createSigners, withBlockchainRPC } from '@yellow-org/sdk';
 import Decimal from 'decimal.js';
 
 async function basicExample() {
@@ -658,7 +659,7 @@ basicExample().catch(console.error);
 ### Example 2: Multi-Chain Operations
 
 ```typescript
-import { Client, createSigners, withBlockchainRPC } from '@erc7824/nitrolite';
+import { Client, createSigners, withBlockchainRPC } from '@yellow-org/sdk';
 import Decimal from 'decimal.js';
 
 async function multiChainExample() {
@@ -698,7 +699,7 @@ multiChainExample().catch(console.error);
 ### Example 3: Transaction History with Pagination
 
 ```typescript
-import { Client, createSigners } from '@erc7824/nitrolite';
+import { Client, createSigners } from '@yellow-org/sdk';
 
 async function queryTransactions() {
   const { stateSigner, txSigner } = createSigners(process.env.PRIVATE_KEY!);
@@ -734,7 +735,7 @@ queryTransactions().catch(console.error);
 ### Example 4: App Session Workflow
 
 ```typescript
-import { Client, createSigners, withBlockchainRPC } from '@erc7824/nitrolite';
+import { Client, createSigners, withBlockchainRPC } from '@yellow-org/sdk';
 import Decimal from 'decimal.js';
 
 async function appSessionExample() {
@@ -802,7 +803,7 @@ appSessionExample().catch(console.error);
 ### Example 5: Connection Monitoring
 
 ```typescript
-import { Client, createSigners, withErrorHandler, withPingInterval } from '@erc7824/nitrolite';
+import { Client, createSigners, withErrorHandler, withPingInterval } from '@yellow-org/sdk';
 
 async function monitorConnection() {
   const { stateSigner, txSigner } = createSigners(process.env.PRIVATE_KEY!);
@@ -852,7 +853,7 @@ import type {
   AppSessionKeyStateV1,
   ChannelSessionKeyStateV1,
   PaginationMetadata,
-} from '@erc7824/nitrolite';
+} from '@yellow-org/sdk';
 ```
 
 ### BigInt for Chain IDs
@@ -968,31 +969,15 @@ For understanding how operations work under the hood:
 - **Running Clearnode instance** or access to public node
 - **Blockchain RPC endpoint** (for on-chain operations via `checkpoint()`)
 
-## Documentation
-
-For complete documentation, visit [https://erc7824.org](https://erc7824.org)
-
-### Documentation Links
-
-- [Quick Start Guide](https://erc7824.org/quick_start)
-- [Channel Creation](https://erc7824.org/quick_start/initializing_channel)
-- [ClearNode Connection](https://erc7824.org/quick_start/connect_to_the_clearnode)
-- [Application Sessions](https://erc7824.org/quick_start/application_session)
-- [Session Closure](https://erc7824.org/quick_start/close_session)
-
-## Build with AI
-
-We have generated a [llms-full.txt](https://erc7824.org/llms-full.txt) file that converts all our documentation into a single markdown document following the [llmstxt.org](https://llmstxt.org/) standard.
-
 ## License
 
 Part of the Nitrolite project. See [LICENSE](../../LICENSE) for details.
 
 ## Related Projects
 
-- [Nitrolite Go SDK](../go/README.md) - Go implementation with same API
-- [ERC-7824 Specification](https://eips.ethereum.org/EIPS/eip-7824) - Standard specification
-- [Nitrolite Smart Contracts](../../contract/) - On-chain contracts
+- [Nitrolite TS Compat](https://www.npmjs.com/package/@yellow-org/sdk-compat) - Compatibility layer for older TypeScript versions
+- [Nitrolite Go SDK](https://github.com/erc7824/nitrolite/tree/stable/sdk/go) - Go implementation with same API
+- [Nitrolite Smart Contracts](https://github.com/erc7824/nitrolite/tree/stable/contracts) - On-chain contracts
 
 ---
 

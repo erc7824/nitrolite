@@ -870,7 +870,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         address user,
         address node,
         uint256 approvedSignatureValidators
-    ) internal view {
+    ) internal {
         (ISignatureValidator userValidator, bytes calldata userSigData) =
             _extractValidator(state.userSig, node, approvedSignatureValidators);
         _validateSignature(channelId, state, userSigData, user, userValidator);
@@ -893,7 +893,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         bytes calldata sigData,
         address participant,
         ISignatureValidator validator
-    ) internal view {
+    ) internal {
         bytes memory signingData = Utils.toSigningData(state);
         ValidationResult result = validator.validateSignature(channelId, signingData, sigData, participant);
         require(ValidationResult.unwrap(result) != ValidationResult.unwrap(VALIDATION_FAILURE), IncorrectSignature());
@@ -945,7 +945,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         address user,
         address node,
         ParticipantIndex challengerIdx
-    ) internal view {
+    ) internal {
         bytes memory signingData = Utils.toSigningData(state);
         bytes memory challengerSigningData = abi.encodePacked(signingData, "challenge");
         address challenger = challengerIdx == ParticipantIndex.USER ? user : node;

@@ -24,6 +24,7 @@ ValidationResult constant VALIDATION_SUCCESS = ValidationResult.wrap(1);
 interface ISignatureValidator {
     /**
      * @notice Validates a participant's signature
+     * @dev Some validators (e.g., SmartWalletValidator with ERC-6492) may modify state by deploying contracts
      * @param channelId The channel identifier to be included in the signed message
      * @param signingData The encoded state data (without channelId or signatures)
      * @param signature The signature to validate
@@ -35,5 +36,5 @@ interface ISignatureValidator {
         bytes calldata signingData,
         bytes calldata signature,
         address participant
-    ) external view returns (ValidationResult);
+    ) external returns (ValidationResult);
 }

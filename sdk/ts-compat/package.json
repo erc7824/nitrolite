@@ -1,6 +1,6 @@
 {
     "name": "@erc7824/nitrolite-compat",
-    "version": "0.1.0",
+    "version": "1.1.0",
     "description": "Compatibility layer bridging Nitrolite SDK v0.5.3 API to v1.0.0, minimising migration effort for existing dApps.",
     "type": "module",
     "sideEffects": false,

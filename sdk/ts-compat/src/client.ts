@@ -825,20 +825,37 @@ export class NitroliteClient {
             const positiveDeltas: PositiveDelta[] = [];
             const negativeDeltas: PositiveDelta[] = [];
 
+            const nextByParticipantAndAsset = new Map<string, PositiveDelta>();
             for (const allocation of v1Allocations) {
                 const key = `${allocation.participant.toLowerCase()}::${allocation.asset.toLowerCase()}`;
+                nextByParticipantAndAsset.set(key, {
+                    participant: allocation.participant.toLowerCase(),
+                    asset: allocation.asset,
+                    amount: allocation.amount,
+                });
+            }
+
+            const allKeys = new Set<string>([
+                ...currentByParticipantAndAsset.keys(),
+                ...nextByParticipantAndAsset.keys(),
+            ]);
+
+            for (const key of allKeys) {
                 const currentAmount = currentByParticipantAndAsset.get(key) ?? new Decimal(0);
-                const delta = allocation.amount.minus(currentAmount);
+                const nextAllocation = nextByParticipantAndAsset.get(key);
+                const nextAmount = nextAllocation?.amount ?? new Decimal(0);
+                const [participant, asset] = key.split('::');
+                const delta = nextAmount.minus(currentAmount);
                 if (delta.greaterThan(0)) {
                     positiveDeltas.push({
-                        participant: allocation.participant.toLowerCase(),
-                        asset: allocation.asset,
+                        participant,
+                        asset: nextAllocation?.asset ?? asset,
                         amount: delta,
                     });
                 } else if (delta.lessThan(0)) {
                     negativeDeltas.push({
-                        participant: allocation.participant.toLowerCase(),
-                        asset: allocation.asset,
+                        participant,
+                        asset: nextAllocation?.asset ?? asset,
                         amount: delta,
                     });
                 }

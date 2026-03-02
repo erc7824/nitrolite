@@ -33,9 +33,17 @@ export async function createAuthRequestMessage(
         requestId,
         timestamp,
     });
-    return JSON.stringify(request, (_, value) =>
-        typeof value === 'bigint' ? Number(value) : value,
-    );
+    return JSON.stringify(request, (key, value) => {
+        if (typeof value !== 'bigint') return value;
+        const asNumber = Number(value);
+        if (!Number.isSafeInteger(asNumber)) {
+            const fieldName = key || '<root>';
+            throw new Error(
+                `Auth request bigint field "${fieldName}" exceeds Number.MAX_SAFE_INTEGER: ${value.toString()}`,
+            );
+        }
+        return asNumber;
+    });
 }
 
 export async function createAuthVerifyMessage(

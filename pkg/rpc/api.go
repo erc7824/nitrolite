@@ -311,7 +311,7 @@ type AppsV1GetAppsResponse struct {
 // AppsV1SubmitAppVersionRequest submits a new application version (currently only creation is supported).
 type AppsV1SubmitAppVersionRequest struct {
 	// App contains the application definition
-	App AppInfoV1 `json:"app"`
+	App AppV1 `json:"app"`
 	// OwnerSig is the owner's signature over the packed app data
 	OwnerSig string `json:"owner_sig"`
 }

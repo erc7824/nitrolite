@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -29,36 +28,12 @@ type AppInfoV1 struct {
 	UpdatedAt time.Time
 }
 
-// GetAppOwnerFunc is a function that returns the owner wallet for a given app ID.
-type GetAppOwnerFunc func(appID string) (ownerWallet string, err error)
-
-// AppOwnerValidator validates that a wallet is the owner of an application.
-type AppOwnerValidator struct {
-	getOwner GetAppOwnerFunc
-}
-
-// NewAppOwnerValidator creates a new AppOwnerValidator with the provided lookup function.
-func NewAppOwnerValidator(getOwner GetAppOwnerFunc) *AppOwnerValidator {
-	return &AppOwnerValidator{getOwner: getOwner}
-}
-
-// ValidateOwner checks that the given wallet is the owner of the specified app.
-// Returns an error if the app is not found or the wallet does not match.
-func (v *AppOwnerValidator) ValidateOwner(appID, wallet string) error {
-	owner, err := v.getOwner(appID)
-	if err != nil {
-		return fmt.Errorf("failed to get app owner: %w", err)
-	}
-
-	if !strings.EqualFold(owner, wallet) {
-		return fmt.Errorf("wallet %s is not the owner of app %s", wallet, appID)
-	}
-
-	return nil
-}
-
 // PackAppV1 packs the AppV1 for signing using ABI encoding.
 func PackAppV1(app AppV1) ([]byte, error) {
+	if !common.IsHexAddress(app.OwnerWallet) {
+		return nil, fmt.Errorf("invalid owner wallet address: %s", app.OwnerWallet)
+	}
+
 	args := abi.Arguments{
 		{Type: abi.Type{T: abi.StringTy}},               // id
 		{Type: abi.Type{T: abi.AddressTy}},              // ownerWallet
@@ -67,7 +42,7 @@ func PackAppV1(app AppV1) ([]byte, error) {
 		{Type: abi.Type{T: abi.BoolTy}},                 // creationApprovalNotRequired
 	}
 
-	appMetadataHash := common.HexToHash(app.Metadata)
+	appMetadataHash := crypto.Keccak256Hash([]byte(app.Metadata))
 
 	packed, err := args.Pack(
 		app.ID,

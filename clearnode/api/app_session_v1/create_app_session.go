@@ -117,7 +117,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 			return rpc.Errorf("application %s is not registered", appDef.Application)
 		}
 
-		if registeredApp.App.CreationApprovalNotRequired == false {
+		if !registeredApp.App.CreationApprovalNotRequired {
 			if reqPayload.OwnerSig == "" {
 				return rpc.Errorf("owner_sig is required for this application")
 			}
@@ -125,6 +125,9 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 			sigBytes, err := hexutil.Decode(reqPayload.OwnerSig)
 			if err != nil {
 				return rpc.Errorf("failed to decode signature: %v", err)
+			}
+			if len(sigBytes) == 0 {
+				return rpc.Errorf("empty owner_sig after decode")
 			}
 
 			sigType := app.AppSessionSignerTypeV1(sigBytes[0])

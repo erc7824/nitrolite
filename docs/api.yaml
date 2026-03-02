@@ -415,8 +415,27 @@ types:
           type: string
           description: User's signature over the session key metadata to authorize the registration/update of the session key
 
+  - app:
+      description: Application definition
+      fields:
+        - name: id
+          type: string
+          description: Application identifier
+        - name: owner_wallet
+          type: string
+          description: Owner's wallet address
+        - name: metadata
+          type: string
+          description: Application metadata (bytes32 hash)
+        - name: version
+          type: string
+          description: Current version of the application
+        - name: creation_approval_not_required
+          type: boolean
+          description: Whether app sessions can be created without owner approval
+
   - app_info:
-      description: Information about a registered application
+      description: Full application info
       fields:
         - name: id
           type: string
@@ -798,7 +817,6 @@ api:
                   description: Participant signatures for the app session creation
                   items:
                     type: string
-                  optional: true
                 - field_name: owner_sig
                   type: string
                   description: Owner signature for app session creation, required when the application's creation_approval_not_required is false
@@ -890,7 +908,7 @@ api:
               description: Register a new application in the app registry. Currently only version 1 (creation) is supported. The owner must sign the packed app data to prove ownership.
               request:
                 - field_name: app
-                  type: app_info
+                  type: app
                   description: Application definition including ID, owner wallet, metadata, version, and creation approval flag
                 - field_name: owner_sig
                   type: string

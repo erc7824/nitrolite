@@ -8,8 +8,9 @@ type Handler struct {
 }
 
 // NewHandler creates a new Handler instance with the provided dependencies.
-func NewHandler(store Store) *Handler {
+func NewHandler(store Store, maxAppMetadataLen int) *Handler {
 	return &Handler{
-		store: store,
+		store:             store,
+		maxAppMetadataLen: maxAppMetadataLen,
 	}
 }

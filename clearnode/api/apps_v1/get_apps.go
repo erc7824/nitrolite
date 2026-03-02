@@ -49,11 +49,15 @@ func (h *Handler) GetApps(c *rpc.Context) {
 
 func mapAppInfoV1(info app.AppInfoV1) rpc.AppInfoV1 {
 	return rpc.AppInfoV1{
-		ID:                          info.App.ID,
-		OwnerWallet:                 info.App.OwnerWallet,
-		Metadata:                    info.App.Metadata,
-		Version:                     strconv.FormatUint(info.App.Version, 10),
-		CreationApprovalNotRequired: info.App.CreationApprovalNotRequired,
+		AppV1: rpc.AppV1{
+			ID:                          info.App.ID,
+			OwnerWallet:                 info.App.OwnerWallet,
+			Metadata:                    info.App.Metadata,
+			Version:                     strconv.FormatUint(info.App.Version, 10),
+			CreationApprovalNotRequired: info.App.CreationApprovalNotRequired,
+		},
+		CreatedAt: strconv.FormatInt(info.CreatedAt.Unix(), 10),
+		UpdatedAt: strconv.FormatInt(info.UpdatedAt.Unix(), 10),
 	}
 }
 

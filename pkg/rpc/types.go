@@ -224,8 +224,8 @@ type AppSessionKeyStateV1 struct {
 // App Registry Types
 // ============================================================================
 
-// AppInfoV1 represents information about a registered application.
-type AppInfoV1 struct {
+// AppV1 represents a registered application definition (without timestamps).
+type AppV1 struct {
 	// ID is the application identifier
 	ID string `json:"id"`
 	// OwnerWallet is the owner's wallet address
@@ -236,6 +236,11 @@ type AppInfoV1 struct {
 	Version string `json:"version"`
 	// CreationApprovalNotRequired indicates if sessions can be created without approval
 	CreationApprovalNotRequired bool `json:"creation_approval_not_required"`
+}
+
+// AppInfoV1 represents full application info including timestamps.
+type AppInfoV1 struct {
+	AppV1
 	// CreatedAt is the creation timestamp (unix seconds)
 	CreatedAt string `json:"created_at"`
 	// UpdatedAt is the last update timestamp (unix seconds)

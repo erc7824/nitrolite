@@ -40,9 +40,7 @@ func testOwnerWallet(t *testing.T, appEntry app.AppV1) (address string, sig stri
 }
 
 func newHandlerWithDefaults(store Store) *Handler {
-	h := NewHandler(store)
-	h.maxAppMetadataLen = 4096
-	return h
+	return NewHandler(store, 4096)
 }
 
 func TestSubmitAppVersion_Success(t *testing.T) {
@@ -65,7 +63,7 @@ func TestSubmitAppVersion_Success(t *testing.T) {
 	handler := newHandlerWithDefaults(mockStore)
 
 	reqPayload := rpc.AppsV1SubmitAppVersionRequest{
-		App: rpc.AppInfoV1{
+		App: rpc.AppV1{
 			ID:          "test-app",
 			OwnerWallet: addr,
 			Metadata:    "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -93,7 +91,7 @@ func TestSubmitAppVersion_MissingOwnerWallet(t *testing.T) {
 	handler := newHandlerWithDefaults(mockStore)
 
 	reqPayload := rpc.AppsV1SubmitAppVersionRequest{
-		App: rpc.AppInfoV1{
+		App: rpc.AppV1{
 			ID:       "test-app",
 			Metadata: "0x00",
 			Version:  "1",
@@ -122,7 +120,7 @@ func TestSubmitAppVersion_MissingOwnerSig(t *testing.T) {
 	handler := newHandlerWithDefaults(mockStore)
 
 	reqPayload := rpc.AppsV1SubmitAppVersionRequest{
-		App: rpc.AppInfoV1{
+		App: rpc.AppV1{
 			ID:          "test-app",
 			OwnerWallet: "0x1111111111111111111111111111111111111111",
 			Metadata:    "0x00",
@@ -151,7 +149,7 @@ func TestSubmitAppVersion_InvalidAppID(t *testing.T) {
 	handler := newHandlerWithDefaults(mockStore)
 
 	reqPayload := rpc.AppsV1SubmitAppVersionRequest{
-		App: rpc.AppInfoV1{
+		App: rpc.AppV1{
 			ID:          "INVALID_APP!!", // doesn't match regex
 			OwnerWallet: "0x1111111111111111111111111111111111111111",
 			Metadata:    "0x00",
@@ -181,7 +179,7 @@ func TestSubmitAppVersion_InvalidVersion(t *testing.T) {
 	handler := newHandlerWithDefaults(mockStore)
 
 	reqPayload := rpc.AppsV1SubmitAppVersionRequest{
-		App: rpc.AppInfoV1{
+		App: rpc.AppV1{
 			ID:          "test-app",
 			OwnerWallet: "0x1111111111111111111111111111111111111111",
 			Metadata:    "0x00",
@@ -211,7 +209,7 @@ func TestSubmitAppVersion_InvalidSignature(t *testing.T) {
 	handler := newHandlerWithDefaults(mockStore)
 
 	reqPayload := rpc.AppsV1SubmitAppVersionRequest{
-		App: rpc.AppInfoV1{
+		App: rpc.AppV1{
 			ID:          "test-app",
 			OwnerWallet: "0x1111111111111111111111111111111111111111",
 			Metadata:    "0x0000000000000000000000000000000000000000000000000000000000000000",

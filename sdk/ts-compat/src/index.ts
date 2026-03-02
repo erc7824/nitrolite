@@ -25,6 +25,7 @@ export {
     packCreateAppSessionHash,
     packSubmitAppStateHash,
     toWalletQuorumSignature,
+    toSessionKeyQuorumSignature,
     type CreateAppSessionHashParticipant,
     type CreateAppSessionHashParams,
     type SubmitAppStateHashAllocation,

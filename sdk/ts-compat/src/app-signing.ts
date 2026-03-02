@@ -3,6 +3,7 @@ import { Address, Hex, concatHex, encodeAbiParameters, keccak256 } from 'viem';
 import { RPCAppStateIntent } from './types';
 
 const WALLET_QUORUM_PREFIX = '0xa1' as Hex;
+const SESSION_KEY_QUORUM_PREFIX = '0xa2' as Hex;
 const RAW_WALLET_SIGNATURE_LENGTH = 132; // 0x + 65-byte signature
 const WRAPPED_WALLET_SIGNATURE_LENGTH = 134; // 0x + 1-byte prefix + 65-byte signature
 
@@ -139,4 +140,27 @@ export function toWalletQuorumSignature(signature: Hex | string): Hex {
     }
 
     return concatHex([WALLET_QUORUM_PREFIX, normalized as Hex]);
+}
+
+/**
+ * Prefixes an app-session key EIP-191 signature for quorum_sigs consumption by app sessions.
+ */
+export function toSessionKeyQuorumSignature(signature: Hex | string): Hex {
+    const normalized = signature.toLowerCase();
+    if (!normalized.startsWith('0x')) {
+        throw new Error('Signature must be a hex string with 0x prefix');
+    }
+
+    if (
+        normalized.startsWith(SESSION_KEY_QUORUM_PREFIX) &&
+        normalized.length === WRAPPED_WALLET_SIGNATURE_LENGTH
+    ) {
+        return normalized as Hex;
+    }
+
+    if (normalized.length !== RAW_WALLET_SIGNATURE_LENGTH) {
+        throw new Error('Expected a 65-byte session key signature (0x + 130 hex chars)');
+    }
+
+    return concatHex([SESSION_KEY_QUORUM_PREFIX, normalized as Hex]);
 }

@@ -1,6 +1,7 @@
 import {
     Client,
     ChannelDefaultSigner,
+    ChannelSessionKeyStateSigner,
     type StateSigner,
     type TransactionSigner,
 } from '@erc7824/nitrolite';
@@ -8,6 +9,8 @@ import type {
     AppDefinitionV1,
     AppParticipantV1,
     AppAllocationV1,
+    AppSessionKeyStateV1,
+    ChannelSessionKeyStateV1,
 } from '@erc7824/nitrolite';
 import Decimal from 'decimal.js';
 import { Address, Hex, WalletClient, formatUnits, parseUnits } from 'viem';
@@ -35,7 +38,12 @@ import type {
 import { RPCAppStateIntent } from './types';
 
 import { buildClientOptions, type CompatClientConfig } from './config';
-import { AllowanceError, InsufficientFundsError, NotInitializedError, UserRejectedError } from './errors';
+import {
+    AllowanceError,
+    InsufficientFundsError,
+    NotInitializedError,
+    UserRejectedError,
+} from './errors';
 
 // ---------------------------------------------------------------------------
 // WalletClient-based signers for browser (MetaMask) environments
@@ -103,6 +111,12 @@ export interface NitroliteClientConfig {
     walletClient: WalletClient;
     chainId: number;
     blockchainRPCs?: Record<number, string>;
+    channelSessionKeySigner?: {
+        sessionKeyPrivateKey: Hex;
+        walletAddress: Address;
+        metadataHash: Hex;
+        authSig: Hex;
+    };
     /** @deprecated v0.5.3 compat -- ignored, addresses come from get_config */
     addresses?: ContractAddresses;
     /** @deprecated v0.5.3 compat -- ignored */
@@ -132,7 +146,28 @@ export class NitroliteClient {
     // -----------------------------------------------------------------------
 
     static async create(config: NitroliteClientConfig): Promise<NitroliteClient> {
-        const stateSigner = new ChannelDefaultSigner(new WalletMsgSigner(config.walletClient));
+        const walletAddress = config.walletClient.account?.address;
+        if (!walletAddress) throw new Error('WalletClient must have an account');
+
+        let stateSigner: StateSigner;
+        if (config.channelSessionKeySigner) {
+            const signerWallet = config.channelSessionKeySigner.walletAddress;
+            if (signerWallet.toLowerCase() !== walletAddress.toLowerCase()) {
+                throw new Error(
+                    `channelSessionKeySigner wallet ${signerWallet} does not match walletClient account ${walletAddress}`,
+                );
+            }
+
+            stateSigner = new ChannelSessionKeyStateSigner(
+                config.channelSessionKeySigner.sessionKeyPrivateKey,
+                signerWallet,
+                config.channelSessionKeySigner.metadataHash,
+                config.channelSessionKeySigner.authSig,
+            );
+        } else {
+            stateSigner = new ChannelDefaultSigner(new WalletMsgSigner(config.walletClient));
+        }
+
         const txSigner = new WalletTxSigner(config.walletClient);
 
         const opts = buildClientOptions({
@@ -142,10 +177,7 @@ export class NitroliteClient {
 
         const v1Client = await Client.create(config.wsURL, stateSigner, txSigner, ...opts);
 
-        const address = config.walletClient.account?.address;
-        if (!address) throw new Error('WalletClient must have an account');
-
-        const compat = new NitroliteClient(v1Client, address, config.chainId);
+        const compat = new NitroliteClient(v1Client, walletAddress, config.chainId);
 
         try {
             await compat.refreshAssets();
@@ -606,6 +638,37 @@ export class NitroliteClient {
 
     async getConfig(): Promise<any> {
         return this.innerClient.getConfig();
+    }
+
+    // -----------------------------------------------------------------------
+    // Session key operations
+    // -----------------------------------------------------------------------
+
+    async signChannelSessionKeyState(state: ChannelSessionKeyStateV1): Promise<Hex> {
+        return this.innerClient.signChannelSessionKeyState(state);
+    }
+
+    async submitChannelSessionKeyState(state: ChannelSessionKeyStateV1): Promise<void> {
+        await this.innerClient.submitChannelSessionKeyState(state);
+    }
+
+    async getLastChannelKeyStates(
+        userAddress: string,
+        sessionKey?: string,
+    ): Promise<ChannelSessionKeyStateV1[]> {
+        return this.innerClient.getLastChannelKeyStates(userAddress, sessionKey);
+    }
+
+    async signSessionKeyState(state: AppSessionKeyStateV1): Promise<Hex> {
+        return this.innerClient.signSessionKeyState(state);
+    }
+
+    async submitSessionKeyState(state: AppSessionKeyStateV1): Promise<void> {
+        await this.innerClient.submitSessionKeyState(state);
+    }
+
+    async getLastKeyStates(userAddress: string, sessionKey?: string): Promise<AppSessionKeyStateV1[]> {
+        return this.innerClient.getLastKeyStates(userAddress, sessionKey);
     }
 
     // -----------------------------------------------------------------------

@@ -961,7 +961,7 @@ contract ChannelHubTest_Challenge_HomeChain_HomeMigration is ChannelHubTest_Chal
             ChannelStatus.MIGRATED_OUT,
             finalizeMigrationVersion,
             0,
-            "Challenge resolved - clearDispute sets status to MIGRATED_OUT"
+            "finalizeMigration should resolve the challenge"
         );
     }
 

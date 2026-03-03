@@ -573,12 +573,260 @@ contract ChannelHubTest_Challenge_HomeChain_EscrowWithdrawal is ChannelHubTest_C
 
 contract ChannelHubTest_Challenge_HomeChain_HomeMigration is ChannelHubTest_Challenge_Base {
     /*
-    - a channel in earlier state can be challenged with initiated migration state (→ common challenge flow)
-    - a channel challenged with "InitiateMigration" state can be checkpointed calling "finalizeMigration" (-> MigratedOut)
+    Test cases:
+    - a channel in Operate status can be challenged with initiated migration state
+    - a channel challenged with "InitiateMigration" state can be checkpointed calling "finalizeMigration" (-> MigratedOut status)
     - a channel challenged with "InitiateMigration" state can be resolved with "operation" state
-    - a channel in initiated migration state can be challenged with it
-    - a channel in initiated migration state can be challenged with a newer Operation state
+        (although this should not happen in practice since the node should finalize migration instead of resolving with an older state, but just to be safe)
+    - a channel in Migrating_in status (empty channel after being called with `initiateMigration`) can be challenged with it
+    - a channel in Migrating_in status (empty channel after being called with `initiateMigration`) can be challenged with a newer Operation state
     - a channel can NOT be challenged when in MIGRATED_OUT status
     - a channel can NOT be challenged in Operating status with finalize migration state
     */
+
+    uint64 initiateMigrationVersion = 1;
+    State initiateMigrationState;
+    uint64 finalizeMigrationVersion = 2;
+    State finalizeMigrationState;
+    uint64 operateAfterMigrationInitVersion = 2;
+    State operateAfterMigrationInitState;
+
+    // New channel for testing NEW home chain behavior
+    ChannelDefinition newHomeDef;
+    bytes32 newHomeChannelId;
+    State newHomeInitiateMigrationState;
+    uint64 newHomeOperateVersion = 3;
+    State newHomeOperateState;
+
+    function setUp() public override {
+        super.setUp();
+        createChannelWithDeposit();
+
+        // INITIATE_MIGRATION state:
+        initiateMigrationState = nextState(
+            initState,
+            StateIntent.INITIATE_MIGRATION,
+            [uint256(700), uint256(0)],
+            [int256(1000), int256(-300)],
+            NON_HOME_CHAIN_ID,
+            NON_HOME_TOKEN,
+            [uint256(0), uint256(700)], // Node locks user allocation on new home
+            [int256(0), int256(700)]
+        );
+        initiateMigrationState = mutualSignStateBothWithEcdsaValidator(initiateMigrationState, channelId, ALICE_PK);
+
+        // FINALIZE_MIGRATION state: Allocations zero out on old home, user receives allocation on new home
+        finalizeMigrationState = nextState(
+            initiateMigrationState,
+            StateIntent.FINALIZE_MIGRATION,
+            [uint256(0), uint256(0)], // Old home: allocations zero out
+            [int256(1000), int256(-1000)], // Old home: net flows balance
+            NON_HOME_CHAIN_ID,
+            NON_HOME_TOKEN,
+            [uint256(700), uint256(0)], // New home: user receives allocation
+            [int256(0), int256(700)]
+        );
+        // Swap home and non-home states as per migration protocol
+        Ledger memory temp = finalizeMigrationState.homeLedger;
+        finalizeMigrationState.homeLedger = finalizeMigrationState.nonHomeLedger;
+        finalizeMigrationState.nonHomeLedger = temp;
+        finalizeMigrationState = mutualSignStateBothWithEcdsaValidator(finalizeMigrationState, channelId, ALICE_PK);
+
+        // OPERATE state after migration initiation (for resolving challenge)
+        operateAfterMigrationInitState = nextState(
+            initiateMigrationState,
+            StateIntent.OPERATE,
+            [uint256(650), uint256(0)],
+            [int256(1000), int256(-350)]
+        );
+        operateAfterMigrationInitState = mutualSignStateBothWithEcdsaValidator(operateAfterMigrationInitState, channelId, ALICE_PK);
+
+        // Setup for NEW home chain tests (migration IN)
+        // Create a new channel definition with different nonce
+        newHomeDef = ChannelDefinition({
+            challengeDuration: CHALLENGE_DURATION,
+            user: alice,
+            node: node,
+            nonce: uint64(42), // Different nonce to create a new channel
+            approvedSignatureValidators: DEFAULT_SIG_VALIDATOR_ID,
+            metadata: bytes32(0)
+        });
+        newHomeChannelId = Utils.getChannelId(newHomeDef, cHub.VERSION());
+
+        // INITIATE_MIGRATION state for NEW home chain (migration IN)
+        // homeLedger = OLD home chain (NON_HOME_CHAIN_ID)
+        // nonHomeLedger = NEW home chain (current chain)
+        newHomeInitiateMigrationState = State({
+            version: initiateMigrationVersion,
+            intent: StateIntent.INITIATE_MIGRATION,
+            metadata: bytes32(0),
+            homeLedger: Ledger({
+                chainId: NON_HOME_CHAIN_ID,
+                token: NON_HOME_TOKEN,
+                decimals: 18,
+                userAllocation: 500,
+                userNetFlow: 500,
+                nodeAllocation: 0,
+                nodeNetFlow: 0
+            }),
+            nonHomeLedger: Ledger({
+                chainId: uint64(block.chainid),
+                token: address(token),
+                decimals: 18,
+                userAllocation: 0,
+                userNetFlow: 0,
+                nodeAllocation: 500, // Node locks user allocation on new home
+                nodeNetFlow: 500
+            }),
+            userSig: "",
+            nodeSig: ""
+        });
+        newHomeInitiateMigrationState = mutualSignStateBothWithEcdsaValidator(newHomeInitiateMigrationState, newHomeChannelId, ALICE_PK);
+
+        // OPERATE state on NEW home chain after migration
+        // After initiateMigration on NEW home, ledgers are swapped, so homeLedger becomes current chain
+        // OPERATE requires userNfDelta == 0, so userNetFlow must stay 0
+        newHomeOperateState = State({
+            version: newHomeOperateVersion,
+            intent: StateIntent.OPERATE,
+            metadata: bytes32(0),
+            homeLedger: Ledger({
+                chainId: uint64(block.chainid),
+                token: address(token),
+                decimals: 18,
+                userAllocation: 450,
+                userNetFlow: 0,
+                nodeAllocation: 0,
+                nodeNetFlow: 450
+            }),
+            nonHomeLedger: Ledger({
+                chainId: 0,
+                token: address(0),
+                decimals: 0,
+                userAllocation: 0,
+                userNetFlow: 0,
+                nodeAllocation: 0,
+                nodeNetFlow: 0
+            }),
+            userSig: "",
+            nodeSig: ""
+        });
+        newHomeOperateState = mutualSignStateBothWithEcdsaValidator(newHomeOperateState, newHomeChannelId, ALICE_PK);
+    }
+
+    function test_challenge_initiateMigration_fromOperating() public {
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateMigrationState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initiateMigrationState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify channel is DISPUTED and initiateMigrationState was enforced
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, initiateMigrationVersion, block.timestamp + CHALLENGE_DURATION, "InitiateMigrationState should be enforced");
+        verifyChannelState(channelId, [uint256(700), uint256(0)], [int256(1000), int256(-300)], "InitiateMigrationState should be enforced");
+    }
+
+    function test_challenge_initiateMigration_resolve_withFinalizeMigration() public {
+        // Challenge with INITIATE_MIGRATION
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateMigrationState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initiateMigrationState, challengerSig, ParticipantIndex.NODE);
+
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, initiateMigrationVersion, block.timestamp + CHALLENGE_DURATION, "Channel should be DISPUTED");
+
+        // Resolve challenge with FINALIZE_MIGRATION (before timeout)
+        vm.prank(alice);
+        cHub.finalizeMigration(channelId, finalizeMigrationState);
+
+        // Verify channel is MIGRATED_OUT and initiateMigrationState was enforced
+        verifyChannelData(channelId, ChannelStatus.MIGRATED_OUT, finalizeMigrationVersion, 0, "Challenge resolved - clearDispute sets status to MIGRATED_OUT");
+    }
+
+    function test_challenge_initiateMigration_resolve_withOperate() public {
+        // Challenge with INITIATE_MIGRATION
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateMigrationState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initiateMigrationState, challengerSig, ParticipantIndex.NODE);
+
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, initiateMigrationVersion, block.timestamp + CHALLENGE_DURATION, "Channel should be DISPUTED");
+
+        // Resolve challenge with newer OPERATE state (before timeout)
+        // This is technically possible but shouldn't happen in practice as participants should NOT sign OPERATE state as direct successor of INITIATE_MIGRATION
+        vm.prank(alice);
+        cHub.checkpointChannel(channelId, operateAfterMigrationInitState);
+
+        // Verify channel is back to OPERATING
+        verifyChannelData(channelId, ChannelStatus.OPERATING, operateAfterMigrationInitVersion, 0, "Challenge should be resolved");
+        verifyChannelState(channelId, [uint256(650), uint256(0)], [int256(1000), int256(-350)], "operateAfterMigrationInitState should be enforced");
+    }
+
+    function test_challenge_newHomeChain_withInitiateMigration_asExisting() public {
+        // Initiate migration IN on NEW home chain
+        vm.prank(alice);
+        cHub.initiateMigration(newHomeDef, newHomeInitiateMigrationState);
+
+        // Verify channel is in MIGRATING_IN status
+        verifyChannelData(newHomeChannelId, ChannelStatus.MIGRATING_IN, initiateMigrationVersion, 0, "newHomeInitiateMigrationState should be enforced");
+
+        // Challenge with the same INITIATE_MIGRATION state (already enforced)
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(newHomeChannelId, newHomeInitiateMigrationState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(newHomeChannelId, newHomeInitiateMigrationState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify channel is DISPUTED and state is still version 0
+        verifyChannelData(newHomeChannelId, ChannelStatus.DISPUTED, initiateMigrationVersion, block.timestamp + CHALLENGE_DURATION, "initiateMigrationVersion should remain enforced");
+    }
+
+    function test_challenge_newHomeChain_withOperate_inMigratingIn() public {
+        // Initiate migration IN on NEW home chain
+        vm.prank(alice);
+        cHub.initiateMigration(newHomeDef, newHomeInitiateMigrationState);
+
+        // Verify channel is in MIGRATING_IN status
+        verifyChannelData(newHomeChannelId, ChannelStatus.MIGRATING_IN, initiateMigrationVersion, 0, "newHomeInitiateMigrationState should be enforced");
+
+        // Challenge with newer OPERATE state
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(newHomeChannelId, newHomeOperateState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(newHomeChannelId, newHomeOperateState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify channel is DISPUTED and newHomeOperateState was enforced
+        verifyChannelData(newHomeChannelId, ChannelStatus.DISPUTED, newHomeOperateVersion, block.timestamp + CHALLENGE_DURATION, "newHomeOperateState should start a challenge");
+        verifyChannelState(newHomeChannelId, [uint256(450), uint256(0)], [int256(0), int256(450)], "newHomeOperateState should be enforced");
+    }
+
+    function test_revert_challenge_migratedOut() public {
+        // First initiate migration
+        vm.prank(alice);
+        cHub.initiateMigration(def, initiateMigrationState);
+
+        // Then finalize migration to put channel in MIGRATED_OUT status
+        vm.prank(alice);
+        cHub.finalizeMigration(channelId, finalizeMigrationState);
+
+        // Verify channel is in MIGRATED_OUT status
+        verifyChannelData(channelId, ChannelStatus.MIGRATED_OUT, finalizeMigrationVersion, 0, "Channel should be MIGRATED_OUT");
+
+        // Try to challenge channel in MIGRATED_OUT status (should fail)
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, finalizeMigrationState, NODE_PK);
+
+        vm.prank(node);
+        vm.expectRevert(ChannelHub.IncorrectChannelStatus.selector);
+        cHub.challengeChannel(channelId, finalizeMigrationState, challengerSig, ParticipantIndex.NODE);
+    }
+
+    function test_revert_challenge_operating_withFinalizeMigration() public {
+        // Channel is in OPERATING status
+        // Try to challenge with FINALIZE_MIGRATION without INITIATE_MIGRATION first (should fail)
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, finalizeMigrationState, NODE_PK);
+
+        vm.prank(node);
+        // NOTE: IncorrectHomeChainId check happens before IncorrectPreviousStateIntent check
+        // finalizeMigrationState has swapped ledgers, so homeLedger.chainId != block.chainid
+        vm.expectRevert(ChannelEngine.IncorrectHomeChainId.selector);
+        cHub.challengeChannel(channelId, finalizeMigrationState, challengerSig, ParticipantIndex.NODE);
+    }
 }

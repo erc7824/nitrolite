@@ -10,7 +10,7 @@ import Decimal from 'decimal.js';
 import * as core from './core';
 import * as app from './app';
 import * as API from './rpc/api';
-import { StateV1, ChannelDefinitionV1, ChannelSessionKeyStateV1 } from './rpc/types';
+import { StateV1, ChannelDefinitionV1, ChannelSessionKeyStateV1, AppV1, AppInfoV1 } from './rpc/types';
 import { RPCClient } from './rpc/client';
 import { WebsocketDialer } from './rpc/dialer';
 import { ClientAssetStore } from './asset_store';
@@ -1403,6 +1403,77 @@ export class Client {
 
     const resp = await this.rpcClient.appSessionsV1RebalanceAppSessions(req);
     return resp.batch_id;
+  }
+
+  // ============================================================================
+  // App Registry Methods
+  // ============================================================================
+
+  /**
+   * GetApps retrieves registered applications with optional filtering.
+   *
+   * @param options - Optional filters (appId, ownerWallet, pagination)
+   * @returns Array of registered apps and pagination metadata
+   *
+   * @example
+   * ```typescript
+   * const { apps, metadata } = await client.getApps({ ownerWallet: '0x1234...' });
+   * for (const app of apps) {
+   *   console.log(`${app.id}: owned by ${app.owner_wallet}`);
+   * }
+   * ```
+   */
+  async getApps(options?: {
+    appId?: string;
+    ownerWallet?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ apps: AppInfoV1[]; metadata: core.PaginationMetadata }> {
+    const req: API.AppsV1GetAppsRequest = {
+      app_id: options?.appId,
+      owner_wallet: options?.ownerWallet,
+      pagination: options?.page && options?.pageSize ? {
+        offset: (options.page - 1) * options.pageSize,
+        limit: options.pageSize,
+      } : undefined,
+    };
+    const resp = await this.rpcClient.appsV1GetApps(req);
+    return {
+      apps: resp.apps,
+      metadata: transformPaginationMetadata(resp.metadata),
+    };
+  }
+
+  /**
+   * RegisterApp registers a new application in the app registry.
+   * Currently only version 1 (creation) is supported.
+   *
+   * The method packs the app definition and signs it with the client's key.
+   * Session key signers are not allowed to perform this action; the main
+   * wallet signer must be used.
+   *
+   * @param appDef - The application definition
+   *
+   * @example
+   * ```typescript
+   * await client.registerApp({
+   *   id: 'my-app',
+   *   owner_wallet: '0x1234...',
+   *   metadata: '{"name": "My App"}',
+   *   version: '1',
+   *   creation_approval_not_required: false,
+   * });
+   * ```
+   */
+  async registerApp(appDef: AppV1): Promise<void> {
+    const packed = app.packAppV1(appDef);
+    const ownerSig = await this.stateSigner.signMessage(packed);
+
+    const req: API.AppsV1SubmitAppVersionRequest = {
+      app: appDef,
+      owner_sig: ownerSig,
+    };
+    await this.rpcClient.appsV1SubmitAppVersion(req);
   }
 
   // ============================================================================

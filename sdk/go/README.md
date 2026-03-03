@@ -47,6 +47,12 @@ client.GetEscrowChannel(ctx, escrowChannelID)   // Escrow channel info
 client.GetLatestState(ctx, wallet, asset, onlySigned) // Latest state
 ```
 
+### App Registry
+```go
+client.GetApps(ctx, opts)                              // List registered apps
+client.RegisterApp(ctx, appDef)                        // Register new app
+```
+
 ### App Sessions
 ```go
 client.GetAppSessions(ctx, opts)                              // List sessions
@@ -137,6 +143,7 @@ sdk/go/
 ├── node.go           # Node information methods
 ├── user.go           # User query methods
 ├── channel.go        # Channel and state management
+├── app_registry.go   # App registry methods
 ├── app_session.go    # App session methods
 ├── asset_cache.go    # Asset lookup and caching
 ├── config.go         # Configuration options
@@ -350,6 +357,26 @@ state, err := client.GetLatestState(ctx, wallet, asset, onlySigned)
 ```
 
 **Note:** State submission and channel creation are handled internally by state operations (Deposit, Withdraw, Transfer). On-chain settlement is handled by Checkpoint.
+
+### App Registry
+
+```go
+// List registered applications with optional filtering
+apps, meta, err := client.GetApps(ctx, &sdk.GetAppsOptions{
+    AppID:       &appID,
+    OwnerWallet: &wallet,
+})
+
+// Register a new application
+appDef := app.AppV1{
+    ID:                          "my-app",
+    OwnerWallet:                 "0x1234...",
+    Metadata:                    `{"name": "My App"}`,
+    Version:                     1,
+    CreationApprovalNotRequired: false,
+}
+err := client.RegisterApp(ctx, appDef)
+```
 
 ### App Sessions (Low-Level)
 
@@ -585,6 +612,10 @@ core.Blockchain      // Blockchain info
 core.ChannelSessionKeyStateV1  // Channel session key state
 // Fields: UserAddress, SessionKey, Version (uint64), Assets []string,
 //         ExpiresAt (time.Time), UserSig string
+
+// App registry types
+app.AppV1                 // Application definition
+app.AppInfoV1             // Application info with timestamps
 
 // App session types
 app.AppSessionInfoV1      // Session info

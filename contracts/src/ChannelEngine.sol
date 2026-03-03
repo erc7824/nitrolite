@@ -319,16 +319,17 @@ library ChannelEngine {
                 || ctx.status == ChannelStatus.MIGRATING_IN,
             IncorrectChannelStatus()
         );
-        require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
-        // nothing changes from initiate escrow deposit state
-        require(userNfDelta == 0, IncorrectUserNetFlowDelta());
-        require(nodeNfDelta == 0, IncorrectNodeNetFlowDelta());
 
         // Check home - non-home state consistency
         require(ctx.prevState.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, IncorrectPreviousStateIntent());
         require(candidate.version == ctx.prevState.version + 1, IncorrectStateVersion());
         require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
         require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
+
+        require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
+        // nothing changes from initiate escrow deposit state
+        require(userNfDelta == 0, IncorrectUserNetFlowDelta());
+        require(nodeNfDelta == 0, IncorrectNodeNetFlowDelta());
 
         uint256 depositAmount = ctx.prevState.nonHomeLedger.userAllocation;
         require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), IncorrectUserNetFlow());

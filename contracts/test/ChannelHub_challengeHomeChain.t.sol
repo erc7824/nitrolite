@@ -13,8 +13,6 @@ import {
     ParticipantIndex,
     DEFAULT_SIG_VALIDATOR_ID
 } from "../src/interfaces/Types.sol";
-import {SessionKeyAuthorization} from "../src/sigValidators/SessionKeyValidator.sol";
-import {TestUtils, SESSION_KEY_VALIDATOR_ID} from "./TestUtils.sol";
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {ChannelEngine} from "../src/ChannelEngine.sol";
 

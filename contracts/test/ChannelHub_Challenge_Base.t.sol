@@ -9,8 +9,6 @@ import {
     ChannelDefinition,
     StateIntent,
     Ledger,
-    ChannelStatus,
-    ParticipantIndex,
     DEFAULT_SIG_VALIDATOR_ID
 } from "../src/interfaces/Types.sol";
 import {TestUtils} from "./TestUtils.sol";

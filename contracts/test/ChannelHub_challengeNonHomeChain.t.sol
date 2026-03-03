@@ -3,11 +3,6 @@ pragma solidity 0.8.30;
 
 import {ChannelHubTest_Base} from "./ChannelHub_Base.t.sol";
 
-import {Utils} from "../src/Utils.sol";
-import {State, ChannelDefinition, StateIntent, Ledger, ChannelStatus} from "../src/interfaces/Types.sol";
-import {SessionKeyAuthorization} from "../src/sigValidators/SessionKeyValidator.sol";
-import {TestUtils, SESSION_KEY_VALIDATOR_ID} from "./TestUtils.sol";
-
 contract ChannelHubTest_Challenge_NonHomeChain_EscrowDeposit is ChannelHubTest_Base {
     /*
     - escrow deposit can be challenged until `unlockAt` time has NOT passed

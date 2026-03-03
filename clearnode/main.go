@@ -31,9 +31,18 @@ func main() {
 	ctx := context.Background()
 
 	vl := bb.ValidationLimits
-	api.NewRPCRouter(bb.NodeVersion, bb.ChannelMinChallengeDuration,
-		bb.RpcNode, bb.StateSigner, bb.DbStore, bb.MemoryStore, bb.RuntimeMetrics, bb.Logger,
-		vl.MaxParticipants, vl.MaxSessionDataLen, vl.MaxAppMetadataLen, vl.MaxSignedUpdates, vl.MaxSessionKeyIDs)
+	rpcRouterCfg := api.RPCRouterConfig{
+		NodeVersion:               bb.NodeVersion,
+		MinChallenge:              bb.ChannelMinChallengeDuration,
+		MaxParticipants:           vl.MaxParticipants,
+		MaxSessionDataLen:         vl.MaxSessionDataLen,
+		MaxAppMetadataLen:         vl.MaxAppMetadataLen,
+		MaxRebalanceSignedUpdates: vl.MaxSignedUpdates,
+		MaxSessionKeyIDs:          vl.MaxSessionKeyIDs,
+		RateLimitPerSec:           bb.RateLimitPerSec,
+		RateLimitBurst:            bb.RateLimitBurst,
+	}
+	api.NewRPCRouter(rpcRouterCfg, bb.RpcNode, bb.StateSigner, bb.DbStore, bb.MemoryStore, bb.RuntimeMetrics, bb.Logger)
 
 	rpcListenAddr := ":7824"
 	rpcListenEndpoint := "/ws"

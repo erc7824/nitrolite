@@ -21,26 +21,44 @@ type RPCRouter struct {
 	Node           rpc.Node
 	lg             log.Logger
 	runtimeMetrics metrics.RuntimeMetricExporter
+
+	rateLimitPerSec float64
+	rateLimitBurst  float64
+}
+
+type RPCRouterConfig struct {
+	NodeVersion  string
+	MinChallenge uint32
+
+	MaxParticipants           int
+	MaxSessionDataLen         int
+	MaxAppMetadataLen         int
+	MaxRebalanceSignedUpdates int
+	MaxSessionKeyIDs          int
+
+	RateLimitPerSec float64
+	RateLimitBurst  float64
 }
 
 func NewRPCRouter(
-	nodeVersion string,
-	minChallenge uint32,
+	cfg RPCRouterConfig,
 	node rpc.Node,
 	signer sign.Signer,
 	dbStore database.DatabaseStore,
 	memoryStore memory.MemoryStore,
 	runtimeMetrics metrics.RuntimeMetricExporter,
 	logger log.Logger,
-	maxParticipants, maxSessionDataLen, maxAppMetadataLen, maxRebalanceSignedUpdates, maxSessionKeyIDs int,
 ) *RPCRouter {
 	r := &RPCRouter{
-		Node:           node,
-		lg:             logger.WithName("rpc-router"),
-		runtimeMetrics: runtimeMetrics,
+		Node:            node,
+		lg:              logger.WithName("rpc-router"),
+		runtimeMetrics:  runtimeMetrics,
+		rateLimitPerSec: cfg.RateLimitPerSec,
+		rateLimitBurst:  cfg.RateLimitBurst,
 	}
 
 	r.Node.Use(r.ObservabilityMiddleware)
+	r.Node.Use(r.RateLimitMiddleware)
 
 	// Transaction wrapper helpers for each store type.
 	// wrapWithMetrics executes fn inside a DB transaction with a metricStore wrapper,
@@ -73,11 +91,11 @@ func NewRPCRouter(
 		panic("failed to create channel wallet signer: " + err.Error())
 	}
 
-	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, nodeChannelSigner, stateAdvancer, statePacker, nodeAddress, minChallenge, runtimeMetrics, maxSessionKeyIDs)
+	channelV1Handler := channel_v1.NewHandler(useChannelV1StoreInTx, memoryStore, nodeChannelSigner, stateAdvancer, statePacker, nodeAddress, cfg.MinChallenge, runtimeMetrics, cfg.MaxSessionKeyIDs)
 	appSessionV1Handler := app_session_v1.NewHandler(useAppSessionV1StoreInTx, memoryStore, signer, stateAdvancer, statePacker, nodeAddress, runtimeMetrics,
-		maxParticipants, maxSessionDataLen, maxSessionKeyIDs, maxRebalanceSignedUpdates)
-	appsV1Handler := apps_v1.NewHandler(dbStore, maxAppMetadataLen)
-	nodeV1Handler := node_v1.NewHandler(memoryStore, nodeAddress, nodeVersion)
+		cfg.MaxParticipants, cfg.MaxSessionDataLen, cfg.MaxSessionKeyIDs, cfg.MaxRebalanceSignedUpdates)
+	appsV1Handler := apps_v1.NewHandler(dbStore, cfg.MaxAppMetadataLen)
+	nodeV1Handler := node_v1.NewHandler(memoryStore, nodeAddress, cfg.NodeVersion)
 	userV1Handler := user_v1.NewHandler(dbStore)
 
 	appSessionV1Group := r.Node.NewGroup(rpc.AppSessionsV1Group.String())
@@ -88,7 +106,7 @@ func NewRPCRouter(
 	appSessionV1Group.Handle(rpc.AppSessionsV1GetAppSessionsMethod.String(), appSessionV1Handler.GetAppSessions)
 	appSessionV1Group.Handle(rpc.AppSessionsV1SubmitSessionKeyStateMethod.String(), appSessionV1Handler.SubmitSessionKeyState)
 	appSessionV1Group.Handle(rpc.AppSessionsV1GetLastKeyStatesMethod.String(), appSessionV1Handler.GetLastKeyStates)
-	if maxRebalanceSignedUpdates >= 2 {
+	if cfg.MaxRebalanceSignedUpdates >= 2 {
 		appSessionV1Group.Handle(rpc.AppSessionsV1RebalanceAppSessionsMethod.String(), appSessionV1Handler.RebalanceAppSessions)
 	}
 

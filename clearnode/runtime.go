@@ -36,6 +36,8 @@ type Backbone struct {
 	ChannelMinChallengeDuration uint32
 	BlockchainRPCs              map[uint64]string
 	ValidationLimits            ValidationLimits
+	RateLimitPerSec             float64
+	RateLimitBurst              float64
 
 	DbStore        database.DatabaseStore
 	MemoryStore    memory.MemoryStore
@@ -66,6 +68,10 @@ type Config struct {
 	SignerKey                   string           `yaml:"signer_key" env:"CLEARNODE_SIGNER_KEY"`                                                             // required when signer_type=key
 	GCPKMSKeyName               string           `yaml:"gcp_kms_key_name" env:"CLEARNODE_GCP_KMS_KEY_NAME"`                                                 // required when signer_type=gcp-kms
 	ValidationLimits            ValidationLimits `yaml:"validation_limits"`
+	RateLimitPerSec             float64          `yaml:"rate_limit_per_sec" env:"CLEARNODE_RATE_LIMIT_PER_SEC" env-default:"10"`
+	RateLimitBurst              float64          `yaml:"rate_limit_burst" env:"CLEARNODE_RATE_LIMIT_BURST" env-default:"20"`
+	WsProcessBufferSize         int              `yaml:"ws_process_buffer_size" env:"CLEARNODE_WS_PROCESS_BUFFER_SIZE" env-default:"64"`
+	WsWriteBufferSize           int              `yaml:"ws_write_buffer_size" env:"CLEARNODE_WS_WRITE_BUFFER_SIZE" env-default:"64"`
 }
 
 // ValidationLimits defines configurable upper bounds for dynamic-length request fields.
@@ -190,8 +196,10 @@ func InitBackbone() *Backbone {
 	// ------------------------------------------------
 
 	rpcNode, err := rpc.NewWebsocketNode(rpc.WebsocketNodeConfig{
-		Logger:             logger,
-		ObserveConnections: runtimeMetrics.SetRPCConnections,
+		Logger:                  logger,
+		ObserveConnections:      runtimeMetrics.SetRPCConnections,
+		WsConnProcessBufferSize: conf.WsProcessBufferSize,
+		WsConnWriteBufferSize:   conf.WsWriteBufferSize,
 	})
 	if err != nil {
 		logger.Fatal("failed to initialize RPC node", "error", err)
@@ -233,6 +241,8 @@ func InitBackbone() *Backbone {
 		ChannelMinChallengeDuration: conf.ChannelMinChallengeDuration,
 		BlockchainRPCs:              blockchainRPCs,
 		ValidationLimits:            conf.ValidationLimits,
+		RateLimitPerSec:             conf.RateLimitPerSec,
+		RateLimitBurst:              conf.RateLimitBurst,
 
 		DbStore:        dbStore,
 		MemoryStore:    memoryStore,

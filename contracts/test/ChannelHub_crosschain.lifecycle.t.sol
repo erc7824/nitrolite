@@ -356,7 +356,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
-        cHub.finalizeEscrowDeposit(escrowId, state);
+        cHub.finalizeEscrowDeposit(bobChannelId, escrowId, state);
 
         // Verify user balance after deposit finalized has NOT changed
         assertEq(token.balanceOf(bob), INITIAL_BALANCE - 500, "User balance after escrow deposit finalized");
@@ -469,7 +469,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
-        cHub.finalizeEscrowDeposit(escrowId, state);
+        cHub.finalizeEscrowDeposit(bobChannelId, escrowId, state);
 
         // Verify user balance after deposit finalized has NOT changed
         assertEq(token14dec.balanceOf(bob), 990 * 1e14, "User balance after escrow deposit finalized");
@@ -560,7 +560,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
-        cHub.finalizeEscrowWithdrawal(escrowId, state);
+        cHub.finalizeEscrowWithdrawal(bobChannelId, escrowId, state);
 
         // Verify user balance after withdrawal (withdrew 750)
         uint256 bobBalanceAfter = token.balanceOf(bob);
@@ -660,7 +660,7 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         state = mutualSignStateBothWithEcdsaValidator(state, bobChannelId, BOB_PK);
 
         vm.prank(node);
-        cHub.finalizeEscrowWithdrawal(escrowId, state);
+        cHub.finalizeEscrowWithdrawal(bobChannelId, escrowId, state);
 
         // Verify user received the withdrawal
         uint256 bobBalanceAfter = token8dec.balanceOf(bob);

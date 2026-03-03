@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ChannelHubTest_Base} from "./ChannelHub_Base.t.sol";
+import {ChannelHubTest_Challenge_Base} from "./ChannelHub_Challenge_Base.t.sol";
 
 import {Utils} from "../src/Utils.sol";
 import {
@@ -18,77 +18,29 @@ import {TestUtils, SESSION_KEY_VALIDATOR_ID} from "./TestUtils.sol";
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {ChannelEngine} from "../src/ChannelEngine.sol";
 
-contract ChannelHubTest_Challenge_HomeChain_NormalOperation is ChannelHubTest_Base {
+
+/*
+ * @dev This file uses integration / blackbox testing through ChannelHub to verify
+ *    critical end-to-end challenge flows (signature validation, fund movements, storage updates, events).
+ *    Complex state machine logic and edge cases are tested exhaustively in dedicated engine unit tests
+ *    (ChannelEngine.t.sol, EscrowDepositEngine.t.sol, EscrowWithdrawalEngine.t.sol) for faster execution
+ *    and better isolation.
+ */
+contract ChannelHubTest_Challenge_HomeChain_NormalOperation is ChannelHubTest_Challenge_Base {
     /*
+    Test cases:
     - a channel can be challenged with a newer state, which is enforced during challenge
     - a channel can be challenged with existing state, which is NOT enforced the second time during challenge
     - challenge is finalized (funds can be withdrawn) after `challengeExpireAt` time expires
     - challenged "operating" state can be resolved with a newer state until `challengeExpireAt` time has NOT passed
     - challenged state can NOT be resolved after `challengeExpireAt` time has passed
-    - it is not possible to challenge an already challenged channel
+    - a channel can NOT be challenged again during a challenge
     - a channel can NOT be challenged with an earlier state
     */
 
-    ChannelDefinition def;
-    bytes32 channelId;
-    State initState;
-
     function setUp() public override {
         super.setUp();
-
-        def = ChannelDefinition({
-            challengeDuration: CHALLENGE_DURATION,
-            user: alice,
-            node: node,
-            nonce: NONCE,
-            approvedSignatureValidators: 0,
-            metadata: bytes32(0)
-        });
-
-        channelId = Utils.getChannelId(def, CHANNEL_HUB_VERSION);
-
-        initState = State({
-            version: 0,
-            intent: StateIntent.DEPOSIT,
-            metadata: bytes32(0),
-            homeLedger: Ledger({
-                chainId: uint64(block.chainid),
-                token: address(token),
-                decimals: 18,
-                userAllocation: 1000,
-                userNetFlow: 1000,
-                nodeAllocation: 0,
-                nodeNetFlow: 0
-            }),
-            nonHomeLedger: Ledger({
-                chainId: 0,
-                token: address(0),
-                decimals: 0,
-                userAllocation: 0,
-                userNetFlow: 0,
-                nodeAllocation: 0,
-                nodeNetFlow: 0
-            }),
-            userSig: "",
-            nodeSig: ""
-        });
-        initState = mutualSignStateBothWithEcdsaValidator(initState, channelId, ALICE_PK);
-
-        vm.prank(alice);
-        cHub.createChannel(def, initState);
-
-    }
-
-    function signChallengeEip191WithEcdsaValidator(
-        bytes32 channelId_,
-        State memory state,
-        uint256 privateKey
-    ) internal pure returns (bytes memory) {
-        bytes memory signingData = Utils.toSigningData(state);
-        bytes memory challengerSigningData = abi.encodePacked(signingData, "challenge");
-        bytes memory message = Utils.pack(channelId_, challengerSigningData);
-        bytes memory signature = TestUtils.signEip191(vm, privateKey, message);
-        return abi.encodePacked(DEFAULT_SIG_VALIDATOR_ID, signature);
+        createChannelWithDeposit();
     }
 
     function test_challengeWithNewerState_enforcesState() public {
@@ -273,4 +225,360 @@ contract ChannelHubTest_Challenge_HomeChain_NormalOperation is ChannelHubTest_Ba
         vm.expectRevert(ChannelHub.ChallengerVersionTooLow.selector);
         cHub.challengeChannel(channelId, initState, challengerSig, ParticipantIndex.NODE);
     }
+}
+
+contract ChannelHubTest_Challenge_HomeChain_EscrowDeposit is ChannelHubTest_Challenge_Base {
+    /*
+    Test cases:
+    - a channel can be challenged with a newer state, which is enforced during challenge:
+        (new: InitiateEscrowDeposit, FinalizeEscrowDeposit)
+    - a channel can be challenged with existing state, which is NOT enforced the second time during challenge:
+        (existing: InitiateEscrowDeposit, FinalizeEscrowDeposit)
+    - a challenged channel can be resolved with "InitiateEscrowDeposit" / "FinalizeEscrowDeposit" state until `challengeExpireAt` time has NOT passed
+    */
+
+   bytes32 escrowId;
+
+   uint64 initiateEscrowDepositVersion = 1;
+   State initiateEscrowDepositState;
+   uint64 finalizeEscrowDepositVersion = 2;
+   State finalizeEscrowDepositState;
+
+    function setUp() public override {
+        super.setUp();
+        createChannelWithDeposit();
+
+        initiateEscrowDepositState = nextState(
+            initState,
+            StateIntent.INITIATE_ESCROW_DEPOSIT,
+            [uint256(1000), uint256(500)],
+            [int256(1000), int256(500)],
+            NON_HOME_CHAIN_ID,
+            NON_HOME_TOKEN,
+            [uint256(500), uint256(0)],
+            [int256(500), int256(0)]
+        );
+        initiateEscrowDepositState = mutualSignStateBothWithEcdsaValidator(initiateEscrowDepositState, channelId, ALICE_PK);
+
+        escrowId = Utils.getEscrowId(channelId, initiateEscrowDepositVersion);
+
+        finalizeEscrowDepositState = nextState(
+            initiateEscrowDepositState,
+            StateIntent.FINALIZE_ESCROW_DEPOSIT,
+            [uint256(1500), uint256(0)],
+            [int256(1000), int256(500)],
+            NON_HOME_CHAIN_ID,
+            NON_HOME_TOKEN,
+            [uint256(0), uint256(0)],
+            [int256(500), int256(-500)]
+        );
+        finalizeEscrowDepositState = mutualSignStateBothWithEcdsaValidator(finalizeEscrowDepositState, channelId, ALICE_PK);
+    }
+
+    function test_challenge_initiateEscrowDeposit_asNew() public {
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateEscrowDepositState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initiateEscrowDepositState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify channel is DISPUTED and initiateEscrowDepositState was enforced
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, initiateEscrowDepositVersion, block.timestamp + CHALLENGE_DURATION, "InitiateEscrowDepositState should be enforced");
+        verifyChannelState(channelId, [uint256(1000), uint256(500)], [int256(1000), int256(500)], "InitiateEscrowDepositState should be enforced");
+    }
+
+    function test_challenge_initiateEscrowDeposit_asExisting() public {
+        vm.prank(alice);
+        cHub.initiateEscrowDeposit(def, initiateEscrowDepositState);
+
+        // Challenge with already enforced initiateEscrowDepositState state
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateEscrowDepositState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initiateEscrowDepositState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify state is still initiateEscrowDepositState
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, initiateEscrowDepositVersion, block.timestamp + CHALLENGE_DURATION, "State should not be re-enforced");
+        verifyChannelState(channelId, [uint256(1000), uint256(500)], [int256(1000), int256(500)], "State should not be re-enforced");
+    }
+
+    function test_challenge_initiateEscrowDeposit_resolve() public {
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initState, challengerSig, ParticipantIndex.NODE);
+
+        // Resolve challenge with newer initiateEscrowDepositState state (before timeout)
+        vm.prank(alice);
+        cHub.initiateEscrowDeposit(def, initiateEscrowDepositState);
+
+        // Verify challenge was resolved
+        verifyChannelData(channelId, ChannelStatus.OPERATING, initiateEscrowDepositVersion, 0, "Challenge should be resolved");
+        verifyChannelState(channelId, [uint256(1000), uint256(500)], [int256(1000), int256(500)], "initiateEscrowDepositState should be enforced");
+    }
+
+    function test_challenge_finalizeEscrowDeposit_asNew() public {
+        // First enforce INITIATE_ESCROW_DEPOSIT on-chain (required for FINALIZE to be valid)
+        vm.prank(alice);
+        cHub.initiateEscrowDeposit(def, initiateEscrowDepositState);
+
+        // Now challenge with FINALIZE_ESCROW_DEPOSIT
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, finalizeEscrowDepositState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, finalizeEscrowDepositState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify channel is DISPUTED and finalizeEscrowDepositState was enforced
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, finalizeEscrowDepositVersion, block.timestamp + CHALLENGE_DURATION, "FinalizeEscrowDepositState should be enforced");
+        verifyChannelState(channelId, [uint256(1500), uint256(0)], [int256(1000), int256(500)], "finalizeEscrowDepositState should be enforced");
+    }
+
+    function test_challenge_finalizeEscrowDeposit_asExisting() public {
+        // First enforce INITIATE_ESCROW_DEPOSIT on-chain
+        vm.prank(alice);
+        cHub.initiateEscrowDeposit(def, initiateEscrowDepositState);
+
+        // Then enforce FINALIZE_ESCROW_DEPOSIT on-chain
+        vm.prank(alice);
+        cHub.finalizeEscrowDeposit(channelId, escrowId, finalizeEscrowDepositState);
+
+        // Challenge with already enforced finalizeEscrowDepositState state
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, finalizeEscrowDepositState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, finalizeEscrowDepositState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify state is still finalizeEscrowDepositState
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, finalizeEscrowDepositVersion, block.timestamp + CHALLENGE_DURATION, "State should not be re-enforced");
+        verifyChannelState(channelId, [uint256(1500), uint256(0)], [int256(1000), int256(500)], "State should not be re-enforced");
+    }
+
+    function test_challenge_finalizeEscrowDeposit_resolve() public {
+        // First enforce INITIATE_ESCROW_DEPOSIT on-chain
+        vm.prank(alice);
+        cHub.initiateEscrowDeposit(def, initiateEscrowDepositState);
+
+        // Challenge with older initiate state
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateEscrowDepositState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initiateEscrowDepositState, challengerSig, ParticipantIndex.NODE);
+
+        // Resolve challenge with newer finalizeEscrowDepositState state (before timeout)
+        vm.prank(alice);
+        cHub.finalizeEscrowDeposit(channelId, escrowId, finalizeEscrowDepositState);
+
+        // Verify challenge was resolved
+        verifyChannelData(channelId, ChannelStatus.OPERATING, finalizeEscrowDepositVersion, 0, "Challenge should be resolved");
+        verifyChannelState(channelId, [uint256(1500), uint256(0)], [int256(1000), int256(500)], "finalizeEscrowDepositState should be enforced");
+    }
+
+    function test_finalizeEscrowDeposit_resolve_newlyChallenged_initializeEscrowDeposit() public {
+        // Challenge with INITIATE_ESCROW_DEPOSIT state (without enforcing it on-chain first)
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateEscrowDepositState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initiateEscrowDepositState, challengerSig, ParticipantIndex.NODE);
+
+        // Resolve challenge with finalizeEscrowDepositState state (before timeout)
+        vm.prank(alice);
+        cHub.finalizeEscrowDeposit(channelId, escrowId, finalizeEscrowDepositState);
+
+        // Verify challenge was resolved
+        verifyChannelData(channelId, ChannelStatus.OPERATING, finalizeEscrowDepositVersion, 0, "Challenge should be resolved");
+        verifyChannelState(channelId, [uint256(1500), uint256(0)], [int256(1000), int256(500)], "finalizeEscrowDepositState should be enforced");
+    }
+
+    function test_revert_onChallengeEscrowDeposit () public {
+        // First enforce INITIATE_ESCROW_DEPOSIT on-chain
+        vm.prank(alice);
+        cHub.initiateEscrowDeposit(def, initiateEscrowDepositState);
+
+        // Challenge with INITIATE_ESCROW_DEPOSIT state
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateEscrowDepositState, NODE_PK);
+
+        vm.prank(node);
+        vm.expectRevert(ChannelHub.NoChannelIdFound.selector);
+        cHub.challengeEscrowDeposit(escrowId, challengerSig, ParticipantIndex.NODE);
+    }
+}
+
+contract ChannelHubTest_Challenge_HomeChain_EscrowWithdrawal is ChannelHubTest_Challenge_Base {
+    /*
+    Test cases:
+    - a channel can be challenged with a newer state, which is enforced during challenge:
+        (new: InitiateEscrowWithdrawal, FinalizeEscrowWithdrawal)
+    - a channel can be challenged with existing state, which is NOT enforced the second time during challenge:
+        (existing: InitiateEscrowWithdrawal, FinalizeEscrowWithdrawal)
+    - a challenged channel can be resolved with "InitiateEscrowWithdrawal" / "FinalizeEscrowWithdrawal" state until `challengeExpireAt` time has NOT passed
+    */
+
+   bytes32 escrowId;
+
+   uint64 initiateEscrowWithdrawalVersion = 1;
+   State initiateEscrowWithdrawalState;
+   uint64 finalizeEscrowWithdrawalVersion = 2;
+   State finalizeEscrowWithdrawalState;
+
+    function setUp() public override {
+        super.setUp();
+        createChannelWithDeposit();
+
+        initiateEscrowWithdrawalState = nextState(
+            initState,
+            StateIntent.INITIATE_ESCROW_WITHDRAWAL,
+            [uint256(1000), uint256(0)],
+            [int256(1000), int256(0)],
+            NON_HOME_CHAIN_ID,
+            NON_HOME_TOKEN,
+            [uint256(0), uint256(300)],
+            [int256(0), int256(300)]
+        );
+        initiateEscrowWithdrawalState = mutualSignStateBothWithEcdsaValidator(initiateEscrowWithdrawalState, channelId, ALICE_PK);
+
+        escrowId = Utils.getEscrowId(channelId, initiateEscrowWithdrawalVersion);
+
+        finalizeEscrowWithdrawalState = nextState(
+            initiateEscrowWithdrawalState,
+            StateIntent.FINALIZE_ESCROW_WITHDRAWAL,
+            [uint256(700), uint256(0)],
+            [int256(1000), int256(-300)],
+            NON_HOME_CHAIN_ID,
+            NON_HOME_TOKEN,
+            [uint256(0), uint256(0)],
+            [int256(-300), int256(300)]
+        );
+        finalizeEscrowWithdrawalState = mutualSignStateBothWithEcdsaValidator(finalizeEscrowWithdrawalState, channelId, ALICE_PK);
+    }
+
+    function test_challenge_initiateEscrowWithdrawal_asNew() public {
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateEscrowWithdrawalState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initiateEscrowWithdrawalState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify channel is DISPUTED and initiateEscrowWithdrawalState was enforced
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, initiateEscrowWithdrawalVersion, block.timestamp + CHALLENGE_DURATION, "InitiateEscrowWithdrawalState should be enforced");
+        verifyChannelState(channelId, [uint256(1000), uint256(0)], [int256(1000), int256(0)], "InitiateEscrowWithdrawalState should be enforced");
+    }
+
+    function test_challenge_initiateEscrowWithdrawal_asExisting() public {
+        vm.prank(alice);
+        cHub.initiateEscrowWithdrawal(def, initiateEscrowWithdrawalState);
+
+        // Challenge with already enforced initiateEscrowWithdrawalState state
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateEscrowWithdrawalState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initiateEscrowWithdrawalState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify state is still initiateEscrowWithdrawalState
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, initiateEscrowWithdrawalVersion, block.timestamp + CHALLENGE_DURATION, "State should not be re-enforced");
+        verifyChannelState(channelId, [uint256(1000), uint256(0)], [int256(1000), int256(0)], "State should not be re-enforced");
+    }
+
+    function test_challenge_initiateEscrowWithdrawal_resolve() public {
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initState, challengerSig, ParticipantIndex.NODE);
+
+        // Resolve challenge with newer initiateEscrowWithdrawalState state (before timeout)
+        vm.prank(alice);
+        cHub.initiateEscrowWithdrawal(def, initiateEscrowWithdrawalState);
+
+        // Verify challenge was resolved
+        verifyChannelData(channelId, ChannelStatus.OPERATING, initiateEscrowWithdrawalVersion, 0, "Challenge should be resolved");
+        verifyChannelState(channelId, [uint256(1000), uint256(0)], [int256(1000), int256(0)], "initiateEscrowWithdrawalState should be enforced");
+    }
+
+    function test_challenge_finalizeEscrowWithdrawal_asNew() public {
+        // INITIATE_ESCROW_WITHDRAWAL is NOT required to be enforced first on-chain
+
+        // Challenge with FINALIZE_ESCROW_WITHDRAWAL
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, finalizeEscrowWithdrawalState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, finalizeEscrowWithdrawalState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify channel is DISPUTED and finalizeEscrowWithdrawalState was enforced
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, finalizeEscrowWithdrawalVersion, block.timestamp + CHALLENGE_DURATION, "FinalizeEscrowWithdrawalState should be enforced");
+        verifyChannelState(channelId, [uint256(700), uint256(0)], [int256(1000), int256(-300)], "finalizeEscrowWithdrawalState should be enforced");
+    }
+
+    function test_challenge_finalizeEscrowWithdrawal_asExisting() public {
+        // INITIATE_ESCROW_WITHDRAWAL is NOT required to be enforced first on-chain
+
+        // Enforce FINALIZE_ESCROW_WITHDRAWAL on-chain
+        vm.prank(alice);
+        cHub.finalizeEscrowWithdrawal(channelId, escrowId, finalizeEscrowWithdrawalState);
+
+        // Challenge with already enforced finalizeEscrowWithdrawalState state
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, finalizeEscrowWithdrawalState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, finalizeEscrowWithdrawalState, challengerSig, ParticipantIndex.NODE);
+
+        // Verify state is still finalizeEscrowWithdrawalState
+        verifyChannelData(channelId, ChannelStatus.DISPUTED, finalizeEscrowWithdrawalVersion, block.timestamp + CHALLENGE_DURATION, "State should not be re-enforced");
+        verifyChannelState(channelId, [uint256(700), uint256(0)], [int256(1000), int256(-300)], "State should not be re-enforced");
+    }
+
+    function test_challenge_finalizeEscrowWithdrawal_resolve() public {
+        // INITIATE_ESCROW_WITHDRAWAL is NOT required to be enforced first on-chain
+
+        // Challenge with older initiate state
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initState, challengerSig, ParticipantIndex.NODE);
+
+        // Resolve challenge with newer finalizeEscrowWithdrawalState state (before timeout)
+        vm.prank(alice);
+        cHub.finalizeEscrowWithdrawal(channelId, escrowId, finalizeEscrowWithdrawalState);
+
+        // Verify challenge was resolved
+        verifyChannelData(channelId, ChannelStatus.OPERATING, finalizeEscrowWithdrawalVersion, 0, "Challenge should be resolved");
+        verifyChannelState(channelId, [uint256(700), uint256(0)], [int256(1000), int256(-300)], "finalizeEscrowWithdrawalState should be enforced");
+    }
+
+    function test_finalizeEscrowWithdrawal_resolve_newlyChallenged_initializeEscrowWithdrawal() public {
+        // Challenge with INITIATE_ESCROW_WITHDRAWAL state (without enforcing it on-chain first)
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateEscrowWithdrawalState, NODE_PK);
+
+        vm.prank(node);
+        cHub.challengeChannel(channelId, initiateEscrowWithdrawalState, challengerSig, ParticipantIndex.NODE);
+
+        // Resolve challenge with finalizeEscrowWithdrawalState state (before timeout)
+        vm.prank(alice);
+        cHub.finalizeEscrowWithdrawal(channelId, escrowId, finalizeEscrowWithdrawalState);
+
+        // Verify challenge was resolved
+        verifyChannelData(channelId, ChannelStatus.OPERATING, finalizeEscrowWithdrawalVersion, 0, "Challenge should be resolved");
+        verifyChannelState(channelId, [uint256(700), uint256(0)], [int256(1000), int256(-300)], "finalizeEscrowWithdrawalState should be enforced");
+    }
+
+    function test_revert_onChallengeEscrowWithdrawal() public {
+        // First enforce INITIATE_ESCROW_WITHDRAWAL on-chain
+        vm.prank(alice);
+        cHub.initiateEscrowWithdrawal(def, initiateEscrowWithdrawalState);
+
+        // Challenge with INITIATE_ESCROW_WITHDRAWAL state
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(channelId, initiateEscrowWithdrawalState, NODE_PK);
+
+        vm.prank(node);
+        vm.expectRevert(ChannelHub.NoChannelIdFound.selector);
+        cHub.challengeEscrowWithdrawal(escrowId, challengerSig, ParticipantIndex.NODE);
+    }
+}
+
+contract ChannelHubTest_Challenge_HomeChain_HomeMigration is ChannelHubTest_Challenge_Base {
+    /*
+    - a channel in earlier state can be challenged with initiated migration state (→ common challenge flow)
+    - a channel challenged with "InitiateMigration" state can be checkpointed calling "finalizeMigration" (-> MigratedOut)
+    - a channel challenged with "InitiateMigration" state can be resolved with "operation" state
+    - a channel in initiated migration state can be challenged with it
+    - a channel in initiated migration state can be challenged with a newer Operation state
+    - a channel can NOT be challenged when in MIGRATED_OUT status
+    - a channel can NOT be challenged in Operating status with finalize migration state
+    */
 }

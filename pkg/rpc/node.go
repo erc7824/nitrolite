@@ -212,10 +212,12 @@ func (wn *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	connectionID := uuid.NewString()
 
 	connConfig := WebsocketConnectionConfig{
-		ConnectionID:  connectionID,
-		Origin:        r.Header.Get("Origin"),
-		WebsocketConn: wsConnection,
-		Logger:        wn.cfg.Logger,
+		ConnectionID:      connectionID,
+		Origin:            r.Header.Get("Origin"),
+		WebsocketConn:     wsConnection,
+		Logger:            wn.cfg.Logger,
+		ProcessBufferSize: wn.cfg.WsConnProcessBufferSize,
+		WriteBufferSize:   wn.cfg.WsConnWriteBufferSize,
 	}
 	connection, err := NewWebsocketConnection(connConfig)
 	if err != nil {

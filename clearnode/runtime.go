@@ -70,6 +70,8 @@ type Config struct {
 	ValidationLimits            ValidationLimits `yaml:"validation_limits"`
 	RateLimitPerSec             float64          `yaml:"rate_limit_per_sec" env:"CLEARNODE_RATE_LIMIT_PER_SEC" env-default:"10"`
 	RateLimitBurst              float64          `yaml:"rate_limit_burst" env:"CLEARNODE_RATE_LIMIT_BURST" env-default:"20"`
+	WsProcessBufferSize         int              `yaml:"ws_process_buffer_size" env:"CLEARNODE_WS_PROCESS_BUFFER_SIZE" env-default:"64"`
+	WsWriteBufferSize           int              `yaml:"ws_write_buffer_size" env:"CLEARNODE_WS_WRITE_BUFFER_SIZE" env-default:"64"`
 }
 
 // ValidationLimits defines configurable upper bounds for dynamic-length request fields.
@@ -194,8 +196,10 @@ func InitBackbone() *Backbone {
 	// ------------------------------------------------
 
 	rpcNode, err := rpc.NewWebsocketNode(rpc.WebsocketNodeConfig{
-		Logger:             logger,
-		ObserveConnections: runtimeMetrics.SetRPCConnections,
+		Logger:                  logger,
+		ObserveConnections:      runtimeMetrics.SetRPCConnections,
+		WsConnProcessBufferSize: conf.WsProcessBufferSize,
+		WsConnWriteBufferSize:   conf.WsWriteBufferSize,
 	})
 	if err != nil {
 		logger.Fatal("failed to initialize RPC node", "error", err)

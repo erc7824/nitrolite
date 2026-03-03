@@ -659,7 +659,9 @@ contract ChannelHub is IVault, ReentrancyGuard {
         if (_isHomeChain(channelId)) {
             // HOME CHAIN: Get user/node from channel definition
             ChannelMeta storage channelMeta = _channels[channelId];
-            _processHomeChainEscrowFinalize(channelId, candidate, channelMeta.definition.user, channelMeta.definition.node);
+            _processHomeChainEscrowFinalize(
+                channelId, candidate, channelMeta.definition.user, channelMeta.definition.node
+            );
             emit EscrowDepositFinalizedOnHome(escrowId, channelId, candidate);
             return;
         }
@@ -691,8 +693,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         EscrowDepositEngine.TransitionContext memory ctx =
             _buildEscrowDepositContext(escrowId, _nodeBalances[node][candidate.nonHomeLedger.token]);
-        EscrowDepositEngine.TransitionEffects memory effects =
-            EscrowDepositEngine.validateTransition(ctx, candidate);
+        EscrowDepositEngine.TransitionEffects memory effects = EscrowDepositEngine.validateTransition(ctx, candidate);
 
         _applyEscrowDepositEffects(
             escrowId, channelId, candidate, effects, user, node, meta.approvedSignatureValidators
@@ -755,7 +756,9 @@ contract ChannelHub is IVault, ReentrancyGuard {
         if (_isHomeChain(channelId)) {
             // HOME CHAIN: Get user/node from channel definition
             ChannelMeta storage channelMeta = _channels[channelId];
-            _processHomeChainEscrowFinalize(channelId, candidate, channelMeta.definition.user, channelMeta.definition.node);
+            _processHomeChainEscrowFinalize(
+                channelId, candidate, channelMeta.definition.user, channelMeta.definition.node
+            );
             emit EscrowWithdrawalFinalizedOnHome(escrowId, channelId, candidate);
             return;
         }

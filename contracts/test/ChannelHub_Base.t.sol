@@ -204,7 +204,7 @@ contract ChannelHubTest_Base is Test {
         uint256 expectedChallengeExpiry,
         string memory description
     ) internal view {
-        (ChannelStatus status,,State memory latestState, uint256 challengeExpiry,) = cHub.getChannelData(channelId);
+        (ChannelStatus status,, State memory latestState, uint256 challengeExpiry,) = cHub.getChannelData(channelId);
         assertEq(uint8(status), uint8(expectedStatus), string.concat(description, ": Channel status: "));
         assertEq(latestState.version, expectedVersion, string.concat(description, ": Channel version: "));
         assertEq(challengeExpiry, expectedChallengeExpiry, string.concat(description, ": Challenge expiry: "));
@@ -217,15 +217,18 @@ contract ChannelHubTest_Base is Test {
         string memory description
     ) internal view {
         (,, State memory latestState,,) = cHub.getChannelData(channelId);
-        assertEq(latestState.homeLedger.userAllocation, allocations[0], string.concat(description, ": User allocation: "));
+        assertEq(
+            latestState.homeLedger.userAllocation, allocations[0], string.concat(description, ": User allocation: ")
+        );
         assertEq(latestState.homeLedger.userNetFlow, netFlows[0], string.concat(description, ": User net flow: "));
-        assertEq(latestState.homeLedger.nodeAllocation, allocations[1], string.concat(description, ": Node allocation: "));
+        assertEq(
+            latestState.homeLedger.nodeAllocation, allocations[1], string.concat(description, ": Node allocation: ")
+        );
         assertEq(latestState.homeLedger.nodeNetFlow, netFlows[1], string.concat(description, ": Node net flow: "));
 
         uint256 nodeBalance = cHub.getAccountBalance(node, address(token));
-        uint256 expectedNodeBalance = netFlows[1] < 0
-            ? INITIAL_BALANCE + uint256(-netFlows[1])
-            : INITIAL_BALANCE - uint256(netFlows[1]);
+        uint256 expectedNodeBalance =
+            netFlows[1] < 0 ? INITIAL_BALANCE + uint256(-netFlows[1]) : INITIAL_BALANCE - uint256(netFlows[1]);
         assertEq(nodeBalance, expectedNodeBalance, string.concat(description, ": Node balance: "));
     }
 }

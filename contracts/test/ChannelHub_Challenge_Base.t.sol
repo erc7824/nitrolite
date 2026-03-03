@@ -73,11 +73,11 @@ abstract contract ChannelHubTest_Challenge_Base is ChannelHubTest_Base {
         cHub.createChannel(def, initState);
     }
 
-    function signChallengeEip191WithEcdsaValidator(
-        bytes32 channelId_,
-        State memory state,
-        uint256 privateKey
-    ) internal pure returns (bytes memory) {
+    function signChallengeEip191WithEcdsaValidator(bytes32 channelId_, State memory state, uint256 privateKey)
+        internal
+        pure
+        returns (bytes memory)
+    {
         bytes memory signingData = Utils.toSigningData(state);
         bytes memory challengerSigningData = abi.encodePacked(signingData, "challenge");
         bytes memory message = Utils.pack(channelId_, challengerSigningData);

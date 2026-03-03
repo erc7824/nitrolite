@@ -109,7 +109,9 @@ contract ChannelHubTest_CrossChain_Lifecycle is ChannelHubTest_Base {
         // Expected: user allocation = 958, user net flow = 1000, node allocation = 0, node net flow = -42
         vm.prank(alice);
         cHub.initiateEscrowDeposit(def, state);
-        verifyChannelState(channelId, [uint256(958), uint256(500)], [int256(1000), int256(458)], "after cross chain deposit");
+        verifyChannelState(
+            channelId, [uint256(958), uint256(500)], [int256(1000), int256(458)], "after cross chain deposit"
+        );
 
         // finalize escrow deposit
         state = nextState(

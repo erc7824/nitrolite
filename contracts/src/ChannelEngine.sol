@@ -65,7 +65,6 @@ library ChannelEngine {
         ChannelStatus newStatus;
         uint64 newChallengeExpiry;
         bool updateLastState;
-        bool clearDispute;
         bool closeChannel;
     }
 
@@ -189,7 +188,7 @@ library ChannelEngine {
         effects.userFundsDelta = userNfDelta; // Pull deposit from user
         effects.nodeFundsDelta = nodeNfDelta; // May lock more from node or release
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -211,7 +210,7 @@ library ChannelEngine {
         effects.userFundsDelta = userNfDelta; // Negative = push to user
         effects.nodeFundsDelta = nodeNfDelta;
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -234,7 +233,7 @@ library ChannelEngine {
         // Calculate effects
         effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -265,6 +264,7 @@ library ChannelEngine {
         effects.userFundsDelta = userNfDelta;
         effects.nodeFundsDelta = nodeNfDelta;
         effects.newStatus = ChannelStatus.CLOSED;
+        effects.newChallengeExpiry = 0;
         effects.closeChannel = true;
 
         return effects;
@@ -300,7 +300,7 @@ library ChannelEngine {
         // Calculate effects
         effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -346,7 +346,7 @@ library ChannelEngine {
         effects.userFundsDelta = 0;
         effects.nodeFundsDelta = 0;
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -379,7 +379,7 @@ library ChannelEngine {
         // Calculate effects - no immediate fund movement
         effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -411,7 +411,7 @@ library ChannelEngine {
         // Calculate effects
         effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -476,7 +476,8 @@ library ChannelEngine {
 
             // Calculate effects - may adjust node vault based on net flow delta
             effects.nodeFundsDelta = nodeNfDelta;
-            effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+            effects.newStatus = ChannelStatus.OPERATING;
+            effects.newChallengeExpiry = 0;
         } else {
             revert IncorrectChannelStatus();
         }
@@ -530,7 +531,7 @@ library ChannelEngine {
             // Calculate effects - release all currently locked funds to node vault
             effects.nodeFundsDelta = nodeNfDelta;
             effects.newStatus = ChannelStatus.MIGRATED_OUT;
-            effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+            effects.newChallengeExpiry = 0;
             effects.closeChannel = true;
         } else {
             revert IncorrectChannelStatus();

@@ -1051,14 +1051,12 @@ contract ChannelHub is IVault, ReentrancyGuard {
             meta.status = effects.newStatus;
         }
 
-        if (effects.clearDispute) {
-            meta.status = ChannelStatus.OPERATING;
-            meta.challengeExpireAt = 0;
+        if (meta.challengeExpireAt != effects.newChallengeExpiry) {
+            meta.challengeExpireAt = effects.newChallengeExpiry;
         }
 
         if (effects.closeChannel) {
             meta.lockedFunds = 0;
-            meta.challengeExpireAt = 0;
         }
     }
 

@@ -71,6 +71,9 @@ contract SessionKeyValidator is ISignatureValidator {
         bytes calldata signature,
         address participant
     ) external pure returns (ValidationResult) {
+        require(channelId != bytes32(0), EmptyChannelId());
+        require(participant != address(0), InvalidSignerAddress());
+
         (SessionKeyAuthorization memory skAuth, bytes memory skSignature) =
             abi.decode(signature, (SessionKeyAuthorization, bytes));
 

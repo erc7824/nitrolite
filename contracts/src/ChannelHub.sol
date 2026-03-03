@@ -94,7 +94,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
     error IncorrectStateIntent();
     error IncorrectChannelStatus();
     error ChallengerVersionTooLow();
-    error OnlyNonHomeEscrowsCanBeChallenged();
+    error NoChannelIdFound();
+    error IncorrectChannelId();
 
     struct ChannelMeta {
         ChannelStatus status;
@@ -546,7 +547,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         // If version is higher, process the new state
         if (candidate.version > prevState.version) {
-            require(candidate.intent == StateIntent.OPERATE, IncorrectStateIntent());
             _validateSignatures(channelId, candidate, user, node, def.approvedSignatureValidators);
 
             ChannelEngine.TransitionContext memory ctx =
@@ -569,8 +569,6 @@ contract ChannelHub is IVault, ReentrancyGuard {
     }
 
     function closeChannel(bytes32 channelId, State calldata candidate) external payable {
-        require(candidate.intent == StateIntent.CLOSE, IncorrectStateIntent());
-
         ChannelMeta storage meta = _channels[channelId];
         ChannelDefinition memory def = meta.definition;
         ChannelStatus status = meta.status;
@@ -595,6 +593,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         }
 
         // Path 2: Cooperative closure with signed CLOSE state
+        require(candidate.intent == StateIntent.CLOSE, IncorrectStateIntent());
         _validateSignatures(channelId, candidate, user, node, def.approvedSignatureValidators);
 
         ChannelEngine.TransitionContext memory ctx =
@@ -639,9 +638,9 @@ contract ChannelHub is IVault, ReentrancyGuard {
         external
     {
         EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
-        require(!_isHomeChain(meta.channelId), OnlyNonHomeEscrowsCanBeChallenged());
-
         bytes32 channelId = meta.channelId;
+        require(channelId != bytes32(0), NoChannelIdFound());
+
         (ISignatureValidator validator, bytes calldata sigData) =
             _extractValidator(challengerSig, meta.node, meta.approvedSignatureValidators);
         _validateChallengerSignature(channelId, meta.initState, sigData, validator, meta.user, meta.node, challengerIdx);
@@ -656,15 +655,25 @@ contract ChannelHub is IVault, ReentrancyGuard {
         emit EscrowDepositChallenged(escrowId, meta.initState, effects.newChallengeExpiry);
     }
 
-    function finalizeEscrowDeposit(bytes32 escrowId, State calldata candidate) external {
+    function finalizeEscrowDeposit(bytes32 channelId, bytes32 escrowId, State calldata candidate) external {
+        if (_isHomeChain(channelId)) {
+            // HOME CHAIN: Get user/node from channel definition
+            ChannelMeta storage channelMeta = _channels[channelId];
+            _processHomeChainEscrowFinalize(
+                channelId, candidate, channelMeta.definition.user, channelMeta.definition.node
+            );
+            emit EscrowDepositFinalizedOnHome(escrowId, channelId, candidate);
+            return;
+        }
+
+        // NON-HOME CHAIN: Use escrow metadata
         EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
+        require(meta.channelId == channelId, IncorrectChannelId()); // Validate consistency
         address user = meta.user;
         address node = meta.node;
-
-        bool isHomeChain = _isHomeChain(meta.channelId);
         EscrowStatus status = meta.status;
 
-        if (!isHomeChain && status == EscrowStatus.DISPUTED && block.timestamp > meta.challengeExpireAt) {
+        if (status == EscrowStatus.DISPUTED && block.timestamp > meta.challengeExpireAt) {
             // NON-HOME CHAIN: Unilateral finalization after challenge timeout
             meta.status = EscrowStatus.FINALIZED;
             uint256 lockedAmount = meta.lockedAmount;
@@ -673,31 +682,24 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             _pushFunds(node, meta.initState.nonHomeLedger.token, lockedAmount);
 
-            emit EscrowDepositFinalized(escrowId, meta.channelId, candidate);
+            emit EscrowDepositFinalized(escrowId, channelId, candidate);
             return;
         }
 
         require(candidate.intent == StateIntent.FINALIZE_ESCROW_DEPOSIT, IncorrectStateIntent());
 
-        if (_isHomeChain(meta.channelId)) {
-            _processHomeChainEscrowFinalize(meta.channelId, candidate, user, node);
-            emit EscrowDepositFinalizedOnHome(escrowId, meta.channelId, candidate);
-            return;
-        } else {
-            // NON-HOME CHAIN: Update via EscrowDepositEngine
-            _validateSignatures(meta.channelId, candidate, user, node, meta.approvedSignatureValidators);
+        // NON-HOME CHAIN: Update via EscrowDepositEngine
+        _validateSignatures(channelId, candidate, user, node, meta.approvedSignatureValidators);
 
-            EscrowDepositEngine.TransitionContext memory ctx =
-                _buildEscrowDepositContext(escrowId, _nodeBalances[node][candidate.nonHomeLedger.token]);
-            EscrowDepositEngine.TransitionEffects memory effects =
-                EscrowDepositEngine.validateTransition(ctx, candidate);
+        EscrowDepositEngine.TransitionContext memory ctx =
+            _buildEscrowDepositContext(escrowId, _nodeBalances[node][candidate.nonHomeLedger.token]);
+        EscrowDepositEngine.TransitionEffects memory effects = EscrowDepositEngine.validateTransition(ctx, candidate);
 
-            _applyEscrowDepositEffects(
-                escrowId, meta.channelId, candidate, effects, user, node, meta.approvedSignatureValidators
-            );
+        _applyEscrowDepositEffects(
+            escrowId, channelId, candidate, effects, user, node, meta.approvedSignatureValidators
+        );
 
-            emit EscrowDepositFinalized(escrowId, meta.channelId, candidate);
-        }
+        emit EscrowDepositFinalized(escrowId, channelId, candidate);
     }
 
     function initiateEscrowWithdrawal(ChannelDefinition calldata def, State calldata candidate) external {
@@ -709,6 +711,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         bytes32 escrowId = Utils.getEscrowId(channelId, candidate.version);
 
         if (_isHomeChain(channelId)) {
+            // HOME CHAIN: Process through channel state, no escrow metadata
             _processHomeChainEscrowInitiate(channelId, candidate);
             emit EscrowWithdrawalInitiatedOnHome(escrowId, channelId, candidate);
         } else {
@@ -729,13 +732,13 @@ contract ChannelHub is IVault, ReentrancyGuard {
         external
     {
         EscrowWithdrawalMeta storage meta = _escrowWithdrawals[escrowId];
-        require(!_isHomeChain(meta.channelId), OnlyNonHomeEscrowsCanBeChallenged());
+        bytes32 channelId = meta.channelId;
+        require(channelId != bytes32(0), NoChannelIdFound());
 
         EscrowWithdrawalEngine.TransitionContext memory ctx = _buildEscrowWithdrawalContext(escrowId, meta.node);
         EscrowWithdrawalEngine.TransitionEffects memory effects = EscrowWithdrawalEngine.validateChallenge(ctx);
 
         // Validate challenger signature
-        bytes32 channelId = meta.channelId;
         address user = meta.user;
         address node = meta.node;
         (ISignatureValidator validator, bytes calldata sigData) =
@@ -749,16 +752,25 @@ contract ChannelHub is IVault, ReentrancyGuard {
         emit EscrowWithdrawalChallenged(escrowId, meta.initState, effects.newChallengeExpiry);
     }
 
-    function finalizeEscrowWithdrawal(bytes32 escrowId, State calldata candidate) external {
+    function finalizeEscrowWithdrawal(bytes32 channelId, bytes32 escrowId, State calldata candidate) external {
+        if (_isHomeChain(channelId)) {
+            // HOME CHAIN: Get user/node from channel definition
+            ChannelMeta storage channelMeta = _channels[channelId];
+            _processHomeChainEscrowFinalize(
+                channelId, candidate, channelMeta.definition.user, channelMeta.definition.node
+            );
+            emit EscrowWithdrawalFinalizedOnHome(escrowId, channelId, candidate);
+            return;
+        }
+
+        // NON-HOME CHAIN: Use escrow metadata
         EscrowWithdrawalMeta storage meta = _escrowWithdrawals[escrowId];
-        bytes32 channelId = meta.channelId;
+        require(meta.channelId == channelId, IncorrectChannelId()); // Validate consistency
         address user = meta.user;
         address node = meta.node;
-
-        bool isHomeChain = _isHomeChain(channelId);
         EscrowStatus status = meta.status;
 
-        if (!isHomeChain && status == EscrowStatus.DISPUTED && block.timestamp > meta.challengeExpireAt) {
+        if (status == EscrowStatus.DISPUTED && block.timestamp > meta.challengeExpireAt) {
             // NON-HOME CHAIN: Unilateral finalization after challenge timeout
             meta.status = EscrowStatus.FINALIZED;
             uint256 lockedAmount = meta.lockedAmount;
@@ -767,29 +779,24 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
             _pushFunds(node, meta.initState.nonHomeLedger.token, lockedAmount);
 
-            emit EscrowWithdrawalFinalized(escrowId, meta.channelId, candidate);
+            emit EscrowWithdrawalFinalized(escrowId, channelId, candidate);
             return;
         }
 
         require(candidate.intent == StateIntent.FINALIZE_ESCROW_WITHDRAWAL, IncorrectStateIntent());
 
-        if (_isHomeChain(channelId)) {
-            _processHomeChainEscrowFinalize(channelId, candidate, user, node);
-            emit EscrowWithdrawalFinalizedOnHome(escrowId, channelId, candidate);
-        } else {
-            // Non-Home chain: Update via EscrowWithdrawalEngine
-            _validateSignatures(channelId, candidate, user, node, meta.approvedSignatureValidators);
+        // NON-HOME CHAIN: Update via EscrowWithdrawalEngine
+        _validateSignatures(channelId, candidate, user, node, meta.approvedSignatureValidators);
 
-            EscrowWithdrawalEngine.TransitionContext memory ctx = _buildEscrowWithdrawalContext(escrowId, node);
-            EscrowWithdrawalEngine.TransitionEffects memory effects =
-                EscrowWithdrawalEngine.validateTransition(ctx, candidate);
+        EscrowWithdrawalEngine.TransitionContext memory ctx = _buildEscrowWithdrawalContext(escrowId, node);
+        EscrowWithdrawalEngine.TransitionEffects memory effects =
+            EscrowWithdrawalEngine.validateTransition(ctx, candidate);
 
-            _applyEscrowWithdrawalEffects(
-                escrowId, channelId, candidate, effects, user, node, meta.approvedSignatureValidators
-            );
+        _applyEscrowWithdrawalEffects(
+            escrowId, channelId, candidate, effects, user, node, meta.approvedSignatureValidators
+        );
 
-            emit EscrowWithdrawalFinalized(escrowId, channelId, candidate);
-        }
+        emit EscrowWithdrawalFinalized(escrowId, channelId, candidate);
     }
 
     function initiateMigration(ChannelDefinition calldata def, State calldata candidate) external {
@@ -1047,14 +1054,12 @@ contract ChannelHub is IVault, ReentrancyGuard {
             meta.status = effects.newStatus;
         }
 
-        if (effects.clearDispute) {
-            meta.status = ChannelStatus.OPERATING;
-            meta.challengeExpireAt = 0;
+        if (meta.challengeExpireAt != effects.newChallengeExpiry) {
+            meta.challengeExpireAt = effects.newChallengeExpiry;
         }
 
         if (effects.closeChannel) {
             meta.lockedFunds = 0;
-            meta.challengeExpireAt = 0;
         }
     }
 
@@ -1124,11 +1129,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         }
 
         if (effects.updateInitState) {
-            meta.initState = candidate;
-            meta.channelId = channelId;
-            meta.user = user;
-            meta.node = node;
-            meta.approvedSignatureValidators = approvedSignatureValidators;
+            _initEscrowDepositMetadata(escrowId, channelId, candidate, user, node, approvedSignatureValidators);
         }
 
         if (effects.newUnlockAt > 0) {
@@ -1184,11 +1185,7 @@ contract ChannelHub is IVault, ReentrancyGuard {
         }
 
         if (effects.updateInitState) {
-            meta.initState = candidate;
-            meta.channelId = channelId;
-            meta.user = user;
-            meta.node = node;
-            meta.approvedSignatureValidators = approvedSignatureValidators;
+            _initEscrowWithdrawalMetadata(escrowId, channelId, candidate, user, node, approvedSignatureValidators);
         }
 
         if (effects.newChallengeExpiry > 0) {
@@ -1222,6 +1219,38 @@ contract ChannelHub is IVault, ReentrancyGuard {
 
         // NOTE: purge escrow deposits to unlock unutilized node liquidity
         _purgeEscrowDeposits();
+    }
+
+    function _initEscrowDepositMetadata(
+        bytes32 escrowId,
+        bytes32 channelId,
+        State memory candidate,
+        address user,
+        address node,
+        uint256 approvedSignatureValidators
+    ) internal {
+        EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
+        meta.channelId = channelId;
+        meta.initState = candidate;
+        meta.user = user;
+        meta.node = node;
+        meta.approvedSignatureValidators = approvedSignatureValidators;
+    }
+
+    function _initEscrowWithdrawalMetadata(
+        bytes32 escrowId,
+        bytes32 channelId,
+        State memory candidate,
+        address user,
+        address node,
+        uint256 approvedSignatureValidators
+    ) internal {
+        EscrowWithdrawalMeta storage meta = _escrowWithdrawals[escrowId];
+        meta.channelId = channelId;
+        meta.initState = candidate;
+        meta.user = user;
+        meta.node = node;
+        meta.approvedSignatureValidators = approvedSignatureValidators;
     }
 
     function _requireValidDefinition(ChannelDefinition calldata def) internal pure {

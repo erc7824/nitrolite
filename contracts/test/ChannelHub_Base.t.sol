@@ -9,7 +9,7 @@ import {TestUtils, SESSION_KEY_VALIDATOR_ID} from "./TestUtils.sol";
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {ECDSAValidator} from "../src/sigValidators/ECDSAValidator.sol";
 import {SessionKeyValidator, SessionKeyAuthorization} from "../src/sigValidators/SessionKeyValidator.sol";
-import {State, StateIntent, Ledger} from "../src/interfaces/Types.sol";
+import {ChannelStatus, State, StateIntent, Ledger} from "../src/interfaces/Types.sol";
 import {ISignatureValidator} from "../src/interfaces/ISignatureValidator.sol";
 
 // forge-lint: disable-next-item(unsafe-typecast)
@@ -197,32 +197,38 @@ contract ChannelHubTest_Base is Test {
         return state;
     }
 
+    function verifyChannelData(
+        bytes32 channelId,
+        ChannelStatus expectedStatus,
+        uint64 expectedVersion,
+        uint256 expectedChallengeExpiry,
+        string memory description
+    ) internal view {
+        (ChannelStatus status,, State memory latestState, uint256 challengeExpiry,) = cHub.getChannelData(channelId);
+        assertEq(uint8(status), uint8(expectedStatus), string.concat(description, ": Channel status: "));
+        assertEq(latestState.version, expectedVersion, string.concat(description, ": Channel version: "));
+        assertEq(challengeExpiry, expectedChallengeExpiry, string.concat(description, ": Challenge expiry: "));
+    }
+
     function verifyChannelState(
         bytes32 channelId,
-        uint256 expectedUserAllocation,
-        int256 expectedUserNetFlow,
-        uint256 expectedNodeAllocation,
-        int256 expectedNodeNetFlow,
+        uint256[2] memory allocations,
+        int256[2] memory netFlows,
         string memory description
     ) internal view {
         (,, State memory latestState,,) = cHub.getChannelData(channelId);
         assertEq(
-            latestState.homeLedger.userAllocation,
-            expectedUserAllocation,
-            string.concat("User allocation ", description)
+            latestState.homeLedger.userAllocation, allocations[0], string.concat(description, ": User allocation: ")
         );
-        assertEq(latestState.homeLedger.userNetFlow, expectedUserNetFlow, string.concat("User net flow ", description));
+        assertEq(latestState.homeLedger.userNetFlow, netFlows[0], string.concat(description, ": User net flow: "));
         assertEq(
-            latestState.homeLedger.nodeAllocation,
-            expectedNodeAllocation,
-            string.concat("Node allocation ", description)
+            latestState.homeLedger.nodeAllocation, allocations[1], string.concat(description, ": Node allocation: ")
         );
-        assertEq(latestState.homeLedger.nodeNetFlow, expectedNodeNetFlow, string.concat("Node net flow ", description));
+        assertEq(latestState.homeLedger.nodeNetFlow, netFlows[1], string.concat(description, ": Node net flow: "));
 
         uint256 nodeBalance = cHub.getAccountBalance(node, address(token));
-        uint256 expectedNodeBalance = expectedNodeNetFlow < 0
-            ? INITIAL_BALANCE + uint256(-expectedNodeNetFlow)
-            : INITIAL_BALANCE - uint256(expectedNodeNetFlow);
-        assertEq(nodeBalance, expectedNodeBalance, string.concat("Node vault balance ", description));
+        uint256 expectedNodeBalance =
+            netFlows[1] < 0 ? INITIAL_BALANCE + uint256(-netFlows[1]) : INITIAL_BALANCE - uint256(netFlows[1]);
+        assertEq(nodeBalance, expectedNodeBalance, string.concat(description, ": Node balance: "));
     }
 }

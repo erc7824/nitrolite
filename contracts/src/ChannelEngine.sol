@@ -26,6 +26,7 @@ library ChannelEngine {
     error IncorrectPreviousStateIntent();
     error IncorrectChannelStatus();
     error IncorrectStateVersion();
+    error ChallengeExpired();
 
     error IncorrectUserAllocation();
     error IncorrectNodeAllocation();
@@ -64,7 +65,6 @@ library ChannelEngine {
         ChannelStatus newStatus;
         uint64 newChallengeExpiry;
         bool updateLastState;
-        bool clearDispute;
         bool closeChannel;
     }
 
@@ -124,6 +124,11 @@ library ChannelEngine {
 
         require(netFlowsSum >= 0, NegativeNetFlowSum());
         require(allocsSum == netFlowsSum.toUint256(), IncorrectAllocationSum());
+
+        // If channel is DISPUTED, check that challenge hasn't expired
+        if (ctx.status == ChannelStatus.DISPUTED) {
+            require(block.timestamp <= ctx.challengeExpiry, ChallengeExpired());
+        }
     }
 
     // ========== Internal: Phase 2 - Intent-Specific Calculation ==========
@@ -183,7 +188,7 @@ library ChannelEngine {
         effects.userFundsDelta = userNfDelta; // Pull deposit from user
         effects.nodeFundsDelta = nodeNfDelta; // May lock more from node or release
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -205,7 +210,7 @@ library ChannelEngine {
         effects.userFundsDelta = userNfDelta; // Negative = push to user
         effects.nodeFundsDelta = nodeNfDelta;
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -228,7 +233,7 @@ library ChannelEngine {
         // Calculate effects
         effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -259,6 +264,7 @@ library ChannelEngine {
         effects.userFundsDelta = userNfDelta;
         effects.nodeFundsDelta = nodeNfDelta;
         effects.newStatus = ChannelStatus.CLOSED;
+        effects.newChallengeExpiry = 0;
         effects.closeChannel = true;
 
         return effects;
@@ -294,7 +300,7 @@ library ChannelEngine {
         // Calculate effects
         effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -313,16 +319,17 @@ library ChannelEngine {
                 || ctx.status == ChannelStatus.MIGRATING_IN,
             IncorrectChannelStatus()
         );
-        require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
-        // nothing changes from initiate escrow deposit state
-        require(userNfDelta == 0, IncorrectUserNetFlowDelta());
-        require(nodeNfDelta == 0, IncorrectNodeNetFlowDelta());
 
         // Check home - non-home state consistency
         require(ctx.prevState.intent == StateIntent.INITIATE_ESCROW_DEPOSIT, IncorrectPreviousStateIntent());
         require(candidate.version == ctx.prevState.version + 1, IncorrectStateVersion());
         require(candidate.nonHomeLedger.userAllocation == 0, IncorrectUserAllocation());
         require(candidate.nonHomeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
+
+        require(candidate.homeLedger.nodeAllocation == 0, IncorrectNodeAllocation());
+        // nothing changes from initiate escrow deposit state
+        require(userNfDelta == 0, IncorrectUserNetFlowDelta());
+        require(nodeNfDelta == 0, IncorrectNodeNetFlowDelta());
 
         uint256 depositAmount = ctx.prevState.nonHomeLedger.userAllocation;
         require(candidate.nonHomeLedger.userNetFlow == depositAmount.toInt256(), IncorrectUserNetFlow());
@@ -339,7 +346,7 @@ library ChannelEngine {
         effects.userFundsDelta = 0;
         effects.nodeFundsDelta = 0;
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -372,7 +379,7 @@ library ChannelEngine {
         // Calculate effects - no immediate fund movement
         effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -404,7 +411,7 @@ library ChannelEngine {
         // Calculate effects
         effects.nodeFundsDelta = nodeNfDelta; // Only node balance adjustments
         effects.newStatus = ChannelStatus.OPERATING;
-        effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+        effects.newChallengeExpiry = 0;
 
         return effects;
     }
@@ -469,7 +476,8 @@ library ChannelEngine {
 
             // Calculate effects - may adjust node vault based on net flow delta
             effects.nodeFundsDelta = nodeNfDelta;
-            effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+            effects.newStatus = ChannelStatus.OPERATING;
+            effects.newChallengeExpiry = 0;
         } else {
             revert IncorrectChannelStatus();
         }
@@ -523,7 +531,7 @@ library ChannelEngine {
             // Calculate effects - release all currently locked funds to node vault
             effects.nodeFundsDelta = nodeNfDelta;
             effects.newStatus = ChannelStatus.MIGRATED_OUT;
-            effects.clearDispute = (ctx.status == ChannelStatus.DISPUTED);
+            effects.newChallengeExpiry = 0;
             effects.closeChannel = true;
         } else {
             revert IncorrectChannelStatus();

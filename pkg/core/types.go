@@ -903,22 +903,33 @@ type Token struct {
 	Decimals     uint8  `json:"decimals"`      // Number of decimal places
 }
 
-// SessionKey represents a session key with spending allowances
-type SessionKey struct {
-	ID          uint64           `json:"id"`              // Unique identifier for the session key record
-	SessionKey  string           `json:"session_key"`     // The address of the session key
-	Application string           `json:"application"`     // Name of the application authorized for this session key
-	Allowances  []AssetAllowance `json:"allowances"`      // Asset allowances with usage tracking
-	Scope       *string          `json:"scope,omitempty"` // Permission scope for this session key
-	ExpiresAt   string           `json:"expires_at"`      // When this session key expires (ISO 8601 format)
-	CreatedAt   string           `json:"created_at"`      // When the session key was created (ISO 8601 format)
-}
+// GatedAction represents an action that can be gated behind certain conditions, such as feature flags or access controls.
+type GatedAction string
 
-// AssetAllowance represents asset allowance with usage tracking
-type AssetAllowance struct {
-	Asset     string          `json:"asset"`     // Symbol of the asset
-	Allowance decimal.Decimal `json:"allowance"` // Maximum amount the session key can spend
-	Used      decimal.Decimal `json:"used"`      // Amount already spent by this session key
+var (
+	Transfer GatedAction = "transfer"
+
+	AppSessionCreation   GatedAction = "app_session_deposit"
+	AppSessionOperation  GatedAction = "app_session_operation"
+	AppSessionDeposit    GatedAction = "app_session_deposit"
+	AppSessionWithdrawal GatedAction = "app_session_withdrawal"
+)
+
+// ID returns a unique identifier for the GatedAction, which can be used for efficient storage and retrieval in databases or feature flag systems.
+func (g GatedAction) ID() uint8 {
+	switch g {
+	case Transfer:
+		return 1
+	case AppSessionCreation:
+		return 10
+	case AppSessionOperation:
+		return 11
+	case AppSessionDeposit:
+		return 12
+	case AppSessionWithdrawal:
+		return 13
+	}
+	return 0
 }
 
 // ========= Blockchain CLient Response Types =========

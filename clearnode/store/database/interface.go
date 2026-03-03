@@ -1,6 +1,8 @@
 package database
 
 import (
+	"time"
+
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/shopspring/decimal"
@@ -192,6 +194,23 @@ type DatabaseStore interface {
 
 	// CountChannelsByStatus returns channel counts grouped by (asset, status).
 	CountChannelsByStatus() ([]ChannelCount, error)
+
+	// --- User Staked Operations ---
+
+	// UpdateUserStaked upserts the staked amount for a user on a specific blockchain.
+	UpdateUserStaked(wallet string, blockchainID uint64, amount decimal.Decimal) error
+
+	// GetUserStaked returns the total staked amount for a user across all blockchains.
+	GetTotalUserStaked(wallet string) (decimal.Decimal, error)
+
+	// --- Action Log Operations ---
+
+	// RecordAction inserts a new action log entry for a user.
+	RecordAction(wallet string, gatedAction core.GatedAction) error
+
+	// GetUserActionCount returns the number of actions matching the given wallet, method, and path
+	// within the specified time window.
+	GetUserActionCount(wallet string, gatedAction core.GatedAction, window time.Duration) (uint64, error)
 
 	// --- Contract Event Operations ---
 

@@ -55,7 +55,7 @@ client.getLatestState(wallet, asset, onlySigned)   // Latest state
 ### App Registry
 ```typescript
 client.getApps(opts)                                            // List registered apps
-client.registerApp(appDef)                                       // Register new app
+client.registerApp(appID, metadata, approvalNotRequired)         // Register new app
 ```
 
 ### App Sessions
@@ -409,13 +409,7 @@ const { apps, metadata } = await client.getApps({
 });
 
 // Register a new application
-await client.registerApp({
-  id: 'my-app',
-  owner_wallet: '0x1234...',
-  metadata: '{"name": "My App"}',
-  version: '1',
-  creation_approval_not_required: false,
-});
+await client.registerApp('my-app', '{"name": "My App"}', false);
 ```
 
 ### App Sessions (Low-Level)

@@ -50,7 +50,7 @@ client.GetLatestState(ctx, wallet, asset, onlySigned) // Latest state
 ### App Registry
 ```go
 client.GetApps(ctx, opts)                              // List registered apps
-client.RegisterApp(ctx, appDef)                        // Register new app
+client.RegisterApp(ctx, appID, metadata, approvalNotRequired) // Register new app
 ```
 
 ### App Sessions
@@ -368,14 +368,7 @@ apps, meta, err := client.GetApps(ctx, &sdk.GetAppsOptions{
 })
 
 // Register a new application
-appDef := app.AppV1{
-    ID:                          "my-app",
-    OwnerWallet:                 "0x1234...",
-    Metadata:                    `{"name": "My App"}`,
-    Version:                     1,
-    CreationApprovalNotRequired: false,
-}
-err := client.RegisterApp(ctx, appDef)
+err := client.RegisterApp(ctx, "my-app", `{"name": "My App"}`, false)
 ```
 
 ### App Sessions (Low-Level)

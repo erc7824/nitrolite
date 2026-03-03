@@ -67,27 +67,33 @@ func (c *Client) GetApps(ctx context.Context, opts *GetAppsOptions) ([]app.AppIn
 // RegisterApp registers a new application in the app registry.
 // Currently only version 1 (creation) is supported.
 //
-// The method packs the app definition and signs it with the client's key.
+// The method builds the app definition from the provided parameters,
+// using the client's signer address as the owner wallet and version 1.
+// It then packs and signs the definition automatically.
+//
 // Session key signers are not allowed to perform this action; the main
 // wallet signer must be used.
 //
 // Parameters:
-//   - appDef: The application definition
+//   - appID: The application identifier
+//   - metadata: The application metadata
+//   - creationApprovalNotRequired: Whether sessions can be created without owner approval
 //
 // Returns:
 //   - Error if the request fails
 //
 // Example:
 //
-//	appDef := app.AppV1{
-//	    ID:          "my-app",
-//	    OwnerWallet: "0x1234...",
-//	    Metadata:    `{"name": "My App"}`,
-//	    Version:     1,
-//	    CreationApprovalNotRequired: false,
-//	}
-//	err := client.RegisterApp(ctx, appDef)
-func (c *Client) RegisterApp(ctx context.Context, appDef app.AppV1) error {
+//	err := client.RegisterApp(ctx, "my-app", `{"name": "My App"}`, false)
+func (c *Client) RegisterApp(ctx context.Context, appID string, metadata string, creationApprovalNotRequired bool) error {
+	appDef := app.AppV1{
+		ID:                          appID,
+		OwnerWallet:                 c.GetUserAddress(),
+		Metadata:                    metadata,
+		Version:                     1,
+		CreationApprovalNotRequired: creationApprovalNotRequired,
+	}
+
 	packed, err := app.PackAppV1(appDef)
 	if err != nil {
 		return fmt.Errorf("failed to pack app: %w", err)

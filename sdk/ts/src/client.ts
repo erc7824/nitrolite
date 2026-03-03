@@ -1448,24 +1448,31 @@ export class Client {
    * RegisterApp registers a new application in the app registry.
    * Currently only version 1 (creation) is supported.
    *
-   * The method packs the app definition and signs it with the client's key.
+   * The method builds the app definition from the provided parameters,
+   * using the client's signer address as the owner wallet and version 1.
+   * It then packs and signs the definition automatically.
+   *
    * Session key signers are not allowed to perform this action; the main
    * wallet signer must be used.
    *
-   * @param appDef - The application definition
+   * @param appID - The application identifier
+   * @param metadata - The application metadata
+   * @param creationApprovalNotRequired - Whether sessions can be created without owner approval
    *
    * @example
    * ```typescript
-   * await client.registerApp({
-   *   id: 'my-app',
-   *   owner_wallet: '0x1234...',
-   *   metadata: '{"name": "My App"}',
-   *   version: '1',
-   *   creation_approval_not_required: false,
-   * });
+   * await client.registerApp('my-app', '{"name": "My App"}', false);
    * ```
    */
-  async registerApp(appDef: AppV1): Promise<void> {
+  async registerApp(appID: string, metadata: string, creationApprovalNotRequired: boolean): Promise<void> {
+    const appDef: AppV1 = {
+      id: appID,
+      owner_wallet: this.txSigner.getAddress(),
+      metadata,
+      version: '1',
+      creation_approval_not_required: creationApprovalNotRequired,
+    };
+
     const packed = app.packAppV1(appDef);
     const ownerSig = await this.stateSigner.signMessage(packed);
 

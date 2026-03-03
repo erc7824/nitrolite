@@ -22,6 +22,9 @@ ValidationResult constant VALIDATION_SUCCESS = ValidationResult.wrap(1);
  * construct the full message according to their specific signing scheme.
  */
 interface ISignatureValidator {
+    error EmptyChannelId();
+    error InvalidSignerAddress();
+
     /**
      * @notice Validates a participant's signature
      * @param channelId The channel identifier to be included in the signed message

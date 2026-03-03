@@ -35,6 +35,9 @@ contract ECDSAValidator is ISignatureValidator {
         bytes calldata signature,
         address participant
     ) external pure returns (ValidationResult) {
+        require(channelId != bytes32(0), EmptyChannelId());
+        require(participant != address(0), InvalidSignerAddress());
+
         bytes memory message = Utils.pack(channelId, signingData);
         if (EcdsaSignatureUtils.validateEcdsaSigner(message, signature, participant)) {
             return VALIDATION_SUCCESS;

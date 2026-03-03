@@ -4,14 +4,14 @@ import {
     ChannelSessionKeyStateSigner,
     type StateSigner,
     type TransactionSigner,
-} from '@erc7824/nitrolite';
+} from '@yellow-org/sdk';
 import type {
     AppDefinitionV1,
     AppParticipantV1,
     AppAllocationV1,
     AppSessionKeyStateV1,
     ChannelSessionKeyStateV1,
-} from '@erc7824/nitrolite';
+} from '@yellow-org/sdk';
 import Decimal from 'decimal.js';
 import { Address, Hex, WalletClient, formatUnits, parseUnits } from 'viem';
 

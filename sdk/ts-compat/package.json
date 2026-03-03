@@ -1,6 +1,6 @@
 {
-    "name": "@erc7824/nitrolite-compat",
-    "version": "1.1.0",
+    "name": "@yellow-org/sdk-compat",
+    "version": "1.1.1",
     "description": "Compatibility layer bridging Nitrolite SDK v0.5.3 API to v1.0.0, minimising migration effort for existing dApps.",
     "type": "module",
     "sideEffects": false,
@@ -17,6 +17,7 @@
         "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
     },
     "keywords": [
+        "yellow",
         "erc7824",
         "nitrolite",
         "compat",
@@ -34,14 +35,14 @@
         "node": ">=20.0.0"
     },
     "peerDependencies": {
-        "@erc7824/nitrolite": ">=0.5.3",
+        "@yellow-org/sdk": ">=1.0.0",
         "viem": "^2.0.0"
     },
     "dependencies": {
         "decimal.js": "^10.4.3"
     },
     "devDependencies": {
-        "@erc7824/nitrolite": "file:../ts",
+        "@yellow-org/sdk": "file:../ts",
         "@types/node": "^25.3.0",
         "tsx": "^4.21.0",
         "typescript": "^5.9.3",

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Sun, Moon } from 'lucide-react';
-import { Client, withBlockchainRPC, ChannelDefaultSigner, ChannelSessionKeyStateSigner } from '@erc7824/nitrolite';
+import { Client, withBlockchainRPC, ChannelDefaultSigner, ChannelSessionKeyStateSigner } from '@yellow-org/sdk';
 import { createWalletClient, custom, type WalletClient } from 'viem';
 import { mainnet } from 'viem/chains';
 import { WalletStateSigner, WalletTransactionSigner } from './walletSigners';

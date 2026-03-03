@@ -1,4 +1,4 @@
-import { type Option, withBlockchainRPC } from '@erc7824/nitrolite';
+import { type Option, withBlockchainRPC } from '@yellow-org/sdk';
 
 export interface CompatClientConfig {
     wsURL: string;

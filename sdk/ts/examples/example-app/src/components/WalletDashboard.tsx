@@ -11,8 +11,8 @@ import Decimal from 'decimal.js';
 import {
   getChannelSessionKeyAuthMetadataHashV1,
   packChannelKeyStateV1,
-} from '@erc7824/nitrolite';
-import type { Client, ChannelSessionKeyStateV1 } from '@erc7824/nitrolite';
+} from '@yellow-org/sdk';
+import type { Client, ChannelSessionKeyStateV1 } from '@yellow-org/sdk';
 import type { SessionKeyState, StatusMessage } from '../types';
 import { formatAddress, formatBalance, timeAgo, formatTxType } from '../utils';
 import { Button } from './ui/button';

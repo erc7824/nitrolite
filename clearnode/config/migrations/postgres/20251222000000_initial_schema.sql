@@ -119,7 +119,7 @@ CREATE TABLE app_sessions_v1 (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_app_sessions_v1_application ON app_sessions_v1(application);
+CREATE INDEX idx_app_sessions_v1_application ON app_sessions_v1(application_id);
 CREATE INDEX idx_app_sessions_v1_status ON app_sessions_v1(status);
 
 -- App Session Participants table: Participants in application sessions

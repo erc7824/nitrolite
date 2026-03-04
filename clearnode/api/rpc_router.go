@@ -140,6 +140,7 @@ func NewRPCRouter(
 	userV1Group := r.Node.NewGroup(rpc.UserV1Group.String())
 	userV1Group.Handle(rpc.UserV1GetBalancesMethod.String(), userV1Handler.GetBalances)
 	userV1Group.Handle(rpc.UserV1GetTransactionsMethod.String(), userV1Handler.GetTransactions)
+	userV1Group.Handle(rpc.UserV1GetActionAllowancesMethod.String(), userV1Handler.GetActionAllowances)
 
 	return r
 }

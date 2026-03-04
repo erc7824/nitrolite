@@ -907,29 +907,48 @@ type Token struct {
 type GatedAction string
 
 var (
-	Transfer GatedAction = "transfer"
+	GatedActionTransfer GatedAction = "transfer"
 
-	AppSessionCreation   GatedAction = "app_session_deposit"
-	AppSessionOperation  GatedAction = "app_session_operation"
-	AppSessionDeposit    GatedAction = "app_session_deposit"
-	AppSessionWithdrawal GatedAction = "app_session_withdrawal"
+	GatedActionAppSessionCreation   GatedAction = "app_session_deposit"
+	GatedActionAppSessionOperation  GatedAction = "app_session_operation"
+	GatedActionAppSessionDeposit    GatedAction = "app_session_deposit"
+	GatedActionAppSessionWithdrawal GatedAction = "app_session_withdrawal"
 )
 
 // ID returns a unique identifier for the GatedAction, which can be used for efficient storage and retrieval in databases or feature flag systems.
 func (g GatedAction) ID() uint8 {
 	switch g {
-	case Transfer:
+	case GatedActionTransfer:
 		return 1
-	case AppSessionCreation:
+	case GatedActionAppSessionCreation:
 		return 10
-	case AppSessionOperation:
+	case GatedActionAppSessionOperation:
 		return 11
-	case AppSessionDeposit:
+	case GatedActionAppSessionDeposit:
 		return 12
-	case AppSessionWithdrawal:
+	case GatedActionAppSessionWithdrawal:
 		return 13
 	}
 	return 0
+}
+
+// GatedActionFromID returns the GatedAction corresponding to the given uint8 ID.
+// Returns an empty GatedAction and false if the ID is unknown.
+func GatedActionFromID(id uint8) (GatedAction, bool) {
+	switch id {
+	case 1:
+		return GatedActionTransfer, true
+	case 10:
+		return GatedActionAppSessionCreation, true
+	case 11:
+		return GatedActionAppSessionOperation, true
+	case 12:
+		return GatedActionAppSessionDeposit, true
+	case 13:
+		return GatedActionAppSessionWithdrawal, true
+	default:
+		return "", false
+	}
 }
 
 // ========= Blockchain CLient Response Types =========

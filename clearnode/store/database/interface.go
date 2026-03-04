@@ -126,6 +126,9 @@ type DatabaseStore interface {
 	// GetApps retrieves applications with optional filtering by app ID, owner wallet, and pagination.
 	GetApps(appID *string, ownerWallet *string, pagination *core.PaginationParams) ([]app.AppInfoV1, core.PaginationMetadata, error)
 
+	// GetAppCount returns the total number of applications owned by a specific wallet.
+	GetAppCount(ownerWallet string) (uint64, error)
+
 	// --- App Session Operations ---
 
 	// CreateAppSession initializes a new application session.
@@ -211,6 +214,9 @@ type DatabaseStore interface {
 	// GetUserActionCount returns the number of actions matching the given wallet, method, and path
 	// within the specified time window.
 	GetUserActionCount(wallet string, gatedAction core.GatedAction, window time.Duration) (uint64, error)
+
+	// GetUserActionCounts returns a map of gated actions to their respective counts for a user within the specified time window.
+	GetUserActionCounts(userWallet string, window time.Duration) (map[core.GatedAction]uint64, error)
 
 	// --- Contract Event Operations ---
 

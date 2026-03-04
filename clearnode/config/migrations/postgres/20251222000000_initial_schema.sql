@@ -275,17 +275,14 @@ CREATE INDEX idx_user_staked_v1_user_wallet ON user_staked_v1(user_wallet);
 CREATE TABLE action_log_v1 (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_wallet CHAR(42) NOT NULL,
-    method SMALLINT NOT NULL,
-    path SMALLINT NOT NULL,
+    gated_action SMALLINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_action_log_v1_wallet_method_path_created ON action_log_v1(user_wallet, method, path, created_at DESC);
-CREATE INDEX idx_action_log_v1_wallet_method_created ON action_log_v1(user_wallet, method, created_at DESC);
+CREATE INDEX idx_action_log_v1_wallet_gated_action_created ON action_log_v1(user_wallet, gated_action, created_at DESC);
 
 -- +goose Down
-DROP INDEX IF EXISTS idx_action_log_v1_wallet_method_created;
-DROP INDEX IF EXISTS idx_action_log_v1_wallet_method_path_created;
+DROP INDEX IF EXISTS idx_action_log_v1_wallet_gated_action_created;
 DROP TABLE IF EXISTS action_log_v1;
 DROP INDEX IF EXISTS idx_user_staked_v1_user_wallet;
 DROP TABLE IF EXISTS user_staked_v1;

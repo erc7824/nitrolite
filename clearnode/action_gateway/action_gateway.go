@@ -62,7 +62,7 @@ func NewActionGatewayFromYaml(configDirPath string) (*ActionGateway, error) {
 	return NewActionGateway(cfg)
 }
 
-type AVStore interface {
+type Store interface {
 	// GetAppCount returns the total number of applications owned by a specific wallet.
 	GetAppCount(ownerWallet string) (uint64, error)
 
@@ -80,7 +80,7 @@ type AVStore interface {
 	GetUserActionCounts(userWallet string, window time.Duration) (map[core.GatedAction]uint64, error)
 }
 
-func (a *ActionGateway) AllowAction(tx AVStore, userAddress string, gatedAction core.GatedAction) error {
+func (a *ActionGateway) AllowAction(tx Store, userAddress string, gatedAction core.GatedAction) error {
 	if _, ok := a.cfg.ActionGates[gatedAction]; !ok {
 		return nil
 	}
@@ -119,7 +119,7 @@ func (a *ActionGateway) AllowAction(tx AVStore, userAddress string, gatedAction 
 	return nil
 }
 
-func (v *ActionGateway) AllowAppRegistration(tx AVStore, userAddress string) error {
+func (v *ActionGateway) AllowAppRegistration(tx Store, userAddress string) error {
 	stakedTokens, err := tx.GetTotalUserStaked(userAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get user staked amount: %w", err)
@@ -155,15 +155,8 @@ func (a *ActionGateway) stakedTo24hActionsAllowance(gatedAction core.GatedAction
 	return actionAllowance
 }
 
-type ActionAllowance struct {
-	GatedAction core.GatedAction
-	TimeWindow  string
-	Allowance   uint64
-	Used        uint64
-}
-
 // GetUserAllowances returns user allowance for every gated action.
-func (a *ActionGateway) GetUserAllowances(tx AVStore, userAddress string) ([]ActionAllowance, error) {
+func (a *ActionGateway) GetUserAllowances(tx Store, userAddress string) ([]core.ActionAllowance, error) {
 	stakedTokens, err := tx.GetTotalUserStaked(userAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user staked amount: %w", err)
@@ -186,9 +179,9 @@ func (a *ActionGateway) GetUserAllowances(tx AVStore, userAddress string) ([]Act
 	}
 
 	timeWindowStr := defaultTimeWindow.String()
-	result := make([]ActionAllowance, 0, len(a.cfg.ActionGates))
+	result := make([]core.ActionAllowance, 0, len(a.cfg.ActionGates))
 	for action := range a.cfg.ActionGates {
-		result = append(result, ActionAllowance{
+		result = append(result, core.ActionAllowance{
 			GatedAction: action,
 			TimeWindow:  timeWindowStr,
 			Allowance:   a.stakedTo24hActionsAllowance(action, remainingStaked),
@@ -196,7 +189,7 @@ func (a *ActionGateway) GetUserAllowances(tx AVStore, userAddress string) ([]Act
 		})
 	}
 
-	slices.SortFunc(result, func(a, b ActionAllowance) int {
+	slices.SortFunc(result, func(a, b core.ActionAllowance) int {
 		return int(a.GatedAction.ID()) - int(b.GatedAction.ID())
 	})
 

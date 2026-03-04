@@ -56,8 +56,8 @@ func TestSubmitDepositState_Success(t *testing.T) {
 
 	// Create existing app session
 	existingAppSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{
 				WalletAddress:   participant1,
@@ -152,6 +152,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
 
 	// Mock allocations check - empty initially
@@ -319,8 +320,20 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 		},
 	}
 
-	// Mock expectations - LockUserState is called before transition type check
-	mockStore.On("LockUserState", participant1, asset).Return(decimal.Zero, nil).Once()
+	// Mock expectations
+	existingAppSession := &app.AppSessionV1{
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: participant1, SignatureWeight: 1},
+		},
+		Quorum:  1,
+		Status:  app.AppSessionStatusOpen,
+		Version: 1,
+	}
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
+	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
+	mockStore.On("LockUserState", participant1, asset).Return(decimal.Zero, nil).Maybe()
 
 	// Create RPC request
 	rpcState := toRPCState(userState)
@@ -390,8 +403,8 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 
 	// Create existing app session with higher quorum requirement
 	existingAppSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{
 				WalletAddress:   participant1,
@@ -477,6 +490,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
 	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
 
 	// Create RPC request

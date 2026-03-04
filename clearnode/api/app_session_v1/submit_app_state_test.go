@@ -29,6 +29,7 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -43,8 +44,8 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 5},
 			{WalletAddress: participant2, SignatureWeight: 5},
@@ -96,6 +97,7 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
@@ -140,6 +142,7 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -154,8 +157,8 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 5},
 			{WalletAddress: participant2, SignatureWeight: 5},
@@ -209,6 +212,7 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
@@ -257,6 +261,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -270,8 +275,8 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	participant1 := wallet1.Address
 
 	existingSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
@@ -313,6 +318,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
@@ -367,6 +373,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -381,8 +388,8 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 5},
 			{WalletAddress: participant2, SignatureWeight: 5},
@@ -430,6 +437,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
@@ -491,6 +499,7 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -504,8 +513,8 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 	participant1 := wallet1.Address
 
 	existingSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
@@ -547,6 +556,7 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil).Maybe()
@@ -586,6 +596,7 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -600,8 +611,8 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 5},
 			{WalletAddress: participant2, SignatureWeight: 5},
@@ -651,6 +662,7 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
@@ -695,6 +707,7 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -708,8 +721,8 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 	participant1 := wallet1.Address
 
 	existingSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
@@ -752,6 +765,7 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil).Maybe()
@@ -802,6 +816,7 @@ func TestSubmitAppState_DepositIntent_Rejected(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -856,6 +871,7 @@ func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -884,6 +900,7 @@ func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 
 	// Create RPC context
@@ -922,6 +939,7 @@ func TestSubmitAppState_InvalidVersion_Rejected(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -954,6 +972,7 @@ func TestSubmitAppState_InvalidVersion_Rejected(t *testing.T) {
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 
 	// Create RPC context
@@ -992,6 +1011,7 @@ func TestSubmitAppState_SessionNotFound_Rejected(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -1051,6 +1071,7 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -1064,8 +1085,8 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 	participant1 := wallet1.Address
 
 	existingSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
@@ -1113,6 +1134,7 @@ func TestSubmitAppState_OperateIntent_InvalidDecimalPrecision_Rejected(t *testin
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
@@ -1155,6 +1177,7 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -1168,8 +1191,8 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 	participant1 := wallet1.Address
 
 	existingSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
@@ -1213,6 +1236,7 @@ func TestSubmitAppState_WithdrawIntent_InvalidDecimalPrecision_Rejected(t *testi
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockAssetStore.On("GetAssetDecimals", "USDC").Return(uint8(6), nil)
@@ -1255,6 +1279,7 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 	handler := NewHandler(
 		storeTxProvider,
 		mockAssetStore,
+		&MockActionGateway{},
 		mockSigner,
 		core.NewStateAdvancerV1(mockAssetStore),
 		mockStatePacker,
@@ -1270,8 +1295,8 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 	participant2 := wallet2.Address
 
 	existingSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
+		SessionID:     appSessionID,
+		ApplicationID: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 50},
 			{WalletAddress: participant2, SignatureWeight: 50},
@@ -1322,6 +1347,7 @@ func TestSubmitAppState_OperateIntent_RedistributeToNewParticipant_Success(t *te
 	}
 
 	// Mock expectations
+	mockStore.On("GetApp", mock.Anything).Return(nil, nil).Maybe()
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)

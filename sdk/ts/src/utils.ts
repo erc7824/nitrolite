@@ -4,7 +4,7 @@
 
 import * as core from './core/types';
 import * as API from './rpc/api';
-import { AssetV1, BalanceEntryV1, ChannelV1, LedgerV1, TransitionV1, StateV1, TransactionV1, PaginationMetadataV1 } from './rpc/types';
+import { AssetV1, BalanceEntryV1, ChannelV1, LedgerV1, TransitionV1, StateV1, TransactionV1, PaginationMetadataV1, ActionAllowanceV1 } from './rpc/types';
 import Decimal from 'decimal.js';
 import { Address } from 'viem';
 
@@ -278,6 +278,22 @@ export function transformPaginationMetadata(
 }
 
 // ============================================================================
+// Action Allowance Transformations
+// ============================================================================
+
+/**
+ * Transform RPC ActionAllowanceV1 to core ActionAllowance
+ */
+export function transformActionAllowance(a: ActionAllowanceV1): core.ActionAllowance {
+  return {
+    gatedAction: a.gated_action,
+    timeWindow: a.time_window,
+    allowance: BigInt(a.allowance),
+    used: BigInt(a.used),
+  };
+}
+
+// ============================================================================
 // App Session Transformations
 // ============================================================================
 
@@ -340,15 +356,10 @@ export function transformSignedAppStateUpdateToRPC(signed: SignedAppStateUpdateV
 export function transformAppSessionInfo(raw: any): AppSessionInfoV1 {
   return {
     appSessionId: raw.app_session_id,
+    appDefinition: transformAppDefinitionFromRPC(raw.app_definition || {}),
     isClosed: raw.status === 'closed',
-    participants: (raw.participants || []).map((p: any) => ({
-      walletAddress: p.wallet_address as Address,
-      signatureWeight: p.signature_weight,
-    })),
     sessionData: raw.session_data || '',
-    quorum: raw.quorum,
     version: BigInt(raw.version),
-    nonce: BigInt(raw.nonce),
     allocations: (raw.allocations || []).map((a: any) => ({
       participant: a.participant as Address,
       asset: a.asset,

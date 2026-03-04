@@ -842,6 +842,15 @@ func (t TransitionType) String() string {
 	}
 }
 
+func (t TransitionType) GatedAction() GatedAction {
+	switch t {
+	case TransitionTypeTransferSend:
+		return GatedActionTransfer
+	default:
+		return ""
+	}
+}
+
 // Transition represents a state transition
 type Transition struct {
 	Type      TransitionType  `json:"type"`       // Type of state transition
@@ -949,6 +958,15 @@ func GatedActionFromID(id uint8) (GatedAction, bool) {
 	default:
 		return "", false
 	}
+}
+
+// ActionAllowance represents the allowance information for a specific gated action,
+// including the time window for which the allowance applies, the total allowance, and the amount used.
+type ActionAllowance struct {
+	GatedAction GatedAction
+	TimeWindow  string
+	Allowance   uint64
+	Used        uint64
 }
 
 // ========= Blockchain CLient Response Types =========

@@ -52,11 +52,15 @@ NODE INFORMATION (Base Client)
 USER QUERIES (Base Client)
   balances [wallet]             Get user balances (defaults to configured wallet)
   transactions [wallet]         Get transaction history (defaults to configured wallet)
+  action-allowances [wallet]    Get action allowances (defaults to configured wallet)
 
 LOW-LEVEL STATE MANAGEMENT (Base Client)
   state [wallet] <asset>        Get latest state (wallet defaults to configured)
   home-channel [wallet] <asset> Get home channel (wallet defaults to configured)
   escrow-channel <channel_id>   Get escrow channel by ID
+
+APP REGISTRY
+  register-app <app_id> [no-approval]  Register a new application
 
 LOW-LEVEL APP SESSIONS (Base Client)
   app-sessions                  List app sessions
@@ -714,6 +718,54 @@ func (o *Operator) listTransactions(ctx context.Context, wallet string) {
 	}
 }
 
+func (o *Operator) getActionAllowances(ctx context.Context, wallet string) {
+	allowances, err := o.client.GetActionAllowances(ctx, wallet)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to get action allowances: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Action Allowances for %s\n", wallet)
+	fmt.Println("========================================")
+	if len(allowances) == 0 {
+		fmt.Println("No action allowances found")
+		return
+	}
+
+	for _, a := range allowances {
+		fmt.Printf("- %s\n", a.GatedAction)
+		fmt.Printf("  Window:    %s\n", a.TimeWindow)
+		fmt.Printf("  Used:      %d / %d\n", a.Used, a.Allowance)
+		remaining := uint64(0)
+		if a.Allowance > a.Used {
+			remaining = a.Allowance - a.Used
+		}
+		fmt.Printf("  Remaining: %d\n", remaining)
+	}
+}
+
+// ============================================================================
+// App Registry
+// ============================================================================
+
+func (o *Operator) registerApp(ctx context.Context, appID, metadata string, creationApprovalNotRequired bool) {
+	fmt.Printf("Registering application: %s...\n", appID)
+
+	err := o.client.RegisterApp(ctx, appID, metadata, creationApprovalNotRequired)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to register app: %v\n", err)
+		return
+	}
+
+	fmt.Println("SUCCESS: Application registered")
+	fmt.Printf("  App ID:   %s\n", appID)
+	if creationApprovalNotRequired {
+		fmt.Println("  Approval: Not required for session creation")
+	} else {
+		fmt.Println("  Approval: Required for session creation")
+	}
+}
+
 // ============================================================================
 // Low-Level State Management (Base Client)
 // ============================================================================
@@ -774,10 +826,10 @@ func (o *Operator) listAppSessions(ctx context.Context, wallet string) {
 	for _, session := range sessions {
 		fmt.Printf("\n- Session %s\n", session.AppSessionID)
 		fmt.Printf("  Version:      %d\n", session.Version)
-		fmt.Printf("  Nonce:        %d\n", session.Nonce)
-		fmt.Printf("  Quorum:       %d\n", session.Quorum)
+		fmt.Printf("  Nonce:        %d\n", session.AppDefinition.Nonce)
+		fmt.Printf("  Quorum:       %d\n", session.AppDefinition.Quorum)
 		fmt.Printf("  Closed:       %v\n", session.IsClosed)
-		fmt.Printf("  Participants: %d\n", len(session.Participants))
+		fmt.Printf("  Participants: %d\n", len(session.AppDefinition.Participants))
 		fmt.Printf("  Allocations:  %d\n", len(session.Allocations))
 	}
 }

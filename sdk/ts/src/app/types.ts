@@ -138,12 +138,10 @@ export interface SignedAppStateUpdateV1 {
  */
 export interface AppSessionInfoV1 {
   appSessionId: string;
+  appDefinition: AppDefinitionV1;
   isClosed: boolean;
-  participants: AppParticipantV1[];
   sessionData: string;
-  quorum: number; // uint8
   version: bigint; // uint64
-  nonce: bigint; // uint64
   allocations: AppAllocationV1[];
 }
 

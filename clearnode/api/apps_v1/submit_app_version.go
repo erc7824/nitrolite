@@ -81,7 +81,7 @@ func (h *Handler) SubmitAppVersion(c *rpc.Context) {
 			return rpc.Errorf("invalid owner signature: %v", err)
 		}
 
-		if err := h.store.CreateApp(appEntry); err != nil {
+		if err := tx.CreateApp(appEntry); err != nil {
 			return rpc.Errorf("failed to create app")
 		}
 

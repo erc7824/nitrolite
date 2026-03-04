@@ -171,8 +171,6 @@ func (m *MockStore) GetUserActionCounts(userWallet string, window time.Duration)
 	return args.Get(0).(map[core.GatedAction]uint64), args.Error(1)
 }
 
-// MockActionGateway is a simple mock that always allows actions.
-// Set Err to a non-nil value to simulate rejection.
 type MockActionGateway struct {
 	Err error
 }

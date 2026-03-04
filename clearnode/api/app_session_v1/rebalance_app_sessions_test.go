@@ -43,7 +43,7 @@ func TestRebalanceAppSessions_Success_TwoSessions(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		nil,
-		nil,
+		&MockActionGateway{},
 		nil,
 		nil,
 		nil,
@@ -150,7 +150,9 @@ func TestRebalanceAppSessions_Success_TwoSessions(t *testing.T) {
 	}
 
 	// Mock expectations for session 1
-	mockStore.On("GetApp", mock.Anything).Return(nil, nil)
+	mockStore.On("GetApp", mock.Anything).Return(&app.AppInfoV1{
+		App: app.AppV1{ID: "test-app", OwnerWallet: "0x0000000000000000000000000000000000000001"},
+	}, nil)
 	mockStore.On("GetAppSession", sessionID1).Return(session1, nil)
 	mockStore.On("GetParticipantAllocations", sessionID1).Return(currentAllocations1, nil)
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
@@ -160,7 +162,9 @@ func TestRebalanceAppSessions_Success_TwoSessions(t *testing.T) {
 	})).Return(nil).Once()
 
 	// Mock expectations for session 2
-	mockStore.On("GetApp", mock.Anything).Return(nil, nil)
+	mockStore.On("GetApp", mock.Anything).Return(&app.AppInfoV1{
+		App: app.AppV1{ID: "test-app", OwnerWallet: "0x0000000000000000000000000000000000000001"},
+	}, nil)
 	mockStore.On("GetAppSession", sessionID2).Return(session2, nil)
 	mockStore.On("GetParticipantAllocations", sessionID2).Return(currentAllocations2, nil)
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
@@ -210,7 +214,7 @@ func TestRebalanceAppSessions_Success_MultiAsset(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		nil,
-		nil,
+		&MockActionGateway{},
 		nil,
 		nil,
 		nil,
@@ -317,14 +321,18 @@ func TestRebalanceAppSessions_Success_MultiAsset(t *testing.T) {
 	}
 
 	// Mock expectations
-	mockStore.On("GetApp", mock.Anything).Return(nil, nil)
+	mockStore.On("GetApp", mock.Anything).Return(&app.AppInfoV1{
+		App: app.AppV1{ID: "test-app", OwnerWallet: "0x0000000000000000000000000000000000000001"},
+	}, nil)
 	mockStore.On("GetAppSession", sessionID1).Return(session1, nil)
 	mockStore.On("GetParticipantAllocations", sessionID1).Return(currentAllocations1, nil)
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(s app.AppSessionV1) bool {
 		return s.SessionID == sessionID1 && s.Version == 2
 	})).Return(nil).Once()
 
-	mockStore.On("GetApp", mock.Anything).Return(nil, nil)
+	mockStore.On("GetApp", mock.Anything).Return(&app.AppInfoV1{
+		App: app.AppV1{ID: "test-app", OwnerWallet: "0x0000000000000000000000000000000000000001"},
+	}, nil)
 	mockStore.On("GetAppSession", sessionID2).Return(session2, nil)
 	mockStore.On("GetParticipantAllocations", sessionID2).Return(currentAllocations2, nil)
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(s app.AppSessionV1) bool {
@@ -366,7 +374,7 @@ func TestRebalanceAppSessions_Error_InsufficientSessions(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		nil,
-		nil,
+		&MockActionGateway{},
 		nil,
 		nil,
 		nil,
@@ -424,7 +432,7 @@ func TestRebalanceAppSessions_Error_InvalidIntent(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		nil,
-		nil,
+		&MockActionGateway{},
 		nil,
 		nil,
 		nil,
@@ -498,7 +506,7 @@ func TestRebalanceAppSessions_Error_DuplicateSession(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		nil,
-		nil,
+		&MockActionGateway{},
 		nil,
 		nil,
 		nil,
@@ -574,7 +582,7 @@ func TestRebalanceAppSessions_Error_ConservationViolation(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		nil,
-		nil,
+		&MockActionGateway{},
 		nil,
 		nil,
 		nil,
@@ -674,14 +682,18 @@ func TestRebalanceAppSessions_Error_ConservationViolation(t *testing.T) {
 	}
 
 	// Mock expectations
-	mockStore.On("GetApp", mock.Anything).Return(nil, nil)
+	mockStore.On("GetApp", mock.Anything).Return(&app.AppInfoV1{
+		App: app.AppV1{ID: "test-app", OwnerWallet: "0x0000000000000000000000000000000000000001"},
+	}, nil)
 	mockStore.On("GetAppSession", sessionID1).Return(session1, nil)
 	mockStore.On("GetParticipantAllocations", sessionID1).Return(currentAllocations1, nil)
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(s app.AppSessionV1) bool {
 		return s.SessionID == sessionID1 && s.Version == 2
 	})).Return(nil).Once()
 
-	mockStore.On("GetApp", mock.Anything).Return(nil, nil)
+	mockStore.On("GetApp", mock.Anything).Return(&app.AppInfoV1{
+		App: app.AppV1{ID: "test-app", OwnerWallet: "0x0000000000000000000000000000000000000001"},
+	}, nil)
 	mockStore.On("GetAppSession", sessionID2).Return(session2, nil)
 	mockStore.On("GetParticipantAllocations", sessionID2).Return(currentAllocations2, nil)
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(s app.AppSessionV1) bool {
@@ -716,7 +728,7 @@ func TestRebalanceAppSessions_Error_SessionNotFound(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		nil,
-		nil,
+		&MockActionGateway{},
 		nil,
 		nil,
 		nil,
@@ -797,7 +809,7 @@ func TestRebalanceAppSessions_Error_ClosedSession(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		nil,
-		nil,
+		&MockActionGateway{},
 		nil,
 		nil,
 		nil,
@@ -813,9 +825,10 @@ func TestRebalanceAppSessions_Error_ClosedSession(t *testing.T) {
 	sessionID2 := "0x2222222222222222222222222222222222222222222222222222222222222222"
 
 	session1 := &app.AppSessionV1{
-		SessionID: sessionID1,
-		Status:    app.AppSessionStatusClosed, // Closed
-		Version:   1,
+		SessionID:     sessionID1,
+		ApplicationID: "test-app",
+		Status:        app.AppSessionStatusClosed, // Closed
+		Version:       1,
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: wallet1.Address, SignatureWeight: 1},
 			{WalletAddress: wallet2.Address, SignatureWeight: 1},
@@ -858,7 +871,9 @@ func TestRebalanceAppSessions_Error_ClosedSession(t *testing.T) {
 		},
 	}
 
-	mockStore.On("GetApp", mock.Anything).Return(nil, nil)
+	mockStore.On("GetApp", mock.Anything).Return(&app.AppInfoV1{
+		App: app.AppV1{ID: "test-app", OwnerWallet: "0x0000000000000000000000000000000000000001"},
+	}, nil)
 	mockStore.On("GetAppSession", sessionID1).Return(session1, nil)
 
 	payload, err := rpc.NewPayload(reqPayload)
@@ -889,7 +904,7 @@ func TestRebalanceAppSessions_Error_InvalidVersion(t *testing.T) {
 	handler := NewHandler(
 		storeTxProvider,
 		nil,
-		nil,
+		&MockActionGateway{},
 		nil,
 		nil,
 		nil,
@@ -905,9 +920,10 @@ func TestRebalanceAppSessions_Error_InvalidVersion(t *testing.T) {
 	sessionID2 := "0x2222222222222222222222222222222222222222222222222222222222222222"
 
 	session1 := &app.AppSessionV1{
-		SessionID: sessionID1,
-		Status:    app.AppSessionStatusOpen,
-		Version:   5, // Current version is 5
+		SessionID:     sessionID1,
+		ApplicationID: "test-app",
+		Status:        app.AppSessionStatusOpen,
+		Version:       5, // Current version is 5
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: wallet1.Address, SignatureWeight: 1},
 			{WalletAddress: wallet2.Address, SignatureWeight: 1},
@@ -950,7 +966,9 @@ func TestRebalanceAppSessions_Error_InvalidVersion(t *testing.T) {
 		},
 	}
 
-	mockStore.On("GetApp", mock.Anything).Return(nil, nil)
+	mockStore.On("GetApp", mock.Anything).Return(&app.AppInfoV1{
+		App: app.AppV1{ID: "test-app", OwnerWallet: "0x0000000000000000000000000000000000000001"},
+	}, nil)
 	mockStore.On("GetAppSession", sessionID1).Return(session1, nil)
 
 	payload, err := rpc.NewPayload(reqPayload)

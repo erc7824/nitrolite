@@ -102,15 +102,25 @@ func (c *Client) GetActionAllowances(ctx context.Context, wallet string) ([]core
 	if err != nil {
 		return nil, fmt.Errorf("failed to get action allowances: %w", err)
 	}
-	return transformActionAllowances(resp.Allowances), nil
+	allowances, err := transformActionAllowances(resp.Allowances)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform action allowances: %w", err)
+	}
+	return allowances, nil
 }
 
 // transformActionAllowances converts RPC ActionAllowanceV1 slice to core.ActionAllowance slice.
-func transformActionAllowances(allowances []rpc.ActionAllowanceV1) []core.ActionAllowance {
+func transformActionAllowances(allowances []rpc.ActionAllowanceV1) ([]core.ActionAllowance, error) {
 	result := make([]core.ActionAllowance, 0, len(allowances))
 	for _, a := range allowances {
-		allowance, _ := strconv.ParseUint(a.Allowance, 10, 64)
-		used, _ := strconv.ParseUint(a.Used, 10, 64)
+		allowance, err := strconv.ParseUint(a.Allowance, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid allowance value %q for action %q: %w", a.Allowance, a.GatedAction, err)
+		}
+		used, err := strconv.ParseUint(a.Used, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid used value %q for action %q: %w", a.Used, a.GatedAction, err)
+		}
 		result = append(result, core.ActionAllowance{
 			GatedAction: a.GatedAction,
 			TimeWindow:  a.TimeWindow,
@@ -118,5 +128,5 @@ func transformActionAllowances(allowances []rpc.ActionAllowanceV1) []core.Action
 			Used:        used,
 		})
 	}
-	return result
+	return result, nil
 }

@@ -41,6 +41,18 @@ func NewActionGateway(cfg ActionLimitConfig) (*ActionGateway, error) {
 		return nil, errors.New("AppCost must be greater than zero")
 	}
 
+	seenIDs := make(map[uint8]core.GatedAction, len(cfg.ActionGates))
+	for action := range cfg.ActionGates {
+		id := action.ID()
+		if id == 0 {
+			return nil, fmt.Errorf("unknown action_gates key: %q", action)
+		}
+		if prev, exists := seenIDs[id]; exists && prev != action {
+			return nil, fmt.Errorf("duplicate gated action id %d for %q and %q", id, prev, action)
+		}
+		seenIDs[id] = action
+	}
+
 	return &ActionGateway{
 		cfg: cfg,
 	}, nil
@@ -66,14 +78,14 @@ type Store interface {
 	// GetAppCount returns the total number of applications owned by a specific wallet.
 	GetAppCount(ownerWallet string) (uint64, error)
 
-	// GetUserStaked returns the total staked amount for a user across all blockchains.
+	// GetTotalUserStaked returns the total staked amount for a user across all blockchains.
 	GetTotalUserStaked(wallet string) (decimal.Decimal, error)
 
 	// RecordAction inserts a new action log entry for a user.
 	RecordAction(wallet string, gatedAction core.GatedAction) error
 
-	// GetUserActionCount returns the number of actions matching the given wallet, method, and path
-	// within the specified time window.
+	// GetUserActionCount returns the number of actions matching the given wallet and gated action
+	// within the specified time window (counting backwards from now).
 	GetUserActionCount(wallet string, gatedAction core.GatedAction, window time.Duration) (uint64, error)
 
 	// GetUserActionCounts returns a map of gated actions to their respective counts for a user within the specified time window.

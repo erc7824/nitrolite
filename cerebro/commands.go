@@ -60,6 +60,8 @@ LOW-LEVEL STATE MANAGEMENT (Base Client)
   escrow-channel <channel_id>   Get escrow channel by ID
 
 APP REGISTRY
+  app-info <app_id>                    Show application details
+  my-apps                              List your registered applications
   register-app <app_id> [no-approval]  Register a new application
 
 LOW-LEVEL APP SESSIONS (Base Client)
@@ -747,6 +749,42 @@ func (o *Operator) getActionAllowances(ctx context.Context, wallet string) {
 // ============================================================================
 // App Registry
 // ============================================================================
+
+func (o *Operator) getApps(ctx context.Context, appID *string, ownerWallet *string) {
+	fmt.Println("Fetching registered applications...")
+
+	apps, _, err := o.client.GetApps(ctx, &sdk.GetAppsOptions{
+		AppID:       appID,
+		OwnerWallet: ownerWallet,
+	})
+	if err != nil {
+		fmt.Printf("ERROR: Failed to get apps: %v\n", err)
+		return
+	}
+
+	if len(apps) == 0 {
+		fmt.Println("No applications found.")
+		return
+	}
+
+	fmt.Printf("Found %d application(s):\n\n", len(apps))
+	for _, a := range apps {
+		fmt.Printf("  App ID:       %s\n", a.App.ID)
+		fmt.Printf("  Owner:        %s\n", a.App.OwnerWallet)
+		fmt.Printf("  Version:      %d\n", a.App.Version)
+		if a.App.CreationApprovalNotRequired {
+			fmt.Println("  Approval:     Not required")
+		} else {
+			fmt.Println("  Approval:     Required")
+		}
+		if a.App.Metadata != "" {
+			fmt.Printf("  Metadata:     %s\n", a.App.Metadata)
+		}
+		fmt.Printf("  Created:      %s\n", a.CreatedAt.Format("2006-01-02 15:04:05"))
+		fmt.Printf("  Updated:      %s\n", a.UpdatedAt.Format("2006-01-02 15:04:05"))
+		fmt.Println()
+	}
+}
 
 func (o *Operator) registerApp(ctx context.Context, appID, metadata string, creationApprovalNotRequired bool) {
 	fmt.Printf("Registering application: %s...\n", appID)

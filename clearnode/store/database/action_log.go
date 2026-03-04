@@ -22,6 +22,10 @@ func (ActionLogEntryV1) TableName() string {
 
 // RecordAction inserts a new action log entry for a user.
 func (s *DBStore) RecordAction(wallet string, gatedAction core.GatedAction) error {
+	if gatedAction.ID() == 0 {
+		return fmt.Errorf("invalid gated action ID")
+	}
+
 	wallet = strings.ToLower(wallet)
 
 	entry := ActionLogEntryV1{

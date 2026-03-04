@@ -203,7 +203,7 @@ type DatabaseStore interface {
 	// UpdateUserStaked upserts the staked amount for a user on a specific blockchain.
 	UpdateUserStaked(wallet string, blockchainID uint64, amount decimal.Decimal) error
 
-	// GetUserStaked returns the total staked amount for a user across all blockchains.
+	// GetTotalUserStaked returns the total staked amount for a user across all blockchains.
 	GetTotalUserStaked(wallet string) (decimal.Decimal, error)
 
 	// --- Action Log Operations ---

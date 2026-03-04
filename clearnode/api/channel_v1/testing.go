@@ -203,8 +203,6 @@ func (m *MockStatePacker) PackState(state core.State) ([]byte, error) {
 	return args.Get(0).([]byte), args.Error(1)
 }
 
-// MockActionGateway is a simple mock that always allows actions.
-// Set Err to a non-nil value to simulate rejection.
 type MockActionGateway struct {
 	Err error
 }

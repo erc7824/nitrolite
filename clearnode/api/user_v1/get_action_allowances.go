@@ -3,6 +3,7 @@ package user_v1
 import (
 	"strconv"
 
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
@@ -19,7 +20,16 @@ func (h *Handler) GetActionAllowances(c *rpc.Context) {
 		return
 	}
 
-	allowances, err := h.actionGateway.GetUserAllowances(h.store, req.Wallet)
+	var allowances []core.ActionAllowance
+	err := h.useStoreInTx(func(tx Store) error {
+		var err error
+		allowances, err = h.actionGateway.GetUserAllowances(h.store, req.Wallet)
+		if err != nil {
+			return rpc.Errorf("failed to retrieve action allowances: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
 		c.Fail(err, "failed to retrieve action allowances")
 		return

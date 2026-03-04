@@ -356,7 +356,7 @@ export function transformSignedAppStateUpdateToRPC(signed: SignedAppStateUpdateV
 export function transformAppSessionInfo(raw: any): AppSessionInfoV1 {
   return {
     appSessionId: raw.app_session_id,
-    appDefinition: transformAppDefinitionFromRPC(raw.app_definition || {}),
+    appDefinition: transformAppDefinitionFromRPC(raw.app_definition),
     isClosed: raw.status === 'closed',
     sessionData: raw.session_data || '',
     version: BigInt(raw.version),
@@ -373,6 +373,9 @@ export function transformAppSessionInfo(raw: any): AppSessionInfoV1 {
  * The server returns snake_case JSON that needs conversion to SDK types.
  */
 export function transformAppDefinitionFromRPC(raw: any): AppDefinitionV1 {
+  if (!raw.application || raw.nonce === undefined || raw.nonce === null) {
+    throw new Error('Invalid app definition: missing required fields (application, nonce)');
+  }
   return {
     application: raw.application,
     participants: (raw.participants || []).map((p: any) => ({

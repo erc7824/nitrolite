@@ -176,6 +176,8 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "escrow-channel", Description: "Get escrow channel"},
 
 			// App registry
+			{Text: "app-info", Description: "Show application details"},
+			{Text: "my-apps", Description: "List your registered applications"},
 			{Text: "register-app", Description: "Register a new application"},
 
 			// App sessions (Base Client - Low-level)
@@ -457,6 +459,21 @@ func (o *Operator) Execute(s string) {
 		o.getEscrowChannel(ctx, args[1])
 
 	// App registry
+	case "app-info":
+		if len(args) < 2 {
+			fmt.Println("ERROR: Usage: app-info <app_id>")
+			return
+		}
+		o.getApps(ctx, &args[1], nil)
+
+	case "my-apps":
+		wallet := o.getImportedWalletAddress()
+		if wallet == "" {
+			fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
+			return
+		}
+		o.getApps(ctx, nil, &wallet)
+
 	case "register-app":
 		if len(args) < 2 {
 			fmt.Println("ERROR: Usage: register-app <app_id> [no-approval]")

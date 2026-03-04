@@ -69,12 +69,12 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 		if err != nil {
 			return rpc.Errorf("failed to look up application: %v", err)
 		}
-
-		if registeredApp != nil {
-			err = h.actionGateway.AllowAction(tx, registeredApp.App.OwnerWallet, appStateUpd.Intent.GatedAction())
-			if err != nil {
-				return rpc.NewError(err)
-			}
+		if registeredApp == nil {
+			return rpc.Errorf("application %s is not registered", appSession.ApplicationID)
+		}
+		err = h.actionGateway.AllowAction(tx, registeredApp.App.OwnerWallet, appStateUpd.Intent.GatedAction())
+		if err != nil {
+			return rpc.NewError(err)
 		}
 
 		if len(reqPayload.QuorumSigs) > len(appSession.Participants) {

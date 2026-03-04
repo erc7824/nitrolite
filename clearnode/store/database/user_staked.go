@@ -10,8 +10,8 @@ import (
 )
 
 type UserStakedV1 struct {
-	UserWallet   string          `gorm:"column:user_wallet;not null"`
-	BlockchainID uint64          `gorm:"column:blockchain_id;not null"`
+	UserWallet   string          `gorm:"column:user_wallet;primaryKey;not null"`
+	BlockchainID uint64          `gorm:"column:blockchain_id;primaryKey;not null"`
 	Amount       decimal.Decimal `gorm:"column:amount;type:varchar(78);not null"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
@@ -24,6 +24,17 @@ func (UserStakedV1) TableName() string {
 // UpdateUserStaked upserts the staked amount for a user on a specific blockchain.
 func (s *DBStore) UpdateUserStaked(wallet string, blockchainID uint64, amount decimal.Decimal) error {
 	wallet = strings.ToLower(wallet)
+
+	if wallet == "" {
+		return fmt.Errorf("wallet address must not be empty")
+	}
+	if blockchainID == 0 {
+		return fmt.Errorf("blockchain ID must not be zero")
+	}
+	if amount.IsNegative() {
+		return fmt.Errorf("staked amount must not be negative")
+	}
+
 	now := time.Now()
 
 	record := UserStakedV1{
@@ -45,7 +56,7 @@ func (s *DBStore) UpdateUserStaked(wallet string, blockchainID uint64, amount de
 	return nil
 }
 
-// GetUserStaked returns the total staked amount for a user across all blockchains.
+// GetTotalUserStaked returns the total staked amount for a user across all blockchains.
 func (s *DBStore) GetTotalUserStaked(wallet string) (decimal.Decimal, error) {
 	wallet = strings.ToLower(wallet)
 

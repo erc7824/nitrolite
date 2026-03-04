@@ -287,7 +287,7 @@ export interface PaginationParamsV1 {
 export interface ActionAllowanceV1 {
   /** The specific action being gated (transfer, app_session_deposit, app_session_operation, app_session_withdrawal) */
   gated_action: string;
-  /** Time window for which the allowance is valid (e.g. "24h") */
+  /** Time window for which the allowance is valid (e.g. "24h0m0s") */
   time_window: string;
   /** Total allowance for the action within the time window */
   allowance: string;

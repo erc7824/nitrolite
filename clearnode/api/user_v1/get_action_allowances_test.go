@@ -14,16 +14,20 @@ import (
 
 func TestGetActionAllowances_Success(t *testing.T) {
 	mockStore := new(MockStore)
+	storeTxProvider := func(fn StoreTxHandler) error {
+		return fn(mockStore)
+	}
 
-	handler := &Handler{
-		store: mockStore,
-		actionGateway: &MockActionGateway{
+	handler := NewHandler(
+		mockStore,
+		storeTxProvider,
+		&MockActionGateway{
 			Allowances: []core.ActionAllowance{
 				{GatedAction: core.GatedActionTransfer, TimeWindow: "24h", Allowance: 100, Used: 5},
 				{GatedAction: core.GatedActionAppSessionCreation, TimeWindow: "24h", Allowance: 50, Used: 0},
 			},
 		},
-	}
+	)
 
 	reqPayload := rpc.UserV1GetActionAllowancesRequest{
 		Wallet: "0x1234567890123456789012345678901234567890",
@@ -57,11 +61,11 @@ func TestGetActionAllowances_Success(t *testing.T) {
 
 func TestGetActionAllowances_EmptyResult(t *testing.T) {
 	mockStore := new(MockStore)
-
-	handler := &Handler{
-		store:         mockStore,
-		actionGateway: &MockActionGateway{},
+	storeTxProvider := func(fn StoreTxHandler) error {
+		return fn(mockStore)
 	}
+
+	handler := NewHandler(mockStore, storeTxProvider, &MockActionGateway{})
 
 	reqPayload := rpc.UserV1GetActionAllowancesRequest{
 		Wallet: "0x1234567890123456789012345678901234567890",
@@ -88,11 +92,11 @@ func TestGetActionAllowances_EmptyResult(t *testing.T) {
 
 func TestGetActionAllowances_MissingWallet(t *testing.T) {
 	mockStore := new(MockStore)
-
-	handler := &Handler{
-		store:         mockStore,
-		actionGateway: &MockActionGateway{},
+	storeTxProvider := func(fn StoreTxHandler) error {
+		return fn(mockStore)
 	}
+
+	handler := NewHandler(mockStore, storeTxProvider, &MockActionGateway{})
 
 	reqPayload := rpc.UserV1GetActionAllowancesRequest{}
 	payload, err := rpc.NewPayload(reqPayload)
@@ -113,13 +117,13 @@ func TestGetActionAllowances_MissingWallet(t *testing.T) {
 
 func TestGetActionAllowances_GatewayError(t *testing.T) {
 	mockStore := new(MockStore)
-
-	handler := &Handler{
-		store: mockStore,
-		actionGateway: &MockActionGateway{
-			Err: fmt.Errorf("gateway failure"),
-		},
+	storeTxProvider := func(fn StoreTxHandler) error {
+		return fn(mockStore)
 	}
+
+	handler := NewHandler(mockStore, storeTxProvider, &MockActionGateway{
+		Err: fmt.Errorf("gateway failure"),
+	})
 
 	reqPayload := rpc.UserV1GetActionAllowancesRequest{
 		Wallet: "0x1234567890123456789012345678901234567890",

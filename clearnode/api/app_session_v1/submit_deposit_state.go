@@ -75,12 +75,13 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		if err != nil {
 			return rpc.Errorf("failed to look up application: %v", err)
 		}
+		if registeredApp == nil {
+			return rpc.Errorf("application %s is not registered", appSession.ApplicationID)
+		}
 
-		if registeredApp != nil {
-			err = h.actionGateway.AllowAction(tx, registeredApp.App.OwnerWallet, appStateUpd.Intent.GatedAction())
-			if err != nil {
-				return rpc.NewError(err)
-			}
+		err = h.actionGateway.AllowAction(tx, registeredApp.App.OwnerWallet, appStateUpd.Intent.GatedAction())
+		if err != nil {
+			return rpc.NewError(err)
 		}
 
 		// Lock the user's state to prevent concurrent modifications

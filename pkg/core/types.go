@@ -918,7 +918,7 @@ type GatedAction string
 var (
 	GatedActionTransfer GatedAction = "transfer"
 
-	GatedActionAppSessionCreation   GatedAction = "app_session_deposit"
+	GatedActionAppSessionCreation   GatedAction = "app_session_creation"
 	GatedActionAppSessionOperation  GatedAction = "app_session_operation"
 	GatedActionAppSessionDeposit    GatedAction = "app_session_deposit"
 	GatedActionAppSessionWithdrawal GatedAction = "app_session_withdrawal"

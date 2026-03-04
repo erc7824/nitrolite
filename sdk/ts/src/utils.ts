@@ -306,7 +306,7 @@ import * as RPCApp from './rpc/api';
  */
 export function transformAppDefinitionToRPC(def: AppDefinitionV1): any {
   return {
-    application: def.application,
+    application_id: def.applicationId,
     participants: def.participants.map(p => ({
       wallet_address: p.walletAddress,
       signature_weight: p.signatureWeight,
@@ -373,11 +373,11 @@ export function transformAppSessionInfo(raw: any): AppSessionInfoV1 {
  * The server returns snake_case JSON that needs conversion to SDK types.
  */
 export function transformAppDefinitionFromRPC(raw: any): AppDefinitionV1 {
-  if (!raw.application || raw.nonce === undefined || raw.nonce === null) {
-    throw new Error('Invalid app definition: missing required fields (application, nonce)');
+  if (!raw.application_id || raw.nonce === undefined || raw.nonce === null) {
+    throw new Error('Invalid app definition: missing required fields (application_id, nonce)');
   }
   return {
-    application: raw.application,
+    applicationId: raw.application_id,
     participants: (raw.participants || []).map((p: any) => ({
       walletAddress: p.wallet_address as Address,
       signatureWeight: p.signature_weight,

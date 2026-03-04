@@ -91,7 +91,7 @@ export interface AppParticipantV1 {
  * AppDefinitionV1 represents the definition for an app session
  */
 export interface AppDefinitionV1 {
-  application: string;
+  applicationId: string;
   participants: AppParticipantV1[];
   quorum: number; // uint8
   nonce: bigint; // uint64

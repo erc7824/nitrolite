@@ -363,5 +363,5 @@ src/
 ## Resources
 
 - [Nitrolite Documentation](https://erc7824.org/quick_start)
-- [GitHub Repository](https://github.com/erc7824/nitrolite)
+- [GitHub Repository](https://github.com/layer-3/nitrolite)
 - [Viem Documentation](https://viem.sh)

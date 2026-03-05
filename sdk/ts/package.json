@@ -53,7 +53,7 @@
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/erc7824/nitrolite.git"
+        "url": "https://github.com/layer-3/nitrolite.git"
     },
     "engines": {
         "node": ">=20.0.0"

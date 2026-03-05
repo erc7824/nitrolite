@@ -192,11 +192,28 @@ type DatabaseStore interface {
 
 	// --- Metric Aggregation ---
 
-	// CountAppSessionsByStatus returns app session counts grouped by (application, status).
-	CountAppSessionsByStatus() ([]AppSessionCount, error)
+	// CountActiveUsers returns distinct user counts per asset (plus "all" aggregate) within the given window.
+	CountActiveUsers(window time.Duration) ([]ActiveCountByLabel, error)
 
-	// CountChannelsByStatus returns channel counts grouped by (asset, status).
-	CountChannelsByStatus() ([]ChannelCount, error)
+	// CountActiveAppSessions returns app session counts per application (plus "all" aggregate) within the given window.
+	CountActiveAppSessions(window time.Duration) ([]ActiveCountByLabel, error)
+
+	// --- Lifespan Metric Operations ---
+
+	// RecordMetric upserts a lifespan metric. Labels are key-value pairs: "key1", "val1", "key2", "val2".
+	RecordMetric(name string, value decimal.Decimal, lastTimestamp time.Time, labels ...string) error
+
+	// GetLifetimeMetric retrieves a lifespan metric by name and labels.
+	GetLifetimeMetric(name string, labels ...string) (LifespanMetric, error)
+
+	// GetLifetimeMetricLastTimestamp returns the most recent last_timestamp among all metrics with the given name.
+	GetLifetimeMetricLastTimestamp(name string) (time.Time, error)
+
+	// GetAppSessionsCountByLabels computes app session count deltas, upserts as lifespan metrics, and returns updated totals.
+	GetAppSessionsCountByLabels() ([]AppSessionCount, error)
+
+	// GetChannelsCountByLabels computes channel count deltas, upserts as lifespan metrics, and returns updated totals.
+	GetChannelsCountByLabels() ([]ChannelCount, error)
 
 	// --- User Staked Operations ---
 

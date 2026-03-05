@@ -192,10 +192,10 @@ type DatabaseStore interface {
 
 	// --- Metric Aggregation ---
 
-	// CountActiveUsers returns distinct user counts per asset (plus "all" aggregate) within the given window.
+	// CountActiveUsers returns distinct user counts per asset within the given window.
 	CountActiveUsers(window time.Duration) ([]ActiveCountByLabel, error)
 
-	// CountActiveAppSessions returns app session counts per application (plus "all" aggregate) within the given window.
+	// CountActiveAppSessions returns app session counts per application within the given window.
 	CountActiveAppSessions(window time.Duration) ([]ActiveCountByLabel, error)
 
 	// --- Lifespan Metric Operations ---

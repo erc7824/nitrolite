@@ -509,7 +509,6 @@ class ExampleTutorialGenerator {
         markdown += `## Next Steps\n\n`;
         markdown += `Congratulations! You've successfully built a ${tutorial.title.toLowerCase()}.\n\n`;
         markdown += `### Continue Learning\n\n`;
-        markdown += `- Continue with the [ERC-7824 Quick Start Guide](https://erc7824.org/quick_start/) for advanced features\n`;
         markdown += `- Explore the [SDK documentation](../README.md)\n`;
         markdown += `- Check out more [Examples](../../examples/)\n`;
         markdown += `- Report issues or contribute at [GitHub](https://github.com/layer-3/nitrolite)\n\n`;

@@ -1,7 +1,7 @@
 [![Release Policy](https://img.shields.io/badge/release%20policy-v1.0-blue)](https://github.com/layer-3/release-process/blob/master/README.md)
-[![codecov](https://codecov.io/github/erc7824/nitrolite/graph/badge.svg?token=XASM4CIEFO)](https://codecov.io/github/erc7824/nitrolite)
+[![codecov](https://codecov.io/github/layer-3/nitrolite/graph/badge.svg?token=XASM4CIEFO)](https://codecov.io/github/layer-3/nitrolite)
 [![Go Reference](https://pkg.go.dev/badge/github.com/layer-3/nitrolite.svg)](https://pkg.go.dev/github.com/layer-3/nitrolite)
-[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/erc7824/nitrolite)](https://github.com/layer-3/nitrolite/releases)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/layer-3/nitrolite)](https://github.com/layer-3/nitrolite/releases)
 
 
 # Nitrolite: State Channel Framework
@@ -96,7 +96,7 @@ See [SDK Go README](/sdk/go/README.md).
 The official TypeScript SDK for web-based applications.
 
 ```bash
-npm install @erc7824/nitrolite
+npm install @layer-3/nitrolite
 ```
 See [SDK TS README](/sdk/ts/README.md).
 

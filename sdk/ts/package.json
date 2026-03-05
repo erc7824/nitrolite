@@ -34,7 +34,6 @@
         "prepublishOnly": "npm run clean && npm run build:prod"
     },
     "keywords": [
-        "erc7824",
         "yellow",
         "yellow-org",
         "statechannels",

@@ -9,7 +9,7 @@ TypeScript SDK for Clearnode payment channels providing both high-level and low-
 - **Low-Level Operations**: Direct RPC access for custom flows and advanced use cases
 - **Full Feature Parity**: 100% compatibility with Go SDK functionality
 
-> If you are migrating from `@erc7824/nitrolite@v0.5.3`, please consider using the [@yellow-org/sdk-compat](https://www.npmjs.com/package/@yellow-org/sdk-compat) package. It is a translation layer that uses this SDK underneath and maps the familiar v0.5.3 API surfaces to this SDK.
+> If you are migrating from `@layer-3/nitrolite@v0.5.3`, please consider using the [@yellow-org/sdk-compat](https://www.npmjs.com/package/@yellow-org/sdk-compat) package. It is a translation layer that uses this SDK underneath and maps the familiar v0.5.3 API surfaces to this SDK.
 
 ## Method Cheat Sheet
 

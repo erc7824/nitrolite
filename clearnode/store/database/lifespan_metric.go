@@ -14,7 +14,6 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type LifespanMetric struct {
@@ -28,48 +27,6 @@ type LifespanMetric struct {
 
 func (LifespanMetric) TableName() string {
 	return "lifespan_metrics"
-}
-
-// RecordMetric upserts a lifespan metric: inserts if not exists, updates value and timestamp if it does.
-func (s *DBStore) RecordMetric(name string, value decimal.Decimal, lastTimestamp time.Time, labels ...string) error {
-	id, err := getMetricID(name, labels...)
-	if err != nil {
-		return fmt.Errorf("failed to compute metric ID: %w", err)
-	}
-
-	if len(labels)%2 != 0 {
-		return fmt.Errorf("labels must be key-value pairs, got odd count: %d", len(labels))
-	}
-
-	labelsMap := make(map[string]string, len(labels)/2)
-	for i := 0; i+1 < len(labels); i += 2 {
-		labelsMap[labels[i]] = labels[i+1]
-	}
-
-	labelsJSON, err := json.Marshal(labelsMap)
-	if err != nil {
-		return fmt.Errorf("failed to marshal labels: %w", err)
-	}
-
-	now := time.Now()
-	record := LifespanMetric{
-		ID:            id,
-		Name:          name,
-		Labels:        datatypes.JSON(labelsJSON),
-		Value:         value,
-		LastTimestamp: lastTimestamp,
-		UpdatedAt:     now,
-	}
-
-	err = s.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"value", "last_timestamp", "updated_at"}),
-	}).Create(&record).Error
-	if err != nil {
-		return fmt.Errorf("failed to record metric: %w", err)
-	}
-
-	return nil
 }
 
 // ChannelCount holds the result of a COUNT() GROUP BY query on channels.
@@ -425,8 +382,7 @@ func (s *DBStore) CountActiveUsers(window time.Duration) ([]ActiveCountByLabel, 
 	return results, nil
 }
 
-// CountActiveAppSessions returns app session counts per application and an "all" aggregate
-// for sessions updated within the given window.
+// CountActiveAppSessions returns app session counts per application within the given window.
 func (s *DBStore) CountActiveAppSessions(window time.Duration) ([]ActiveCountByLabel, error) {
 	since := time.Now().Add(-window)
 
@@ -442,25 +398,6 @@ func (s *DBStore) CountActiveAppSessions(window time.Duration) ([]ActiveCountByL
 	}
 
 	return results, nil
-}
-
-// GetLifetimeMetric retrieves a lifespan metric by name and labels.
-func (s *DBStore) GetLifetimeMetric(name string, labels ...string) (LifespanMetric, error) {
-	id, err := getMetricID(name, labels...)
-	if err != nil {
-		return LifespanMetric{}, fmt.Errorf("failed to compute metric ID: %w", err)
-	}
-
-	var metric LifespanMetric
-	err = s.db.Where("id = ?", id).First(&metric).Error
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return LifespanMetric{}, fmt.Errorf("metric not found: %w", err)
-		}
-		return LifespanMetric{}, fmt.Errorf("failed to get metric: %w", err)
-	}
-
-	return metric, nil
 }
 
 // GetLifetimeMetricLastTimestamp returns the most recent last_timestamp among all metrics with the given name.

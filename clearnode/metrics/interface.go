@@ -62,4 +62,5 @@ type StoreMetricExporter interface {
 	SetChannels(asset string, status core.ChannelStatus, count uint64)
 	SetActiveUsers(asset, timeSpanLabel string, count uint64) // asset="all" for aggregated
 	SetActiveAppSessions(applicationID, timeSpanLabel string, count uint64)
+	SetTotalValueLocked(domain, asset string, value float64)
 }

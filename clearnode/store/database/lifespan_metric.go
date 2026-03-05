@@ -136,7 +136,7 @@ func (s *DBStore) GetChannelsCountByLabels() ([]ChannelCount, error) {
 				id,                         // $1
 				metricName,                 // $2
 				datatypes.JSON(labelsJSON), // $3
-				deltaValue.String(),        // $4
+				deltaValue,                 // $4
 				d.LastUpdated,              // $5
 				now,                        // $6
 			)
@@ -147,11 +147,7 @@ func (s *DBStore) GetChannelsCountByLabels() ([]ChannelCount, error) {
 			VALUES %s
 			ON CONFLICT (id) DO UPDATE
 			SET
-				value = (
-					CAST(COALESCE(NULLIF(lifespan_metrics.value, ''), '0') AS NUMERIC)
-					+
-					CAST(COALESCE(NULLIF(EXCLUDED.value, ''), '0') AS NUMERIC)
-				),
+				value = lifespan_metrics.value + EXCLUDED.value,
 				last_timestamp = GREATEST(lifespan_metrics.last_timestamp, EXCLUDED.last_timestamp),
 				updated_at = now()
 		`, strings.Join(valuesSQL, ","))
@@ -165,7 +161,7 @@ func (s *DBStore) GetChannelsCountByLabels() ([]ChannelCount, error) {
 	err = s.db.Raw(`
 		SELECT labels->>'asset' AS asset,
 		       labels->>'status' AS status,
-		       value::numeric AS count,
+		       value::bigint AS count,
 		       last_timestamp AS last_updated
 		FROM lifespan_metrics
 		WHERE name = ?
@@ -242,7 +238,7 @@ func (s *DBStore) GetAppSessionsCountByLabels() ([]AppSessionCount, error) {
 				id,                         // $1
 				metricName,                 // $2
 				datatypes.JSON(labelsJSON), // $3
-				deltaValue.String(),        // $4
+				deltaValue,                 // $4
 				d.LastUpdated,              // $5
 				now,                        // $6
 			)
@@ -253,11 +249,7 @@ func (s *DBStore) GetAppSessionsCountByLabels() ([]AppSessionCount, error) {
 			VALUES %s
 			ON CONFLICT (id) DO UPDATE
 			SET
-				value = (
-					CAST(COALESCE(NULLIF(lifespan_metrics.value, ''), '0') AS NUMERIC)
-					+
-					CAST(COALESCE(NULLIF(EXCLUDED.value, ''), '0') AS NUMERIC)
-				),
+				value = lifespan_metrics.value + EXCLUDED.value,
 				last_timestamp = GREATEST(lifespan_metrics.last_timestamp, EXCLUDED.last_timestamp),
 				updated_at = now()
 		`, strings.Join(valuesSQL, ","))
@@ -271,7 +263,119 @@ func (s *DBStore) GetAppSessionsCountByLabels() ([]AppSessionCount, error) {
 	err = s.db.Raw(`
 		SELECT labels->>'application_id' AS application_id,
 		       labels->>'status' AS status,
-		       value::numeric AS count,
+		       value::bigint AS count,
+		       last_timestamp AS last_updated
+		FROM lifespan_metrics
+		WHERE name = ?
+	`, metricName).Scan(&results).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to read lifespan metrics: %w", err)
+	}
+
+	return results, nil
+}
+
+// TotalValueLocked holds the total value locked for a given asset, along with the last update timestamp.
+type TotalValueLocked struct {
+	Asset       string          `gorm:"column:asset"`
+	Domain      string          `gorm:"column:domain"`
+	Value       decimal.Decimal `gorm:"column:value"`
+	LastUpdated time.Time       `gorm:"column:last_updated"`
+}
+
+func (s *DBStore) GetTotalValueLocked() ([]TotalValueLocked, error) {
+	metricName := "total_value_locked"
+
+	lastProcessedTimestamp, err := s.GetLifetimeMetricLastTimestamp(metricName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last processed timestamp: %w", err)
+	}
+
+	// Compute net TVL deltas since lastProcessedTimestamp:
+	// - channels: deposits (tx_type=10) minus withdrawals (tx_type=11)
+	// - app_sessions: commits (tx_type=40) minus releases (tx_type=41)
+	var deltas []TotalValueLocked
+	err = s.db.Raw(`
+		SELECT domain, asset_symbol AS asset, SUM(net) AS value, MAX(created_at) AS last_updated
+		FROM (
+			SELECT 'channels' AS domain, asset_symbol,
+			       CASE WHEN tx_type = ? THEN amount ELSE -amount END AS net,
+			       created_at
+			FROM transactions
+			WHERE tx_type IN (?, ?) AND created_at > ?
+			UNION ALL
+			SELECT 'app_sessions' AS domain, asset_symbol,
+			       CASE WHEN tx_type = ? THEN amount ELSE -amount END AS net,
+			       created_at
+			FROM transactions
+			WHERE tx_type IN (?, ?) AND created_at > ?
+		) t
+		GROUP BY domain, asset_symbol
+	`,
+		core.TransactionTypeHomeDeposit, core.TransactionTypeHomeDeposit, core.TransactionTypeHomeWithdrawal, lastProcessedTimestamp,
+		core.TransactionTypeCommit, core.TransactionTypeCommit, core.TransactionTypeRelease, lastProcessedTimestamp,
+	).Scan(&deltas).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute TVL deltas: %w", err)
+	}
+
+	if len(deltas) > 0 {
+		now := time.Now()
+		valuesSQL := make([]string, 0, len(deltas))
+		args := make([]any, 0, len(deltas)*6)
+
+		for i, d := range deltas {
+			labelsMap := map[string]string{
+				"domain": d.Domain,
+				"asset":  d.Asset,
+			}
+			labelsJSON, err := json.Marshal(labelsMap)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal labels for domain=%s asset=%s: %w", d.Domain, d.Asset, err)
+			}
+
+			id, err := getMetricID(metricName, "domain", d.Domain, "asset", d.Asset)
+			if err != nil {
+				return nil, fmt.Errorf("failed to compute metric ID for domain=%s asset=%s: %w", d.Domain, d.Asset, err)
+			}
+
+			base := i * 6
+			valuesSQL = append(valuesSQL,
+				fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d)",
+					base+1, base+2, base+3, base+4, base+5, base+6,
+				),
+			)
+
+			args = append(args,
+				id,                         // $1
+				metricName,                 // $2
+				datatypes.JSON(labelsJSON), // $3
+				d.Value,                    // $4
+				d.LastUpdated,              // $5
+				now,                        // $6
+			)
+		}
+
+		upsertSQL := fmt.Sprintf(`
+			INSERT INTO lifespan_metrics (id, name, labels, value, last_timestamp, updated_at)
+			VALUES %s
+			ON CONFLICT (id) DO UPDATE
+			SET
+				value = lifespan_metrics.value + EXCLUDED.value,
+				last_timestamp = GREATEST(lifespan_metrics.last_timestamp, EXCLUDED.last_timestamp),
+				updated_at = now()
+		`, strings.Join(valuesSQL, ","))
+
+		if err := s.db.Exec(upsertSQL, args...).Error; err != nil {
+			return nil, fmt.Errorf("failed to upsert lifespan metrics: %w", err)
+		}
+	}
+
+	var results []TotalValueLocked
+	err = s.db.Raw(`
+		SELECT labels->>'domain' AS domain,
+		       labels->>'asset' AS asset,
+		       value,
 		       last_timestamp AS last_updated
 		FROM lifespan_metrics
 		WHERE name = ?

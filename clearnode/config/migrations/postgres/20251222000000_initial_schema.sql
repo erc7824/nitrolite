@@ -87,6 +87,7 @@ CREATE TABLE transactions (
 );
 
 CREATE INDEX idx_transactions_type ON transactions(tx_type);
+CREATE INDEX idx_transactions_type_created ON transactions(tx_type, created_at);
 CREATE INDEX idx_transactions_from_account ON transactions(from_account);
 CREATE INDEX idx_transactions_to_account ON transactions(to_account);
 CREATE INDEX idx_transactions_from_to_type ON transactions(from_account, to_account, tx_type);
@@ -343,6 +344,7 @@ DROP INDEX IF EXISTS idx_transactions_from_comp;
 DROP INDEX IF EXISTS idx_transactions_from_to_type;
 DROP INDEX IF EXISTS idx_transactions_to_account;
 DROP INDEX IF EXISTS idx_transactions_from_account;
+DROP INDEX IF EXISTS idx_transactions_type_created;
 DROP INDEX IF EXISTS idx_transactions_type;
 DROP TABLE IF EXISTS transactions;
 DROP INDEX IF EXISTS idx_channel_states_escrow_channel_id;

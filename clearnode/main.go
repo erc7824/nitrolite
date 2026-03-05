@@ -108,7 +108,7 @@ func main() {
 		})
 	}
 
-	go runStoreMetricsExporter(ctx, 10*time.Second, bb.DbStore, bb.StoreMetrics, logger)
+	go runStoreMetricsExporter(ctx, 30*time.Second, bb.DbStore, bb.StoreMetrics, logger)
 
 	metricsListenAddr := ":4242"
 	metricsEndpoint := "/metrics"
@@ -173,6 +173,7 @@ func runStoreMetricsExporter(
 	store interface {
 		GetChannelsCountByLabels() ([]database.ChannelCount, error)
 		GetAppSessionsCountByLabels() ([]database.AppSessionCount, error)
+		GetTotalValueLocked() ([]database.TotalValueLocked, error)
 		CountActiveUsers(window time.Duration) ([]database.ActiveCountByLabel, error)
 		CountActiveAppSessions(window time.Duration) ([]database.ActiveCountByLabel, error)
 	},
@@ -208,6 +209,15 @@ func runStoreMetricsExporter(
 			} else {
 				for _, c := range appSessionCounts {
 					metricExported.SetAppSessions(c.Application, c.Status, c.Count)
+				}
+			}
+
+			tvlCounts, err := store.GetTotalValueLocked()
+			if err != nil {
+				logger.Error("failed to get total value locked", "error", err)
+			} else {
+				for _, c := range tvlCounts {
+					metricExported.SetTotalValueLocked(c.Domain, c.Asset, c.Value.InexactFloat64())
 				}
 			}
 

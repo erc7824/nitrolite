@@ -28,6 +28,7 @@ type storeMetricExporter struct {
 	channelsTotal     *prometheus.GaugeVec
 	usersActive       *prometheus.GaugeVec
 	appSessionsActive *prometheus.GaugeVec
+	totalValueLocked  *prometheus.GaugeVec
 }
 
 func NewStoreMetricExporter(reg prometheus.Registerer) (StoreMetricExporter, error) {
@@ -52,6 +53,11 @@ func NewStoreMetricExporter(reg prometheus.Registerer) (StoreMetricExporter, err
 			Name:      "app_sessions_active",
 			Help:      "Current total active app sessions",
 		}, []string{"application", "timespan"}),
+		totalValueLocked: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: MetricNamespace,
+			Name:      "total_value_locked",
+			Help:      "Total value locked by domain and asset",
+		}, []string{"domain", "asset"}),
 	}
 
 	if reg != nil {
@@ -60,6 +66,7 @@ func NewStoreMetricExporter(reg prometheus.Registerer) (StoreMetricExporter, err
 			m.channelsTotal,
 			m.usersActive,
 			m.appSessionsActive,
+			m.totalValueLocked,
 		)
 	} else {
 		return nil, fmt.Errorf("prometheus registerer not provided")
@@ -82,6 +89,10 @@ func (m *storeMetricExporter) SetActiveUsers(asset, timeSpanLabel string, count 
 
 func (m *storeMetricExporter) SetActiveAppSessions(applicationID, timeSpanLabel string, count uint64) {
 	m.appSessionsActive.WithLabelValues(applicationID, timeSpanLabel).Set(float64(count))
+}
+
+func (m *storeMetricExporter) SetTotalValueLocked(domain, asset string, value float64) {
+	m.totalValueLocked.WithLabelValues(domain, asset).Set(value)
 }
 
 // runtimeMetricExporter is the concrete implementation of the Metrics interface.

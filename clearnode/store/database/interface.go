@@ -215,6 +215,9 @@ type DatabaseStore interface {
 	// GetChannelsCountByLabels computes channel count deltas, upserts as lifespan metrics, and returns updated totals.
 	GetChannelsCountByLabels() ([]ChannelCount, error)
 
+	// GetTotalValueLocked computes TVL deltas by domain (channels, app_sessions) and asset, upserts as lifespan metrics, and returns updated totals.
+	GetTotalValueLocked() ([]TotalValueLocked, error)
+
 	// --- User Staked Operations ---
 
 	// UpdateUserStaked upserts the staked amount for a user on a specific blockchain.

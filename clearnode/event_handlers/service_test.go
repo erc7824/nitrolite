@@ -2,9 +2,11 @@ package event_handlers
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -513,5 +515,72 @@ func TestHandleEscrowWithdrawalFinalized_Success(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
+	mockStore.AssertExpectations(t)
+}
+
+func TestHandleUserLockedBalanceUpdated_Success(t *testing.T) {
+	// Setup
+	mockStore := new(MockStore)
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
+
+	service := &EventHandlerService{
+		useStoreInTx: func(handler StoreTxHandler) error {
+			return handler(mockStore)
+		},
+	}
+
+	// Test data
+	userWallet := "0x1234567890123456789012345678901234567890"
+	blockchainID := uint64(1)
+	balance := decimal.NewFromInt(1000)
+
+	event := &core.UserLockedBalanceUpdatedEvent{
+		UserAddress:  userWallet,
+		BlockchainID: blockchainID,
+		Balance:      balance,
+	}
+
+	// Mock expectations
+	mockStore.On("UpdateUserStaked", userWallet, blockchainID, balance).Return(nil)
+
+	// Execute
+	err := service.HandleUserLockedBalanceUpdated(ctx, event)
+
+	// Assert
+	require.NoError(t, err)
+	mockStore.AssertExpectations(t)
+}
+
+func TestHandleUserLockedBalanceUpdated_StoreError(t *testing.T) {
+	// Setup
+	mockStore := new(MockStore)
+	ctx := log.SetContextLogger(context.Background(), log.NewNoopLogger())
+
+	service := &EventHandlerService{
+		useStoreInTx: func(handler StoreTxHandler) error {
+			return handler(mockStore)
+		},
+	}
+
+	// Test data
+	userWallet := "0x1234567890123456789012345678901234567890"
+	blockchainID := uint64(1)
+	balance := decimal.NewFromInt(500)
+
+	event := &core.UserLockedBalanceUpdatedEvent{
+		UserAddress:  userWallet,
+		BlockchainID: blockchainID,
+		Balance:      balance,
+	}
+
+	// Mock expectations
+	mockStore.On("UpdateUserStaked", userWallet, blockchainID, balance).Return(errors.New("db error"))
+
+	// Execute
+	err := service.HandleUserLockedBalanceUpdated(ctx, event)
+
+	// Assert
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "db error")
 	mockStore.AssertExpectations(t)
 }

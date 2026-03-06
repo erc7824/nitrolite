@@ -14,16 +14,15 @@ import (
 	"github.com/layer-3/nitrolite/pkg/sign"
 )
 
-var _ core.Client = &Client{}
+var _ core.BlockchainClient = &BlockchainClient{}
 
-type Client struct {
-	contract        *ChannelHub
-	transactOpts    *bind.TransactOpts
-	nodeAddress     common.Address
-	contractAddress common.Address
-	blockchainID    uint64
-	assetStore      AssetStore
-	evmClient       EVMClient
+type BlockchainClient struct {
+	BaseClient
+	contract                  *ChannelHub
+	transactOpts              *bind.TransactOpts
+	nodeAddress               common.Address
+	channelHubContractAddress common.Address
+	assetStore                AssetStore
 
 	requireCheckAllowance bool
 	requireCheckBalance   bool
@@ -31,10 +30,10 @@ type Client struct {
 }
 
 type ClientOption interface {
-	apply(c *Client)
+	apply(c *BlockchainClient)
 }
 
-func NewClient(
+func NewBlockchainClient(
 	contractAddress common.Address,
 	evmClient EVMClient,
 	txSigner sign.Signer,
@@ -42,19 +41,21 @@ func NewClient(
 	nodeAddress string,
 	assetStore AssetStore,
 	opts ...ClientOption,
-) (*Client, error) {
+) (*BlockchainClient, error) {
 	contract, err := NewChannelHub(contractAddress, evmClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create ChannelHub contract instance")
 	}
-	client := &Client{
-		contract:        contract,
-		transactOpts:    signerTxOpts(txSigner, blockchainID),
-		nodeAddress:     common.HexToAddress(nodeAddress),
-		contractAddress: contractAddress,
-		blockchainID:    blockchainID,
-		assetStore:      assetStore,
-		evmClient:       evmClient,
+	client := &BlockchainClient{
+		BaseClient: BaseClient{
+			evmClient:    evmClient,
+			blockchainID: blockchainID,
+		},
+		contract:                  contract,
+		transactOpts:              signerTxOpts(txSigner, blockchainID),
+		nodeAddress:               common.HexToAddress(nodeAddress),
+		channelHubContractAddress: contractAddress,
+		assetStore:                assetStore,
 
 		requireCheckAllowance: true,
 		requireCheckBalance:   true,
@@ -69,7 +70,7 @@ func NewClient(
 
 // ========= Getters - IVault =========
 
-func (c *Client) GetAccountsBalances(accounts []string, tokens []string) ([][]decimal.Decimal, error) {
+func (c *BlockchainClient) GetAccountsBalances(accounts []string, tokens []string) ([][]decimal.Decimal, error) {
 	if len(accounts) == 0 || len(tokens) == 0 {
 		return [][]decimal.Decimal{}, nil
 	}
@@ -92,7 +93,7 @@ func (c *Client) GetAccountsBalances(accounts []string, tokens []string) ([][]de
 	return result, nil
 }
 
-func (c *Client) getAllowance(asset string, owner string) (decimal.Decimal, error) {
+func (c *BlockchainClient) getAllowance(asset string, owner string) (decimal.Decimal, error) {
 	tokenAddrHex, err := c.assetStore.GetTokenAddress(asset, c.blockchainID)
 	if err != nil {
 		return decimal.Zero, errors.Wrap(err, "failed to get token address")
@@ -109,7 +110,7 @@ func (c *Client) getAllowance(asset string, owner string) (decimal.Decimal, erro
 	if err != nil {
 		return decimal.Zero, errors.Wrap(err, "failed to instantiate token contract")
 	}
-	allowance, err := erc20Contract.Allowance(&bind.CallOpts{}, ownerAddr, c.contractAddress)
+	allowance, err := erc20Contract.Allowance(&bind.CallOpts{}, ownerAddr, c.channelHubContractAddress)
 	if err != nil {
 		return decimal.Zero, errors.Wrapf(err, "failed to get allowance for token %s", asset)
 	}
@@ -122,7 +123,7 @@ func (c *Client) getAllowance(asset string, owner string) (decimal.Decimal, erro
 	return decimal.NewFromBigInt(allowance, -int32(decimals)), nil
 }
 
-func (c *Client) GetTokenBalance(asset string, walletAddress string) (decimal.Decimal, error) {
+func (c *BlockchainClient) GetTokenBalance(asset string, walletAddress string) (decimal.Decimal, error) {
 	tokenAddrHex, err := c.assetStore.GetTokenAddress(asset, c.blockchainID)
 	if err != nil {
 		return decimal.Zero, errors.Wrap(err, "failed to get token address")
@@ -160,7 +161,7 @@ func (c *Client) GetTokenBalance(asset string, walletAddress string) (decimal.De
 
 // ========= Getters - ChannelsHub =========
 
-func (c *Client) GetNodeBalance(token string) (decimal.Decimal, error) {
+func (c *BlockchainClient) GetNodeBalance(token string) (decimal.Decimal, error) {
 	tokenAddr := common.HexToAddress(token)
 	balance, err := c.contract.GetAccountBalance(nil, c.nodeAddress, tokenAddr)
 	if err != nil {
@@ -173,7 +174,7 @@ func (c *Client) GetNodeBalance(token string) (decimal.Decimal, error) {
 	return decimal.NewFromBigInt(balance, -int32(decimals)), nil
 }
 
-func (c *Client) GetOpenChannels(user string) ([]string, error) {
+func (c *BlockchainClient) GetOpenChannels(user string) ([]string, error) {
 	userAddr := common.HexToAddress(user)
 	channelIDs, err := c.contract.GetOpenChannels(nil, userAddr)
 	if err != nil {
@@ -187,7 +188,7 @@ func (c *Client) GetOpenChannels(user string) ([]string, error) {
 	return result, nil
 }
 
-func (c *Client) GetHomeChannelData(homeChannelID string) (core.HomeChannelDataResponse, error) {
+func (c *BlockchainClient) GetHomeChannelData(homeChannelID string) (core.HomeChannelDataResponse, error) {
 	channelIDBytes, err := hexToBytes32(homeChannelID)
 	if err != nil {
 		return core.HomeChannelDataResponse{}, errors.Wrap(err, "invalid channel ID")
@@ -214,7 +215,7 @@ func (c *Client) GetHomeChannelData(homeChannelID string) (core.HomeChannelDataR
 	}, nil
 }
 
-func (c *Client) GetEscrowDepositData(escrowChannelID string) (core.EscrowDepositDataResponse, error) {
+func (c *BlockchainClient) GetEscrowDepositData(escrowChannelID string) (core.EscrowDepositDataResponse, error) {
 	escrowIDBytes, err := hexToBytes32(escrowChannelID)
 	if err != nil {
 		return core.EscrowDepositDataResponse{}, errors.Wrap(err, "invalid escrow ID")
@@ -232,14 +233,14 @@ func (c *Client) GetEscrowDepositData(escrowChannelID string) (core.EscrowDeposi
 
 	return core.EscrowDepositDataResponse{
 		EscrowChannelID: escrowChannelID,
-		Node:            c.contractAddress.Hex(),
+		Node:            c.channelHubContractAddress.Hex(),
 		LastState:       *lastState,
 		UnlockExpiry:    data.UnlockAt,
 		ChallengeExpiry: data.ChallengeExpiry,
 	}, nil
 }
 
-func (c *Client) GetEscrowWithdrawalData(escrowChannelID string) (core.EscrowWithdrawalDataResponse, error) {
+func (c *BlockchainClient) GetEscrowWithdrawalData(escrowChannelID string) (core.EscrowWithdrawalDataResponse, error) {
 	escrowIDBytes, err := hexToBytes32(escrowChannelID)
 	if err != nil {
 		return core.EscrowWithdrawalDataResponse{}, errors.Wrap(err, "invalid escrow ID")
@@ -257,14 +258,14 @@ func (c *Client) GetEscrowWithdrawalData(escrowChannelID string) (core.EscrowWit
 
 	return core.EscrowWithdrawalDataResponse{
 		EscrowChannelID: escrowChannelID,
-		Node:            c.contractAddress.Hex(),
+		Node:            c.channelHubContractAddress.Hex(),
 		LastState:       *lastState,
 	}, nil
 }
 
 // ========= IVault Functions =========
 
-func (c *Client) Deposit(node, token string, amount decimal.Decimal) (string, error) {
+func (c *BlockchainClient) Deposit(node, token string, amount decimal.Decimal) (string, error) {
 	nodeAddr := common.HexToAddress(node)
 	tokenAddr := common.HexToAddress(token)
 
@@ -294,7 +295,7 @@ func (c *Client) Deposit(node, token string, amount decimal.Decimal) (string, er
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) Withdraw(node, token string, amount decimal.Decimal) (string, error) {
+func (c *BlockchainClient) Withdraw(node, token string, amount decimal.Decimal) (string, error) {
 	nodeAddr := common.HexToAddress(node)
 	tokenAddr := common.HexToAddress(token)
 
@@ -321,7 +322,7 @@ func (c *Client) Withdraw(node, token string, amount decimal.Decimal) (string, e
 
 // ========= Getters - ERC20 =========
 
-func (c *Client) Approve(asset string, amount decimal.Decimal) (string, error) {
+func (c *BlockchainClient) Approve(asset string, amount decimal.Decimal) (string, error) {
 	tokenAddrHex, err := c.assetStore.GetTokenAddress(asset, c.blockchainID)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get token address")
@@ -351,7 +352,7 @@ func (c *Client) Approve(asset string, amount decimal.Decimal) (string, error) {
 		return "", err
 	}
 
-	tx, err := erc20Contract.Approve(c.transactOpts, c.contractAddress, amountBig)
+	tx, err := erc20Contract.Approve(c.transactOpts, c.channelHubContractAddress, amountBig)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to approve token spending")
 	}
@@ -361,7 +362,7 @@ func (c *Client) Approve(asset string, amount decimal.Decimal) (string, error) {
 
 // ========= Channel Lifecycle =========
 
-func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string, error) {
+func (c *BlockchainClient) Create(def core.ChannelDefinition, initCCS core.State) (string, error) {
 	contractDef, err := coreDefToContractDef(def, initCCS.Asset, initCCS.UserWallet, c.nodeAddress)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to convert channel definition")
@@ -421,7 +422,7 @@ func (c *Client) Create(def core.ChannelDefinition, initCCS core.State) (string,
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) MigrateChannelHere(def core.ChannelDefinition, candidate core.State) (string, error) {
+func (c *BlockchainClient) MigrateChannelHere(def core.ChannelDefinition, candidate core.State) (string, error) {
 	contractDef, err := coreDefToContractDef(def, candidate.Asset, candidate.UserWallet, c.nodeAddress)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to convert channel definition")
@@ -444,7 +445,7 @@ func (c *Client) MigrateChannelHere(def core.ChannelDefinition, candidate core.S
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) Checkpoint(candidate core.State) (string, error) {
+func (c *BlockchainClient) Checkpoint(candidate core.State) (string, error) {
 	if candidate.HomeChannelID == nil {
 		return "", errors.New("candidate state must have a home channel ID")
 	}
@@ -511,7 +512,7 @@ func (c *Client) Checkpoint(candidate core.State) (string, error) {
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) Challenge(candidate core.State, challengerSig []byte, challengerIdx core.ChannelParticipant) (string, error) {
+func (c *BlockchainClient) Challenge(candidate core.State, challengerSig []byte, challengerIdx core.ChannelParticipant) (string, error) {
 	if candidate.HomeChannelID == nil {
 		return "", errors.New("candidate state must have a home channel ID")
 	}
@@ -539,7 +540,7 @@ func (c *Client) Challenge(candidate core.State, challengerSig []byte, challenge
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) Close(candidate core.State) (string, error) {
+func (c *BlockchainClient) Close(candidate core.State) (string, error) {
 	if candidate.HomeChannelID == nil {
 		return "", errors.New("candidate state must have a home channel ID")
 	}
@@ -573,7 +574,7 @@ func (c *Client) Close(candidate core.State) (string, error) {
 
 // ========= Escrow Deposit =========
 
-func (c *Client) InitiateEscrowDeposit(def core.ChannelDefinition, initCCS core.State) (string, error) {
+func (c *BlockchainClient) InitiateEscrowDeposit(def core.ChannelDefinition, initCCS core.State) (string, error) {
 	contractDef, err := coreDefToContractDef(def, initCCS.Asset, initCCS.UserWallet, c.nodeAddress)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to convert channel definition")
@@ -600,7 +601,7 @@ func (c *Client) InitiateEscrowDeposit(def core.ChannelDefinition, initCCS core.
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) ChallengeEscrowDeposit(candidate core.State, challengerSig []byte, challengerIdx core.ChannelParticipant) (string, error) {
+func (c *BlockchainClient) ChallengeEscrowDeposit(candidate core.State, challengerSig []byte, challengerIdx core.ChannelParticipant) (string, error) {
 	if candidate.EscrowChannelID == nil {
 		return "", errors.New("candidate state must have an escrow channel ID")
 	}
@@ -622,7 +623,7 @@ func (c *Client) ChallengeEscrowDeposit(candidate core.State, challengerSig []by
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) FinalizeEscrowDeposit(candidate core.State) (string, error) {
+func (c *BlockchainClient) FinalizeEscrowDeposit(candidate core.State) (string, error) {
 	if candidate.EscrowChannelID == nil {
 		return "", errors.New("candidate state must have an escrow channel ID")
 	}
@@ -655,7 +656,7 @@ func (c *Client) FinalizeEscrowDeposit(candidate core.State) (string, error) {
 
 // ========= Escrow Withdrawal =========
 
-func (c *Client) InitiateEscrowWithdrawal(def core.ChannelDefinition, initCCS core.State) (string, error) {
+func (c *BlockchainClient) InitiateEscrowWithdrawal(def core.ChannelDefinition, initCCS core.State) (string, error) {
 	contractDef, err := coreDefToContractDef(def, initCCS.Asset, initCCS.UserWallet, c.nodeAddress)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to convert channel definition")
@@ -682,7 +683,7 @@ func (c *Client) InitiateEscrowWithdrawal(def core.ChannelDefinition, initCCS co
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) ChallengeEscrowWithdrawal(candidate core.State, challengerSig []byte, challengerIdx core.ChannelParticipant) (string, error) {
+func (c *BlockchainClient) ChallengeEscrowWithdrawal(candidate core.State, challengerSig []byte, challengerIdx core.ChannelParticipant) (string, error) {
 	if candidate.EscrowChannelID == nil {
 		return "", errors.New("candidate state must have an escrow channel ID")
 	}
@@ -704,7 +705,7 @@ func (c *Client) ChallengeEscrowWithdrawal(candidate core.State, challengerSig [
 	return tx.Hash().Hex(), nil
 }
 
-func (c *Client) FinalizeEscrowWithdrawal(candidate core.State) (string, error) {
+func (c *BlockchainClient) FinalizeEscrowWithdrawal(candidate core.State) (string, error) {
 	if candidate.EscrowChannelID == nil {
 		return "", errors.New("candidate state must have an escrow channel ID")
 	}

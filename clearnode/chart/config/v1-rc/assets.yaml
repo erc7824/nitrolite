@@ -23,4 +23,11 @@ assets:
       - blockchain_id: 11155111
         address: "0x0000000000000000000000000000000000000000"
         decimals: 18
-
+  - name: "Yellow"
+    symbol: "yellow"
+    decimals: 18
+    suggested_blockchain_id: 11155111
+    tokens:
+      - blockchain_id: 11155111
+        address: "0xB1aA0ac73B5E648a57db2d9342f11c471FcC85F1"
+        decimals: 18

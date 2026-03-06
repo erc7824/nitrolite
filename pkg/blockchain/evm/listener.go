@@ -72,8 +72,7 @@ func (l *Listener) Listen(ctx context.Context, handleClosure func(err error)) {
 	}
 
 	go func() {
-		defer childHandleClosure(nil)
-		l.listenEvents(childCtx)
+		childHandleClosure(l.listenEvents(childCtx))
 	}()
 
 	go func() {
@@ -87,11 +86,11 @@ func (l *Listener) Listen(ctx context.Context, handleClosure func(err error)) {
 }
 
 // listenEvents listens for blockchain events and processes them with the provided handler
-func (l *Listener) listenEvents(ctx context.Context) {
+func (l *Listener) listenEvents(ctx context.Context) error {
 	ev, err := l.getLatestEvent(l.contractAddress.String(), l.blockchainID)
 	if err != nil {
 		l.logger.Error("failed to get latest processed event", "error", err, "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String())
-		return
+		return err
 	}
 	lastBlock := ev.BlockNumber
 	lastIndex := ev.LogIndex
@@ -151,18 +150,22 @@ func (l *Listener) listenEvents(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			l.logger.Info("stopping event listener", "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String())
-			return
+			return nil
 		case eventLog := <-historicalCh:
 			l.logger.Debug("received new event", "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String(), "blockNumber", lastBlock, "logIndex", eventLog.Index)
 
 			ctx := log.SetContextLogger(context.Background(), l.logger)
-			l.handleEvent(ctx, eventLog)
+			if err := l.handleEvent(ctx, eventLog); err != nil {
+				return err
+			}
 		case eventLog := <-currentCh:
 			lastBlock = eventLog.BlockNumber
 			l.logger.Debug("received new event", "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String(), "blockNumber", lastBlock, "logIndex", eventLog.Index)
 
 			ctx := log.SetContextLogger(context.Background(), l.logger)
-			l.handleEvent(ctx, eventLog)
+			if err := l.handleEvent(ctx, eventLog); err != nil {
+				return err
+			}
 		case err := <-eventSubscription.Err():
 			if err != nil {
 				l.logger.Error("event subscription error", "error", err, "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String())

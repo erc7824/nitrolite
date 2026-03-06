@@ -11,7 +11,7 @@ type ClientAllowanceCheck struct {
 	RequireAllowanceCheck bool
 }
 
-func (ch ClientAllowanceCheck) apply(c *Client) {
+func (ch ClientAllowanceCheck) apply(c *BlockchainClient) {
 	c.requireCheckAllowance = ch.RequireAllowanceCheck
 }
 
@@ -19,7 +19,7 @@ type ClientBalanceCheck struct {
 	RequireBalanceCheck bool
 }
 
-func (ch ClientBalanceCheck) apply(c *Client) {
+func (ch ClientBalanceCheck) apply(c *BlockchainClient) {
 	c.requireCheckBalance = ch.RequireBalanceCheck
 }
 
@@ -27,7 +27,7 @@ type ClientFeeCheck struct {
 	RequirePositiveNativeBalance bool
 }
 
-func (ch ClientFeeCheck) apply(c *Client) {
+func (ch ClientFeeCheck) apply(c *BlockchainClient) {
 	if !ch.RequirePositiveNativeBalance {
 		c.checkFeeFn = func(ctx context.Context, account common.Address) error {
 			return nil

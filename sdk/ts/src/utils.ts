@@ -41,6 +41,7 @@ export function transformNodeConfig(resp: API.NodeV1GetConfigResponse): core.Nod
     name: info.name,
     id: BigInt(info.blockchain_id),
     channelHubAddress: info.channel_hub_address as Address,
+    lockingContractAddress: info.locking_contract_address as Address | undefined,
     blockStep: 0n, // Not provided in RPC response
   }));
 

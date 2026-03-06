@@ -10,7 +10,7 @@ import (
 
 // Client defines the interface for interacting with the ChannelsHub smart contract
 // TODO: add context to all methods
-type Client interface {
+type BlockchainClient interface {
 	// Getters - IVault
 	GetAccountsBalances(accounts []string, tokens []string) ([][]decimal.Decimal, error)
 
@@ -47,6 +47,19 @@ type Client interface {
 	FinalizeEscrowWithdrawal(candidate State) (string, error)
 }
 
+// ========= AppRegistryClient Interface =========
+
+type AppRegistryClient interface {
+	ApproveToken(amount decimal.Decimal) (string, error)
+	GetBalance(user string) (decimal.Decimal, error)
+	GetTokenDecimals() (uint8, error)
+
+	Lock(targetWallet string, amount decimal.Decimal) (string, error)
+	Relock() (string, error)
+	Unlock() (string, error)
+	Withdraw(destinationWallet string) (string, error)
+}
+
 // ========= TransitionValidator Interface =========
 
 // StateAdvancer applies state transitions
@@ -72,7 +85,7 @@ type AssetStore interface {
 }
 
 // Channel lifecycle event handlers
-type BlockchainEventHandler interface {
+type ChannelHubEventHandler interface {
 	HandleHomeChannelCreated(context.Context, *HomeChannelCreatedEvent) error
 	HandleHomeChannelMigrated(context.Context, *HomeChannelMigratedEvent) error
 	HandleHomeChannelCheckpointed(context.Context, *HomeChannelCheckpointedEvent) error
@@ -84,4 +97,8 @@ type BlockchainEventHandler interface {
 	HandleEscrowWithdrawalInitiated(context.Context, *EscrowWithdrawalInitiatedEvent) error
 	HandleEscrowWithdrawalChallenged(context.Context, *EscrowWithdrawalChallengedEvent) error
 	HandleEscrowWithdrawalFinalized(context.Context, *EscrowWithdrawalFinalizedEvent) error
+}
+
+type LockingContractEventHandler interface {
+	HandleUserLockedBalanceUpdated(context.Context, *UserLockedBalanceUpdatedEvent) error
 }

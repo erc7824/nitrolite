@@ -2,6 +2,7 @@ package event_handlers
 
 import (
 	"github.com/layer-3/nitrolite/pkg/core"
+	"github.com/shopspring/decimal"
 )
 
 // StoreTxHandler is a function that executes Store operations within a transaction.
@@ -49,4 +50,7 @@ type Store interface {
 	// ScheduleFinalizeEscrowWithdrawal schedules a checkpoint for an escrow withdrawal operation.
 	// This queues the state to be submitted on-chain to finalize an escrow withdrawal.
 	ScheduleFinalizeEscrowWithdrawal(stateID string, chainID uint64) error
+
+	// UpdateUserStaked updates the total staked amount for a user on a specific blockchain.
+	UpdateUserStaked(wallet string, blockchainID uint64, amount decimal.Decimal) error
 }

@@ -12,14 +12,11 @@ import (
 )
 
 func main() {
+	const defaultWSURL = "wss://clearnode-v1-rc.yellow.org/ws"
+
 	log.SetFlags(0)
 	log.SetPrefix("clearnode-cli: ")
 	log.SetOutput(os.Stderr)
-	if len(os.Args) < 2 {
-		log.Fatalf("Usage: clearnode-cli <clearnode_ws_url>\nExample: clearnode-cli wss://clearnode.example.com/ws")
-	}
-
-	wsURL := os.Args[1]
 
 	// Get config directory
 	configDir := os.Getenv("CLEARNODE_CLI_CONFIG_DIR")
@@ -42,8 +39,18 @@ func main() {
 		log.Fatalf("failed to initialize storage: %v", err)
 	}
 
+	// Determine WebSocket URL: CLI arg > stored > default
+	var wsURL string
+	if len(os.Args) >= 2 {
+		wsURL = os.Args[1]
+	} else if stored, err := store.GetWSURL(); err == nil {
+		wsURL = stored
+	} else {
+		wsURL = defaultWSURL
+	}
+
 	// Create operator
-	operator, err := NewOperator(wsURL, store)
+	operator, err := NewOperator(wsURL, configDir, store)
 	if err != nil {
 		log.Fatalf("failed to create operator: %v", err)
 	}

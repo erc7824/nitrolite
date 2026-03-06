@@ -64,8 +64,9 @@ func TestListener_Listen_CurrentEvents(t *testing.T) {
 
 	// Channel to signal event handling
 	eventHandled := make(chan struct{})
-	handleEvent := func(ctx context.Context, log types.Log) {
+	handleEvent := func(ctx context.Context, log types.Log) error {
 		close(eventHandled)
+		return nil
 	}
 
 	listener := NewListener(addr, mockClient, 1, 100, logger, handleEvent, getLatestEvent)
@@ -157,7 +158,7 @@ func TestListener_Listen_HistoricalAndCurrent(t *testing.T) {
 	var receivedCount int64
 	doneCh := make(chan struct{})
 
-	handleEvent := func(ctx context.Context, log types.Log) {
+	handleEvent := func(ctx context.Context, log types.Log) error {
 		count := atomic.AddInt64(&receivedCount, 1)
 		if count >= 2 { // Expect 1 historical + 1 current
 			select {
@@ -166,6 +167,8 @@ func TestListener_Listen_HistoricalAndCurrent(t *testing.T) {
 				close(doneCh)
 			}
 		}
+
+		return nil
 	}
 
 	listener := NewListener(addr, mockClient, 1, 10, logger, handleEvent, getLatestEvent)

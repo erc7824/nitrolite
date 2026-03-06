@@ -566,11 +566,10 @@ func (c *Client) Checkpoint(ctx context.Context, asset string) (string, error) {
 	blockchainID := state.HomeLedger.BlockchainID
 
 	// Initialize blockchain client if needed
-	if err := c.initializeBlockchainClient(ctx, blockchainID); err != nil {
+	blockchainClient, err := c.getOrInitBlockchainClient(ctx, blockchainID)
+	if err != nil {
 		return "", err
 	}
-
-	blockchainClient := c.blockchainClients[blockchainID]
 
 	// Get home channel info to determine on-chain status
 	channel, err := c.GetHomeChannel(ctx, userWallet, asset)
@@ -699,11 +698,11 @@ func (c *Client) Challenge(ctx context.Context, state core.State) (string, error
 
 	// Initialize blockchain client and submit
 	blockchainID := state.HomeLedger.BlockchainID
-	if err := c.initializeBlockchainClient(ctx, blockchainID); err != nil {
+	blockchainClient, err := c.getOrInitBlockchainClient(ctx, blockchainID)
+	if err != nil {
 		return "", err
 	}
 
-	blockchainClient := c.blockchainClients[blockchainID]
 	txHash, err := blockchainClient.Challenge(state, challengerSig, core.ChannelParticipantUser)
 	if err != nil {
 		return "", fmt.Errorf("failed to challenge on blockchain: %w", err)
@@ -980,11 +979,11 @@ func (c *Client) SignChannelSessionKeyState(state core.ChannelSessionKeyStateV1)
 //   - Transaction hash of the approval transaction
 //   - Error if the operation fails or the asset is a native token
 func (c *Client) ApproveToken(ctx context.Context, chainID uint64, asset string, amount decimal.Decimal) (string, error) {
-	if err := c.initializeBlockchainClient(ctx, chainID); err != nil {
+	blockchainClient, err := c.getOrInitBlockchainClient(ctx, chainID)
+	if err != nil {
 		return "", err
 	}
 
-	blockchainClient := c.blockchainClients[chainID]
 	return blockchainClient.Approve(asset, amount)
 }
 
@@ -1003,10 +1002,10 @@ func (c *Client) ApproveToken(ctx context.Context, chainID uint64, asset string,
 // Requirements:
 //   - Blockchain RPC must be configured for the chain (use WithBlockchainRPC)
 func (c *Client) GetOnChainBalance(ctx context.Context, chainID uint64, asset string, wallet string) (decimal.Decimal, error) {
-	if err := c.initializeBlockchainClient(ctx, chainID); err != nil {
+	blockchainClient, err := c.getOrInitBlockchainClient(ctx, chainID)
+	if err != nil {
 		return decimal.Zero, err
 	}
 
-	blockchainClient := c.blockchainClients[chainID]
 	return blockchainClient.GetTokenBalance(asset, wallet)
 }

@@ -28,6 +28,8 @@ export interface TransactionSigner {
   sendTransaction(tx: any): Promise<Hex>;
   /** Sign a message (raw bytes) */
   signMessage(message: { raw: Hex }): Promise<Hex>;
+  /** Get the underlying viem local account for wallet client creation */
+  getAccount?(): ReturnType<typeof privateKeyToAccount>;
 }
 
 /**
@@ -115,6 +117,14 @@ export class EthereumRawSigner implements TransactionSigner {
    */
   async signMessage(message: { raw: Hex }): Promise<Hex> {
     return await this.account.sign({ hash: message.raw });
+  }
+
+  /**
+   * Get the underlying viem local account for wallet client creation.
+   * Required for Node.js environments where HTTP transport cannot sign transactions.
+   */
+  getAccount(): ReturnType<typeof privateKeyToAccount> {
+    return this.account;
   }
 }
 

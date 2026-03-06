@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -15,7 +16,18 @@ import (
 	"github.com/layer-3/nitrolite/pkg/core"
 	"github.com/layer-3/nitrolite/pkg/sign"
 	sdk "github.com/layer-3/nitrolite/sdk/go"
+	"golang.org/x/term"
 )
+
+// readSecure reads a line from stdin without echo. Works under go-prompt's raw mode.
+func readSecure() string {
+	bytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Println() // newline after hidden input
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(bytes))
+}
 
 // ============================================================================
 // Help & Config
@@ -26,15 +38,27 @@ func (o *Operator) showHelp() {
 Clearnode CLI - SDK Development Tool
 =====================================
 
-SETUP COMMANDS
-  help                          Display this help message
-  config                        Display current configuration
-  wallet                        Display wallet address
-  import wallet                 Configure wallet (import or generate)
-  import rpc <chain_id> <url>   Configure blockchain RPC endpoint
+CONFIGURATION
+  config                                                       Display current configuration
+  config wallet                                                Display wallet address
+  config wallet import                                         Import existing private key
+  config wallet generate                                       Generate new wallet
+  config wallet export <path>                                  Export private key to file
+  config rpc import <chain_id> <url>                           Configure blockchain RPC endpoint
+  config node                                                  Show node info
+  config node set-ws-url <url>                                 Set clearnode WebSocket URL
+  config node set-home-blockchain <asset> <chain_id>           Set home blockchain for channels
+  config session-key                                           Show current session key info
+  config session-key generate                                  Generate new session key
+  config session-key import                                    Import existing session key
+  config session-key clear                                     Clear session key, revert to default signer
+  config session-key register-channel-key <key> <hours> <assets>     Register channel session key
+  config session-key channel-keys                              List active channel session keys
+  config session-key register-app-key <key> <hours> [apps] [sessions]  Register app session key
+  config session-key app-keys                                  List active app session keys
 
-HIGH-LEVEL OPERATIONS (Smart Client)
-  token-balance <chain_id> <asset>             Check on-chain token balance for your wallet
+OPERATIONS
+  token-balance <chain_id> <asset>             Check on-chain token balance
   approve <chain_id> <asset> <amount>          Approve token spending for deposits
   deposit <chain_id> <asset> <amount>          Deposit to channel (auto-create if needed)
   withdraw <chain_id> <asset> <amount>         Withdraw from channel
@@ -43,58 +67,47 @@ HIGH-LEVEL OPERATIONS (Smart Client)
   close-channel <asset>                        Close home channel on-chain
   checkpoint <asset>                           Submit latest state on-chain
 
-NODE INFORMATION (Base Client)
+QUERIES
   ping                          Test node connection
-  node info                     Get node configuration
   chains                        List supported blockchains
   assets [chain_id]             List supported assets (optionally filter by chain)
-
-USER QUERIES (Base Client)
   balances [wallet]             Get user balances (defaults to configured wallet)
-  transactions [wallet]         Get transaction history (defaults to configured wallet)
-  action-allowances [wallet]    Get action allowances (defaults to configured wallet)
-
-LOW-LEVEL STATE MANAGEMENT (Base Client)
-  state [wallet] <asset>        Get latest state (wallet defaults to configured)
-  home-channel [wallet] <asset> Get home channel (wallet defaults to configured)
+  transactions [wallet]         Get transaction history
+  action-allowances [wallet]    Get action allowances
+  state [wallet] <asset>        Get latest state
+  home-channel [wallet] <asset> Get home channel
   escrow-channel <channel_id>   Get escrow channel by ID
 
 APP REGISTRY
   app-info <app_id>                    Show application details
   my-apps                              List your registered applications
   register-app <app_id> [no-approval]  Register a new application
+  app-sessions                         List app sessions
 
-LOW-LEVEL APP SESSIONS (Base Client)
-  app-sessions                  List app sessions
-
-SESSION KEY MANAGEMENT
-  generate-session-key                                                Generate or import session key (stores locally)
-  session-key                                                         Show current session key info
-  clear-session-key                                                   Clear session key, revert to default wallet signer
-  create-channel-session-key <session_key> <expires_hours> <assets>   Register channel session key (auto-activates if stored)
-  channel-session-keys                                                List active channel session keys
-  create-app-session-key <session_key> <expires_hours> [app_ids] [session_ids]  Register app session key (IDs: comma-separated)
-  app-session-keys                                                    List active app session keys
+SECURITY TOKEN OPERATIONS
+  security-token approve <chain_id> <amount>                  Approve security token spending
+  security-token balance <chain_id> [wallet]                  Check escrowed security token balance
+  security-token escrow <chain_id> [target_address] <amount>  Escrow security tokens
+  security-token initiate-withdrawal <chain_id>               Start unlock period
+  security-token cancel-withdrawal <chain_id>                 Cancel unlock and re-lock
+  security-token withdraw <chain_id> <destination>            Withdraw unlocked security tokens
 
 OTHER
+  help                          Display this help message
   exit                          Exit the CLI
 
 EXAMPLES
-  import wallet
-  import rpc 80002 https://polygon-amoy.g.alchemy.com/v2/KEY
+  config wallet import
+  config rpc import 80002 https://polygon-amoy.g.alchemy.com/v2/KEY
+  config session-key generate
+  config session-key register-channel-key 0xabcd... 24 usdc,weth
   approve 80002 usdc 1000000
   deposit 80002 usdc 100
   transfer 0x1234... usdc 50
-  balances              # Uses configured wallet
-  balances 0x1234...    # Query specific wallet
-  state usdc            # Get state for USDC
-  chains
-  generate-session-key                               # Step 1: generate/import
-  create-channel-session-key 0xabcd... 24 usdc,weth  # Step 2: register + activate
-  create-app-session-key 0xabcd... 24 app1,app2`)
+  balances`)
 }
 
-func (o *Operator) showConfig(ctx context.Context) {
+func (o *Operator) showConfig() {
 	fmt.Println("Current Configuration")
 	fmt.Println("=====================")
 
@@ -142,14 +155,15 @@ func (o *Operator) showConfig(ctx context.Context) {
 		}
 	}
 
-	// Node info
-	nodeConfig, err := o.client.GetConfig(ctx)
-	if err == nil {
-		fmt.Printf("\nNode Info\n")
-		fmt.Printf("   Address:   %s\n", nodeConfig.NodeAddress)
-		fmt.Printf("   Version:   %s\n", nodeConfig.NodeVersion)
-		fmt.Printf("   Chains:    %d\n", len(nodeConfig.Blockchains))
-	}
+	// Node connection
+	fmt.Printf("Node:       %s\n", o.wsURL)
+
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  config wallet                                        Wallet management")
+	fmt.Println("  config rpc import <chain_id> <url>                   Configure blockchain RPC")
+	fmt.Println("  config node                                          Node info and connection")
+	fmt.Println("  config session-key                                   Session key management")
 }
 
 // ============================================================================
@@ -161,7 +175,7 @@ func (o *Operator) showWallet(_ context.Context) {
 	privateKey, err := o.store.GetPrivateKey()
 	if err != nil {
 		fmt.Println("ERROR: No wallet configured")
-		fmt.Println("INFO: Use 'import wallet' to configure wallet")
+		fmt.Println("INFO: Use 'config wallet import' to configure wallet")
 		return
 	}
 
@@ -179,101 +193,81 @@ func (o *Operator) showWallet(_ context.Context) {
 	fmt.Printf("Address: %s\n", address)
 }
 
+func (o *Operator) exportWallet(exportPath string) {
+	privateKey, err := o.store.GetPrivateKey()
+	if err != nil {
+		fmt.Println("ERROR: No wallet configured")
+		return
+	}
+
+	if err := os.WriteFile(exportPath, []byte(privateKey+"\n"), 0600); err != nil {
+		fmt.Printf("ERROR: Failed to export wallet: %v\n", err)
+		return
+	}
+
+	fmt.Printf("SUCCESS: Private key exported to %s\n", exportPath)
+	fmt.Println("WARNING: Keep this file secure and do not share it with anyone.")
+}
+
 // ============================================================================
 // Import Commands
 // ============================================================================
 
-func (o *Operator) importWallet(_ context.Context) {
-	fmt.Println("Wallet Configuration")
-	fmt.Println("====================")
-	fmt.Println()
-	fmt.Println("Choose an option:")
-	fmt.Println("  1. Import existing private key")
-	fmt.Println("  2. Generate new wallet")
-	fmt.Println()
-	fmt.Print("Enter choice (1 or 2): ")
-
-	var choice string
-	fmt.Scanln(&choice)
-	choice = strings.TrimSpace(choice)
-
-	var privateKey string
-	var signer sign.Signer
-	var err error
-
-	switch choice {
-	case "1":
-		// Import existing key
-		fmt.Println()
-		fmt.Println("Import Existing Wallet")
-		fmt.Print("Enter private key (with or without 0x prefix): ")
-		fmt.Scanln(&privateKey)
-
-		privateKey = strings.TrimSpace(privateKey)
-		if privateKey == "" {
-			fmt.Println("ERROR: Private key cannot be empty")
-			return
-		}
-
-		// Validate by creating signer
-		signer, err = sign.NewEthereumRawSigner(privateKey)
-		if err != nil {
-			fmt.Printf("ERROR: Invalid private key: %v\n", err)
-			return
-		}
-
-	case "2":
-		// Generate new wallet
-		fmt.Println()
-		fmt.Println("Generate New Wallet")
-		privateKey, err = generatePrivateKey()
-		if err != nil {
-			fmt.Printf("ERROR: Failed to generate private key: %v\n", err)
-			return
-		}
-
-		signer, err = sign.NewEthereumRawSigner(privateKey)
-		if err != nil {
-			fmt.Printf("ERROR: Failed to create signer: %v\n", err)
-			return
-		}
-
-		fmt.Println()
-		fmt.Println("WARNING: Save your private key securely!")
-		fmt.Println("=========================================")
-		fmt.Printf("Private Key: %s\n", privateKey)
-		fmt.Println("=========================================")
-		fmt.Println()
-		fmt.Print("Type 'I have saved my private key' to continue: ")
-
-		var confirmation string
-		fmt.Scanln(&confirmation)
-		// Read the full line
-		if confirmation == "" {
-			fmt.Println("ERROR: You must confirm that you saved the private key")
-			return
-		}
-
-	default:
-		fmt.Println("ERROR: Invalid choice")
+func (o *Operator) importWallet() {
+	fmt.Print("Enter private key (with or without 0x prefix): ")
+	privateKey := readSecure()
+	if privateKey == "" {
+		fmt.Println("ERROR: Private key cannot be empty")
 		return
 	}
 
-	// Save to storage
+	signer, err := sign.NewEthereumRawSigner(privateKey)
+	if err != nil {
+		fmt.Printf("ERROR: Invalid private key: %v\n", err)
+		return
+	}
+
 	if err := o.store.SetPrivateKey(privateKey); err != nil {
 		fmt.Printf("ERROR: Failed to save private key: %v\n", err)
 		return
 	}
 
-	fmt.Printf("SUCCESS: Wallet configured successfully\n")
+	fmt.Printf("SUCCESS: Wallet configured\n")
 	fmt.Printf("Address: %s\n", signer.PublicKey().Address().String())
 
-	if choice == "2" {
-		fmt.Println()
-		fmt.Println("Security Recommendations:")
-		fmt.Println("   - Store your private key in a secure location")
-		fmt.Println("   - Never share your private key with anyone")
-		fmt.Println("   - Consider using a hardware wallet for large amounts")
+	fmt.Println("Reconnecting...")
+	if err := o.reconnect(); err != nil {
+		fmt.Printf("WARNING: Failed to reconnect: %v\n", err)
+		fmt.Println("INFO: Restart the CLI to apply changes.")
+	}
+}
+
+func (o *Operator) generateWallet() {
+	privateKey, err := generatePrivateKey()
+	if err != nil {
+		fmt.Printf("ERROR: Failed to generate private key: %v\n", err)
+		return
+	}
+
+	signer, err := sign.NewEthereumRawSigner(privateKey)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to create signer: %v\n", err)
+		return
+	}
+
+	if err := o.store.SetPrivateKey(privateKey); err != nil {
+		fmt.Printf("ERROR: Failed to save private key: %v\n", err)
+		return
+	}
+
+	fmt.Printf("SUCCESS: New wallet generated\n")
+	fmt.Printf("Address: %s\n", signer.PublicKey().Address().String())
+	fmt.Println("IMPORTANT: Run 'config wallet export' to save your private key to a file.")
+
+	fmt.Println("Reconnecting...")
+	if err := o.reconnect(); err != nil {
+		fmt.Printf("WARNING: Failed to reconnect: %v\n", err)
+		fmt.Println("INFO: Restart the CLI to apply changes.")
 	}
 }
 
@@ -288,9 +282,14 @@ func (o *Operator) importRPC(_ context.Context, chainIDStr, rpcURL string) {
 		fmt.Printf("ERROR: Failed to save RPC: %v\n", err)
 		return
 	}
-	// TODO: add to SDK Client dynamically
 
 	fmt.Printf("SUCCESS: RPC configured for chain %d\n", chainID)
+
+	fmt.Println("Reconnecting...")
+	if err := o.reconnect(); err != nil {
+		fmt.Printf("WARNING: Failed to reconnect: %v\n", err)
+		fmt.Println("INFO: Restart the CLI to apply changes.")
+	}
 }
 
 func (o *Operator) setHomeBlockchain(_ context.Context, asset, chainIDStr string) {
@@ -345,7 +344,7 @@ func (o *Operator) tokenBalance(ctx context.Context, chainIDStr, asset string) {
 
 	wallet := o.getImportedWalletAddress()
 	if wallet == "" {
-		fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
+		fmt.Println("ERROR: No wallet configured. Use 'config wallet import' first.")
 		return
 	}
 
@@ -489,6 +488,7 @@ func (o *Operator) nodeInfo(ctx context.Context) {
 
 	fmt.Println("Node Information")
 	fmt.Println("================")
+	fmt.Printf("WS URL:    %s\n", o.wsURL)
 	fmt.Printf("Address:   %s\n", config.NodeAddress)
 	fmt.Printf("Version:   %s\n", config.NodeVersion)
 	fmt.Printf("Chains:    %d\n", len(config.Blockchains))
@@ -510,8 +510,28 @@ func (o *Operator) nodeInfo(ctx context.Context) {
 	fmt.Println("\nSupported Blockchains:")
 	for _, bc := range config.Blockchains {
 		fmt.Printf("  - %s (ID: %d)\n", bc.Name, bc.ID)
-		fmt.Printf("    Contract:   %s\n", bc.ChannelHubAddress)
+		fmt.Printf("    Channel Hub: %s\n", bc.ChannelHubAddress)
+		if bc.LockingContractAddress != "" {
+			fmt.Printf("    Locking:     %s\n", bc.LockingContractAddress)
+		}
 	}
+}
+
+func (o *Operator) setWSURL(wsURL string) {
+	if err := o.store.SetWSURL(wsURL); err != nil {
+		fmt.Printf("ERROR: Failed to save WebSocket URL: %v\n", err)
+		return
+	}
+
+	o.wsURL = wsURL
+	fmt.Printf("SUCCESS: WebSocket URL set to %s\n", wsURL)
+	fmt.Println("INFO: Reconnecting...")
+	if err := o.reconnect(); err != nil {
+		fmt.Printf("ERROR: Failed to reconnect: %v\n", err)
+		fmt.Println("INFO: URL saved. Restart the CLI to connect.")
+		return
+	}
+	fmt.Println("SUCCESS: Connected to new node")
 }
 
 func (o *Operator) listChains(ctx context.Context) {
@@ -876,50 +896,34 @@ func (o *Operator) listAppSessions(ctx context.Context, wallet string) {
 // Session Key Management
 // ============================================================================
 
-func (o *Operator) generateSessionKey(_ context.Context) {
-	fmt.Println("Session Key Setup")
-	fmt.Println("=================")
-	fmt.Println()
-	fmt.Println("Choose an option:")
-	fmt.Println("  1. Generate new session key")
-	fmt.Println("  2. Import existing private key")
-	fmt.Println()
-	fmt.Print("Enter choice (1 or 2): ")
-
-	var choice string
-	fmt.Scanln(&choice)
-	choice = strings.TrimSpace(choice)
-
-	var privateKeyHex string
-	var err error
-
-	switch choice {
-	case "1":
-		privateKeyHex, err = generatePrivateKey()
-		if err != nil {
-			fmt.Printf("ERROR: Failed to generate session key: %v\n", err)
-			return
-		}
-	case "2":
-		fmt.Print("Enter session key private key (hex): ")
-		fmt.Scanln(&privateKeyHex)
-		privateKeyHex = strings.TrimSpace(privateKeyHex)
-		if privateKeyHex == "" {
-			fmt.Println("ERROR: Private key cannot be empty")
-			return
-		}
-	default:
-		fmt.Println("ERROR: Invalid choice")
+func (o *Operator) generateSessionKey() {
+	privateKeyHex, err := generatePrivateKey()
+	if err != nil {
+		fmt.Printf("ERROR: Failed to generate session key: %v\n", err)
 		return
 	}
 
+	o.storeSessionKey(privateKeyHex)
+}
+
+func (o *Operator) importSessionKey() {
+	fmt.Print("Enter session key private key (hex): ")
+	privateKeyHex := readSecure()
+	if privateKeyHex == "" {
+		fmt.Println("ERROR: Private key cannot be empty")
+		return
+	}
+
+	o.storeSessionKey(privateKeyHex)
+}
+
+func (o *Operator) storeSessionKey(privateKeyHex string) {
 	signer, err := sign.NewEthereumRawSigner(privateKeyHex)
 	if err != nil {
 		fmt.Printf("ERROR: Invalid private key: %v\n", err)
 		return
 	}
 
-	// Store the session key private key locally (no metadata yet — will be set on registration)
 	if err := o.store.SetSessionKeyPrivateKey(privateKeyHex); err != nil {
 		fmt.Printf("ERROR: Failed to store session key: %v\n", err)
 		return
@@ -927,17 +931,11 @@ func (o *Operator) generateSessionKey(_ context.Context) {
 
 	address := signer.PublicKey().Address().String()
 
-	fmt.Println()
 	fmt.Println("SUCCESS: Session key stored locally")
 	fmt.Printf("  Address: %s\n", address)
-	if choice == "1" {
-		fmt.Printf("  Private Key: %s\n", privateKeyHex)
-		fmt.Println()
-		fmt.Println("WARNING: Save the private key securely!")
-	}
 	fmt.Println()
 	fmt.Println("Next step: Register it on the clearnode with:")
-	fmt.Printf("  create-channel-session-key %s <expires_hours> <assets>\n", address)
+	fmt.Printf("  config session-key register-channel-key %s <expires_hours> <assets>\n", address)
 }
 
 func (o *Operator) showSessionKey() {
@@ -947,7 +945,7 @@ func (o *Operator) showSessionKey() {
 		pk, pkErr := o.store.GetSessionKeyPrivateKey()
 		if pkErr != nil {
 			fmt.Println("No session key configured")
-			fmt.Println("INFO: Use 'generate-session-key' to create one.")
+			fmt.Println("INFO: Use 'config session-key generate' to create one.")
 			return
 		}
 		signer, sigErr := sign.NewEthereumRawSigner(pk)
@@ -961,7 +959,7 @@ func (o *Operator) showSessionKey() {
 		fmt.Println("Status:  Stored locally (not yet registered on clearnode)")
 		fmt.Println()
 		fmt.Println("Next step: Register it with:")
-		fmt.Printf("  create-channel-session-key %s <expires_hours> <assets>\n", signer.PublicKey().Address().String())
+		fmt.Printf("  config session-key register-channel-key %s <expires_hours> <assets>\n", signer.PublicKey().Address().String())
 		return
 	}
 
@@ -1008,7 +1006,7 @@ func (o *Operator) createChannelSessionKey(ctx context.Context, sessionKeyAddr, 
 
 	wallet := o.getImportedWalletAddress()
 	if wallet == "" {
-		fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
+		fmt.Println("ERROR: No wallet configured. Use 'config wallet import' first.")
 		return
 	}
 
@@ -1133,7 +1131,7 @@ func (o *Operator) createAppSessionKey(ctx context.Context, sessionKeyAddr, expi
 
 	wallet := o.getImportedWalletAddress()
 	if wallet == "" {
-		fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
+		fmt.Println("ERROR: No wallet configured. Use 'config wallet import' first.")
 		return
 	}
 
@@ -1210,6 +1208,145 @@ func (o *Operator) listAppSessionKeys(ctx context.Context, wallet string) {
 		}
 		fmt.Printf("  Expires At:      %s\n", state.ExpiresAt.Format("2006-01-02 15:04:05"))
 	}
+}
+
+// ============================================================================
+// Security Token Operations
+// ============================================================================
+
+func (o *Operator) escrowSecurityTokens(ctx context.Context, chainIDStr, targetAddress, amountStr string) {
+	chainID, err := o.parseChainID(chainIDStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	amount, err := o.parseAmount(amountStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	// Default target to own wallet if not specified
+	if targetAddress == "" {
+		targetAddress = o.getImportedWalletAddress()
+		if targetAddress == "" {
+			fmt.Println("ERROR: No wallet configured. Use 'config wallet import' first.")
+			return
+		}
+		fmt.Printf("INFO: Using configured wallet as target: %s\n", targetAddress)
+	}
+
+	fmt.Printf("Escrowing %s security tokens for %s on chain %d...\n", amount.String(), targetAddress, chainID)
+
+	txHash, err := o.client.EscrowSecurityTokens(ctx, targetAddress, chainID, amount)
+	if err != nil {
+		fmt.Printf("ERROR: Escrow failed: %v\n", err)
+		return
+	}
+
+	fmt.Println("SUCCESS: Security tokens escrowed")
+	fmt.Printf("Transaction Hash: %s\n", txHash)
+}
+
+func (o *Operator) initiateSecurityWithdrawal(ctx context.Context, chainIDStr string) {
+	chainID, err := o.parseChainID(chainIDStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Initiating security tokens withdrawal on chain %d...\n", chainID)
+
+	txHash, err := o.client.InitiateSecurityTokensWithdrawal(ctx, chainID)
+	if err != nil {
+		fmt.Printf("ERROR: Initiate withdrawal failed: %v\n", err)
+		return
+	}
+
+	fmt.Println("SUCCESS: Security tokens withdrawal initiated")
+	fmt.Printf("Transaction Hash: %s\n", txHash)
+}
+
+func (o *Operator) cancelSecurityWithdrawal(ctx context.Context, chainIDStr string) {
+	chainID, err := o.parseChainID(chainIDStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Cancelling security tokens withdrawal on chain %d...\n", chainID)
+
+	txHash, err := o.client.CancelSecurityTokensWithdrawal(ctx, chainID)
+	if err != nil {
+		fmt.Printf("ERROR: Cancel withdrawal failed: %v\n", err)
+		return
+	}
+
+	fmt.Println("SUCCESS: Security tokens withdrawal cancelled (re-locked)")
+	fmt.Printf("Transaction Hash: %s\n", txHash)
+}
+
+func (o *Operator) withdrawSecurityTokens(ctx context.Context, chainIDStr, destination string) {
+	chainID, err := o.parseChainID(chainIDStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Withdrawing security tokens to %s on chain %d...\n", destination, chainID)
+
+	txHash, err := o.client.WithdrawSecurityTokens(ctx, chainID, destination)
+	if err != nil {
+		fmt.Printf("ERROR: Withdraw security tokens failed: %v\n", err)
+		return
+	}
+
+	fmt.Println("SUCCESS: Security tokens withdrawn")
+	fmt.Printf("Transaction Hash: %s\n", txHash)
+}
+
+func (o *Operator) approveSecurityToken(ctx context.Context, chainIDStr, amountStr string) {
+	chainID, err := o.parseChainID(chainIDStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	amount, err := o.parseAmount(amountStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Approving %s security tokens on chain %d...\n", amount.String(), chainID)
+
+	txHash, err := o.client.ApproveSecurityToken(ctx, chainID, amount)
+	if err != nil {
+		fmt.Printf("ERROR: Approve security token failed: %v\n", err)
+		return
+	}
+
+	fmt.Println("SUCCESS: Security token spending approved")
+	fmt.Printf("Transaction Hash: %s\n", txHash)
+}
+
+func (o *Operator) securityBalance(ctx context.Context, chainIDStr, wallet string) {
+	chainID, err := o.parseChainID(chainIDStr)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Querying security token balance for %s on chain %d...\n", wallet, chainID)
+
+	balance, err := o.client.GetLockedBalance(ctx, chainID, wallet)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to get security token balance: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Security token balance: %s\n", balance.String())
 }
 
 // ============================================================================

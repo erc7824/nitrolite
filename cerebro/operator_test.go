@@ -152,7 +152,7 @@ func TestOperator_Connect_Failure(t *testing.T) {
 	require.NoError(t, err)
 
 	// Attempt to connect to a non-existent server
-	_, err = NewOperator("ws://localhost:12345/nonexistent", s)
+	_, err = NewOperator("ws://localhost:12345/nonexistent", t.TempDir(), s)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to connect to clearnode")
 }

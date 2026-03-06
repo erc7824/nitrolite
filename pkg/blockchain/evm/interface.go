@@ -9,7 +9,7 @@ import (
 	"github.com/layer-3/nitrolite/pkg/core"
 )
 
-type HandleEvent func(ctx context.Context, eventLog types.Log)
+type HandleEvent func(ctx context.Context, eventLog types.Log) error
 type StoreContractEvent func(ev core.BlockchainEvent) error
 type LatestEventGetter func(contractAddress string, blockchainID uint64) (ev core.BlockchainEvent, err error)
 

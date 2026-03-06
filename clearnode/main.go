@@ -28,7 +28,9 @@ func main() {
 
 	bb := InitBackbone()
 	logger := bb.Logger
-	ctx := context.Background()
+	rootCtx := context.Background()
+	blockchainCtx, cancelBlockchain := context.WithCancel(rootCtx)
+	ctx := rootCtx
 
 	vl := bb.ValidationLimits
 	rpcRouterCfg := api.RPCRouterConfig{
@@ -78,34 +80,59 @@ func main() {
 		if err != nil {
 			logger.Fatal("failed to connect to EVM Node")
 		}
-		reactor := evm.NewReactor(b.ID, eventHandlerService, bb.DbStore.StoreContractEvent)
-		reactor.SetOnEventProcessed(bb.RuntimeMetrics.IncBlockchainEvent)
-		l := evm.NewListener(common.HexToAddress(b.ChannelHubAddress), client, b.ID, b.BlockStep, logger, reactor.HandleEvent, bb.DbStore.GetLatestEvent)
-		l.Listen(ctx, func(err error) {
-			if err != nil {
-				logger.Fatal("blockchain listener stopped", "error", err, "blockchainID", b.ID)
+
+		if b.ChannelHubAddress != "" {
+			// For the node itself, the node address is the signer's address
+			nodeAddress := bb.StateSigner.PublicKey().Address().String()
+
+			clientOpts := []evm.ClientOption{
+				evm.ClientBalanceCheck{RequireBalanceCheck: false},
+				evm.ClientAllowanceCheck{RequireAllowanceCheck: false},
 			}
-		})
 
-		// For the node itself, the node address is the signer's address
-		nodeAddress := bb.StateSigner.PublicKey().Address().String()
+			blockchainClient, err := evm.NewBlockchainClient(common.HexToAddress(b.ChannelHubAddress), client, bb.TxSigner, b.ID, nodeAddress, bb.MemoryStore, clientOpts...)
+			if err != nil {
+				logger.Fatal("failed to create EVM client")
+			}
 
-		clientOpts := []evm.ClientOption{
-			evm.ClientBalanceCheck{RequireBalanceCheck: false},
-			evm.ClientAllowanceCheck{RequireAllowanceCheck: false},
+			reactor := evm.NewChannelHubReactor(b.ID, eventHandlerService, bb.DbStore.StoreContractEvent)
+			reactor.SetOnEventProcessed(bb.RuntimeMetrics.IncBlockchainEvent)
+			l := evm.NewListener(common.HexToAddress(b.ChannelHubAddress), client, b.ID, b.BlockStep, logger, reactor.HandleEvent, bb.DbStore.GetLatestEvent)
+			l.Listen(blockchainCtx, func(err error) {
+				if err != nil {
+					logger.Fatal("blockchain listener stopped", "error", err, "blockchainID", b.ID)
+				}
+			})
+
+			worker := NewBlockchainWorker(b.ID, blockchainClient, bb.DbStore, logger, bb.RuntimeMetrics)
+			worker.Start(blockchainCtx, func(err error) {
+				if err != nil {
+					logger.Fatal("blockchain worker stopped", "error", err, "blockchainID", b.ID)
+				}
+			})
+		} else {
+			logger.Info("channel hub address is not configured for blockchain", "blockchainID", b.ID)
 		}
 
-		blockchainClient, err := evm.NewClient(common.HexToAddress(b.ChannelHubAddress), client, bb.TxSigner, b.ID, nodeAddress, bb.MemoryStore, clientOpts...)
-		if err != nil {
-			logger.Fatal("failed to create EVM client")
-		}
-
-		worker := NewBlockchainWorker(b.ID, blockchainClient, bb.DbStore, logger, bb.RuntimeMetrics)
-		worker.Start(ctx, func(err error) {
+		if b.LockingContractAddress != "" {
+			appRegistryClient, err := evm.NewLockingClient(common.HexToAddress(b.LockingContractAddress), client, b.ID)
 			if err != nil {
-				logger.Fatal("blockchain worker stopped", "error", err, "blockchainID", b.ID)
+				logger.Fatal("failed to create locking client", "error", err, "blockchainID", b.ID)
 			}
-		})
+
+			reactor, err := evm.NewLockingContractReactor(b.ID, eventHandlerService, appRegistryClient.GetTokenDecimals, bb.DbStore.StoreContractEvent)
+			if err != nil {
+				logger.Fatal("failed to create app registry reactor", "error", err, "blockchainID", b.ID)
+			}
+
+			reactor.SetOnEventProcessed(bb.RuntimeMetrics.IncBlockchainEvent)
+			l := evm.NewListener(common.HexToAddress(b.LockingContractAddress), client, b.ID, b.BlockStep, logger, reactor.HandleEvent, bb.DbStore.GetLatestEvent)
+			l.Listen(blockchainCtx, func(err error) {
+				if err != nil {
+					logger.Fatal("blockchain listener stopped", "error", err, "blockchainID", b.ID)
+				}
+			})
+		}
 	}
 
 	go runStoreMetricsExporter(ctx, 30*time.Second, bb.DbStore, bb.StoreMetrics, logger)
@@ -158,12 +185,14 @@ func main() {
 		logger.Error("failed to shut down RPC server", "error", err)
 	}
 
+	logger.Info("stopping blockchain listeners and workers")
+	cancelBlockchain()
+
 	// Close backbone resources
 	if err := bb.Close(); err != nil {
 		logger.Error("failed to close backbone resources", "error", err)
 	}
 
-	// TODO: gracefully stop blockchain listeners and workers
 	logger.Info("shutdown complete")
 }
 

@@ -28,6 +28,11 @@ func NewOperator(wsURL string, store *Storage) (*Operator, error) {
 		exitCh: make(chan struct{}),
 	}
 
+	if _, err := store.GetPrivateKey(); err != nil {
+		fmt.Println("INFO: No wallet configured. Use 'import wallet' to get started.")
+		return op, nil
+	}
+
 	if err := op.connect(); err != nil {
 		return nil, err
 	}
@@ -276,6 +281,17 @@ func (o *Operator) Execute(s string) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	// Commands that work without a wallet/connection
+	if o.client == nil {
+		switch args[0] {
+		case "help", "config", "wallet", "import", "generate-session-key", "session-key", "exit":
+			// allowed without connection
+		default:
+			fmt.Println("ERROR: Not connected. Configure a wallet first with 'import wallet'.")
+			return
+		}
+	}
 
 	switch args[0] {
 	case "help":
@@ -557,6 +573,10 @@ func (o *Operator) Execute(s string) {
 }
 
 func (o *Operator) getChainSuggestions() []prompt.Suggest {
+	if o.client == nil {
+		return nil
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -576,6 +596,10 @@ func (o *Operator) getChainSuggestions() []prompt.Suggest {
 }
 
 func (o *Operator) getAssetSuggestions() []prompt.Suggest {
+	if o.client == nil {
+		return nil
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

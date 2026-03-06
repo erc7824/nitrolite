@@ -143,6 +143,10 @@ func (o *Operator) showConfig(ctx context.Context) {
 	}
 
 	// Node info
+	if o.client == nil {
+		fmt.Println("\nNode Info: Not connected (import wallet to connect)")
+		return
+	}
 	nodeConfig, err := o.client.GetConfig(ctx)
 	if err == nil {
 		fmt.Printf("\nNode Info\n")
@@ -267,6 +271,16 @@ func (o *Operator) importWallet(_ context.Context) {
 
 	fmt.Printf("SUCCESS: Wallet configured successfully\n")
 	fmt.Printf("Address: %s\n", signer.PublicKey().Address().String())
+
+	// Connect to node now that we have a wallet
+	if o.client == nil {
+		fmt.Println("Connecting to node...")
+		if err := o.connect(); err != nil {
+			fmt.Printf("WARNING: Wallet saved but failed to connect: %v\n", err)
+		} else {
+			fmt.Println("INFO: Connected to node.")
+		}
+	}
 
 	if choice == "2" {
 		fmt.Println()

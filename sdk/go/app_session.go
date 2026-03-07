@@ -99,12 +99,20 @@ func (c *Client) GetAppDefinition(ctx context.Context, appSessionID string) (*ap
 	return &def, nil
 }
 
+// CreateAppSessionOptions contains optional parameters for CreateAppSession.
+type CreateAppSessionOptions struct {
+	// OwnerSig is the app owner's signature approving session creation.
+	// Required when the app's CreationApprovalNotRequired is false.
+	OwnerSig string
+}
+
 // CreateAppSession creates a new application session between participants.
 //
 // Parameters:
 //   - definition: The app definition with participants, quorum, application ID
 //   - sessionData: Optional JSON stringified session data
 //   - quorumSigs: Participant signatures for the app session creation
+//   - opts: Optional parameters (owner signature for apps requiring approval)
 //
 // Returns:
 //   - AppSessionID of the created session
@@ -121,11 +129,14 @@ func (c *Client) GetAppDefinition(ctx context.Context, appSessionID string) (*ap
 //	    Nonce: 1,
 //	}
 //	sessionID, version, status, err := client.CreateAppSession(ctx, def, "{}", []string{"sig1", "sig2"})
-func (c *Client) CreateAppSession(ctx context.Context, definition app.AppDefinitionV1, sessionData string, quorumSigs []string) (string, string, string, error) {
+func (c *Client) CreateAppSession(ctx context.Context, definition app.AppDefinitionV1, sessionData string, quorumSigs []string, opts ...CreateAppSessionOptions) (string, string, string, error) {
 	req := rpc.AppSessionsV1CreateAppSessionRequest{
 		Definition:  transformAppDefinitionToRPC(definition),
 		SessionData: sessionData,
 		QuorumSigs:  quorumSigs,
+	}
+	if len(opts) > 0 && opts[0].OwnerSig != "" {
+		req.OwnerSig = opts[0].OwnerSig
 	}
 	resp, err := c.rpcClient.AppSessionsV1CreateAppSession(ctx, req)
 	if err != nil {

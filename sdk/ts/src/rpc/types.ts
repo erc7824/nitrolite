@@ -223,6 +223,8 @@ export interface BlockchainInfoV1 {
   blockchain_id: string; // uint64 as string
   /** Channel hub contract address on this network */
   channel_hub_address: Address;
+  /** Locking contract address on this network */
+  locking_contract_address?: Address;
 }
 
 // ============================================================================

@@ -11,6 +11,8 @@ export {
   EthereumRawSigner,
   ChannelDefaultSigner,
   ChannelSessionKeyStateSigner,
+  AppSessionWalletSignerV1,
+  AppSessionKeySignerV1,
   createSigners,
 } from './signers';
 

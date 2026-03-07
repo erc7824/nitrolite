@@ -14,6 +14,7 @@ import (
 	"github.com/layer-3/nitrolite/pkg/core"
 	"github.com/layer-3/nitrolite/pkg/rpc"
 	"github.com/layer-3/nitrolite/pkg/sign"
+	"github.com/shopspring/decimal"
 )
 
 // Client provides a unified interface for interacting with Clearnode.
@@ -47,15 +48,17 @@ import (
 //	config, _ := client.GetConfig(ctx)
 //	balances, _ := client.GetBalances(ctx, walletAddress)
 type Client struct {
-	rpcClient         *rpc.Client
-	config            Config
-	exitCh            chan struct{}
-	closeOnce         sync.Once
-	blockchainClients map[uint64]core.Client
-	homeBlockchains   map[string]uint64
-	stateSigner       core.ChannelSigner
-	rawSigner         sign.Signer
-	assetStore        *clientAssetStore
+	rpcClient                *rpc.Client
+	config                   Config
+	exitCh                   chan struct{}
+	closeOnce                sync.Once
+	chainsMu                 sync.Mutex
+	blockchainClients        map[uint64]core.BlockchainClient
+	blockchainLockingClients map[uint64]*evm.LockingClient
+	homeBlockchains          map[string]uint64
+	stateSigner              core.ChannelSigner
+	rawSigner                sign.Signer
+	assetStore               *clientAssetStore
 }
 
 // NewClient creates a new Clearnode client with both high-level and low-level methods.
@@ -101,13 +104,14 @@ func NewClient(wsURL string, stateSigner core.ChannelSigner, rawSigner sign.Sign
 
 	// Create client instance
 	client := &Client{
-		rpcClient:         rpcClient,
-		config:            config,
-		exitCh:            make(chan struct{}),
-		blockchainClients: make(map[uint64]core.Client),
-		homeBlockchains:   make(map[string]uint64),
-		stateSigner:       stateSigner,
-		rawSigner:         rawSigner,
+		rpcClient:                rpcClient,
+		config:                   config,
+		exitCh:                   make(chan struct{}),
+		blockchainClients:        make(map[uint64]core.BlockchainClient),
+		blockchainLockingClients: make(map[uint64]*evm.LockingClient),
+		homeBlockchains:          make(map[string]uint64),
+		stateSigner:              stateSigner,
+		rawSigner:                rawSigner,
 	}
 
 	// Create asset store
@@ -296,41 +300,43 @@ func WithBlockchainRPC(chainID uint64, rpcURL string) Option {
 	}
 }
 
-// initializeBlockchainClient initializes a blockchain client for a specific chain.
-// This is called lazily when a blockchain operation is needed.
-func (c *Client) initializeBlockchainClient(ctx context.Context, chainID uint64) error {
+// getOrInitBlockchainClient returns the blockchain client for a specific chain.
+func (c *Client) getOrInitBlockchainClient(ctx context.Context, chainID uint64) (core.BlockchainClient, error) {
+	c.chainsMu.Lock()
+	defer c.chainsMu.Unlock()
+
 	// Check if already initialized
-	if _, exists := c.blockchainClients[chainID]; exists {
-		return nil
+	if bc, exists := c.blockchainClients[chainID]; exists {
+		return bc, nil
 	}
 
 	// Get RPC URL from config
 	rpcURL, exists := c.config.BlockchainRPCs[chainID]
 	if !exists {
-		return fmt.Errorf("blockchain RPC not configured for chain %d (use WithBlockchainRPC)", chainID)
+		return nil, fmt.Errorf("blockchain RPC not configured for chain %d (use WithBlockchainRPC)", chainID)
 	}
 
-	// Get contract address for this blockchain
-	contractAddress, err := c.getContractAddress(ctx, chainID)
+	// Get channel hub address for this blockchain
+	channelHubAddress, err := c.getChannelHubAddress(ctx, chainID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Get node address
 	nodeAddress, err := c.getNodeAddress(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Connect to blockchain
 	ethClient, err := ethclient.Dial(rpcURL)
 	if err != nil {
-		return fmt.Errorf("failed to connect to blockchain RPC: %w", err)
+		return nil, fmt.Errorf("failed to connect to blockchain RPC: %w", err)
 	}
 
 	// Create blockchain client using the user's signer and node address
-	evmClient, err := evm.NewClient(
-		common.HexToAddress(contractAddress),
+	evmClient, err := evm.NewBlockchainClient(
+		common.HexToAddress(channelHubAddress),
 		ethClient,
 		c.rawSigner,
 		chainID,
@@ -339,11 +345,11 @@ func (c *Client) initializeBlockchainClient(ctx context.Context, chainID uint64)
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to create blockchain client: %w", err)
+		return nil, fmt.Errorf("failed to create blockchain client: %w", err)
 	}
 
 	c.blockchainClients[chainID] = evmClient
-	return nil
+	return evmClient, nil
 }
 
 // generateNonce generates a random 8-byte nonce for channel creation.
@@ -373,8 +379,8 @@ func (c *Client) getTokenAddress(ctx context.Context, blockchainID uint64, asset
 	return "", fmt.Errorf("asset %s not found", asset)
 }
 
-// getContractAddress retrieves the channel hub contract address for a specific blockchain from node config.
-func (c *Client) getContractAddress(ctx context.Context, blockchainID uint64) (string, error) {
+// getChannelHubAddress retrieves the channel hub contract address for a specific blockchain from node config.
+func (c *Client) getChannelHubAddress(ctx context.Context, blockchainID uint64) (string, error) {
 	nodeConfig, err := c.GetConfig(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get node config: %w", err)
@@ -382,11 +388,70 @@ func (c *Client) getContractAddress(ctx context.Context, blockchainID uint64) (s
 
 	for _, bc := range nodeConfig.Blockchains {
 		if bc.ID == blockchainID {
+			if bc.ChannelHubAddress == "" {
+				return "", fmt.Errorf("channel hub address not configured for blockchain %d", blockchainID)
+			}
 			return bc.ChannelHubAddress, nil
 		}
 	}
 
 	return "", fmt.Errorf("blockchain %d not found in node config", blockchainID)
+}
+
+// getLockingContractAddress retrieves the Locking contract address for a specific blockchain from node config.
+func (c *Client) getLockingContractAddress(ctx context.Context, blockchainID uint64) (string, error) {
+	nodeConfig, err := c.GetConfig(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get node config: %w", err)
+	}
+
+	for _, bc := range nodeConfig.Blockchains {
+		if bc.ID == blockchainID {
+			if bc.LockingContractAddress == "" {
+				return "", fmt.Errorf("locking contract address not configured for blockchain %d", blockchainID)
+			}
+			return bc.LockingContractAddress, nil
+		}
+	}
+
+	return "", fmt.Errorf("blockchain %d not found in node config", blockchainID)
+}
+
+// getOrInitLockingClient returns the locking client for a specific chain,
+// initializing it lazily if needed. Thread-safe.
+func (c *Client) getOrInitLockingClient(ctx context.Context, chainID uint64) (*evm.LockingClient, error) {
+	c.chainsMu.Lock()
+	defer c.chainsMu.Unlock()
+
+	if lc, exists := c.blockchainLockingClients[chainID]; exists {
+		return lc, nil
+	}
+
+	rpcURL, exists := c.config.BlockchainRPCs[chainID]
+	if !exists {
+		return nil, fmt.Errorf("blockchain RPC not configured for chain %d (use WithBlockchainRPC)", chainID)
+	}
+
+	lockingContractAddress, err := c.getLockingContractAddress(ctx, chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	ethClient, err := ethclient.Dial(rpcURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to blockchain RPC: %w", err)
+	}
+	client, err := evm.NewLockingClient(
+		common.HexToAddress(lockingContractAddress),
+		ethClient,
+		chainID,
+		c.rawSigner,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Locking client: %w", err)
+	}
+	c.blockchainLockingClients[chainID] = client
+	return client, nil
 }
 
 // getNodeAddress retrieves the node's Ethereum address from the node config.
@@ -406,4 +471,126 @@ func (c *Client) getSupportedSigValidatorsBitmap(ctx context.Context) (string, e
 		return "", fmt.Errorf("failed to get node config: %w", err)
 	}
 	return core.BuildSigValidatorsBitmap(nodeConfig.SupportedSigValidators), nil
+}
+
+// ============================================================================
+// Locking On-Chain Methods
+// ============================================================================
+
+// EscrowSecurityTokens locks tokens into the Locking contract on the specified blockchain.
+// The tokens are locked for the caller's own address. Before calling this method,
+// you must approve the Locking to spend your tokens using ApproveSecurityToken.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - destinationWalletAddress: The Ethereum address to lock tokens for
+//   - blockchainID: The blockchain network ID
+//   - amount: The amount of tokens to lock (in human-readable decimals, e.g., 100.5 USDC)
+//
+// Returns:
+//   - Transaction hash
+//   - Error if the operation fails
+func (c *Client) EscrowSecurityTokens(ctx context.Context, targetWalletAddress string, blockchainID uint64, amount decimal.Decimal) (string, error) {
+	lc, err := c.getOrInitLockingClient(ctx, blockchainID)
+	if err != nil {
+		return "", err
+	}
+	return lc.Lock(targetWalletAddress, amount)
+}
+
+// InitiateSecurityTokensWithdrawal initiates the unlock process for locked tokens in the Locking contract.
+// After the unlock period elapses, Withdraw Security Tokens can be called to retrieve the tokens.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - blockchainID: The blockchain network ID
+//
+// Returns:
+//   - Transaction hash
+//   - Error if the operation fails
+func (c *Client) InitiateSecurityTokensWithdrawal(ctx context.Context, blockchainID uint64) (string, error) {
+	lc, err := c.getOrInitLockingClient(ctx, blockchainID)
+	if err != nil {
+		return "", err
+	}
+
+	return lc.Unlock()
+}
+
+// CancelSecurityTokensWithdrawal re-locks tokens that are currently in the unlocking state,
+// cancelling the pending unlock and returning them to the locked state.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - blockchainID: The blockchain network ID
+//
+// Returns:
+//   - Transaction hash
+//   - Error if the operation fails
+func (c *Client) CancelSecurityTokensWithdrawal(ctx context.Context, blockchainID uint64) (string, error) {
+	lc, err := c.getOrInitLockingClient(ctx, blockchainID)
+	if err != nil {
+		return "", err
+	}
+
+	return lc.Relock()
+}
+
+// WithdrawSecurityTokens withdraws unlocked tokens from the Locking contract to the specified destination.
+// Can only be called after the unlock period has fully elapsed.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - blockchainID: The blockchain network ID
+//   - destinationWalletAddress: The Ethereum address to receive the withdrawn tokens
+//
+// Returns:
+//   - Transaction hash
+//   - Error if the operation fails
+func (c *Client) WithdrawSecurityTokens(ctx context.Context, blockchainID uint64, destinationWalletAddress string) (string, error) {
+	lc, err := c.getOrInitLockingClient(ctx, blockchainID)
+	if err != nil {
+		return "", err
+	}
+
+	return lc.Withdraw(destinationWalletAddress)
+}
+
+// ApproveSecurityToken approves the Locking contract to spend tokens on behalf of the caller.
+// This must be called before Lock Security Tokens.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - chainID: The blockchain network ID
+//   - amount: The amount of tokens to approve
+//
+// Returns:
+//   - Transaction hash
+//   - Error if the operation fails
+func (c *Client) ApproveSecurityToken(ctx context.Context, chainID uint64, amount decimal.Decimal) (string, error) {
+	lc, err := c.getOrInitLockingClient(ctx, chainID)
+	if err != nil {
+		return "", err
+	}
+
+	return lc.ApproveToken(amount)
+}
+
+// GetLockedBalance returns the locked balance of a user in the Locking contract.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - chainID: The blockchain network ID
+//   - wallet: The Ethereum address to check
+//
+// Returns:
+//   - The locked balance as a decimal (adjusted for token decimals)
+//   - Error if the query fails
+func (c *Client) GetLockedBalance(ctx context.Context, chainID uint64, wallet string) (decimal.Decimal, error) {
+	lc, err := c.getOrInitLockingClient(ctx, chainID)
+	if err != nil {
+		return decimal.Zero, err
+	}
+
+	return lc.GetBalance(wallet)
 }

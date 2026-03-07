@@ -236,6 +236,8 @@ export interface AppSessionsV1CreateAppSessionRequest {
   session_data: string;
   /** Participant signatures for the app session creation */
   quorum_sigs?: string[];
+  /** Optional owner signature for app session creation if approval required by the app registry */
+  owner_sig?: string;
 }
 
 export interface AppSessionsV1CreateAppSessionResponse {

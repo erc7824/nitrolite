@@ -283,7 +283,8 @@ type BlockchainInfoV1 struct {
 	BlockchainID string `json:"blockchain_id"`
 	// ChannelHubAddress is the contract address on this network
 	ChannelHubAddress string `json:"channel_hub_address"`
-	// DefaultValidatorAddress is the validator contract address set in a channel supported by clearnode
+	// LockingContractAddress is the contract address for the locking contract on this network
+	LockingContractAddress string `json:"locking_contract_address"`
 }
 
 // ============================================================================

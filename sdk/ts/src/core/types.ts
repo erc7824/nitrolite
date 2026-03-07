@@ -165,6 +165,7 @@ export interface Blockchain {
   name: string;
   id: bigint; // uint64
   channelHubAddress: Address;
+  lockingContractAddress?: Address;
   blockStep: bigint; // uint64
 }
 

@@ -35,6 +35,20 @@ func NewStorage(path string) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
+func (s *Storage) SetWSURL(wsURL string) error {
+	_, err := s.db.Exec("INSERT OR REPLACE INTO config (key, value) VALUES ('ws_url', ?)", wsURL)
+	return err
+}
+
+func (s *Storage) GetWSURL() (string, error) {
+	var wsURL string
+	err := s.db.QueryRow("SELECT value FROM config WHERE key = 'ws_url'").Scan(&wsURL)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("no WebSocket URL configured")
+	}
+	return wsURL, err
+}
+
 func (s *Storage) SetPrivateKey(privateKey string) error {
 	_, err := s.db.Exec("INSERT OR REPLACE INTO config (key, value) VALUES ('private_key', ?)", privateKey)
 	return err

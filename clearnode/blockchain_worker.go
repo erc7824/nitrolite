@@ -38,13 +38,13 @@ const (
 
 type BlockchainWorker struct {
 	blockchainID uint64
-	client       core.Client
+	client       core.BlockchainClient
 	store        BlockchainWorkerStore
 	logger       log.Logger
 	metrics      MetricsExporter
 }
 
-func NewBlockchainWorker(blockchainID uint64, client core.Client, store BlockchainWorkerStore, logger log.Logger, m MetricsExporter) *BlockchainWorker {
+func NewBlockchainWorker(blockchainID uint64, client core.BlockchainClient, store BlockchainWorkerStore, logger log.Logger, m MetricsExporter) *BlockchainWorker {
 	return &BlockchainWorker{
 		blockchainID: blockchainID,
 		client:       client,

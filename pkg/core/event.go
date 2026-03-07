@@ -1,5 +1,7 @@
 package core
 
+import "github.com/shopspring/decimal"
+
 // On-chain events
 
 // HomeChannelCreatedEvent represents the ChannelCreated event
@@ -44,6 +46,12 @@ type channelChallengedEvent struct {
 	ChannelID       string `json:"channel_id"`
 	StateVersion    uint64 `json:"state_version"`
 	ChallengeExpiry uint64 `json:"challenge_expiry"`
+}
+
+type UserLockedBalanceUpdatedEvent struct {
+	UserAddress  string          `json:"user_address"`
+	BlockchainID uint64          `json:"blockchain_id"`
+	Balance      decimal.Decimal `json:"balance"`
 }
 
 type BlockchainEvent struct {

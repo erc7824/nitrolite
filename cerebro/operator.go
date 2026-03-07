@@ -15,17 +15,19 @@ import (
 )
 
 type Operator struct {
-	wsURL  string
-	store  *Storage
-	client *sdk.Client
-	exitCh chan struct{}
+	wsURL     string
+	configDir string
+	store     *Storage
+	client    *sdk.Client
+	exitCh    chan struct{}
 }
 
-func NewOperator(wsURL string, store *Storage) (*Operator, error) {
+func NewOperator(wsURL, configDir string, store *Storage) (*Operator, error) {
 	op := &Operator{
-		wsURL:  wsURL,
-		store:  store,
-		exitCh: make(chan struct{}),
+		wsURL:     wsURL,
+		configDir: configDir,
+		store:     store,
+		exitCh:    make(chan struct{}),
 	}
 
 	if err := op.connect(); err != nil {
@@ -69,10 +71,29 @@ func (o *Operator) buildStateSigner(walletPrivateKey string) (core.ChannelSigner
 }
 
 // connect creates the SDK client with the appropriate signer.
+// If no wallet is configured, a new one is automatically generated.
 func (o *Operator) connect() error {
 	privateKey, err := o.store.GetPrivateKey()
 	if err != nil {
-		return fmt.Errorf("no wallet imported (use 'import wallet' first): %w", err)
+		// Auto-generate a new wallet for first-time users
+		privateKey, err = generatePrivateKey()
+		if err != nil {
+			return fmt.Errorf("failed to generate wallet: %w", err)
+		}
+		if err := o.store.SetPrivateKey(privateKey); err != nil {
+			return fmt.Errorf("failed to save generated wallet: %w", err)
+		}
+		signer, err := sign.NewEthereumRawSigner(privateKey)
+		if err != nil {
+			return fmt.Errorf("failed to create signer: %w", err)
+		}
+		fmt.Println()
+		fmt.Println("Welcome! No wallet imported. A new wallet has been generated for you.")
+		fmt.Printf("Address: %s\n", signer.PublicKey().Address().String())
+		fmt.Println()
+		fmt.Println("IMPORTANT: Run 'config wallet export' to save your private key to a file.")
+		fmt.Println("INFO: You can import a different wallet anytime with 'config wallet import'.")
+		fmt.Println()
 	}
 
 	stateSigner, err := o.buildStateSigner(privateKey)
@@ -144,10 +165,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 		return []prompt.Suggest{
 			// Setup
 			{Text: "help", Description: "Show help information"},
-			{Text: "config", Description: "Show current configuration"},
-			{Text: "wallet", Description: "Show wallet address"},
-			{Text: "import", Description: "Import wallet or blockchain RPC"},
-			{Text: "set-home-blockchain", Description: "Set home blockchain for channels"},
+			{Text: "config", Description: "Configuration (wallet, rpc, node, session-key)"},
 
 			// High-level operations
 			{Text: "token-balance", Description: "Check on-chain token balance"},
@@ -161,7 +179,6 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 
 			// Node information
 			{Text: "ping", Description: "Test node connection"},
-			{Text: "node", Description: "Get node information"},
 			{Text: "chains", Description: "List supported blockchains"},
 			{Text: "assets", Description: "List supported assets"},
 
@@ -183,33 +200,36 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			// App sessions (Base Client - Low-level)
 			{Text: "app-sessions", Description: "List app sessions"},
 
-			// Session key management
-			{Text: "generate-session-key", Description: "Generate or import session key (stores locally)"},
-			{Text: "session-key", Description: "Show current session key info"},
-			{Text: "clear-session-key", Description: "Clear session key, revert to default signer"},
-			{Text: "create-channel-session-key", Description: "Register channel session key"},
-			{Text: "channel-session-keys", Description: "List active channel session keys"},
-			{Text: "create-app-session-key", Description: "Register app session key"},
-			{Text: "app-session-keys", Description: "List active app session keys"},
+			// Security token operations
+			{Text: "security-token", Description: "Security token operations"},
 
-			{Text: "exit", Description: "Exit the CLI"},
+{Text: "exit", Description: "Exit the CLI"},
 		}
 	}
 
 	// Second level
 	if len(args) < 3 {
 		switch args[0] {
-		case "import":
+		case "config":
 			return []prompt.Suggest{
-				{Text: "wallet", Description: "Import private key for signing"},
-				{Text: "rpc", Description: "Import blockchain RPC URL"},
+				{Text: "wallet", Description: "Wallet management"},
+				{Text: "rpc", Description: "RPC management"},
+				{Text: "node", Description: "Node info and connection"},
+				{Text: "session-key", Description: "Session key management"},
 			}
-		case "set-home-blockchain", "close-channel", "acknowledge", "checkpoint":
-			// set-home-blockchain <asset> <chain_id>, others take <asset>
+		case "close-channel", "acknowledge", "checkpoint":
 			return o.getAssetSuggestions()
 		case "token-balance", "approve", "deposit", "withdraw":
-			// token-balance <chain_id> <asset>, approve/deposit/withdraw <chain_id> <asset> <amount>
 			return o.getChainSuggestions()
+		case "security-token":
+			return []prompt.Suggest{
+				{Text: "approve", Description: "Approve security token spending"},
+				{Text: "balance", Description: "Check escrowed security token balance"},
+				{Text: "escrow", Description: "Escrow security tokens"},
+				{Text: "initiate-withdrawal", Description: "Start unlock period"},
+				{Text: "cancel-withdrawal", Description: "Cancel unlock and re-lock"},
+				{Text: "withdraw", Description: "Withdraw unlocked security tokens"},
+			}
 		case "state", "home-channel":
 			// state [wallet] <asset>, home-channel [wallet] <asset>
 			// Suggest asset first (common case), wallet can be typed manually
@@ -221,23 +241,40 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			return o.getWalletSuggestion()
 		case "assets":
 			return o.getChainSuggestions()
-		case "node":
-			return []prompt.Suggest{
-				{Text: "info", Description: "Get node configuration"},
-			}
 		}
 	}
 
 	// Third level
 	if len(args) < 4 {
 		switch args[0] {
-		case "import":
-			if args[1] == "rpc" {
-				return o.getChainSuggestions()
+		case "config":
+			switch args[1] {
+			case "wallet":
+				return []prompt.Suggest{
+					{Text: "import", Description: "Import existing private key"},
+					{Text: "generate", Description: "Generate new wallet"},
+					{Text: "export", Description: "Export private key to file"},
+				}
+			case "rpc":
+				return []prompt.Suggest{
+					{Text: "import", Description: "Import blockchain RPC URL"},
+				}
+			case "node":
+				return []prompt.Suggest{
+					{Text: "set-ws-url", Description: "Set clearnode WebSocket URL"},
+					{Text: "set-home-blockchain", Description: "Set home blockchain for channels"},
+				}
+			case "session-key":
+				return []prompt.Suggest{
+					{Text: "generate", Description: "Generate new session key"},
+					{Text: "import", Description: "Import existing session key"},
+					{Text: "clear", Description: "Clear session key, revert to default signer"},
+					{Text: "register-channel-key", Description: "Register channel session key"},
+					{Text: "channel-keys", Description: "List active channel session keys"},
+					{Text: "register-app-key", Description: "Register app session key"},
+					{Text: "app-keys", Description: "List active app session keys"},
+				}
 			}
-		case "set-home-blockchain":
-			// set-home-blockchain <asset> <chain_id>
-			return o.getChainSuggestions()
 		case "token-balance":
 			// token-balance <chain_id> <asset>
 			return o.getAssetSuggestions()
@@ -250,6 +287,9 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 		case "state", "home-channel":
 			// state [wallet] <asset> — if wallet was explicitly provided, suggest asset
 			return o.getAssetSuggestions()
+		case "security-token":
+			// security-token <subcommand> <chain_id> ...
+			return o.getChainSuggestions()
 		case "escrow-channel":
 			// Escrow channel ID (no suggestion)
 			return nil
@@ -259,9 +299,24 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 	// Fourth level
 	if len(args) < 5 {
 		switch args[0] {
-		case "create-channel-session-key":
-			// Fourth arg is assets (comma-separated)
-			return o.getAssetSuggestions()
+		case "config":
+			switch args[1] {
+			case "rpc":
+				if args[2] == "import" {
+					return o.getChainSuggestions()
+				}
+			case "node":
+				if args[2] == "set-home-blockchain" {
+					return o.getAssetSuggestions()
+				}
+			}
+		}
+	}
+
+	// Fifth level
+	if len(args) < 6 {
+		if args[0] == "config" && args[1] == "node" && args[2] == "set-home-blockchain" {
+			return o.getChainSuggestions()
 		}
 	}
 
@@ -281,33 +336,125 @@ func (o *Operator) Execute(s string) {
 	case "help":
 		o.showHelp()
 	case "config":
-		o.showConfig(ctx)
-	case "wallet":
-		o.showWallet(ctx)
-	case "import":
 		if len(args) < 2 {
-			fmt.Println("ERROR: Usage: import <wallet|rpc> ...")
+			o.showConfig()
 			return
 		}
 		switch args[1] {
 		case "wallet":
-			o.importWallet(ctx)
-		case "rpc":
-			if len(args) < 4 {
-				fmt.Println("ERROR: Usage: import rpc <chain_id> <rpc_url>")
+			if len(args) < 3 {
+				o.showWallet(ctx)
 				return
 			}
-			o.importRPC(ctx, args[2], args[3])
+			switch args[2] {
+			case "import":
+				o.importWallet()
+			case "generate":
+				o.generateWallet()
+			case "export":
+				if len(args) < 4 {
+					fmt.Println("ERROR: Usage: config wallet export <path>")
+					return
+				}
+				o.exportWallet(args[3])
+			default:
+				fmt.Printf("ERROR: Unknown wallet command: %s\n", args[2])
+				fmt.Println("Usage: config wallet [import|generate|export]")
+			}
+		case "rpc":
+			if len(args) < 3 {
+				fmt.Println("ERROR: Usage: config rpc import <chain_id> <rpc_url>")
+				return
+			}
+			switch args[2] {
+			case "import":
+				if len(args) < 5 {
+					fmt.Println("ERROR: Usage: config rpc import <chain_id> <rpc_url>")
+					return
+				}
+				o.importRPC(ctx, args[3], args[4])
+			default:
+				fmt.Printf("ERROR: Unknown rpc command: %s\n", args[2])
+				fmt.Println("Usage: config rpc [import]")
+			}
+		case "node":
+			if len(args) < 3 {
+				o.nodeInfo(ctx)
+				return
+			}
+			switch args[2] {
+			case "set-ws-url":
+				if len(args) < 4 {
+					fmt.Println("ERROR: Usage: config node set-ws-url <url>")
+					return
+				}
+				o.setWSURL(args[3])
+			case "set-home-blockchain":
+				if len(args) < 5 {
+					fmt.Println("ERROR: Usage: config node set-home-blockchain <asset> <chain_id>")
+					return
+				}
+				o.setHomeBlockchain(ctx, args[3], args[4])
+			default:
+				fmt.Printf("ERROR: Unknown node command: %s\n", args[2])
+				fmt.Println("Usage: config node [set-ws-url|set-home-blockchain]")
+			}
+		case "session-key":
+			if len(args) < 3 {
+				o.showSessionKey()
+				return
+			}
+			switch args[2] {
+			case "generate":
+				o.generateSessionKey()
+			case "import":
+				o.importSessionKey()
+			case "clear":
+				o.clearSessionKey()
+			case "register-channel-key":
+				if len(args) < 6 {
+					fmt.Println("ERROR: Usage: config session-key register-channel-key <session_key_address> <expires_hours> <assets>")
+					fmt.Println("INFO: Assets are comma-separated, e.g. usdc,weth")
+					return
+				}
+				o.createChannelSessionKey(ctx, args[3], args[4], args[5])
+			case "channel-keys":
+				wallet := o.getImportedWalletAddress()
+				if wallet == "" {
+					fmt.Println("ERROR: No wallet configured. Use 'config wallet import' first.")
+					return
+				}
+				o.listChannelSessionKeys(ctx, wallet)
+			case "register-app-key":
+				if len(args) < 5 {
+					fmt.Println("ERROR: Usage: config session-key register-app-key <session_key_address> <expires_hours> [app_ids] [session_ids]")
+					fmt.Println("INFO: IDs are comma-separated. app_ids and session_ids are optional.")
+					return
+				}
+				appIDs := ""
+				sessionIDs := ""
+				if len(args) >= 6 {
+					appIDs = args[5]
+				}
+				if len(args) >= 7 {
+					sessionIDs = args[6]
+				}
+				o.createAppSessionKey(ctx, args[3], args[4], appIDs, sessionIDs)
+			case "app-keys":
+				wallet := o.getImportedWalletAddress()
+				if wallet == "" {
+					fmt.Println("ERROR: No wallet configured. Use 'config wallet import' first.")
+					return
+				}
+				o.listAppSessionKeys(ctx, wallet)
+			default:
+				fmt.Printf("ERROR: Unknown session-key command: %s\n", args[2])
+				fmt.Println("Usage: config session-key [generate|import|clear|register-channel-key|channel-keys|register-app-key|app-keys]")
+			}
 		default:
-			fmt.Printf("ERROR: Unknown import type: %s\n", args[1])
+			fmt.Printf("ERROR: Unknown config command: %s\n", args[1])
+			fmt.Println("Usage: config [wallet|rpc|node|session-key]")
 		}
-
-	case "set-home-blockchain":
-		if len(args) < 3 {
-			fmt.Println("ERROR: Usage: set-home-blockchain <asset> <chain_id>")
-			return
-		}
-		o.setHomeBlockchain(ctx, args[1], args[2])
 	// High-level operations
 	case "token-balance":
 		if len(args) < 3 {
@@ -361,10 +508,6 @@ func (o *Operator) Execute(s string) {
 	// Node information
 	case "ping":
 		o.ping(ctx)
-	case "node":
-		if len(args) < 2 || args[1] == "info" {
-			o.nodeInfo(ctx)
-		}
 	case "chains":
 		o.listChains(ctx)
 	case "assets":
@@ -384,7 +527,7 @@ func (o *Operator) Execute(s string) {
 			wallet = o.getImportedWalletAddress()
 			if wallet == "" {
 				fmt.Println("ERROR: Usage: balances <wallet_address>")
-				fmt.Println("INFO: No wallet configured. Use 'import wallet' first or specify a wallet address.")
+				fmt.Println("INFO: No wallet configured. Use 'config wallet import' first or specify a wallet address.")
 				return
 			}
 			fmt.Printf("INFO: Using configured wallet: %s\n", wallet)
@@ -399,7 +542,7 @@ func (o *Operator) Execute(s string) {
 			wallet = o.getImportedWalletAddress()
 			if wallet == "" {
 				fmt.Println("ERROR: Usage: transactions <wallet_address>")
-				fmt.Println("INFO: No wallet configured. Use 'import wallet' first or specify a wallet address.")
+				fmt.Println("INFO: No wallet configured. Use 'config wallet import' first or specify a wallet address.")
 				return
 			}
 			fmt.Printf("INFO: Using configured wallet: %s\n", wallet)
@@ -418,7 +561,7 @@ func (o *Operator) Execute(s string) {
 			wallet = o.getImportedWalletAddress()
 			if wallet == "" {
 				fmt.Println("ERROR: Usage: state <wallet_address> <asset>")
-				fmt.Println("INFO: No wallet configured. Use 'import wallet' first or specify a wallet address.")
+				fmt.Println("INFO: No wallet configured. Use 'config wallet import' first or specify a wallet address.")
 				return
 			}
 			asset = args[1]
@@ -440,7 +583,7 @@ func (o *Operator) Execute(s string) {
 			wallet = o.getImportedWalletAddress()
 			if wallet == "" {
 				fmt.Println("ERROR: Usage: home-channel <wallet_address> <asset>")
-				fmt.Println("INFO: No wallet configured. Use 'import wallet' first or specify a wallet address.")
+				fmt.Println("INFO: No wallet configured. Use 'config wallet import' first or specify a wallet address.")
 				return
 			}
 			asset = args[1]
@@ -469,7 +612,7 @@ func (o *Operator) Execute(s string) {
 	case "my-apps":
 		wallet := o.getImportedWalletAddress()
 		if wallet == "" {
-			fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
+			fmt.Println("ERROR: No wallet configured. Use 'config wallet import' first.")
 			return
 		}
 		o.getApps(ctx, nil, &wallet)
@@ -492,7 +635,7 @@ func (o *Operator) Execute(s string) {
 			wallet = o.getImportedWalletAddress()
 			if wallet == "" {
 				fmt.Println("ERROR: Usage: action-allowances <wallet_address>")
-				fmt.Println("INFO: No wallet configured. Use 'import wallet' first or specify a wallet address.")
+				fmt.Println("INFO: No wallet configured. Use 'config wallet import' first or specify a wallet address.")
 				return
 			}
 			fmt.Printf("INFO: Using configured wallet: %s\n", wallet)
@@ -504,49 +647,71 @@ func (o *Operator) Execute(s string) {
 		wallet := o.getImportedWalletAddress()
 		o.listAppSessions(ctx, wallet)
 
-	// Session key management
-	case "generate-session-key":
-		o.generateSessionKey(ctx)
-	case "session-key":
-		o.showSessionKey()
-	case "clear-session-key":
-		o.clearSessionKey()
-	case "create-channel-session-key":
-		if len(args) < 4 {
-			fmt.Println("ERROR: Usage: create-channel-session-key <session_key_address> <expires_hours> <assets>")
-			fmt.Println("INFO: Assets are comma-separated, e.g. usdc,weth")
+
+	// Security token operations
+	case "security-token":
+		if len(args) < 2 {
+			fmt.Println("ERROR: Usage: security-token <command> ...")
+			fmt.Println("Commands: approve, balance, escrow, initiate-withdrawal, cancel-withdrawal, withdraw")
 			return
 		}
-		o.createChannelSessionKey(ctx, args[1], args[2], args[3])
-	case "channel-session-keys":
-		wallet := o.getImportedWalletAddress()
-		if wallet == "" {
-			fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
-			return
+		switch args[1] {
+		case "approve":
+			if len(args) < 4 {
+				fmt.Println("ERROR: Usage: security-token approve <chain_id> <amount>")
+				return
+			}
+			o.approveSecurityToken(ctx, args[2], args[3])
+		case "escrow":
+			if len(args) < 4 {
+				fmt.Println("ERROR: Usage: security-token escrow <chain_id> [target_address] <amount>")
+				fmt.Println("INFO: If target_address is omitted, your own wallet is used.")
+				return
+			}
+			if len(args) >= 5 {
+				o.escrowSecurityTokens(ctx, args[2], args[3], args[4])
+			} else {
+				o.escrowSecurityTokens(ctx, args[2], "", args[3])
+			}
+		case "initiate-withdrawal":
+			if len(args) < 3 {
+				fmt.Println("ERROR: Usage: security-token initiate-withdrawal <chain_id>")
+				return
+			}
+			o.initiateSecurityWithdrawal(ctx, args[2])
+		case "cancel-withdrawal":
+			if len(args) < 3 {
+				fmt.Println("ERROR: Usage: security-token cancel-withdrawal <chain_id>")
+				return
+			}
+			o.cancelSecurityWithdrawal(ctx, args[2])
+		case "withdraw":
+			if len(args) < 4 {
+				fmt.Println("ERROR: Usage: security-token withdraw <chain_id> <destination_address>")
+				return
+			}
+			o.withdrawSecurityTokens(ctx, args[2], args[3])
+		case "balance":
+			if len(args) < 3 {
+				fmt.Println("ERROR: Usage: security-token balance <chain_id> [wallet_address]")
+				return
+			}
+			wallet := ""
+			if len(args) >= 4 {
+				wallet = args[3]
+			} else {
+				wallet = o.getImportedWalletAddress()
+				if wallet == "" {
+					fmt.Println("ERROR: No wallet configured. Use 'config wallet import' first or specify a wallet address.")
+					return
+				}
+				fmt.Printf("INFO: Using configured wallet: %s\n", wallet)
+			}
+			o.securityBalance(ctx, args[2], wallet)
+		default:
+			fmt.Printf("ERROR: Unknown security-token command: %s\n", args[1])
+			fmt.Println("Commands: approve, balance, escrow, initiate-withdrawal, cancel-withdrawal, withdraw")
 		}
-		o.listChannelSessionKeys(ctx, wallet)
-	case "create-app-session-key":
-		if len(args) < 3 {
-			fmt.Println("ERROR: Usage: create-app-session-key <session_key_address> <expires_hours> [app_ids] [session_ids]")
-			fmt.Println("INFO: IDs are comma-separated. app_ids and session_ids are optional.")
-			return
-		}
-		appIDs := ""
-		sessionIDs := ""
-		if len(args) >= 4 {
-			appIDs = args[3]
-		}
-		if len(args) >= 5 {
-			sessionIDs = args[4]
-		}
-		o.createAppSessionKey(ctx, args[1], args[2], appIDs, sessionIDs)
-	case "app-session-keys":
-		wallet := o.getImportedWalletAddress()
-		if wallet == "" {
-			fmt.Println("ERROR: No wallet configured. Use 'import wallet' first.")
-			return
-		}
-		o.listAppSessionKeys(ctx, wallet)
 
 	case "exit":
 		fmt.Println("Exiting...")

@@ -2,20 +2,27 @@ package main
 
 // Example: Complete App Session Lifecycle
 //
+// Prerequisites (minimum channel balances):
+//   - Wallet 1: 0.0001 USDC
+//   - Wallet 2: 0.00015 WETH
+//   - Wallet 3: no balance required (receives funds via redistribution)
+//
 // This example demonstrates:
-// 1. Create first app session for wallet 1
-// 2. Deposit USDC into first app session by wallet 1
-// 3. Create second app session for wallet 2 with wallet 3 as a participant
-// 4. Deposit WETH into second app session by wallet 2
-// 5. Redistribute app state within app session so that participant with wallet 3 also has some allocation
-// 6. Rebalance 2 app sessions atomically
+// 1. Register apps in the app registry (required before creating app sessions)
+// 2. Create first app session for wallet 1
+// 3. Deposit USDC into first app session by wallet 1
+// 4. Create second app session for wallet 2 with wallet 3 as a participant
+// 5. Deposit WETH into second app session by wallet 2
+// 6. Redistribute app state within app session so that participant with wallet 3 also has some allocation
 // 7. Wallet 3 withdraws from his app session
 // 8. Close both app sessions
+// 9. Fail case: attempt to create app session for unregistered app (expected to fail)
 
 import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -30,26 +37,40 @@ import (
 
 func main() {
 	ctx := context.Background()
-	wsURL := "wss://deployment.yellow.org/ws"
+	wsURL := "wss://clearnode-sandbox.yellow.org/v1/ws"
 
 	// --- 0. Setup Wallets ---
 	// Replace these strings with your actual hex private keys
-	wallet1PrivateKey := "0x7d60..."
-	wallet2PrivateKey := "0x9b65..."
-	wallet3PrivateKey := "0xf636..."
+	wallet1PrivateKey := "0x7d607..."
+	wallet2PrivateKey := "0x9b652..."
+	wallet3PrivateKey := "0xf6369..."
 
-	// Create signers from private keys
-	wallet1Signer, err := sign.NewEthereumMsgSigner(wallet1PrivateKey)
+	// Create raw signers from private keys
+	wallet1RawSigner, err := sign.NewEthereumRawSigner(wallet1PrivateKey)
 	if err != nil {
 		log.Fatalf("Invalid wallet 1 private key: %v", err)
 	}
-	wallet2Signer, err := sign.NewEthereumMsgSigner(wallet2PrivateKey)
+	wallet2RawSigner, err := sign.NewEthereumRawSigner(wallet2PrivateKey)
 	if err != nil {
 		log.Fatalf("Invalid wallet 2 private key: %v", err)
 	}
-	wallet3Signer, err := sign.NewEthereumMsgSigner(wallet3PrivateKey)
+	wallet3RawSigner, err := sign.NewEthereumRawSigner(wallet3PrivateKey)
 	if err != nil {
 		log.Fatalf("Invalid wallet 3 private key: %v", err)
+	}
+
+	// Create msg signers (EIP-191 prefixed) for channel and app session signing
+	wallet1Signer, err := sign.NewEthereumMsgSignerFromRaw(wallet1RawSigner)
+	if err != nil {
+		log.Fatalf("Failed to create msg signer for wallet 1: %v", err)
+	}
+	wallet2Signer, err := sign.NewEthereumMsgSignerFromRaw(wallet2RawSigner)
+	if err != nil {
+		log.Fatalf("Failed to create msg signer for wallet 2: %v", err)
+	}
+	wallet3Signer, err := sign.NewEthereumMsgSignerFromRaw(wallet3RawSigner)
+	if err != nil {
+		log.Fatalf("Failed to create msg signer for wallet 3: %v", err)
 	}
 
 	channel1Signer, err := core.NewChannelDefaultSigner(wallet1Signer)
@@ -62,7 +83,7 @@ func main() {
 	}
 	channel3Signer, err := core.NewChannelDefaultSigner(wallet3Signer)
 	if err != nil {
-		log.Fatalf("Failed to create channel signer for wallet 2: %v", err)
+		log.Fatalf("Failed to create channel signer for wallet 3: %v", err)
 	}
 
 	appSession1Signer, err := app.NewAppSessionWalletSignerV1(wallet1Signer)
@@ -75,9 +96,9 @@ func main() {
 	}
 
 	// Extract wallet addresses
-	wallet1Address := wallet1Signer.PublicKey().Address().String() // 0x053aEAD7d3eebE4359300fDE849bCD9E77384989
-	wallet2Address := wallet2Signer.PublicKey().Address().String() // 0x2BfA10aAd64Ae0F7855f54f27117Fcc9C61C6770
-	wallet3Address := wallet3Signer.PublicKey().Address().String() // 0xaB5670b44cb4A3B5535BD637cb600DA572148c98
+	wallet1Address := wallet1RawSigner.PublicKey().Address().String()
+	wallet2Address := wallet2RawSigner.PublicKey().Address().String()
+	wallet3Address := wallet3RawSigner.PublicKey().Address().String()
 
 	fmt.Println("--- Wallets Imported ---")
 	fmt.Printf("Wallet 1 Address: %s\n", wallet1Address)
@@ -86,16 +107,41 @@ func main() {
 	fmt.Println("------------------------")
 
 	// Create SDK clients (in a real app, these would be separate instances)
-	wallet1Client, err := sdk.NewClient(wsURL, channel1Signer, wallet1Signer)
+	wallet1Client, err := sdk.NewClient(wsURL, channel1Signer, wallet1RawSigner)
+	if err != nil {
+		log.Fatal(err)
+	}
+	wallet2Client, err := sdk.NewClient(wsURL, channel2Signer, wallet2RawSigner)
+	if err != nil {
+		log.Fatal(err)
+	}
+	wallet3Client, err := sdk.NewClient(wsURL, channel3Signer, wallet3RawSigner)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// --- 1. Create App Session 1 (Single Participant: Wallet 1) ---
-	fmt.Println("=== Step 1: Creating App Session 1 (Wallet 1 only) ===")
+	// --- 1. Register Apps ---
+	fmt.Println("=== Step 1: Registering Apps ===")
+
+	suffix := fmt.Sprintf("%06d", rand.Intn(1000000))
+	app1ID := "test-app-" + suffix
+	app2ID := "multi-party-app-" + suffix
+
+	if err := wallet1Client.RegisterApp(ctx, app1ID, "{}", true); err != nil {
+		log.Fatalf("Failed to register %s: %v", app1ID, err)
+	}
+	fmt.Printf("✓ Registered app: %s\n", app1ID)
+
+	if err := wallet1Client.RegisterApp(ctx, app2ID, "{}", false); err != nil {
+		log.Fatalf("Failed to register %s: %v", app2ID, err)
+	}
+	fmt.Printf("✓ Registered app: %s (owner approval required)\n\n", app2ID)
+
+	// --- 2. Create App Session 1 (Single Participant: Wallet 1) ---
+	fmt.Println("=== Step 2: Creating App Session 1 (Wallet 1 only) ===")
 
 	session1Definition := app.AppDefinitionV1{
-		ApplicationID: "test-app",
+		ApplicationID: app1ID,
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: wallet1Address, SignatureWeight: 100},
 		},
@@ -115,8 +161,8 @@ func main() {
 	}
 	fmt.Printf("✓ Created App Session 1: %s\n\n", session1ID)
 
-	// --- 2. Deposit USDC into Session 1 ---
-	fmt.Println("=== Step 2: Depositing USDC into Session 1 ===")
+	// --- 3. Deposit USDC into Session 1 ---
+	fmt.Println("=== Step 3: Depositing USDC into Session 1 ===")
 
 	session1DepositAmount := decimal.NewFromFloat(0.0001)
 	session1DepositUpdate := app.AppStateUpdateV1{
@@ -139,19 +185,10 @@ func main() {
 	}
 	fmt.Printf("✓ Deposited %s USDC into Session 1\n\n", session1DepositAmount)
 
-	// --- 3. Create App Session 2 (Multi-Party: Wallet 2 & 3) ---
-	fmt.Println("=== Step 3: Creating App Session 2 (Wallet 2 & 3) ===")
+	// --- 4. Create App Session 2 (Multi-Party: Wallet 2 & 3) ---
+	fmt.Println("=== Step 4: Creating App Session 2 (Wallet 2 & 3) ===")
 
-	appID := "multi-party-app"
-	wallet2Client, err := sdk.NewClient(wsURL, channel2Signer, wallet2Signer)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	wallet3Client, err := sdk.NewClient(wsURL, channel3Signer, wallet3Signer) // No channel signer needed for wallet 3 since it's not creating channels
-	if err != nil {
-		log.Fatal(err)
-	}
+	appID := app2ID
 
 	msgSigner3, err := generateMsgSigner()
 	if err != nil {
@@ -202,16 +239,23 @@ func main() {
 
 	appSession2CreateSession2Sig, _ := appSession2Signer.Sign(session2CreateRequest)
 	appSession3CreateSession2Sig, _ := appSession3Signer.Sign(session2CreateRequest)
-	session2ID, _, _, err := wallet2Client.CreateAppSession(ctx, session2Definition, "{}", []string{appSession2CreateSession2Sig.String(), appSession3CreateSession2Sig.String()})
+
+	// Owner approval: wallet1 is the owner of app2, sign the create request using app session signer
+	ownerApprovalSig, err := appSession1Signer.Sign(session2CreateRequest)
+	if err != nil {
+		log.Fatalf("Failed to sign owner approval: %v", err)
+	}
+
+	session2ID, _, _, err := wallet2Client.CreateAppSession(ctx, session2Definition, "{}", []string{appSession2CreateSession2Sig.String(), appSession3CreateSession2Sig.String()}, sdk.CreateAppSessionOptions{OwnerSig: ownerApprovalSig.String()})
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("✓ Created App Session 2: %s\n\n", session2ID)
 
-	// --- 4. Deposit WETH into Session 2 by Wallet 2 ---
-	fmt.Println("=== Step 4: Depositing WETH into Session 2 ===")
+	// --- 5. Deposit WETH into Session 2 by Wallet 2 ---
+	fmt.Println("=== Step 5: Depositing WETH into Session 2 ===")
 
-	session2DepositAmount := decimal.NewFromFloat(0.015)
+	session2DepositAmount := decimal.NewFromFloat(0.00015)
 	session2DepositUpdate := app.AppStateUpdateV1{
 		AppSessionID: session2ID,
 		Intent:       app.AppStateUpdateIntentDeposit,
@@ -242,16 +286,16 @@ func main() {
 		fmt.Printf("Session 2 before redistribution - Version: %d, Allocations: %+v\n\n", session2InfoBeforeRedist[0].Version, session2InfoBeforeRedist[0].Allocations)
 	}
 
-	// --- 5. Redistribute within Session 2 (Wallet 2 -> Wallet 3) ---
-	fmt.Println("=== Step 5: Redistributing funds in Session 2 ===")
+	// --- 6. Redistribute within Session 2 (Wallet 2 -> Wallet 3) ---
+	fmt.Println("=== Step 6: Redistributing funds in Session 2 ===")
 
 	session2RedistributeUpdate := app.AppStateUpdateV1{
 		AppSessionID: session2ID,
 		Intent:       app.AppStateUpdateIntentOperate,
 		Version:      3,
 		Allocations: []app.AppAllocationV1{
-			{Participant: wallet2Address, Asset: "weth", Amount: decimal.NewFromFloat(0.01)},
-			{Participant: wallet3Address, Asset: "weth", Amount: decimal.NewFromFloat(0.005)},
+			{Participant: wallet2Address, Asset: "weth", Amount: decimal.NewFromFloat(0.0001)},
+			{Participant: wallet3Address, Asset: "weth", Amount: decimal.NewFromFloat(0.00005)},
 		},
 	}
 
@@ -268,83 +312,84 @@ func main() {
 	if err != nil {
 		log.Fatalf("Redistribution failed: %v", err)
 	}
-	fmt.Println("✓ Redistributed WETH: Wallet 2 (0.01) -> Wallet 3 (0.005)")
+	fmt.Println("✓ Redistributed WETH: Wallet 2 (0.0001) -> Wallet 3 (0.00005)")
 
-	// --- 6. Rebalance Both App Sessions Atomically ---
-	fmt.Println("=== Step 6: Atomic Rebalance Across Sessions ===")
+	// NOTE: Rebalance step is disabled.
+	// // --- 7. Rebalance Both App Sessions Atomically ---
+	// fmt.Println("=== Step 6: Atomic Rebalance Across Sessions ===")
 
-	// Check current allocations before rebalance
-	session1InfoBeforeRebalance, _, err := wallet1Client.GetAppSessions(ctx, &sdk.GetAppSessionsOptions{AppSessionID: &session1ID})
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(session1InfoBeforeRebalance) > 0 {
-		fmt.Printf("Session 1 before rebalance - Version: %d, Allocations: %+v\n", session1InfoBeforeRebalance[0].Version, session1InfoBeforeRebalance[0].Allocations)
-	}
+	// // Check current allocations before rebalance
+	// session1InfoBeforeRebalance, _, err := wallet1Client.GetAppSessions(ctx, &sdk.GetAppSessionsOptions{AppSessionID: &session1ID})
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// if len(session1InfoBeforeRebalance) > 0 {
+	// 	fmt.Printf("Session 1 before rebalance - Version: %d, Allocations: %+v\n", session1InfoBeforeRebalance[0].Version, session1InfoBeforeRebalance[0].Allocations)
+	// }
 
-	session2InfoBeforeRebalance, _, err := wallet2Client.GetAppSessions(ctx, &sdk.GetAppSessionsOptions{AppSessionID: &session2ID})
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(session2InfoBeforeRebalance) > 0 {
-		fmt.Printf("Session 2 before rebalance - Version: %d, Allocations: %+v\n\n", session2InfoBeforeRebalance[0].Version, session2InfoBeforeRebalance[0].Allocations)
-	}
+	// session2InfoBeforeRebalance, _, err := wallet2Client.GetAppSessions(ctx, &sdk.GetAppSessionsOptions{AppSessionID: &session2ID})
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// if len(session2InfoBeforeRebalance) > 0 {
+	// 	fmt.Printf("Session 2 before rebalance - Version: %d, Allocations: %+v\n\n", session2InfoBeforeRebalance[0].Version, session2InfoBeforeRebalance[0].Allocations)
+	// }
 
-	// Prepare rebalance updates for both sessions
-	session1RebalanceUpdate := app.AppStateUpdateV1{
-		AppSessionID: session1ID,
-		Intent:       app.AppStateUpdateIntentRebalance,
-		Version:      3,
-		Allocations: []app.AppAllocationV1{
-			{Participant: wallet1Address, Asset: "weth", Amount: decimal.NewFromFloat(0.005)},
-			{Participant: wallet1Address, Asset: "usdc", Amount: decimal.NewFromFloat(0.00005)},
-		},
-	}
+	// // Prepare rebalance updates for both sessions
+	// session1RebalanceUpdate := app.AppStateUpdateV1{
+	// 	AppSessionID: session1ID,
+	// 	Intent:       app.AppStateUpdateIntentRebalance,
+	// 	Version:      3,
+	// 	Allocations: []app.AppAllocationV1{
+	// 		{Participant: wallet1Address, Asset: "weth", Amount: decimal.NewFromFloat(0.005)},
+	// 		{Participant: wallet1Address, Asset: "usdc", Amount: decimal.NewFromFloat(0.00005)},
+	// 	},
+	// }
 
-	session1RebalanceRequest, err := app.PackAppStateUpdateV1(session1RebalanceUpdate)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// session1RebalanceRequest, err := app.PackAppStateUpdateV1(session1RebalanceUpdate)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	appSession1RebalanceSig, _ := appSession1Signer.Sign(session1RebalanceRequest)
+	// appSession1RebalanceSig, _ := appSession1Signer.Sign(session1RebalanceRequest)
 
-	session2RebalanceUpdate := app.AppStateUpdateV1{
-		AppSessionID: session2ID,
-		Intent:       app.AppStateUpdateIntentRebalance,
-		Version:      4,
-		Allocations: []app.AppAllocationV1{
-			{Participant: wallet2Address, Asset: "usdc", Amount: decimal.NewFromFloat(0.00005)},
-			{Participant: wallet2Address, Asset: "weth", Amount: decimal.NewFromFloat(0.005)},
-			{Participant: wallet3Address, Asset: "weth", Amount: decimal.NewFromFloat(0.005)},
-		},
-	}
+	// session2RebalanceUpdate := app.AppStateUpdateV1{
+	// 	AppSessionID: session2ID,
+	// 	Intent:       app.AppStateUpdateIntentRebalance,
+	// 	Version:      4,
+	// 	Allocations: []app.AppAllocationV1{
+	// 		{Participant: wallet2Address, Asset: "usdc", Amount: decimal.NewFromFloat(0.00005)},
+	// 		{Participant: wallet2Address, Asset: "weth", Amount: decimal.NewFromFloat(0.005)},
+	// 		{Participant: wallet3Address, Asset: "weth", Amount: decimal.NewFromFloat(0.005)},
+	// 	},
+	// }
 
-	session2RebalanceRequest, err := app.PackAppStateUpdateV1(session2RebalanceUpdate)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// session2RebalanceRequest, err := app.PackAppStateUpdateV1(session2RebalanceUpdate)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	appSession2RebalanceSig, _ := appSession2Signer.Sign(session2RebalanceRequest)
-	appSession3RebalanceSig, _ := appSession3Signer.Sign(session2RebalanceRequest)
+	// appSession2RebalanceSig, _ := appSession2Signer.Sign(session2RebalanceRequest)
+	// appSession3RebalanceSig, _ := appSession3Signer.Sign(session2RebalanceRequest)
 
-	// Submit atomic rebalance
-	signedRebalanceUpdates := []app.SignedAppStateUpdateV1{
-		{
-			AppStateUpdate: session1RebalanceUpdate,
-			QuorumSigs:     []string{appSession1RebalanceSig.String()},
-		},
-		{
-			AppStateUpdate: session2RebalanceUpdate,
-			QuorumSigs:     []string{appSession2RebalanceSig.String(), appSession3RebalanceSig.String()},
-		},
-	}
+	// // Submit atomic rebalance
+	// signedRebalanceUpdates := []app.SignedAppStateUpdateV1{
+	// 	{
+	// 		AppStateUpdate: session1RebalanceUpdate,
+	// 		QuorumSigs:     []string{appSession1RebalanceSig.String()},
+	// 	},
+	// 	{
+	// 		AppStateUpdate: session2RebalanceUpdate,
+	// 		QuorumSigs:     []string{appSession2RebalanceSig.String(), appSession3RebalanceSig.String()},
+	// 	},
+	// }
 
-	rebalanceBatchID, err := wallet2Client.RebalanceAppSessions(ctx, signedRebalanceUpdates)
-	if err != nil {
-		log.Printf("⚠ Rebalance Error: %v", err)
-	} else {
-		fmt.Printf("✓ Atomic Rebalance Submitted. BatchID: %s\n\n", rebalanceBatchID)
-	}
+	// rebalanceBatchID, err := wallet2Client.RebalanceAppSessions(ctx, signedRebalanceUpdates)
+	// if err != nil {
+	// 	log.Printf("⚠ Rebalance Error: %v", err)
+	// } else {
+	// 	fmt.Printf("✓ Atomic Rebalance Submitted. BatchID: %s\n\n", rebalanceBatchID)
+	// }
 
 	// --- 7. Wallet 3 Withdraws from Session 2 ---
 	fmt.Println("=== Step 7: Wallet 3 Withdrawing from Session 2 ===")
@@ -352,11 +397,10 @@ func main() {
 	session2WithdrawUpdate := app.AppStateUpdateV1{
 		AppSessionID: session2ID,
 		Intent:       app.AppStateUpdateIntentWithdraw,
-		Version:      5,
+		Version:      4,
 		Allocations: []app.AppAllocationV1{
-			{Participant: wallet2Address, Asset: "usdc", Amount: decimal.NewFromFloat(0.00005)},
-			{Participant: wallet2Address, Asset: "weth", Amount: decimal.NewFromFloat(0.005)},
-			{Participant: wallet3Address, Asset: "weth", Amount: decimal.NewFromFloat(0.001)},
+			{Participant: wallet2Address, Asset: "weth", Amount: decimal.NewFromFloat(0.00005)},
+			{Participant: wallet3Address, Asset: "weth", Amount: decimal.NewFromFloat(0.00001)},
 		},
 	}
 
@@ -372,7 +416,7 @@ func main() {
 	if err != nil {
 		log.Printf("⚠ Withdraw Error: %v", err)
 	} else {
-		fmt.Println("✓ Wallet 3 successfully withdrew 0.004 WETH back to channel")
+		fmt.Println("✓ Wallet 3 successfully withdrew WETH back to channel")
 	}
 
 	// --- 8. Close Both App Sessions ---
@@ -382,10 +426,9 @@ func main() {
 	session1CloseUpdate := app.AppStateUpdateV1{
 		AppSessionID: session1ID,
 		Intent:       app.AppStateUpdateIntentClose,
-		Version:      4,
+		Version:      3,
 		Allocations: []app.AppAllocationV1{
-			{Participant: wallet1Address, Asset: "weth", Amount: decimal.NewFromFloat(0.005)},
-			{Participant: wallet1Address, Asset: "usdc", Amount: decimal.NewFromFloat(0.00005)},
+			{Participant: wallet1Address, Asset: "usdc", Amount: decimal.NewFromFloat(0.0001)},
 		},
 	}
 
@@ -407,11 +450,10 @@ func main() {
 	session2CloseUpdate := app.AppStateUpdateV1{
 		AppSessionID: session2ID,
 		Intent:       app.AppStateUpdateIntentClose,
-		Version:      6,
+		Version:      5,
 		Allocations: []app.AppAllocationV1{
-			{Participant: wallet2Address, Asset: "usdc", Amount: decimal.NewFromFloat(0.00005)},
-			{Participant: wallet2Address, Asset: "weth", Amount: decimal.NewFromFloat(0.005)},
-			{Participant: wallet3Address, Asset: "weth", Amount: decimal.NewFromFloat(0.001)},
+			{Participant: wallet2Address, Asset: "weth", Amount: decimal.NewFromFloat(0.00005)},
+			{Participant: wallet3Address, Asset: "weth", Amount: decimal.NewFromFloat(0.00001)},
 		},
 	}
 
@@ -428,6 +470,31 @@ func main() {
 		log.Printf("⚠ Close Session 2 Error: %v", err)
 	} else {
 		fmt.Println("✓ Session 2 successfully closed")
+	}
+
+	// --- 9. Fail Case: Create App Session for Unregistered App ---
+	fmt.Println("\n=== Step 9: Creating App Session for Unregistered App (expected to fail) ===")
+
+	unregisteredDefinition := app.AppDefinitionV1{
+		ApplicationID: "unregistered-app-" + suffix,
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: wallet1Address, SignatureWeight: 100},
+		},
+		Quorum: 100,
+		Nonce:  uint64(time.Now().UnixNano()),
+	}
+
+	unregisteredCreateRequest, err := app.PackCreateAppSessionRequestV1(unregisteredDefinition, "{}")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	unregisteredSig, _ := appSession1Signer.Sign(unregisteredCreateRequest)
+	_, _, _, err = wallet1Client.CreateAppSession(ctx, unregisteredDefinition, "{}", []string{unregisteredSig.String()})
+	if err != nil {
+		fmt.Printf("✓ Expected error: %v\n", err)
+	} else {
+		fmt.Println("✗ Unexpected success: app session was created for unregistered app")
 	}
 
 	fmt.Println("\n=== Example Complete ===")

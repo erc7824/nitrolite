@@ -47,7 +47,7 @@ func (m *MockPublicKey) Bytes() []byte {
 	return m.pubBytes
 }
 
-func TestNewClient(t *testing.T) {
+func TestNewBlockchainClient(t *testing.T) {
 	t.Parallel()
 	mockEVMClient := new(MockEVMClient)
 	mockAssetStore := new(MockAssetStore)
@@ -60,7 +60,7 @@ func TestNewClient(t *testing.T) {
 	blockchainID := uint64(1337)
 
 	// Mock models simulate an EVM client where NewClient/NewChannelHub return a local struct without external calls
-	client, err := NewClient(
+	client, err := NewBlockchainClient(
 		contractAddress,
 		mockEVMClient,
 		mockSigner,
@@ -75,7 +75,7 @@ func TestNewClient(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, mockEVMClient, mockAssetStore, mockSigner)
 }
 
-func TestClient_GetAccountsBalances(t *testing.T) {
+func TestBlockchainClient_GetAccountsBalances(t *testing.T) {
 	t.Parallel()
 	mockEVMClient := new(MockEVMClient)
 	mockAssetStore := new(MockAssetStore)
@@ -84,7 +84,7 @@ func TestClient_GetAccountsBalances(t *testing.T) {
 	setupMockSigner(t, mockSigner)
 
 	contractAddress := common.HexToAddress("0xContract")
-	client, err := NewClient(contractAddress, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
+	client, err := NewBlockchainClient(contractAddress, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
 	require.NoError(t, err)
 
 	accounts := []string{"0xUser1", "0xUser2"}
@@ -104,7 +104,7 @@ func TestClient_GetAccountsBalances(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, mockEVMClient, mockAssetStore, mockSigner)
 }
 
-func TestClient_GetNodeBalance(t *testing.T) {
+func TestBlockchainClient_GetNodeBalance(t *testing.T) {
 	t.Parallel()
 	mockEVMClient := new(MockEVMClient)
 	mockAssetStore := new(MockAssetStore)
@@ -112,7 +112,7 @@ func TestClient_GetNodeBalance(t *testing.T) {
 
 	setupMockSigner(t, mockSigner)
 
-	client, err := NewClient(common.Address{}, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
+	client, err := NewBlockchainClient(common.Address{}, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
 	require.NoError(t, err)
 
 	token := "0xToken"
@@ -129,7 +129,7 @@ func TestClient_GetNodeBalance(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, mockEVMClient, mockAssetStore, mockSigner)
 }
 
-func TestClient_GetOpenChannels(t *testing.T) {
+func TestBlockchainClient_GetOpenChannels(t *testing.T) {
 	t.Parallel()
 	mockEVMClient := new(MockEVMClient)
 	mockAssetStore := new(MockAssetStore)
@@ -137,7 +137,7 @@ func TestClient_GetOpenChannels(t *testing.T) {
 
 	setupMockSigner(t, mockSigner)
 
-	client, err := NewClient(common.Address{}, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
+	client, err := NewBlockchainClient(common.Address{}, mockEVMClient, mockSigner, 1, "0xNode", mockAssetStore)
 	require.NoError(t, err)
 
 	// Mock GetOpenChannels return: bytes32[]

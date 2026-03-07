@@ -10,7 +10,7 @@ import type { AppState, ClearnodeConfig, NetworkConfig, SessionKeyState, StatusM
 import { formatAddress } from './utils';
 
 const CLEARNODES: ClearnodeConfig[] = [
-  { name: 'YN Testnet', url: 'wss://clearnode-v1-rc.yellow.org/ws' },
+  { name: 'YN Testnet', url: 'wss://clearnode-sandbox.yellow.org/v1/ws' },
 ];
 
 const NETWORKS: NetworkConfig[] = [
@@ -272,9 +272,10 @@ function App() {
   const currentNetwork = NETWORKS.find(n => n.chainId === appState.selectedChainId);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col transition-colors duration-200">
+    <div className="min-h-screen bg-background flex flex-col transition-colors duration-200 relative">
+
       {/* Header */}
-      <header className="border-b border-border bg-card flex-shrink-0 transition-colors duration-200">
+      <header className="glass border-b border-white/[0.06] flex-shrink-0 transition-colors duration-200 relative z-10">
         <div className="max-w-5xl mx-auto px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -301,14 +302,14 @@ function App() {
 
               {/* Network indicator */}
               {currentNetwork && (
-                <span className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted border border-border">
+                <span className="text-xs text-muted-foreground uppercase tracking-wider px-2 py-1 glass-input rounded-lg">
                   {currentNetwork.name}
                 </span>
               )}
 
               {/* Wallet */}
               {autoConnecting ? (
-                <div className="flex items-center gap-2 px-4 py-2 bg-muted border border-border">
+                <div className="flex items-center gap-2 px-4 py-2 glass-input rounded-lg">
                   <div className="animate-spin rounded-full h-3 w-3 border-2 border-accent border-t-transparent" />
                   <span className="text-xs uppercase tracking-wider font-medium">Connecting...</span>
                 </div>
@@ -321,7 +322,7 @@ function App() {
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 px-3 py-2 border border-border">
+                  <div className="flex items-center gap-2 px-3 py-2 glass-input rounded-lg">
                     <div className={`h-1.5 w-1.5 rounded-full ${appState.connected ? 'bg-green-400 animate-pulse' : 'bg-muted-foreground'}`} />
                     <code className="text-xs font-mono">{formatAddress(appState.address)}</code>
                   </div>
@@ -343,7 +344,7 @@ function App() {
       {status && <StatusBar status={status} onClose={() => setStatus(null)} />}
 
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-6 py-6 w-full flex-1">
+      <main className="max-w-5xl mx-auto px-6 py-6 w-full flex-1 relative z-10">
         {appState.connected && appState.client && appState.address && walletClient ? (
           <WalletDashboard
             client={appState.client}
@@ -371,17 +372,42 @@ function App() {
               </p>
               <button
                 onClick={connectWallet}
-                className="px-8 py-3 bg-accent text-accent-foreground text-sm font-semibold uppercase tracking-wider hover:bg-accent/90 transition-colors"
+                className="px-8 py-3 bg-accent text-accent-foreground text-sm font-semibold uppercase tracking-wider hover:bg-accent/90 transition-colors rounded-xl"
               >
                 Connect Wallet
               </button>
+            </div>
+          </div>
+        ) : !autoConnecting && appState.address && !appState.connected ? (
+          <div className="flex items-center justify-center py-32 animate-fade-in">
+            <div className="text-center max-w-md">
+              <h2 className="text-xl font-semibold tracking-tight uppercase mb-2">
+                Connection Failed
+              </h2>
+              <p className="text-xs text-muted-foreground mb-6">
+                Wallet connected as <code className="font-mono">{formatAddress(appState.address)}</code> but the clearnode is unreachable.
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={connectWallet}
+                  className="px-6 py-2.5 bg-accent text-accent-foreground text-xs font-semibold uppercase tracking-wider hover:bg-accent/90 transition-colors rounded-xl"
+                >
+                  Retry
+                </button>
+                <button
+                  onClick={disconnectWallet}
+                  className="px-6 py-2.5 glass-input text-xs font-semibold uppercase tracking-wider hover:text-foreground transition-colors rounded-xl"
+                >
+                  Disconnect
+                </button>
+              </div>
             </div>
           </div>
         ) : null}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border py-4 flex-shrink-0 transition-colors duration-200">
+      <footer className="glass border-t border-white/[0.06] py-4 flex-shrink-0 transition-colors duration-200 relative z-10">
         <div className="max-w-5xl mx-auto px-6 flex items-center justify-between text-xs text-muted-foreground">
           <span className="uppercase tracking-wider">Yellow SDK v1.0.0</span>
           <a

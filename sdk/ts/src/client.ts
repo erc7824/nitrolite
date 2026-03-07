@@ -103,6 +103,7 @@ export class Client {
   private exitPromise: Promise<void>;
   private exitResolve?: () => void;
   private blockchainClients: Map<bigint, blockchain.evm.Client>;
+  private blockchainLockingClients: Map<bigint, blockchain.evm.LockingClient>;
   private homeBlockchains: Map<string, bigint>;
   private stateSigner: StateSigner;
   private txSigner: TransactionSigner;
@@ -121,6 +122,7 @@ export class Client {
     this.txSigner = txSigner;
     this.assetStore = assetStore;
     this.blockchainClients = new Map();
+    this.blockchainLockingClients = new Map();
     this.homeBlockchains = new Map();
 
     // Create exit promise
@@ -908,6 +910,92 @@ export class Client {
   }
 
   // ============================================================================
+  // Locking On-Chain Methods
+  // ============================================================================
+
+  /**
+   * Lock tokens into the Locking contract on the specified blockchain.
+   * The tokens are locked for the specified target address. Before calling this method,
+   * you must approve the Locking contract to spend your tokens using approveSecurityToken.
+   *
+   * @param targetWalletAddress - The Ethereum address to lock tokens for
+   * @param blockchainId - The blockchain network ID
+   * @param amount - The amount of tokens to lock (in human-readable decimals, e.g., 100.5 USDC)
+   * @returns Transaction hash
+   */
+  async escrowSecurityTokens(targetWalletAddress: string, blockchainId: bigint, amount: Decimal): Promise<string> {
+    await this.initializeLockingClient(blockchainId);
+    return this.blockchainLockingClients.get(blockchainId)!.lock(
+      targetWalletAddress as Address,
+      amount,
+    );
+  }
+
+  /**
+   * Initiate the unlock process for locked tokens in the Locking contract.
+   * After the unlock period elapses, withdrawSecurityTokens can be called to retrieve the tokens.
+   *
+   * @param blockchainId - The blockchain network ID
+   * @returns Transaction hash
+   */
+  async initiateSecurityTokensWithdrawal(blockchainId: bigint): Promise<string> {
+    await this.initializeLockingClient(blockchainId);
+    return this.blockchainLockingClients.get(blockchainId)!.unlock();
+  }
+
+  /**
+   * Re-lock tokens that are currently in the unlocking state,
+   * cancelling the pending unlock and returning them to the locked state.
+   *
+   * @param blockchainId - The blockchain network ID
+   * @returns Transaction hash
+   */
+  async cancelSecurityTokensWithdrawal(blockchainId: bigint): Promise<string> {
+    await this.initializeLockingClient(blockchainId);
+    return this.blockchainLockingClients.get(blockchainId)!.relock();
+  }
+
+  /**
+   * Withdraw unlocked tokens from the Locking contract to the specified destination.
+   * Can only be called after the unlock period has fully elapsed.
+   *
+   * @param blockchainId - The blockchain network ID
+   * @param destinationWalletAddress - The Ethereum address to receive the withdrawn tokens
+   * @returns Transaction hash
+   */
+  async withdrawSecurityTokens(blockchainId: bigint, destinationWalletAddress: string): Promise<string> {
+    await this.initializeLockingClient(blockchainId);
+    return this.blockchainLockingClients.get(blockchainId)!.withdraw(
+      destinationWalletAddress as Address,
+    );
+  }
+
+  /**
+   * Approve the Locking contract to spend tokens on behalf of the caller.
+   * This must be called before escrowSecurityTokens.
+   *
+   * @param chainId - The blockchain network ID
+   * @param amount - The amount of tokens to approve
+   * @returns Transaction hash
+   */
+  async approveSecurityToken(chainId: bigint, amount: Decimal): Promise<string> {
+    await this.initializeLockingClient(chainId);
+    return this.blockchainLockingClients.get(chainId)!.approveToken(amount);
+  }
+
+  /**
+   * Get the locked balance of a user in the Locking contract.
+   *
+   * @param chainId - The blockchain network ID
+   * @param wallet - The Ethereum address to check
+   * @returns The locked balance as a Decimal (adjusted for token decimals)
+   */
+  async getLockedBalance(chainId: bigint, wallet: string): Promise<Decimal> {
+    await this.initializeLockingClient(chainId);
+    return this.blockchainLockingClients.get(chainId)!.getBalance(wallet as Address);
+  }
+
+  // ============================================================================
   // Node Information Methods
   // ============================================================================
 
@@ -1275,13 +1363,17 @@ export class Client {
   async createAppSession(
     definition: app.AppDefinitionV1,
     sessionData: string,
-    quorumSigs: string[]
+    quorumSigs: string[],
+    opts?: { ownerSig?: string }
   ): Promise<{ appSessionId: string; version: string; status: string }> {
     const req: API.AppSessionsV1CreateAppSessionRequest = {
       definition: transformAppDefinitionToRPC(definition) as any, // RPC type
       session_data: sessionData,
       quorum_sigs: quorumSigs,
     };
+    if (opts?.ownerSig) {
+      req.owner_sig = opts.ownerSig;
+    }
     const resp = await this.rpcClient.appSessionsV1CreateAppSession(req);
     return {
       appSessionId: resp.app_session_id,
@@ -1495,7 +1587,10 @@ export class Client {
     };
 
     const packed = app.packAppV1(appDef);
-    const ownerSig = await this.stateSigner.signMessage(packed);
+    if (!this.txSigner.signPersonalMessage) {
+      throw new Error('TransactionSigner must implement signPersonalMessage for app registration');
+    }
+    const ownerSig = await this.txSigner.signPersonalMessage(packed);
 
     const req: API.AppsV1SubmitAppVersionRequest = {
       app: appDef,
@@ -1617,15 +1712,10 @@ export class Client {
   // ============================================================================
 
   /**
-   * Initialize a blockchain client for a specific chain.
+   * Get the RPC URL and blockchain info for a specific chain, validating that
+   * the chain is configured and supported by the node.
    */
-  private async initializeBlockchainClient(chainId: bigint): Promise<void> {
-    // Check if already initialized
-    if (this.blockchainClients.has(chainId)) {
-      return;
-    }
-
-    // Get RPC URL from config
+  private async getBlockchainRPCInfo(chainId: bigint): Promise<{ rpcUrl: string; blockchainInfo: core.Blockchain; config: core.NodeConfig }> {
     const rpcUrl = this.config.blockchainRPCs?.get(chainId);
     if (!rpcUrl) {
       throw new Error(
@@ -1633,23 +1723,23 @@ export class Client {
       );
     }
 
-    // Get node config to find contract address
     const config = await this.getConfig();
     const blockchainInfo = config.blockchains.find((b) => b.id === chainId);
     if (!blockchainInfo) {
-      throw new Error(`blockchain ${chainId} not supported by node`);
+      throw new Error(`blockchain ${chainId} not found in node config`);
     }
 
-    const contractAddress = blockchainInfo.channelHubAddress;
-    const nodeAddress = config.nodeAddress;
+    return { rpcUrl, blockchainInfo, config };
+  }
 
-    // Create viem clients
+  /**
+   * Create viem public and wallet clients for a specific chain and RPC URL.
+   */
+  private createEVMClients(chainId: bigint, rpcUrl: string): { publicClient: blockchain.evm.EVMClient; walletClient: blockchain.evm.WalletSigner | null } {
     const publicClient = createPublicClient({
       transport: http(rpcUrl),
     }) as blockchain.evm.EVMClient;
 
-    // Create a minimal chain object for the wallet client
-    // This is required for viem to know which chain to submit transactions to
     const chain = {
       id: Number(chainId),
       name: `Chain ${chainId}`,
@@ -1660,40 +1750,86 @@ export class Client {
       },
     };
 
-
-    // Detect if we're in a browser with MetaMask/wallet provider
-    // In browser: use wallet provider for transactions (supports signing)
-    // In Node.js: use HTTP (requires private key, won't work for transactions)
     const isBrowser = typeof window !== 'undefined' && typeof (window as any).ethereum !== 'undefined';
 
-    let walletClient: blockchain.evm.WalletSigner;
-
+    let walletClient: blockchain.evm.WalletSigner | null = null;
     if (isBrowser) {
-      // Use MetaMask/wallet provider which supports transaction signing
       walletClient = createWalletClient({
         chain,
         transport: custom((window as any).ethereum),
         account: this.txSigner.getAddress(),
       }) as blockchain.evm.WalletSigner;
     } else {
-      // Fallback to HTTP (will fail for transactions in most cases)
-      walletClient = createWalletClient({
-        chain,
-        transport: http(rpcUrl),
-        account: this.txSigner.getAddress(),
-      }) as blockchain.evm.WalletSigner;
+      const account = this.txSigner.getAccount ? this.txSigner.getAccount() : undefined;
+      if (account) {
+        walletClient = createWalletClient({
+          chain,
+          transport: http(rpcUrl),
+          account,
+        }) as blockchain.evm.WalletSigner;
+      }
+    }
+
+    return { publicClient, walletClient };
+  }
+
+  /**
+   * Initialize a blockchain client for a specific chain.
+   * This is called lazily when a blockchain operation is needed.
+   */
+  private async initializeBlockchainClient(chainId: bigint): Promise<void> {
+    if (this.blockchainClients.has(chainId)) {
+      return;
+    }
+
+    const { rpcUrl, blockchainInfo, config } = await this.getBlockchainRPCInfo(chainId);
+
+    if (!blockchainInfo.channelHubAddress) {
+      throw new Error(`channel hub address not configured for blockchain ${chainId}`);
+    }
+
+    const { publicClient, walletClient } = this.createEVMClients(chainId, rpcUrl);
+
+    if (!walletClient) {
+      throw new Error('Node.js environment requires a TransactionSigner that implements getAccount() (e.g., EthereumRawSigner)');
     }
 
     const blockchainClient = new blockchain.evm.Client(
-      contractAddress,
+      blockchainInfo.channelHubAddress,
       publicClient,
       walletClient,
       chainId,
-      nodeAddress,
+      config.nodeAddress,
       this.assetStore
     );
 
     this.blockchainClients.set(chainId, blockchainClient);
+  }
+
+  /**
+   * Initialize a Locking contract client for a specific chain.
+   * This is called lazily when a locking operation is needed.
+   */
+  private async initializeLockingClient(chainId: bigint): Promise<void> {
+    if (this.blockchainLockingClients.has(chainId)) {
+      return;
+    }
+
+    const { rpcUrl, blockchainInfo } = await this.getBlockchainRPCInfo(chainId);
+
+    if (!blockchainInfo.lockingContractAddress) {
+      throw new Error(`locking contract address not configured for blockchain ${chainId}`);
+    }
+
+    const { publicClient, walletClient } = this.createEVMClients(chainId, rpcUrl);
+
+    const lockingClient = new blockchain.evm.LockingClient(
+      blockchainInfo.lockingContractAddress,
+      publicClient,
+      walletClient || undefined,
+    );
+
+    this.blockchainLockingClients.set(chainId, lockingClient);
   }
 
   /**

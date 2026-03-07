@@ -1,6 +1,7 @@
 package event_handlers
 
 import (
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/layer-3/nitrolite/pkg/core"
@@ -65,5 +66,11 @@ func (m *MockStore) ScheduleFinalizeEscrowDeposit(stateID string, chainID uint64
 // ScheduleFinalizeEscrowWithdrawal mocks scheduling an escrow withdrawal checkpoint
 func (m *MockStore) ScheduleFinalizeEscrowWithdrawal(stateID string, chainID uint64) error {
 	args := m.Called(stateID, chainID)
+	return args.Error(0)
+}
+
+// UpdateUserStaked mocks updating the total staked amount for a user
+func (m *MockStore) UpdateUserStaked(wallet string, blockchainID uint64, amount decimal.Decimal) error {
+	args := m.Called(wallet, blockchainID, amount)
 	return args.Error(0)
 }

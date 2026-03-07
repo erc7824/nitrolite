@@ -17,20 +17,18 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 		{
 			name: "valid config",
 			cfg: BlockchainsConfig{
-				DefaultContractAddresses: DefaultContractAddresses{
-					ChannelHub: "0x0000000000000000000000000000000000000001",
-				},
-
 				Blockchains: []BlockchainConfig{
 					{
-						ID:                1,
-						Name:              "ethereum",
-						ChannelHubAddress: "0x1111111111111111111111111111111111111111",
-						BlockStep:         10,
+						ID:                      1,
+						Name:                    "ethereum",
+						ChannelHubAddress:       "0x1111111111111111111111111111111111111111",
+						BlockStep:               10,
+						ChannelHubSigValidators: map[uint8]string{1: "0x3333333333333333333333333333333333333333"},
 					},
 					{
-						ID:   11155111,
-						Name: "ethereum_sepolia",
+						ID:                     11155111,
+						Name:                   "ethereum_sepolia",
+						LockingContractAddress: "0x2222222222222222222222222222222222222222",
 					},
 				},
 			},
@@ -48,7 +46,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 				sepoliaCfg := blockchains[1]
 				assert.Equal(t, "ethereum_sepolia", sepoliaCfg.Name)
 				assert.Equal(t, uint64(11155111), sepoliaCfg.ID)
-				assert.Equal(t, "0x0000000000000000000000000000000000000001", sepoliaCfg.ChannelHubAddress)
+				assert.Equal(t, "0x2222222222222222222222222222222222222222", sepoliaCfg.LockingContractAddress)
 				assert.False(t, sepoliaCfg.Disabled)
 				assert.Equal(t, defaultBlockStep, sepoliaCfg.BlockStep)
 			},
@@ -80,14 +78,13 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 		{
 			name: "disabled blockchain",
 			cfg: BlockchainsConfig{
-				DefaultContractAddresses: DefaultContractAddresses{
-					ChannelHub: "0x0000000000000000000000000000000000000001",
-				},
 				Blockchains: []BlockchainConfig{
 					{
-						ID:       1,
-						Name:     "ethereum",
-						Disabled: false,
+						ID:                      1,
+						Name:                    "ethereum",
+						Disabled:                false,
+						ChannelHubAddress:       "0x1111111111111111111111111111111111111111",
+						ChannelHubSigValidators: map[uint8]string{1: "0x3333333333333333333333333333333333333333"},
 					},
 					{
 						ID:       11155111,
@@ -108,28 +105,6 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 				assert.Equal(t, "_ethereum_sepolia_", sepoliaCfg.Name)
 				assert.Equal(t, uint64(11155111), sepoliaCfg.ID)
 			},
-		},
-		{
-			name: "invalid default channel hub address",
-			cfg: BlockchainsConfig{
-				DefaultContractAddresses: DefaultContractAddresses{
-					ChannelHub: "0x0000s00000000000000000000000000000000001",
-				},
-			},
-			expectedErrorStr: "invalid default channel hub address '0x0000s00000000000000000000000000000000001'",
-		},
-		{
-			name: "missing channel hub address",
-			cfg: BlockchainsConfig{
-				Blockchains: []BlockchainConfig{
-					{
-						ID:                1,
-						Name:              "ethereum",
-						ChannelHubAddress: "",
-					},
-				},
-			},
-			expectedErrorStr: "missing default and blockchain-specific channel hub address for blockchain 'ethereum'",
 		},
 		{
 			name: "invalid channel hub address",

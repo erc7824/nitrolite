@@ -63,6 +63,7 @@ client.registerApp(appID, metadata, approvalNotRequired)         // Register new
 client.getAppSessions(opts)                                     // List sessions
 client.getAppDefinition(appSessionId)                           // Session definition
 client.createAppSession(definition, sessionData, sigs)          // Create session
+client.createAppSession(def, data, sigs, { ownerSig })          // Create with owner approval
 client.submitAppSessionDeposit(update, sigs, asset, amount)     // Deposit to session
 client.submitAppState(update, sigs)                             // Update session
 client.rebalanceAppSessions(signedUpdates)                      // Atomic rebalance
@@ -151,7 +152,7 @@ main().catch(console.error);
 ```
 sdk/ts/src/
 ├── client.ts         # Core client, constructors, high-level operations
-├── signers.ts        # EthereumMsgSigner and EthereumRawSigner
+├── signers.ts        # Signers (EthereumMsg/Raw, Channel, AppSession)
 ├── config.ts         # Configuration options
 ├── asset_store.ts    # Asset metadata caching
 ├── utils.ts          # Type transformations
@@ -436,6 +437,50 @@ const nodeSig = await client.submitAppSessionDeposit(
 await client.submitAppState(appUpdate, quorumSigs);
 
 const batchId = await client.rebalanceAppSessions(signedUpdates);
+```
+
+#### Owner Approval for App Session Creation
+
+When an app is registered with `creationApprovalNotRequired: false`, the app owner must sign the session creation request. Pass the owner's signature via the options parameter:
+
+```typescript
+import { AppSessionWalletSignerV1, EthereumMsgSigner } from '@yellow-org/sdk';
+
+// Owner signs the create request using their app session signer
+const ownerMsgSigner = new EthereumMsgSigner(ownerPrivateKey);
+const ownerAppSessionSigner = new AppSessionWalletSignerV1(ownerMsgSigner);
+const ownerSig = await ownerAppSessionSigner.signMessage(createRequest);
+
+const { appSessionId } = await client.createAppSession(
+  definition,
+  sessionData,
+  quorumSigs,
+  { ownerSig }
+);
+```
+
+### App Session Signers
+
+App session operations require signatures with a type byte prefix, similar to channel signers:
+
+| Type | Byte | Class | Usage |
+|------|------|-------|-------|
+| Wallet | `0xA1` | `AppSessionWalletSignerV1` | Main wallet signs app session operations |
+| Session Key | `0xA2` | `AppSessionKeySignerV1` | Delegated session key signs on behalf of wallet |
+
+```typescript
+import { EthereumMsgSigner, AppSessionWalletSignerV1, AppSessionKeySignerV1 } from '@yellow-org/sdk';
+
+// Create app session wallet signer
+const msgSigner = new EthereumMsgSigner(privateKey);
+const appSessionSigner = new AppSessionWalletSignerV1(msgSigner);
+
+// Sign app session operations (create, deposit, state updates, etc.)
+const sig = await appSessionSigner.signMessage(packedRequest);
+
+// For session key delegation
+const sessionKeyMsgSigner = new EthereumMsgSigner(sessionKeyPrivateKey);
+const sessionKeySigner = new AppSessionKeySignerV1(sessionKeyMsgSigner);
 ```
 
 ### App Session Keys
@@ -755,8 +800,17 @@ queryTransactions().catch(console.error);
 
 ### Example 4: App Session Workflow
 
+For a comprehensive multi-party app session example including app registration, owner approval,
+session key delegation, deposits, redistribution, and more, see
+[examples/app_sessions/lifecycle.ts](examples/app_sessions/lifecycle.ts).
+
 ```typescript
-import { Client, createSigners, withBlockchainRPC } from '@yellow-org/sdk';
+import {
+  Client, createSigners, EthereumMsgSigner,
+  AppSessionWalletSignerV1, withBlockchainRPC
+} from '@yellow-org/sdk';
+import { AppStateUpdateIntent } from '@yellow-org/sdk/app/types';
+import { packCreateAppSessionRequestV1, packAppStateUpdateV1 } from '@yellow-org/sdk/app/packing';
 import Decimal from 'decimal.js';
 
 async function appSessionExample() {
@@ -769,42 +823,55 @@ async function appSessionExample() {
   );
 
   try {
+    // Register app (required before creating sessions)
+    await client.registerApp('chess-v1', '{}', true);
+
+    // Create app session signer
+    const msgSigner = new EthereumMsgSigner(process.env.PRIVATE_KEY!);
+    const appSessionSigner = new AppSessionWalletSignerV1(msgSigner);
+
     // Create app session
     const definition = {
-      application: 'chess-v1',
+      applicationId: 'chess-v1',
       participants: [
-        { walletAddress: client.getUserAddress(), signatureWeight: 1 },
-        { walletAddress: '0xOpponent...', signatureWeight: 1 },
+        { walletAddress: client.getUserAddress(), signatureWeight: 100 },
       ],
-      quorum: 2,
-      nonce: 1n,
+      quorum: 100,
+      nonce: BigInt(Date.now() * 1000000),
     };
+
+    const createRequest = packCreateAppSessionRequestV1(definition, '{}');
+    const createSig = await appSessionSigner.signMessage(createRequest);
 
     const { appSessionId } = await client.createAppSession(
       definition,
       '{}',
-      ['sig1', 'sig2']
+      [createSig]
     );
     console.log('Session created:', appSessionId);
 
     // Deposit to app session
+    const depositAmount = new Decimal(50);
     const appUpdate = {
       appSessionId,
-      intent: 1, // Deposit
-      version: 1n,
+      intent: AppStateUpdateIntent.Deposit,
+      version: 2n,
       allocations: [{
         participant: client.getUserAddress(),
         asset: 'usdc',
-        amount: new Decimal(50),
+        amount: depositAmount,
       }],
       sessionData: '{}',
     };
 
+    const depositRequest = packAppStateUpdateV1(appUpdate);
+    const depositSig = await appSessionSigner.signMessage(depositRequest);
+
     const nodeSig = await client.submitAppSessionDeposit(
       appUpdate,
-      ['sig1'],
+      [depositSig],
       'usdc',
-      new Decimal(50)
+      depositAmount
     );
     console.log('Deposit signature:', nodeSig);
 
@@ -874,6 +941,17 @@ import type {
   AppSessionKeyStateV1,
   ChannelSessionKeyStateV1,
   PaginationMetadata,
+} from '@yellow-org/sdk';
+
+// Signer types
+import {
+  EthereumMsgSigner,
+  EthereumRawSigner,
+  ChannelDefaultSigner,
+  ChannelSessionKeyStateSigner,
+  AppSessionWalletSignerV1,
+  AppSessionKeySignerV1,
+  createSigners,
 } from '@yellow-org/sdk';
 
 // App Registry types (from rpc/types)

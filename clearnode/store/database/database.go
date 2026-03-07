@@ -67,6 +67,7 @@ func connectToPostgresql(cnf DatabaseConfig, embedMigrations embed.FS) (*gorm.DB
 	}
 	dial := postgres.Open(dsn)
 
+	// TODO: don't print SQL in logs
 	db, err := gorm.Open(dial, &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			TablePrefix: cnf.Schema + ".", // schema name

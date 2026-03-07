@@ -61,7 +61,9 @@ contract DeployChannelHub is Script {
 
         // Libraries are deployed via the CREATE2 deployer; they do not affect
         // the deployer's nonce sequence, so ChannelHub lands at nonce `nonce`.
-        console.log("ChannelEngine/EscrowDepositEng/EscrowWithdrawEng: deployed via CREATE2 deployer (see broadcast JSON)");
+        console.log(
+            "ChannelEngine/EscrowDepositEng/EscrowWithdrawEng: deployed via CREATE2 deployer (see broadcast JSON)"
+        );
         console.log("ChannelHub:        ", vm.computeCreateAddress(deployer, nonce));
 
         vm.startBroadcast();
@@ -92,6 +94,6 @@ contract DeployChannelHub is Script {
         console.log("=== Deployment complete ===");
         console.log("DefaultSigValidator:", defaultValidatorAddr);
         console.log("ChannelHub:         ", address(hub));
-        console.log("(Library addresses are logged above and in the broadcast JSON)");
+        console.log("(Library addresses are logged in the broadcast JSON)");
     }
 }

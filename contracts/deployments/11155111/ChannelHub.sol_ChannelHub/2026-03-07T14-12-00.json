@@ -10,9 +10,9 @@
     "0x735EB1026aFbA78B602dA39C6B59EABa95753686"
   ],
   "libraries": {
-    "src/ChannelEngine.sol:ChannelEngine": "0xb7bE0E2007dDF320d680942cb9e008F986E74F83",
-    "src/EscrowDepositEngine.sol:EscrowDepositEngine": "0x2aC63456d78Cf2E2FDAf45cbed45b5d29907f4ac",
-    "src/EscrowWithdrawalEngine.sol:EscrowWithdrawalEngine": "0x36E4A80f54612497647539C8Ff8bDc1611Cb8f53"
+    "src/ChannelEngine.sol:ChannelEngine": "0x78d150fda6fa6739c18014b347c7c7c45c58e148",
+    "src/EscrowDepositEngine.sol:EscrowDepositEngine": "0x728904e52308213ba61c90ef49f34c18fbda9e11",
+    "src/EscrowWithdrawalEngine.sol:EscrowWithdrawalEngine": "0x893f2d45fdffe2d4297a5c1d5732edce4849ee82"
   },
   "comment": "clearnet-sandbox-1"
 }

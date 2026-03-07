@@ -116,7 +116,7 @@ func (r *ChannelHubReactor) HandleEvent(ctx context.Context, l types.Log) error 
 	case channelHubAbi.Events["EscrowDepositsPurged"].ID:
 		err = r.handleEscrowDepositsPurged(ctx, l)
 	default:
-		err = errors.New("unknown event: " + eventID.Hex())
+		logger.Warn("unknown event: " + eventID.Hex())
 	}
 	if r.onEventProcessed != nil {
 		r.onEventProcessed(r.blockchainID, err == nil)

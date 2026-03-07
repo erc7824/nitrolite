@@ -29,6 +29,9 @@ type BlockchainClient interface {
 	Deposit(node, token string, amount decimal.Decimal) (string, error)
 	Withdraw(node, token string, amount decimal.Decimal) (string, error)
 
+	// Node lifecycle
+	EnsureSigValidatorRegistered(validatorID uint8, validatorAddress string, checkOnly bool) error
+
 	// Channel lifecycle
 	Create(def ChannelDefinition, initCCS State) (string, error)
 	MigrateChannelHere(def ChannelDefinition, candidate State) (string, error)

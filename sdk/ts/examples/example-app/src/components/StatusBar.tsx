@@ -31,7 +31,7 @@ export default function StatusBar({ status, onClose }: StatusBarProps) {
   return (
     <div
       className={cn(
-        'fixed top-6 right-6 max-w-md border-l-4 border p-4 z-50 animate-in slide-in-from-right-5',
+        'fixed top-6 right-6 max-w-md border-l-4 p-4 z-50 animate-in slide-in-from-right-5 glass rounded-xl',
         bg
       )}
     >

@@ -17,7 +17,7 @@ import { Erc20Abi } from './erc20_abi';
 export class LockingClient {
   private contractAddress: Address;
   private evmClient: EVMClient;
-  private walletSigner: WalletSigner;
+  private walletSigner?: WalletSigner;
 
   private tokenAddress?: Address;
   private tokenDecimals?: number;
@@ -25,11 +25,18 @@ export class LockingClient {
   constructor(
     contractAddress: Address,
     evmClient: EVMClient,
-    walletSigner: WalletSigner,
+    walletSigner?: WalletSigner,
   ) {
     this.contractAddress = contractAddress;
     this.evmClient = evmClient;
     this.walletSigner = walletSigner;
+  }
+
+  private requireWalletSigner(): WalletSigner {
+    if (!this.walletSigner) {
+      throw new Error('Write operations require a wallet signer. In Node.js, use a TransactionSigner that implements getAccount() (e.g., EthereumRawSigner)');
+    }
+    return this.walletSigner;
   }
 
   /**
@@ -66,6 +73,7 @@ export class LockingClient {
    * @returns Transaction hash
    */
   async lock(target: Address, amount: Decimal): Promise<string> {
+    const walletSigner = this.requireWalletSigner();
     const { decimals } = await this.ensureTokenInfo();
     const amountBig = decimalToBigInt(amount, decimals);
 
@@ -74,10 +82,10 @@ export class LockingClient {
       abi: AppRegistryAbi,
       functionName: 'lock',
       args: [target, amountBig],
-      account: this.walletSigner.account!.address,
+      account: walletSigner.account!.address,
     });
 
-    const hash = await this.walletSigner.writeContract(request as any);
+    const hash = await walletSigner.writeContract(request as any);
     await this.evmClient.waitForTransactionReceipt({ hash });
     return hash;
   }
@@ -88,14 +96,15 @@ export class LockingClient {
    * @returns Transaction hash
    */
   async relock(): Promise<string> {
+    const walletSigner = this.requireWalletSigner();
     const { request } = await this.evmClient.simulateContract({
       address: this.contractAddress,
       abi: AppRegistryAbi,
       functionName: 'relock',
-      account: this.walletSigner.account!.address,
+      account: walletSigner.account!.address,
     });
 
-    const hash = await this.walletSigner.writeContract(request as any);
+    const hash = await walletSigner.writeContract(request as any);
     await this.evmClient.waitForTransactionReceipt({ hash });
     return hash;
   }
@@ -107,14 +116,15 @@ export class LockingClient {
    * @returns Transaction hash
    */
   async unlock(): Promise<string> {
+    const walletSigner = this.requireWalletSigner();
     const { request } = await this.evmClient.simulateContract({
       address: this.contractAddress,
       abi: AppRegistryAbi,
       functionName: 'unlock',
-      account: this.walletSigner.account!.address,
+      account: walletSigner.account!.address,
     });
 
-    const hash = await this.walletSigner.writeContract(request as any);
+    const hash = await walletSigner.writeContract(request as any);
     await this.evmClient.waitForTransactionReceipt({ hash });
     return hash;
   }
@@ -127,15 +137,16 @@ export class LockingClient {
    * @returns Transaction hash
    */
   async withdraw(destination: Address): Promise<string> {
+    const walletSigner = this.requireWalletSigner();
     const { request } = await this.evmClient.simulateContract({
       address: this.contractAddress,
       abi: AppRegistryAbi,
       functionName: 'withdraw',
       args: [destination],
-      account: this.walletSigner.account!.address,
+      account: walletSigner.account!.address,
     });
 
-    const hash = await this.walletSigner.writeContract(request as any);
+    const hash = await walletSigner.writeContract(request as any);
     await this.evmClient.waitForTransactionReceipt({ hash });
     return hash;
   }
@@ -148,6 +159,7 @@ export class LockingClient {
    * @returns Transaction hash
    */
   async approveToken(amount: Decimal): Promise<string> {
+    const walletSigner = this.requireWalletSigner();
     const { address: tokenAddress, decimals } = await this.ensureTokenInfo();
     const amountBig = decimalToBigInt(amount, decimals);
 
@@ -156,10 +168,10 @@ export class LockingClient {
       abi: Erc20Abi,
       functionName: 'approve',
       args: [this.contractAddress, amountBig],
-      account: this.walletSigner.account!.address,
+      account: walletSigner.account!.address,
     });
 
-    const hash = await this.walletSigner.writeContract(request as any);
+    const hash = await walletSigner.writeContract(request as any);
     await this.evmClient.waitForTransactionReceipt({ hash });
     return hash;
   }

@@ -84,7 +84,7 @@ func (r *LockingContractReactor) HandleEvent(ctx context.Context, l types.Log) e
 	case lockingContractAbi.Events["Withdrawn"].ID:
 		err = r.handleWithdrawn(ctx, l)
 	default:
-		err = errors.New("unknown event: " + eventID.Hex())
+		logger.Warn("unknown event: " + eventID.Hex())
 	}
 	if r.onEventProcessed != nil {
 		r.onEventProcessed(r.blockchainID, err == nil)

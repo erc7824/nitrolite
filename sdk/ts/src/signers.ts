@@ -28,6 +28,8 @@ export interface TransactionSigner {
   sendTransaction(tx: any): Promise<Hex>;
   /** Sign a message (raw bytes) */
   signMessage(message: { raw: Hex }): Promise<Hex>;
+  /** Sign a message with EIP-191 prefix (personal_sign). Used for app registration. */
+  signPersonalMessage?(hash: Hex): Promise<Hex>;
   /** Get the underlying viem local account for wallet client creation */
   getAccount?(): ReturnType<typeof privateKeyToAccount>;
 }
@@ -117,6 +119,13 @@ export class EthereumRawSigner implements TransactionSigner {
    */
   async signMessage(message: { raw: Hex }): Promise<Hex> {
     return await this.account.sign({ hash: message.raw });
+  }
+
+  /**
+   * Sign a message with EIP-191 prefix (personal_sign)
+   */
+  async signPersonalMessage(hash: Hex): Promise<Hex> {
+    return await this.account.signMessage({ message: { raw: hash } });
   }
 
   /**
@@ -243,6 +252,66 @@ export class ChannelSessionKeyStateSigner implements StateSigner {
 
     // Prepend 0x01 type byte (ChannelSignerType_SessionKey)
     return `0x01${encoded.slice(2)}` as Hex;
+  }
+}
+
+/**
+ * AppSessionWalletSignerV1 wraps an EthereumMsgSigner and prepends the 0x00 type byte
+ * to signatures for app session operations.
+ * Corresponds to Go SDK's app.NewAppSessionWalletSignerV1.
+ *
+ * @example
+ * ```typescript
+ * const msgSigner = new EthereumMsgSigner(privateKey);
+ * const appSessionSigner = new AppSessionWalletSignerV1(msgSigner);
+ * const sig = await appSessionSigner.signMessage(hash);
+ * ```
+ */
+export class AppSessionWalletSignerV1 implements StateSigner {
+  private inner: StateSigner;
+
+  constructor(inner: StateSigner) {
+    this.inner = inner;
+  }
+
+  getAddress(): Address {
+    return this.inner.getAddress();
+  }
+
+  async signMessage(hash: Hex): Promise<Hex> {
+    const sig = await this.inner.signMessage(hash);
+    // Prepend 0xa1 type byte (AppSessionSignerTypeV1_Wallet)
+    return `0xa1${sig.slice(2)}` as Hex;
+  }
+}
+
+/**
+ * AppSessionKeySignerV1 wraps an EthereumMsgSigner and prepends the 0xa2 type byte
+ * to signatures for app session operations using session keys.
+ * Corresponds to Go SDK's app.NewAppSessionKeySignerV1.
+ *
+ * @example
+ * ```typescript
+ * const msgSigner = new EthereumMsgSigner(sessionKeyPrivateKey);
+ * const appSessionSigner = new AppSessionKeySignerV1(msgSigner);
+ * const sig = await appSessionSigner.signMessage(hash);
+ * ```
+ */
+export class AppSessionKeySignerV1 implements StateSigner {
+  private inner: StateSigner;
+
+  constructor(inner: StateSigner) {
+    this.inner = inner;
+  }
+
+  getAddress(): Address {
+    return this.inner.getAddress();
+  }
+
+  async signMessage(hash: Hex): Promise<Hex> {
+    const sig = await this.inner.signMessage(hash);
+    // Prepend 0xa2 type byte (AppSessionSignerTypeV1_SessionKey)
+    return `0xa2${sig.slice(2)}` as Hex;
   }
 }
 

@@ -9,16 +9,18 @@ import (
 )
 
 type MemoryStoreV1 struct {
-	blockchains     []core.Blockchain
-	assets          []core.Asset
-	supportedAssets map[string]map[uint64]string // map[asset]map[blockchain_id]string
-	tokenDecimals   map[uint64]map[string]uint8  // map[blockchain_id]map[token_address]decimals
-	assetDecimals   map[string]uint8             // map[asset]decimals
+	blockchains          []core.Blockchain
+	assets               []core.Asset
+	channelSigValidators map[uint64]map[uint8]string  // map[blockchain_id]map[validator_id]validator_address
+	supportedAssets      map[string]map[uint64]string // map[asset]map[blockchain_id]string
+	tokenDecimals        map[uint64]map[string]uint8  // map[blockchain_id]map[token_address]decimals
+	assetDecimals        map[string]uint8             // map[asset]decimals
 }
 
 func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]BlockchainConfig) (MemoryStore, error) {
 	supportedBlockchainIDs := make(map[uint64]struct{})
 	blockchains := make([]core.Blockchain, 0, len(blockchainsConfig))
+	channelSigValidators := make(map[uint64]map[uint8]string)
 	for _, bc := range blockchainsConfig {
 		if bc.Disabled {
 			continue
@@ -26,6 +28,7 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 
 		if bc.ChannelHubAddress != "" {
 			supportedBlockchainIDs[bc.ID] = struct{}{}
+			channelSigValidators[bc.ID] = bc.ChannelHubSigValidators
 		}
 
 		blockchains = append(blockchains, core.Blockchain{
@@ -124,11 +127,12 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint64]Bl
 	})
 
 	return &MemoryStoreV1{
-		blockchains:     blockchains,
-		assets:          assets,
-		supportedAssets: supportedAssets,
-		tokenDecimals:   tokenDecimals,
-		assetDecimals:   assetDecimals,
+		blockchains:          blockchains,
+		assets:               assets,
+		channelSigValidators: channelSigValidators,
+		supportedAssets:      supportedAssets,
+		tokenDecimals:        tokenDecimals,
+		assetDecimals:        assetDecimals,
 	}, nil
 }
 
@@ -173,6 +177,14 @@ func (ms *MemoryStoreV1) GetAssets(blockchainID *uint64) ([]core.Asset, error) {
 	}
 
 	return filteredAssets, nil
+}
+
+func (ms *MemoryStoreV1) GetChannelSigValidators(blockchainID uint64) (map[uint8]string, error) {
+	channelSigValidators, ok := ms.channelSigValidators[blockchainID]
+	if !ok {
+		return nil, fmt.Errorf("blockchain with ID '%d' is not supported", blockchainID)
+	}
+	return channelSigValidators, nil
 }
 
 func (ms *MemoryStoreV1) GetTokenAddress(asset string, blockchainID uint64) (string, error) {

@@ -12,7 +12,7 @@
  *
  * Prerequisites:
  *   - PRIVATE_KEY env var set to an Ethereum private key
- *   - CLEARNODE_WS_URL env var (defaults to wss://clearnode-v1-rc.yellow.org/ws)
+ *   - CLEARNODE_WS_URL env var (defaults to wss://clearnode-sandbox.yellow.org/v1/ws)
  *   - CHAIN_ID env var (defaults to 11155111 for Sepolia)
  *
  * Balance-dependent tests:
@@ -100,7 +100,7 @@ async function walletSign(wc: any, hash: Hex): Promise<Hex> {
 }
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
-const WS_URL = process.env.CLEARNODE_WS_URL || 'wss://clearnode-v1-rc.yellow.org/ws';
+const WS_URL = process.env.CLEARNODE_WS_URL || 'wss://clearnode-sandbox.yellow.org/v1/ws';
 const CHAIN_ID = parseInt(process.env.CHAIN_ID || '11155111', 10);
 if (Number.isNaN(CHAIN_ID)) {
     console.error('CHAIN_ID must be a valid integer');

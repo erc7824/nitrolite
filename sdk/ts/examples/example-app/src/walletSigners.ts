@@ -75,6 +75,20 @@ export class WalletTransactionSigner {
   }
 
   /**
+   * Sign a message with EIP-191 prefix (personal_sign via MetaMask)
+   */
+  async signPersonalMessage(hash: Hex): Promise<Hex> {
+    if (!this.walletClient.account) {
+      throw new Error('Wallet client does not have an account');
+    }
+
+    return await this.walletClient.signMessage({
+      account: this.walletClient.account,
+      message: { raw: hash },
+    });
+  }
+
+  /**
    * Sign a message (raw bytes without prefix)
    */
   async signRaw(hash: Hex): Promise<Hex> {

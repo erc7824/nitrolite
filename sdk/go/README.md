@@ -58,6 +58,7 @@ client.RegisterApp(ctx, appID, metadata, approvalNotRequired) // Register new ap
 client.GetAppSessions(ctx, opts)                              // List sessions
 client.GetAppDefinition(ctx, appSessionID)                    // Session definition
 client.CreateAppSession(ctx, definition, sessionData, sigs)   // Create session
+client.CreateAppSession(ctx, def, data, sigs, opts)           // Create with owner approval
 client.SubmitAppSessionDeposit(ctx, update, sigs, asset, amount) // Deposit to session
 client.SubmitAppState(ctx, update, sigs)                      // Update session
 client.RebalanceAppSessions(ctx, signedUpdates)               // Atomic rebalance
@@ -382,6 +383,37 @@ err := client.SubmitAppState(ctx, update, sigs)
 batchID, err := client.RebalanceAppSessions(ctx, signedUpdates)
 ```
 
+#### Owner Approval for App Session Creation
+
+When an app is registered with `creationApprovalNotRequired: false`, the app owner must sign the session creation request. Pass the owner's signature via `CreateAppSessionOptions`:
+
+```go
+// Owner signs the create request using their app session signer
+ownerSig, _ := ownerAppSessionSigner.Sign(createRequest)
+
+sessionID, _, _, err := client.CreateAppSession(ctx, def, data, sigs,
+    sdk.CreateAppSessionOptions{OwnerSig: ownerSig.String()},
+)
+```
+
+### App Session Signers (`pkg/app`)
+
+App session operations require signatures with a type byte prefix, similar to channel signers:
+
+| Type | Byte | Constructor | Usage |
+|------|------|------------|-------|
+| Wallet | `0xA1` | `app.NewAppSessionWalletSignerV1(msgSigner)` | Main wallet signs app session operations |
+| Session Key | `0xA2` | `app.NewAppSessionKeySignerV1(msgSigner)` | Delegated session key signs on behalf of wallet |
+
+```go
+// Create app session wallet signer
+msgSigner, _ := sign.NewEthereumMsgSigner(privateKeyHex)
+appSessionSigner, _ := app.NewAppSessionWalletSignerV1(msgSigner)
+
+// Sign app session operations (create, deposit, state updates, etc.)
+sig, _ := appSessionSigner.Sign(packedRequest)
+```
+
 ### Session Keys — App Sessions
 
 ```go
@@ -578,12 +610,15 @@ go run lifecycle.go
 ```
 
 This example demonstrates:
-- Creating app sessions with multiple participants
+- Registering apps in the app registry (with and without owner approval)
+- Creating app sessions with single and multiple participants
+- Owner approval for app session creation
+- Session key delegation for app session participants
 - Depositing assets into app sessions
 - Operating on app session state (redistributing allocations)
-- Atomic rebalancing across multiple app sessions
 - Withdrawing from app sessions
 - Closing app sessions
+- Fail case: attempting to create a session for an unregistered app
 
 The example walks through a complete multi-party app session scenario with three wallets.
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,12 +19,18 @@ import (
 	"github.com/layer-3/nitrolite/clearnode/store/database"
 	"github.com/layer-3/nitrolite/clearnode/stress"
 	"github.com/layer-3/nitrolite/pkg/blockchain/evm"
+	"github.com/layer-3/nitrolite/pkg/core"
 	"github.com/layer-3/nitrolite/pkg/log"
 )
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "stress-test" {
 		os.Exit(stress.Run(os.Args[2:]))
+	}
+
+	if len(os.Args) > 1 && os.Args[1] == "operator" {
+		runOperatorCommand(os.Args[2:])
+		return
 	}
 
 	bb := InitBackbone()
@@ -93,6 +100,15 @@ func main() {
 			blockchainClient, err := evm.NewBlockchainClient(common.HexToAddress(b.ChannelHubAddress), client, bb.TxSigner, b.ID, nodeAddress, bb.MemoryStore, clientOpts...)
 			if err != nil {
 				logger.Fatal("failed to create EVM client")
+			}
+
+			sigValidators, err := bb.MemoryStore.GetChannelSigValidators(b.ID)
+			if err != nil {
+				logger.Fatal("failed to get channel signature validators from memory store", "error", err, "blockchainID", b.ID)
+			}
+
+			if err := ensureSigValidatorsRegistered(blockchainClient, sigValidators, true); err != nil {
+				logger.Fatal("failed to ensure signature validators are registered", "error", err, "blockchainID", b.ID)
 			}
 
 			reactor := evm.NewChannelHubReactor(b.ID, eventHandlerService, bb.DbStore.StoreContractEvent)
@@ -194,6 +210,95 @@ func main() {
 	}
 
 	logger.Info("shutdown complete")
+}
+
+func runOperatorCommand(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: clearnode operator <command>")
+		fmt.Println("Commands:")
+		fmt.Println("  address               Print the operator address")
+		fmt.Println("  register-validators   Register signature validators on-chain")
+		os.Exit(1)
+	}
+
+	switch args[0] {
+	case "address":
+		runOperatorAddress()
+	case "register-validators":
+		runRegisterValidators()
+	default:
+		fmt.Printf("Unknown operator command: %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+func runOperatorAddress() {
+	bb := InitBackbone()
+	defer bb.Close()
+
+	fmt.Println(bb.StateSigner.PublicKey().Address().String())
+	time.Sleep(5 * time.Second)
+}
+
+func runRegisterValidators() {
+	bb := InitBackbone()
+	defer bb.Close()
+	logger := bb.Logger
+
+	blockchains, err := bb.MemoryStore.GetBlockchains()
+	if err != nil {
+		logger.Fatal("failed to get blockchains from memory store", "error", err)
+	}
+
+	for _, b := range blockchains {
+		if b.ChannelHubAddress == "" {
+			continue
+		}
+
+		rpcURL, ok := bb.BlockchainRPCs[b.ID]
+		if !ok {
+			logger.Fatal("no RPC URL configured for blockchain", "blockchainID", b.ID)
+		}
+
+		client, err := ethclient.Dial(rpcURL)
+		if err != nil {
+			logger.Fatal("failed to connect to EVM Node", "blockchainID", b.ID)
+		}
+
+		nodeAddress := bb.StateSigner.PublicKey().Address().String()
+		clientOpts := []evm.ClientOption{
+			evm.ClientBalanceCheck{RequireBalanceCheck: false},
+			evm.ClientAllowanceCheck{RequireAllowanceCheck: false},
+		}
+
+		blockchainClient, err := evm.NewBlockchainClient(common.HexToAddress(b.ChannelHubAddress), client, bb.TxSigner, b.ID, nodeAddress, bb.MemoryStore, clientOpts...)
+		if err != nil {
+			logger.Fatal("failed to create EVM client", "blockchainID", b.ID)
+		}
+
+		sigValidators, err := bb.MemoryStore.GetChannelSigValidators(b.ID)
+		if err != nil {
+			logger.Fatal("failed to get channel signature validators from memory store", "error", err, "blockchainID", b.ID)
+		}
+
+		if err := ensureSigValidatorsRegistered(blockchainClient, sigValidators, false); err != nil {
+			logger.Fatal("failed to register signature validators", "error", err, "blockchainID", b.ID)
+		}
+
+		logger.Info("signature validators registered successfully", "blockchainID", b.ID)
+	}
+
+	logger.Info("all signature validators registered")
+}
+
+func ensureSigValidatorsRegistered(client core.BlockchainClient, validators map[uint8]string, checkOnly bool) error {
+	for id, addr := range validators {
+		if err := client.EnsureSigValidatorRegistered(id, addr, checkOnly); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func runStoreMetricsExporter(

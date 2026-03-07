@@ -102,7 +102,7 @@ const txSigner = new WalletTransactionSigner(walletClient);
 
 // Connect
 const client = await Client.create(
-  'wss://clearnode-v1-rc.yellow.org/ws',
+  'wss://clearnode-sandbox.yellow.org/v1/ws',
   stateSigner,
   txSigner,
   withBlockchainRPC(11155111n, 'https://ethereum-sepolia-rpc.publicnode.com'),
@@ -276,7 +276,7 @@ const sessionSigner = new ChannelSessionKeyStateSigner(
 const txSigner = new WalletTransactionSigner(walletClient);
 
 const sessionClient = await Client.create(
-  'wss://clearnode-v1-rc.yellow.org/ws',
+  'wss://clearnode-sandbox.yellow.org/v1/ws',
   sessionSigner,
   txSigner,
   withBlockchainRPC(11155111n, 'https://ethereum-sepolia-rpc.publicnode.com'),

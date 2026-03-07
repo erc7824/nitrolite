@@ -1,7 +1,7 @@
 {
     "name": "@yellow-org/sdk",
-    "version": "1.1.1",
-    "description": "The Nitrolite SDK empowers developers to build high-performance, scalable web3 applications using state channels. It's designed to provide near-instant transactions and significantly improved user experiences by minimizing direct blockchain interactions.",
+    "version": "1.2.0",
+    "description": "The Yellow SDK empowers developers to build high-performance, scalable web3 applications using state channels. It's designed to provide near-instant transactions and significantly improved user experiences by minimizing direct blockchain interactions.",
     "type": "module",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",

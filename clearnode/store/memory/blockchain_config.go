@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/layer-3/nitrolite/pkg/core"
 	"gopkg.in/yaml.v3"
 )
 
@@ -40,6 +41,8 @@ type BlockchainConfig struct {
 	BlockStep uint64 `yaml:"block_step"`
 	// ChannelHubAddress is the address of the ChannelHub contract on this blockchain
 	ChannelHubAddress string `yaml:"channel_hub_address"`
+	// ChannelHubSigValidators maps validator IDs to the addresses of signature validators for the ChannelHub contract on this blockchain
+	ChannelHubSigValidators map[uint8]string `yaml:"channel_hub_sig_validators"`
 	// LockingContractAddress is the address of the locking contract on this blockchain
 	LockingContractAddress string `yaml:"locking_contract_address"`
 }
@@ -97,6 +100,18 @@ func verifyBlockchainsConfig(cfg *BlockchainsConfig) error {
 
 		if bc.BlockStep == 0 {
 			cfg.Blockchains[i].BlockStep = defaultBlockStep
+		}
+
+		if bc.ChannelHubAddress != "" && len(core.ChannelSignerTypes) > 1 {
+			for _, channelSignerType := range core.ChannelSignerTypes[1:] {
+				validatorAddress, ok := bc.ChannelHubSigValidators[uint8(channelSignerType)]
+				if !ok {
+					return fmt.Errorf("blockchain '%s' must specify a signature validator address for channel signer type %d", bc.Name, channelSignerType)
+				}
+				if !contractAddressRegex.MatchString(validatorAddress) {
+					return fmt.Errorf("invalid signature validator address '%s' for channel signer type %d on blockchain '%s'", validatorAddress, channelSignerType, bc.Name)
+				}
+			}
 		}
 	}
 

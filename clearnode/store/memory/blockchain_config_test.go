@@ -19,10 +19,11 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:                1,
-						Name:              "ethereum",
-						ChannelHubAddress: "0x1111111111111111111111111111111111111111",
-						BlockStep:         10,
+						ID:                      1,
+						Name:                    "ethereum",
+						ChannelHubAddress:       "0x1111111111111111111111111111111111111111",
+						BlockStep:               10,
+						ChannelHubSigValidators: map[uint8]string{1: "0x3333333333333333333333333333333333333333"},
 					},
 					{
 						ID:                     11155111,
@@ -79,10 +80,11 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:                1,
-						Name:              "ethereum",
-						Disabled:          false,
-						ChannelHubAddress: "0x1111111111111111111111111111111111111111",
+						ID:                      1,
+						Name:                    "ethereum",
+						Disabled:                false,
+						ChannelHubAddress:       "0x1111111111111111111111111111111111111111",
+						ChannelHubSigValidators: map[uint8]string{1: "0x3333333333333333333333333333333333333333"},
 					},
 					{
 						ID:       11155111,

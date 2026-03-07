@@ -90,7 +90,6 @@ func (l *Listener) listenEvents(ctx context.Context) error {
 	ev, err := l.getLatestEvent(l.contractAddress.String(), l.blockchainID)
 	if err != nil {
 		l.logger.Error("failed to get latest processed event", "error", err, "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String())
-		return err
 	}
 	lastBlock := ev.BlockNumber
 	lastIndex := ev.LogIndex
@@ -150,6 +149,7 @@ func (l *Listener) listenEvents(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			l.logger.Info("stopping event listener", "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String())
+			eventSubscription.Unsubscribe()
 			return nil
 		case eventLog := <-historicalCh:
 			l.logger.Debug("received new event", "blockchainID", l.blockchainID, "contractAddress", l.contractAddress.String(), "blockNumber", lastBlock, "logIndex", eventLog.Index)

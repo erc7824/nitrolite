@@ -162,11 +162,11 @@ export default function ActionModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50"
       onClick={phase === 'form' ? onClose : undefined}
     >
       <div
-        className="bg-card border border-border p-6 max-w-md w-full mx-4 animate-scale-in"
+        className="glass-heavy rounded-xl p-6 max-w-md w-full mx-4 animate-scale-in"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

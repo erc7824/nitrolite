@@ -3,7 +3,7 @@ import {
   ArrowDownToLine, ArrowUpFromLine, Send, XCircle,
   Shield, AlertTriangle, CheckCircle2, ArrowRightLeft,
   RefreshCw, Key, Loader2, ChevronDown, ChevronUp,
-  Users, Database, Copy, Check,
+  Users, Database, Copy, Check, Lock, Unlock, AppWindow, Plus,
 } from 'lucide-react';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import type { WalletClient } from 'viem';
@@ -12,7 +12,7 @@ import {
   getChannelSessionKeyAuthMetadataHashV1,
   packChannelKeyStateV1,
 } from '@yellow-org/sdk';
-import type { Client, ChannelSessionKeyStateV1 } from '@yellow-org/sdk';
+import type { Client, ChannelSessionKeyStateV1, ActionAllowance, AppInfoV1 } from '@yellow-org/sdk';
 import type { SessionKeyState, StatusMessage } from '../types';
 import { formatAddress, formatBalance, timeAgo, formatTxType } from '../utils';
 import { Button } from './ui/button';
@@ -53,8 +53,12 @@ interface WalletDashboardProps {
 
 function isAllowanceError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
-  return msg.toLowerCase().includes('allowance') && msg.toLowerCase().includes('sufficient');
+  const lower = msg.toLowerCase();
+  // OpenZeppelin ERC20InsufficientAllowance(address,uint256,uint256) selector
+  if (lower.includes('0xfb8f41b2')) return true;
+  return lower.includes('allowance') && lower.includes('sufficient');
 }
+
 
 const MAX_APPROVE_AMOUNT = new Decimal('1e18');
 
@@ -80,6 +84,12 @@ export default function WalletDashboard({
   const [selectedTx, setSelectedTx] = useState<any>(null);
   const [copied, setCopied] = useState(false);
 
+  // Security token state
+  const [lockedBalance, setLockedBalance] = useState<Decimal | null>(null);
+  const [allowances, setAllowances] = useState<ActionAllowance[]>([]);
+  const [lockingLoading, setLockingLoading] = useState(false);
+  const [lockAmount, setLockAmount] = useState('');
+
   // Advanced section
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [nodeConfig, setNodeConfig] = useState<any>(null);
@@ -90,6 +100,14 @@ export default function WalletDashboard({
   const [keyStates, setKeyStates] = useState<ChannelSessionKeyStateV1[]>([]);
   const [keyStatesLoading, setKeyStatesLoading] = useState(false);
   const [revokingKey, setRevokingKey] = useState<string | null>(null);
+
+  // App Registry
+  const [myApps, setMyApps] = useState<AppInfoV1[]>([]);
+  const [myAppsLoading, setMyAppsLoading] = useState(false);
+  const [registerAppId, setRegisterAppId] = useState('');
+  const [registerAppMetadata, setRegisterAppMetadata] = useState('');
+  const [registerAppNoApproval, setRegisterAppNoApproval] = useState(false);
+  const [registeringApp, setRegisteringApp] = useState(false);
 
 
   // Fetch all wallet data
@@ -102,6 +120,9 @@ export default function WalletDashboard({
         client.getLatestState(address as `0x${string}`, asset, true),
         client.getHomeChannel(address as `0x${string}`, asset),
         client.getTransactions(address as `0x${string}`, { page: 1, pageSize: 10 }),
+        client.getLockedBalance(BigInt(chainId), address),
+        client.getActionAllowances(address as `0x${string}`),
+        !nodeConfig ? client.getConfig() : Promise.resolve(null),
       ]);
 
       if (results[0].status === 'fulfilled') setBalances(results[0].value as any[]);
@@ -111,13 +132,16 @@ export default function WalletDashboard({
       if (results[4].status === 'fulfilled') {
         setTransactions((results[4].value as any).transactions || []);
       }
+      if (results[5].status === 'fulfilled') setLockedBalance(results[5].value as Decimal);
+      if (results[6].status === 'fulfilled') setAllowances(results[6].value as ActionAllowance[]);
+      if (results[7].status === 'fulfilled' && results[7].value) setNodeConfig(results[7].value);
     } catch (e) {
       console.error('Fetch error:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [client, address, asset]);
+  }, [client, address, asset, chainId]);
 
   // Initial fetch + polling
   useEffect(() => {
@@ -298,6 +322,77 @@ export default function WalletDashboard({
     }
   };
 
+  // --- Security token handlers ---
+
+  const GATED_ACTION_LABELS: Record<string, string> = {
+    transfer: 'Transfers',
+    app_session_creation: 'App Session Creations',
+    app_session_operation: 'App Session Updates',
+    app_session_deposit: 'App Session Deposits',
+    app_session_withdrawal: 'App Session Withdrawals',
+  };
+
+  const handleLockTokens = async () => {
+    if (!lockAmount || lockingLoading) return;
+    try {
+      setLockingLoading(true);
+      const amount = new Decimal(lockAmount);
+      try {
+        await client.escrowSecurityTokens(address, BigInt(chainId), amount);
+      } catch (error) {
+        if (!isAllowanceError(error)) throw error;
+        await client.approveSecurityToken(BigInt(chainId), MAX_APPROVE_AMOUNT);
+        await client.escrowSecurityTokens(address, BigInt(chainId), amount);
+      }
+      showStatus('success', 'Tokens locked successfully');
+      setLockAmount('');
+      await fetchData();
+    } catch (error) {
+      showStatus('error', 'Lock failed', error instanceof Error ? error.message : String(error));
+    } finally {
+      setLockingLoading(false);
+    }
+  };
+
+  const handleInitiateUnlock = async () => {
+    try {
+      setLockingLoading(true);
+      await client.initiateSecurityTokensWithdrawal(BigInt(chainId));
+      showStatus('success', 'Unlock initiated', 'Tokens will be available for withdrawal after the unlock period');
+      await fetchData();
+    } catch (error) {
+      showStatus('error', 'Unlock initiation failed', error instanceof Error ? error.message : String(error));
+    } finally {
+      setLockingLoading(false);
+    }
+  };
+
+  const handleCancelUnlock = async () => {
+    try {
+      setLockingLoading(true);
+      await client.cancelSecurityTokensWithdrawal(BigInt(chainId));
+      showStatus('success', 'Unlock cancelled, tokens re-locked');
+      await fetchData();
+    } catch (error) {
+      showStatus('error', 'Cancel unlock failed', error instanceof Error ? error.message : String(error));
+    } finally {
+      setLockingLoading(false);
+    }
+  };
+
+  const handleWithdrawTokens = async () => {
+    try {
+      setLockingLoading(true);
+      await client.withdrawSecurityTokens(BigInt(chainId), address);
+      showStatus('success', 'Tokens withdrawn successfully');
+      await fetchData();
+    } catch (error) {
+      showStatus('error', 'Withdraw failed', error instanceof Error ? error.message : String(error));
+    } finally {
+      setLockingLoading(false);
+    }
+  };
+
   // --- Advanced section handlers ---
 
   const fetchNodeConfig = async () => {
@@ -344,6 +439,35 @@ export default function WalletDashboard({
     }
   };
 
+  const fetchMyApps = async () => {
+    try {
+      setMyAppsLoading(true);
+      const { apps } = await client.getApps({ ownerWallet: address });
+      setMyApps(apps);
+    } catch {
+      setMyApps([]);
+    } finally {
+      setMyAppsLoading(false);
+    }
+  };
+
+  const handleRegisterApp = async () => {
+    if (!registerAppId || registeringApp) return;
+    try {
+      setRegisteringApp(true);
+      await client.registerApp(registerAppId, registerAppMetadata, registerAppNoApproval);
+      showStatus('success', 'App registered', `App ID: ${registerAppId}`);
+      setRegisterAppId('');
+      setRegisterAppMetadata('');
+      setRegisterAppNoApproval(false);
+      await fetchMyApps();
+    } catch (error) {
+      showStatus('error', 'Registration failed', error instanceof Error ? error.message : String(error));
+    } finally {
+      setRegisteringApp(false);
+    }
+  };
+
   const handleRevokeKey = async (ks: ChannelSessionKeyStateV1) => {
     if (!walletClient.account) return;
     const revokeId = `${ks.session_key}-${ks.version}`;
@@ -383,6 +507,7 @@ export default function WalletDashboard({
       if (!nodeConfig) fetchNodeConfig();
       fetchAppSessions();
       fetchKeyStates();
+      fetchMyApps();
     }
   }, [showAdvanced]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -430,7 +555,7 @@ export default function WalletDashboard({
     <div className="space-y-4 animate-fade-in">
       {/* Acknowledge banner */}
       {needsAcknowledge && (
-        <div className="bg-accent/10 border border-accent/30 px-4 py-3 flex items-center justify-between">
+        <div className="bg-accent/10 border border-accent/30 px-4 py-3 flex items-center justify-between rounded-xl">
           <div className="flex items-center gap-2 text-xs">
             <AlertTriangle className="h-3.5 w-3.5 text-accent flex-shrink-0" />
             <span>New state v{latestState?.version?.toString()} needs acknowledgement</span>
@@ -448,34 +573,26 @@ export default function WalletDashboard({
         </div>
       )}
 
-      {/* Top row: Balance + Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Balance Card */}
-        <div className="lg:col-span-3 bg-card border border-border p-6 transition-colors duration-200">
-          {/* Asset tabs */}
-          <div className="flex gap-1.5 mb-5">
-            {assets.map(a => (
-              <button
-                key={a}
-                onClick={() => onAssetChange(a)}
-                className={`px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all ${
-                  a === asset
-                    ? 'bg-accent text-accent-foreground'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {a}
-              </button>
-            ))}
-          </div>
-
-          {/* Balance display */}
-          <div className="mb-5">
-            <div className="text-3xl lg:text-4xl font-semibold tracking-tight tabular-nums">
-              {formatBalance(currentBalance?.balance)}
-            </div>
-            <div className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
-              {asset.toUpperCase()} Balance
+      {/* Hero: Balance + Actions + Security Token */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Channel Balance Card — spans 2 cols */}
+        <div className="lg:col-span-2 glass glass-hover rounded-xl p-6 transition-colors duration-200 flex flex-col">
+          {/* Top: asset tabs + address */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex gap-1.5">
+              {assets.map(a => (
+                <button
+                  key={a}
+                  onClick={() => onAssetChange(a)}
+                  className={`px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all rounded-lg ${
+                    a === asset
+                      ? 'bg-accent text-accent-foreground'
+                      : 'glass-input text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {a}
+                </button>
+              ))}
             </div>
             <button
               onClick={() => {
@@ -484,15 +601,57 @@ export default function WalletDashboard({
                 setTimeout(() => setCopied(false), 2000);
               }}
               title={address}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2 font-mono"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors font-mono"
             >
               {formatAddress(address)}
               {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
             </button>
           </div>
 
+          {/* Balance display */}
+          <div className="mb-6">
+            <div className="text-4xl lg:text-5xl font-semibold tracking-tight tabular-nums">
+              {formatBalance(currentBalance?.balance)}
+            </div>
+            <div className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
+              {asset.toUpperCase()} Balance
+            </div>
+          </div>
+
+          {/* Action buttons — grid of tiles */}
+          <div className="grid grid-cols-4 gap-2 mb-5">
+            <button
+              onClick={() => setActiveModal('deposit')}
+              className="group flex flex-col items-center gap-1.5 py-3 rounded-lg glass-input hover:bg-green-500/10 hover:border-green-500/20 transition-all"
+            >
+              <ArrowDownToLine className="h-4 w-4 text-green-400 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">Deposit</span>
+            </button>
+            <button
+              onClick={() => setActiveModal('withdraw')}
+              className="group flex flex-col items-center gap-1.5 py-3 rounded-lg glass-input hover:bg-orange-500/10 hover:border-orange-500/20 transition-all"
+            >
+              <ArrowUpFromLine className="h-4 w-4 text-orange-400 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">Withdraw</span>
+            </button>
+            <button
+              onClick={() => setActiveModal('transfer')}
+              className="group flex flex-col items-center gap-1.5 py-3 rounded-lg glass-input hover:bg-blue-500/10 hover:border-blue-500/20 transition-all"
+            >
+              <Send className="h-4 w-4 text-blue-400 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">Send</span>
+            </button>
+            <button
+              onClick={() => setActiveModal('close')}
+              className="group flex flex-col items-center gap-1.5 py-3 rounded-lg glass-input hover:bg-red-500/10 hover:border-red-500/20 transition-all"
+            >
+              <XCircle className="h-4 w-4 text-red-400 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">Close</span>
+            </button>
+          </div>
+
           {/* Channel sync status */}
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-3 text-xs mt-auto pt-4 border-t border-white/[0.06]">
             {canCheckpoint ? (
               <>
                 <div className="flex items-center gap-1.5 text-yellow-500">
@@ -531,47 +690,81 @@ export default function WalletDashboard({
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="lg:col-span-2 bg-card border border-border p-6 transition-colors duration-200">
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-            Actions
+        {/* Security Token Card */}
+        <div className="glass glass-hover rounded-xl p-6 transition-colors duration-200 flex flex-col">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+            <Lock className="h-3.5 w-3.5" />
+            <span>Security Token</span>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <button
-              onClick={() => setActiveModal('deposit')}
-              className="flex flex-col items-center gap-2.5 p-4 bg-muted hover:bg-muted/70 transition-colors group"
-            >
-              <div className="w-10 h-10 flex items-center justify-center bg-green-500/10 text-green-400 group-hover:bg-green-500/20 transition-colors">
-                <ArrowDownToLine className="h-5 w-5" />
-              </div>
-              <span className="text-xs font-semibold uppercase tracking-wider">Deposit</span>
-            </button>
 
-            <button
-              onClick={() => setActiveModal('withdraw')}
-              className="flex flex-col items-center gap-2.5 p-4 bg-muted hover:bg-muted/70 transition-colors group"
-            >
-              <div className="w-10 h-10 flex items-center justify-center bg-orange-500/10 text-orange-400 group-hover:bg-orange-500/20 transition-colors">
-                <ArrowUpFromLine className="h-5 w-5" />
-              </div>
-              <span className="text-xs font-semibold uppercase tracking-wider">Withdraw</span>
-            </button>
-
-            <button
-              onClick={() => setActiveModal('transfer')}
-              className="flex flex-col items-center gap-2.5 p-4 bg-muted hover:bg-muted/70 transition-colors group"
-            >
-              <div className="w-10 h-10 flex items-center justify-center bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20 transition-colors">
-                <Send className="h-5 w-5" />
-              </div>
-              <span className="text-xs font-semibold uppercase tracking-wider">Send</span>
-            </button>
+          <div className="mb-6">
+            <div className="text-3xl lg:text-4xl font-semibold tracking-tight tabular-nums">
+              {lockedBalance ? lockedBalance.toString() : '0'}
+            </div>
+            <div className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
+              YELLOW Locked
+            </div>
           </div>
+
+          {/* Lock input */}
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              type="text"
+              value={lockAmount}
+              onChange={(e) => setLockAmount(e.target.value)}
+              placeholder="Amount"
+              className="h-9 flex-1 px-3 text-xs glass-input rounded-lg font-mono focus:outline-none focus:border-accent"
+            />
+            <Button
+              onClick={handleLockTokens}
+              disabled={lockingLoading || !lockAmount}
+              size="sm"
+              className="h-9 text-xs gap-1.5"
+            >
+              {lockingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Lock className="h-3 w-3" />}
+              Lock
+            </Button>
+          </div>
+
+          {/* Unlock controls — only when there's a balance */}
+          {lockedBalance && !lockedBalance.isZero() && (
+            <div className="grid grid-cols-3 gap-2 mt-auto">
+              <Button
+                onClick={handleInitiateUnlock}
+                disabled={lockingLoading}
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1"
+              >
+                <Unlock className="h-3 w-3" />
+                Unlock
+              </Button>
+              <Button
+                onClick={handleCancelUnlock}
+                disabled={lockingLoading}
+                variant="outline"
+                size="sm"
+                className="h-8 text-[11px]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleWithdrawTokens}
+                disabled={lockingLoading}
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1"
+              >
+                <ArrowUpFromLine className="h-3 w-3" />
+                Claim
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Activity Feed */}
-      <div className="bg-card border border-border p-6 transition-colors duration-200">
+      <div className="glass glass-hover rounded-xl p-6 transition-colors duration-200">
         <div className="flex items-center justify-between mb-4">
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Recent Activity
@@ -597,7 +790,7 @@ export default function WalletDashboard({
                 <div
                   key={tx.id || idx}
                   onClick={() => setSelectedTx(tx)}
-                  className="flex items-center gap-3 py-2.5 px-2 border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                  className="flex items-center gap-3 py-2.5 px-2 border-b border-border/40 last:border-0 hover:bg-white/[0.03] transition-colors cursor-pointer rounded-lg"
                 >
                   <div className={`w-8 h-8 flex items-center justify-center flex-shrink-0 ${color}`}>
                     <Icon className="h-4 w-4" />
@@ -626,7 +819,7 @@ export default function WalletDashboard({
       </div>
 
       {/* Auto Sign (Session Key) */}
-      <div className="bg-card border border-border px-6 py-4 transition-colors duration-200">
+      <div className="glass glass-hover rounded-xl px-6 py-4 transition-colors duration-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Key className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -676,11 +869,50 @@ export default function WalletDashboard({
         </div>
       </div>
 
+      {/* Action Allowances */}
+      {allowances.length > 0 && (
+        <div className="glass glass-hover rounded-xl px-6 py-4 transition-colors duration-200">
+          <div className="mb-3">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <Shield className="h-3.5 w-3.5" />
+              <span>Action Allowances</span>
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Allowances increase as you lock more security tokens
+            </div>
+          </div>
+          <div className="space-y-2">
+            {allowances.map((a) => {
+              const used = Number(a.used);
+              const total = Number(a.allowance);
+              const pct = total > 0 ? Math.min((used / total) * 100, 100) : 0;
+              return (
+                <div key={a.gatedAction} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span>{GATED_ACTION_LABELS[a.gatedAction] || a.gatedAction}</span>
+                    <span className="font-mono text-muted-foreground">
+                      {used}/{total}
+                      <span className="ml-1.5 text-[10px]">({a.timeWindow})</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-muted overflow-hidden rounded-full">
+                    <div
+                      className={`h-full transition-all rounded-full ${pct >= 90 ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.4)]' : pct >= 60 ? 'bg-yellow-500 shadow-[0_0_6px_rgba(234,179,8,0.4)]' : 'bg-accent shadow-[0_0_6px_rgba(234,179,8,0.3)]'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Advanced Section Toggle */}
-      <div className="bg-card border border-border transition-colors duration-200">
+      <div className="glass rounded-xl transition-colors duration-200">
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="w-full px-6 py-3 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+          className="w-full px-6 py-3 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors rounded-xl"
         >
           <span>Advanced</span>
           {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -759,6 +991,100 @@ export default function WalletDashboard({
                           ))}
                         </div>
                       )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* App Registry */}
+            <div>
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                <AppWindow className="h-3.5 w-3.5" />
+                <span>My Apps</span>
+                <button
+                  onClick={fetchMyApps}
+                  disabled={myAppsLoading}
+                  className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <RefreshCw className={`h-3 w-3 ${myAppsLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+
+              {/* Register new app form */}
+              <div className="glass-input rounded-lg p-3 mb-3 space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Plus className="h-3 w-3" />
+                  Register New App
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={registerAppId}
+                    onChange={(e) => setRegisterAppId(e.target.value)}
+                    placeholder="app-id (lowercase, hyphens)"
+                    className="h-8 flex-1 px-2.5 text-xs glass-input rounded-lg font-mono focus:outline-none focus:border-accent"
+                  />
+                  <input
+                    type="text"
+                    value={registerAppMetadata}
+                    onChange={(e) => setRegisterAppMetadata(e.target.value)}
+                    placeholder="Metadata (optional)"
+                    className="h-8 flex-1 px-2.5 text-xs glass-input rounded-lg focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={registerAppNoApproval}
+                      onChange={(e) => setRegisterAppNoApproval(e.target.checked)}
+                      className="accent-accent"
+                    />
+                    <span className="text-xs text-muted-foreground">No approval required for session creation</span>
+                  </label>
+                  <Button
+                    onClick={handleRegisterApp}
+                    disabled={registeringApp || !registerAppId}
+                    size="sm"
+                    className="h-7 text-xs gap-1.5"
+                  >
+                    {registeringApp ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                    Register
+                  </Button>
+                </div>
+              </div>
+
+              {/* Apps list */}
+              {myAppsLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground py-4">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Loading apps...</span>
+                </div>
+              ) : myApps.length === 0 ? (
+                <div className="text-xs text-muted-foreground bg-muted p-4 text-center">
+                  No registered apps
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[240px] overflow-y-auto scrollbar-thin">
+                  {myApps.map((app) => (
+                    <div key={app.id} className="bg-muted p-3 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono font-medium">{app.id}</span>
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">v{app.version}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>
+                          Approval: {app.creation_approval_not_required
+                            ? <span className="text-green-400">Not required</span>
+                            : <span className="text-yellow-500">Required</span>
+                          }
+                        </span>
+                        {app.metadata && <span className="truncate max-w-[200px]" title={app.metadata}>Meta: {app.metadata}</span>}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Created {new Date(Number(app.created_at) * 1000).toLocaleString()}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -870,11 +1196,11 @@ export default function WalletDashboard({
         const { label, isIncoming } = getTxDisplay(selectedTx);
         return (
           <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50"
             onClick={() => setSelectedTx(null)}
           >
             <div
-              className="bg-card border border-border p-6 max-w-md w-full mx-4 animate-scale-in"
+              className="glass-heavy rounded-xl p-6 max-w-md w-full mx-4 animate-scale-in"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-5">

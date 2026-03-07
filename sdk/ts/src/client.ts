@@ -1363,13 +1363,17 @@ export class Client {
   async createAppSession(
     definition: app.AppDefinitionV1,
     sessionData: string,
-    quorumSigs: string[]
+    quorumSigs: string[],
+    opts?: { ownerSig?: string }
   ): Promise<{ appSessionId: string; version: string; status: string }> {
     const req: API.AppSessionsV1CreateAppSessionRequest = {
       definition: transformAppDefinitionToRPC(definition) as any, // RPC type
       session_data: sessionData,
       quorum_sigs: quorumSigs,
     };
+    if (opts?.ownerSig) {
+      req.owner_sig = opts.ownerSig;
+    }
     const resp = await this.rpcClient.appSessionsV1CreateAppSession(req);
     return {
       appSessionId: resp.app_session_id,
@@ -1583,7 +1587,10 @@ export class Client {
     };
 
     const packed = app.packAppV1(appDef);
-    const ownerSig = await this.stateSigner.signMessage(packed);
+    if (!this.txSigner.signPersonalMessage) {
+      throw new Error('TransactionSigner must implement signPersonalMessage for app registration');
+    }
+    const ownerSig = await this.txSigner.signPersonalMessage(packed);
 
     const req: API.AppsV1SubmitAppVersionRequest = {
       app: appDef,
@@ -1728,7 +1735,7 @@ export class Client {
   /**
    * Create viem public and wallet clients for a specific chain and RPC URL.
    */
-  private createEVMClients(chainId: bigint, rpcUrl: string): { publicClient: blockchain.evm.EVMClient; walletClient: blockchain.evm.WalletSigner } {
+  private createEVMClients(chainId: bigint, rpcUrl: string): { publicClient: blockchain.evm.EVMClient; walletClient: blockchain.evm.WalletSigner | null } {
     const publicClient = createPublicClient({
       transport: http(rpcUrl),
     }) as blockchain.evm.EVMClient;
@@ -1745,7 +1752,7 @@ export class Client {
 
     const isBrowser = typeof window !== 'undefined' && typeof (window as any).ethereum !== 'undefined';
 
-    let walletClient: blockchain.evm.WalletSigner;
+    let walletClient: blockchain.evm.WalletSigner | null = null;
     if (isBrowser) {
       walletClient = createWalletClient({
         chain,
@@ -1754,14 +1761,13 @@ export class Client {
       }) as blockchain.evm.WalletSigner;
     } else {
       const account = this.txSigner.getAccount ? this.txSigner.getAccount() : undefined;
-      if (!account) {
-        throw new Error('Node.js environment requires a TransactionSigner that implements getAccount() (e.g., EthereumRawSigner)');
+      if (account) {
+        walletClient = createWalletClient({
+          chain,
+          transport: http(rpcUrl),
+          account,
+        }) as blockchain.evm.WalletSigner;
       }
-      walletClient = createWalletClient({
-        chain,
-        transport: http(rpcUrl),
-        account,
-      }) as blockchain.evm.WalletSigner;
     }
 
     return { publicClient, walletClient };
@@ -1783,6 +1789,10 @@ export class Client {
     }
 
     const { publicClient, walletClient } = this.createEVMClients(chainId, rpcUrl);
+
+    if (!walletClient) {
+      throw new Error('Node.js environment requires a TransactionSigner that implements getAccount() (e.g., EthereumRawSigner)');
+    }
 
     const blockchainClient = new blockchain.evm.Client(
       blockchainInfo.channelHubAddress,
@@ -1816,7 +1826,7 @@ export class Client {
     const lockingClient = new blockchain.evm.LockingClient(
       blockchainInfo.lockingContractAddress,
       publicClient,
-      walletClient,
+      walletClient || undefined,
     );
 
     this.blockchainLockingClients.set(chainId, lockingClient);

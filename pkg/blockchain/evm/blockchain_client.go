@@ -2,7 +2,9 @@ package evm
 
 import (
 	"context"
+	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -20,6 +22,7 @@ type BlockchainClient struct {
 	BaseClient
 	contract                  *ChannelHub
 	transactOpts              *bind.TransactOpts
+	txSigner                  sign.Signer
 	nodeAddress               common.Address
 	channelHubContractAddress common.Address
 	assetStore                AssetStore
@@ -53,6 +56,7 @@ func NewBlockchainClient(
 		},
 		contract:                  contract,
 		transactOpts:              signerTxOpts(txSigner, blockchainID),
+		txSigner:                  txSigner,
 		nodeAddress:               common.HexToAddress(nodeAddress),
 		channelHubContractAddress: contractAddress,
 		assetStore:                assetStore,
@@ -737,4 +741,51 @@ func (c *BlockchainClient) FinalizeEscrowWithdrawal(candidate core.State) (strin
 	}
 
 	return tx.Hash().Hex(), nil
+}
+
+func (c *BlockchainClient) EnsureSigValidatorRegistered(validatorID uint8, validatorAddress string, checkOnly bool) error {
+	validatorAddr := common.HexToAddress(validatorAddress)
+
+	_validatorAddr, err := c.contract.GetNodeValidator(nil, c.nodeAddress, validatorID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to check if validator %d is registered", validatorID)
+	}
+	if _validatorAddr.Hex() == validatorAddr.Hex() {
+		return nil
+	} else if _validatorAddr != (common.Address{}) {
+		return errors.Errorf("validator ID %d is already registered with a different address %s", validatorID, _validatorAddr.Hex())
+	}
+
+	if checkOnly {
+		return errors.Errorf("validator ID %d with address %s is not registered; run 'clearnode operator register-validator' to register", validatorID, validatorAddress)
+	}
+
+	if err := c.checkFeeFn(context.Background(), c.transactOpts.From); err != nil {
+		return err
+	}
+
+	uint8Type, _ := abi.NewType("uint8", "", nil)
+	addressType, _ := abi.NewType("address", "", nil)
+	uint256Type, _ := abi.NewType("uint256", "", nil)
+	args := abi.Arguments{
+		{Type: uint8Type},
+		{Type: addressType},
+		{Type: uint256Type},
+	}
+	message, err := args.Pack(validatorID, validatorAddr, new(big.Int).SetUint64(c.blockchainID))
+	if err != nil {
+		return errors.Wrap(err, "failed to encode validator registration message")
+	}
+
+	sig, err := c.txSigner.Sign(sign.ComputeEthereumSignedMessageHash(message))
+	if err != nil {
+		return errors.Wrap(err, "failed to sign validator registration message")
+	}
+
+	_, err = c.contract.RegisterNodeValidator(c.transactOpts, c.nodeAddress, validatorID, validatorAddr, sig)
+	if err != nil {
+		return errors.Wrapf(err, "failed to register validator %d with address %s", validatorID, validatorAddress)
+	}
+
+	return nil
 }

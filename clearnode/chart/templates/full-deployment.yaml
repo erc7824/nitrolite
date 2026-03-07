@@ -4,6 +4,7 @@ metadata:
   name: {{ include "clearnode.common.fullname" . }}
   labels:
     {{- include "clearnode.common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
 spec:
   {{- include "clearnode.component.replicaCount" . | nindent 2 }}
   strategy:

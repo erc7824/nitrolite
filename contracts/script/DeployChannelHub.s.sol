@@ -43,10 +43,11 @@ contract DeployChannelHub is Script {
 
         // ----------------------------------------------------------------
         // Predict addresses for informational logging.
-        // Foundry auto-deploys unlinked libraries in the order they appear
-        // in the dependency graph before broadcasting the script's own txs.
-        // The exact deployment order follows the nonce sequence starting at
-        // the deployer's current nonce.
+        // NOTE: Unlinked libraries (ChannelEngine, EscrowDepositEngine,
+        // EscrowWithdrawalEngine) are deployed by Foundry via the CREATE2
+        // deployer (0x4e59b44847b379578588920ca78fbf26c0b4956c) and do NOT
+        // consume the deployer's CREATE nonce.  Their exact addresses appear
+        // in the broadcast JSON after the run.
         // ----------------------------------------------------------------
         uint64 nonce = vm.getNonce(deployer);
 
@@ -58,11 +59,10 @@ contract DeployChannelHub is Script {
             console.log("DefaultValidator:  ", defaultValidatorAddr);
         }
 
-        // Library deployment slots (auto-managed by Foundry)
-        console.log("ChannelEngine:     ", vm.computeCreateAddress(deployer, nonce));
-        console.log("EscrowDepositEng:  ", vm.computeCreateAddress(deployer, nonce + 1));
-        console.log("EscrowWithdrawEng: ", vm.computeCreateAddress(deployer, nonce + 2));
-        console.log("ChannelHub:        ", vm.computeCreateAddress(deployer, nonce + 3));
+        // Libraries are deployed via the CREATE2 deployer; they do not affect
+        // the deployer's nonce sequence, so ChannelHub lands at nonce `nonce`.
+        console.log("ChannelEngine/EscrowDepositEng/EscrowWithdrawEng: deployed via CREATE2 deployer (see broadcast JSON)");
+        console.log("ChannelHub:        ", vm.computeCreateAddress(deployer, nonce));
 
         vm.startBroadcast();
 
@@ -77,6 +77,10 @@ contract DeployChannelHub is Script {
         //    Foundry detects unlinked library references (ChannelEngine,
         //    EscrowDepositEngine, EscrowWithdrawalEngine) and inserts their
         //    deployment transactions before this one in the broadcast batch.
+        require(
+            defaultValidatorAddr.code.length > 0,
+            "DeployChannelHub: DEFAULT_VALIDATOR_ADDR has no code - must be a deployed contract"
+        );
         ChannelHub hub = new ChannelHub(ISignatureValidator(defaultValidatorAddr));
 
         vm.stopBroadcast();

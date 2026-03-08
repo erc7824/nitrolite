@@ -55,8 +55,8 @@ service:
     enabled: true
     # -- HTTP service port
     port: 7824
-    # -- HTTP service path
-    path: /
+    # -- HTTP service path (used by ingress)
+    path: /ws
 
 metrics:
   # -- Enable Prometheus metrics
@@ -151,6 +151,18 @@ affinity: {}
 
 # -- Additional labels to add to all resources
 extraLabels: {}
+
+debug:
+  # -- Enable debug deployment (idle container for exec debugging)
+  enabled: false
+  # -- Resource requests for debug container
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
 
 stressTest:
   # -- Enable stress test pods (helm test)

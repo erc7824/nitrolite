@@ -26,6 +26,7 @@ nginx.ingress.kubernetes.io/ssl-redirect: "true"
 {{- if .Values.networking.ingress.grpc }}
 nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
 {{- end }}
+nginx.ingress.kubernetes.io/rewrite-target: /ws
 {{- with .Values.networking.ingress.annotations }}
 {{ toYaml . }}
 {{- end }}

@@ -86,12 +86,16 @@ const assets   = await client.getAssetsList();
 
 ### 4. Transfer off-chain
 
-`transfer()` accepts raw-unit string amounts (smallest denomination). The compat layer divides by token decimals internally before delegating to the v1 SDK:
+The compat `transfer(destination, allocations)` preserves the v0.5.3-style array-of-allocations signature. Each `TransferAllocation.amount` is a **raw-unit string** (smallest denomination). The compat layer divides by token decimals before delegating to the v1 SDK's `transfer(wallet, asset, Decimal)`:
 
 ```typescript
+// 5 USDC = 5_000_000 raw units (6 decimals)
 await client.transfer(recipientAddress, [
-  { asset: 'usdc', amount: '5000000' },  // 5 USDC in raw units (6 decimals)
+  { asset: 'usdc', amount: '5000000' },
 ]);
+
+// For direct SDK access with human-readable Decimal:
+// await client.innerClient.transfer('0xRecip...', 'usdc', new Decimal(5));
 ```
 
 ### 5. Close & clean up
@@ -363,12 +367,14 @@ await client.withdrawSecurityTokens(chainId, destinationWallet);
 
 ### Amount conventions
 
-| Method group | Amount type | Example for 100 tokens (18 decimals) |
+All compat methods accept **raw amounts** (smallest token unit). The compat layer converts to human-readable `Decimal` internally before delegating to the v1 SDK (which uses `Decimal` throughout).
+
+| Method group | Input type | Example: 100 tokens (18 decimals) |
 |---|---|---|
 | `deposit`, `withdrawal`, `lockSecurityTokens`, `approveSecurityToken`, `getLockedBalance` | Raw `bigint` | `100_000_000_000_000_000_000n` |
-| `transfer` | Raw string in `TransferAllocation.amount` | `'100000000000000000000'` |
+| `transfer` | Raw string via `TransferAllocation.amount` | `'100000000000000000000'` |
 
-The compat layer converts raw amounts to human-readable `Decimal` values internally before passing to the v1 SDK.
+> For direct access to the v1 SDK's human-readable `Decimal` API, use `client.innerClient`.
 
 ## RPC Stubs
 

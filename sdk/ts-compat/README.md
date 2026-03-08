@@ -86,9 +86,11 @@ const assets   = await client.getAssetsList();
 
 ### 4. Transfer off-chain
 
+`transfer()` accepts human-readable string amounts (the compat layer scales by token decimals internally):
+
 ```typescript
 await client.transfer(recipientAddress, [
-  { asset: 'usdc', amount: '5.0' },
+  { asset: 'usdc', amount: '5000000' },  // 5 USDC in raw units (6 decimals)
 ]);
 ```
 
@@ -135,7 +137,7 @@ await client.close();
 
 | Method | Description |
 |---|---|
-| `createAppSession(definition, allocations, quorumSigs?)` | Create an app session (optionally with quorum signatures) |
+| `createAppSession(definition, allocations, quorumSigs?, opts?)` | Create an app session (optionally with quorum signatures and `ownerSig`) |
 | `closeAppSession(appSessionId, allocations, quorumSigs?)` | Close an app session (optionally with quorum signatures) |
 | `submitAppState(params)` | Submit state update (operate/deposit/withdraw/close) with optional `quorum_sigs` |
 | `getAppDefinition(appSessionId)` | Get the definition for a session |
@@ -358,7 +360,14 @@ await client.cancelSecurityTokensWithdrawal(chainId);
 await client.withdrawSecurityTokens(chainId, destinationWallet);
 ```
 
-All amounts use raw `bigint` units (consistent with `deposit()` and `withdrawal()`). The compat layer converts to human-readable `Decimal` values internally.
+### Amount conventions
+
+| Method group | Amount type | Example for 100 tokens (18 decimals) |
+|---|---|---|
+| `deposit`, `withdrawal`, `lockSecurityTokens`, `approveSecurityToken`, `getLockedBalance` | Raw `bigint` | `100_000_000_000_000_000_000n` |
+| `transfer` | Raw string in `TransferAllocation.amount` | `'100000000000000000000'` |
+
+The compat layer converts raw amounts to human-readable `Decimal` values internally before passing to the v1 SDK.
 
 ## RPC Stubs
 

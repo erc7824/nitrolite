@@ -206,6 +206,7 @@ export interface CreateAppSessionRequestParams {
     allocations: RPCAppSessionAllocation[];
     session_data?: string;
     quorum_sigs?: string[];
+    owner_sig?: string;
 }
 
 export interface SubmitAppStateRequestParamsV02 {

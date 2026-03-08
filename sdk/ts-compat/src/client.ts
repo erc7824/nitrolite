@@ -16,7 +16,7 @@ import type {
 } from '@yellow-org/sdk';
 import type * as core from '@yellow-org/sdk';
 import Decimal from 'decimal.js';
-import { Address, Hex, WalletClient, formatUnits, parseUnits } from 'viem';
+import { Address, Hex, WalletClient, createPublicClient, http, formatUnits, parseUnits } from 'viem';
 
 import type {
     RPCBalance,
@@ -140,11 +140,13 @@ export class NitroliteClient {
     private _lastAppSessionsListErrorLogged: string | null = null;
     private _blockchains: core.Blockchain[] | null = null;
     private _lockingTokenDecimals = new Map<number, number>();
+    private _blockchainRPCs: Record<number, string>;
 
-    private constructor(client: Client, userAddress: Address, chainId: number) {
+    private constructor(client: Client, userAddress: Address, chainId: number, blockchainRPCs?: Record<number, string>) {
         this.innerClient = client;
         this.userAddress = userAddress;
         this._chainId = BigInt(chainId);
+        this._blockchainRPCs = blockchainRPCs ?? {};
     }
 
     // -----------------------------------------------------------------------
@@ -183,7 +185,7 @@ export class NitroliteClient {
 
         const v1Client = await Client.create(config.wsURL, stateSigner, txSigner, ...opts);
 
-        const compat = new NitroliteClient(v1Client, walletAddress, config.chainId);
+        const compat = new NitroliteClient(v1Client, walletAddress, config.chainId, config.blockchainRPCs);
 
         try {
             await compat.refreshAssets();
@@ -687,6 +689,7 @@ export class NitroliteClient {
         definitionOrParams: RPCAppDefinition | CreateAppSessionRequestParams,
         allocations?: RPCAppSessionAllocation[],
         quorumSigs?: string[],
+        opts?: { ownerSig?: string },
     ): Promise<{ appSessionId: string; version: string; status: string }> {
         const def = 'definition' in definitionOrParams ? definitionOrParams.definition : definitionOrParams;
         const allocs = 'definition' in definitionOrParams ? definitionOrParams.allocations : (allocations ?? []);
@@ -696,6 +699,9 @@ export class NitroliteClient {
         const sessionData = 'definition' in definitionOrParams
             ? (definitionOrParams.session_data ?? JSON.stringify({ allocations: allocs }))
             : JSON.stringify({ allocations: allocs });
+        const ownerSig = 'definition' in definitionOrParams
+            ? (definitionOrParams.owner_sig ?? opts?.ownerSig)
+            : opts?.ownerSig;
 
         const v1Def: AppDefinitionV1 = {
             applicationId: def.application ?? (def as any).protocol ?? '',
@@ -707,7 +713,8 @@ export class NitroliteClient {
             nonce: BigInt(def.nonce ?? Date.now()),
         };
 
-        const result = await this.innerClient.createAppSession(v1Def, sessionData, quorumSignatures);
+        const v1Opts = ownerSig ? { ownerSig } : undefined;
+        const result = await this.innerClient.createAppSession(v1Def, sessionData, quorumSignatures, v1Opts);
         return { appSessionId: result.appSessionId, version: result.version, status: result.status };
     }
 
@@ -1066,31 +1073,47 @@ export class NitroliteClient {
         return BigInt(balance.mul(new Decimal(10).pow(decimals)).toFixed(0));
     }
 
+    private static readonly LOCKING_ASSET_ABI = [
+        { type: 'function', name: 'asset', inputs: [], outputs: [{ type: 'address' }], stateMutability: 'view' },
+    ] as const;
+
+    private static readonly ERC20_DECIMALS_ABI = [
+        { type: 'function', name: 'decimals', inputs: [], outputs: [{ type: 'uint8' }], stateMutability: 'view' },
+    ] as const;
+
     private async getLockingTokenDecimals(chainId: number): Promise<number> {
         const cached = this._lockingTokenDecimals.get(chainId);
         if (cached !== undefined) return cached;
 
-        try {
-            const blockchains = await this.ensureBlockchains();
-            const chain = blockchains.find((b) => b.id === BigInt(chainId));
-            if (chain?.lockingContractAddress) {
-                await this.ensureAssets();
-                for (const [, info] of this.assetsByToken) {
-                    if (info.chainId === BigInt(chainId)) {
-                        this._lockingTokenDecimals.set(chainId, info.decimals);
-                        return info.decimals;
-                    }
-                }
-                console.warn(
-                    `[compat] Could not resolve token decimals for locking contract ${chain.lockingContractAddress} on chain ${chainId}; defaulting to 6 (USDC). ` +
-                    'If the locked token uses different decimals, amounts will be incorrect.',
-                );
-            }
-        } catch {
-            console.warn(`[compat] Failed to fetch blockchain info for chain ${chainId}; defaulting locking token decimals to 6`);
+        const blockchains = await this.ensureBlockchains();
+        const chain = blockchains.find((b) => b.id === BigInt(chainId));
+        if (!chain?.lockingContractAddress) {
+            throw new Error(`No locking contract configured for chain ${chainId}`);
         }
 
-        this._lockingTokenDecimals.set(chainId, 6);
-        return 6;
+        const rpcUrl = this._blockchainRPCs[chainId];
+        if (!rpcUrl) {
+            throw new Error(
+                `No RPC URL configured for chain ${chainId}. ` +
+                'Pass blockchainRPCs in NitroliteClientConfig to use locking methods.',
+            );
+        }
+
+        const publicClient = createPublicClient({ transport: http(rpcUrl) });
+
+        const tokenAddress = await publicClient.readContract({
+            address: chain.lockingContractAddress,
+            abi: NitroliteClient.LOCKING_ASSET_ABI,
+            functionName: 'asset',
+        }) as Address;
+
+        const decimals = await publicClient.readContract({
+            address: tokenAddress,
+            abi: NitroliteClient.ERC20_DECIMALS_ABI,
+            functionName: 'decimals',
+        }) as number;
+
+        this._lockingTokenDecimals.set(chainId, decimals);
+        return decimals;
     }
 }

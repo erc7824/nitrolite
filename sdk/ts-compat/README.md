@@ -86,10 +86,16 @@ const assets   = await client.getAssetsList();
 
 ### 4. Transfer off-chain
 
+The compat `transfer(destination, allocations)` preserves the v0.5.3-style array-of-allocations signature. Each `TransferAllocation.amount` is a **raw-unit string** (smallest denomination). The compat layer divides by token decimals before delegating to the v1 SDK's `transfer(wallet, asset, Decimal)`:
+
 ```typescript
+// 5 USDC = 5_000_000 raw units (6 decimals)
 await client.transfer(recipientAddress, [
-  { asset: 'usdc', amount: '5.0' },
+  { asset: 'usdc', amount: '5000000' },
 ]);
+
+// For direct SDK access with human-readable Decimal:
+// await client.innerClient.transfer('0xRecip...', 'usdc', new Decimal(5));
 ```
 
 ### 5. Close & clean up
@@ -111,6 +117,8 @@ await client.close();
 | `closeChannel()` | Close all open channels |
 | `resizeChannel({ allocate_amount, token })` | Resize an existing channel |
 | `challengeChannel({ state })` | Challenge a channel on-chain |
+| `acknowledge(tokenAddress)` | Acknowledge a pending state or create a channel |
+| `checkTokenAllowance(chainId, tokenAddress)` | Check ERC-20 allowance for the ChannelHub |
 
 ### Queries
 
@@ -123,6 +131,9 @@ await client.close();
 | `getAssetsList()` | List supported assets |
 | `getAccountInfo()` | Aggregate balance + channel count |
 | `getConfig()` | Node configuration |
+| `getBlockchains()` | List supported blockchains |
+| `getActionAllowances(wallet?)` | Get gated action allowances for a wallet |
+| `getEscrowChannel(escrowChannelId)` | Query an escrow channel by ID |
 | `getChannelData(channelId)` | Full channel + state for a specific channel |
 | `getLastAppSessionsListError()` | Last `getAppSessionsList()` error message (if any) |
 
@@ -130,10 +141,17 @@ await client.close();
 
 | Method | Description |
 |---|---|
-| `createAppSession(definition, allocations, quorumSigs?)` | Create an app session (optionally with quorum signatures) |
-| `closeAppSession(appSessionId, allocations, quorumSigs?)` | Close an app session (optionally with quorum signatures) |
-| `submitAppState(params)` | Submit state update (operate/deposit/withdraw/close) with optional `quorum_sigs` |
+| `createAppSession(definition, allocations, quorumSigs, opts?)` | Create an app session with quorum signatures (optional `ownerSig` via opts) |
+| `closeAppSession(appSessionId, allocations, quorumSigs)` | Close an app session with quorum signatures |
+| `submitAppState(params)` | Submit state update (operate/deposit/withdraw/close) |
 | `getAppDefinition(appSessionId)` | Get the definition for a session |
+
+### App Registry
+
+| Method | Description |
+|---|---|
+| `getApps(options?)` | List registered applications (filter by appId, owner, pagination) |
+| `registerApp(appID, metadata, creationApprovalNotRequired)` | Register a new application |
 
 ### App Session Signing Helpers
 
@@ -173,12 +191,24 @@ await client.close();
 | `parseAmount(tokenAddress, humanAmount)` | Convert human-readable string → raw bigint |
 | `findOpenChannel(tokenAddress, chainId?)` | Find an open channel for a given token |
 
+### Security Token Locking
+
+| Method | Description |
+|---|---|
+| `lockSecurityTokens(targetWallet, chainId, amount)` | Lock tokens into the Locking contract for a target address |
+| `initiateSecurityTokensWithdrawal(chainId)` | Start the unlock process for locked tokens |
+| `cancelSecurityTokensWithdrawal(chainId)` | Re-lock tokens, cancelling a pending unlock |
+| `withdrawSecurityTokens(chainId, destination)` | Withdraw unlocked tokens to a destination address |
+| `approveSecurityToken(chainId, amount)` | Approve the Locking contract to spend tokens |
+| `getLockedBalance(chainId, wallet?)` | Query locked balance (returns raw bigint) |
+
 ### Lifecycle
 
 | Method | Description |
 |---|---|
 | `ping()` | Health check |
 | `close()` | Close the WebSocket connection |
+| `waitForClose()` | Returns a promise that resolves when the connection is closed |
 | `refreshAssets()` | Re-fetch the asset map from the clearnode |
 
 ### Accessing the v1.0.0 SDK Directly
@@ -253,6 +283,7 @@ The compat layer provides typed error classes for common failure modes:
 | `UserRejectedError` | `USER_REJECTED` | User cancelled in wallet |
 | `InsufficientFundsError` | `INSUFFICIENT_FUNDS` | Not enough balance |
 | `NotInitializedError` | `NOT_INITIALIZED` | Client not connected |
+| `OngoingStateTransitionError` | `ONGOING_STATE_TRANSITION` | Previous action still finalizing |
 
 ### `getUserFacingMessage(error)`
 
@@ -304,6 +335,45 @@ poller.start();
 poller.stop();
 poller.setInterval(10000); // change interval
 ```
+
+## Security Token Locking
+
+Lock tokens into the on-chain Locking contract to provide security deposits. The locking token and its decimals are resolved from the contract at runtime — `blockchainRPCs` must be configured for the target chain or these methods will throw.
+
+```typescript
+const chainId = 11155111; // Sepolia
+// Yellow token on Sepolia has 18 decimals; 100 YELLOW = 100 * 10^18
+const amount = 100_000_000_000_000_000_000n;
+
+// Approve the Locking contract to spend tokens
+await client.approveSecurityToken(chainId, amount);
+
+// Lock tokens for a target address
+await client.lockSecurityTokens(targetWallet, chainId, amount);
+
+// Query locked balance (returns raw bigint in token's smallest unit)
+const locked = await client.getLockedBalance(chainId);
+
+// Initiate unlock (starts the unlock period)
+await client.initiateSecurityTokensWithdrawal(chainId);
+
+// Cancel unlock (re-lock tokens)
+await client.cancelSecurityTokensWithdrawal(chainId);
+
+// After unlock period elapses, withdraw to a destination
+await client.withdrawSecurityTokens(chainId, destinationWallet);
+```
+
+### Amount conventions
+
+The compat layer accepts raw amounts (smallest token unit) and converts to human-readable `Decimal` before delegating to the v1 SDK.
+
+| Method group | Input type | Example: 100 tokens (18 decimals) |
+|---|---|---|
+| `deposit`, `withdrawal`, `lockSecurityTokens`, `approveSecurityToken`, `getLockedBalance` | Raw `bigint` | `100_000_000_000_000_000_000n` |
+| `transfer` | Raw string via `TransferAllocation.amount` | `'100000000000000000000'` |
+
+> For direct access to the v1 SDK's human-readable `Decimal` API, use `client.innerClient`.
 
 ## RPC Stubs
 

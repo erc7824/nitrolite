@@ -7,8 +7,8 @@
         "skipLibCheck": true,
         "strict": true,
         "paths": {
-            "@layer-3/nitrolite": ["../../ts/src/index.ts"],
-            "@layer-3/nitrolite-compat": ["../src/index.ts"]
+            "@yellow-org/sdk": ["../../ts/src/index.ts"],
+            "@yellow-org/sdk-compat": ["../src/index.ts"]
         }
     },
     "include": ["./*.ts"]

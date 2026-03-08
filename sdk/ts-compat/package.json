@@ -1,6 +1,6 @@
 {
     "name": "@yellow-org/sdk-compat",
-    "version": "1.1.1",
+    "version": "1.2.0",
     "description": "Compatibility layer bridging Nitrolite SDK v0.5.3 API to v1.0.0, minimising migration effort for existing dApps.",
     "type": "module",
     "sideEffects": false,
@@ -35,7 +35,7 @@
         "node": ">=20.0.0"
     },
     "peerDependencies": {
-        "@yellow-org/sdk": ">=1.0.0",
+        "@yellow-org/sdk": ">=1.2.0",
         "viem": "^2.0.0"
     },
     "dependencies": {

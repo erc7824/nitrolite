@@ -10,10 +10,12 @@ import type {
     AppParticipantV1,
     AppAllocationV1,
     AppSessionKeyStateV1,
+    AppInfoV1,
     ChannelSessionKeyStateV1,
 } from '@yellow-org/sdk';
+import type * as core from '@yellow-org/sdk';
 import Decimal from 'decimal.js';
-import { Address, Hex, WalletClient, formatUnits, parseUnits } from 'viem';
+import { Address, Hex, WalletClient, createPublicClient, http, formatUnits, parseUnits } from 'viem';
 
 import type {
     RPCBalance,
@@ -42,6 +44,7 @@ import {
     AllowanceError,
     InsufficientFundsError,
     NotInitializedError,
+    OngoingStateTransitionError,
     UserRejectedError,
 } from './errors';
 
@@ -134,11 +137,15 @@ export class NitroliteClient {
     private _lastChannels: LedgerChannel[] = [];
     private _lastAppSessionsListError: string | null = null;
     private _lastAppSessionsListErrorLogged: string | null = null;
+    private _blockchains: core.Blockchain[] | null = null;
+    private _lockingTokenDecimals = new Map<number, number>();
+    private _blockchainRPCs: Record<number, string>;
 
-    private constructor(client: Client, userAddress: Address, chainId: number) {
+    private constructor(client: Client, userAddress: Address, chainId: number, blockchainRPCs?: Record<number, string>) {
         this.innerClient = client;
         this.userAddress = userAddress;
         this._chainId = BigInt(chainId);
+        this._blockchainRPCs = blockchainRPCs ?? {};
     }
 
     // -----------------------------------------------------------------------
@@ -177,7 +184,7 @@ export class NitroliteClient {
 
         const v1Client = await Client.create(config.wsURL, stateSigner, txSigner, ...opts);
 
-        const compat = new NitroliteClient(v1Client, walletAddress, config.chainId);
+        const compat = new NitroliteClient(v1Client, walletAddress, config.chainId, config.blockchainRPCs);
 
         try {
             await compat.refreshAssets();
@@ -306,6 +313,7 @@ export class NitroliteClient {
         if (lower.includes('user rejected') || lower.includes('user denied')) return new UserRejectedError(msg);
         if (lower.includes('insufficient funds') || lower.includes('exceeds balance')) return new InsufficientFundsError(msg);
         if (lower.includes('not initialized') || lower.includes('not connected')) return new NotInitializedError(msg);
+        if (lower.includes('ongoing') || lower.includes('state transition')) return new OngoingStateTransitionError(msg);
         return error instanceof Error ? error : new Error(msg);
     }
 
@@ -680,6 +688,7 @@ export class NitroliteClient {
         definitionOrParams: RPCAppDefinition | CreateAppSessionRequestParams,
         allocations?: RPCAppSessionAllocation[],
         quorumSigs?: string[],
+        opts?: { ownerSig?: string },
     ): Promise<{ appSessionId: string; version: string; status: string }> {
         const def = 'definition' in definitionOrParams ? definitionOrParams.definition : definitionOrParams;
         const allocs = 'definition' in definitionOrParams ? definitionOrParams.allocations : (allocations ?? []);
@@ -689,9 +698,12 @@ export class NitroliteClient {
         const sessionData = 'definition' in definitionOrParams
             ? (definitionOrParams.session_data ?? JSON.stringify({ allocations: allocs }))
             : JSON.stringify({ allocations: allocs });
+        const ownerSig = 'definition' in definitionOrParams
+            ? (definitionOrParams.owner_sig ?? opts?.ownerSig)
+            : opts?.ownerSig;
 
         const v1Def: AppDefinitionV1 = {
-            application: def.application ?? (def as any).protocol ?? '',
+            applicationId: def.application || '',
             participants: def.participants.map((addr, i) => ({
                 walletAddress: addr as Address,
                 signatureWeight: def.weights[i] ?? 1,
@@ -700,7 +712,8 @@ export class NitroliteClient {
             nonce: BigInt(def.nonce ?? Date.now()),
         };
 
-        const result = await this.innerClient.createAppSession(v1Def, sessionData, quorumSignatures);
+        const v1Opts = ownerSig ? { ownerSig } : undefined;
+        const result = await this.innerClient.createAppSession(v1Def, sessionData, quorumSignatures, v1Opts);
         return { appSessionId: result.appSessionId, version: result.version, status: result.status };
     }
 
@@ -755,7 +768,7 @@ export class NitroliteClient {
     async getAppDefinition(appSessionId: string): Promise<GetAppDefinitionResponseParams> {
         const def = await this.innerClient.getAppDefinition(appSessionId);
         return {
-            protocol: def.application,
+            protocol: def.applicationId,
             participants: def.participants.map((p) => p.walletAddress),
             weights: def.participants.map((p) => p.signatureWeight),
             quorum: def.quorum,
@@ -930,5 +943,168 @@ export class NitroliteClient {
 
     async ping(): Promise<void> {
         await this.innerClient.ping();
+    }
+
+    waitForClose(): Promise<void> {
+        return this.innerClient.waitForClose();
+    }
+
+    // -----------------------------------------------------------------------
+    // Acknowledge
+    // -----------------------------------------------------------------------
+
+    async acknowledge(tokenAddress: Address): Promise<void> {
+        const { symbol } = await this.resolveToken(tokenAddress);
+        await this.innerClient.acknowledge(symbol);
+    }
+
+    // -----------------------------------------------------------------------
+    // Token allowance
+    // -----------------------------------------------------------------------
+
+    async checkTokenAllowance(chainId: number, tokenAddress: Address): Promise<bigint> {
+        return this.innerClient.checkTokenAllowance(
+            BigInt(chainId),
+            tokenAddress,
+            this.userAddress,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional queries
+    // -----------------------------------------------------------------------
+
+    async getBlockchains(): Promise<core.Blockchain[]> {
+        return this.ensureBlockchains();
+    }
+
+    private async ensureBlockchains(): Promise<core.Blockchain[]> {
+        if (!this._blockchains) {
+            this._blockchains = await this.innerClient.getBlockchains();
+        }
+        return this._blockchains;
+    }
+
+    async getActionAllowances(wallet?: Address): Promise<core.ActionAllowance[]> {
+        return this.innerClient.getActionAllowances(wallet ?? this.userAddress);
+    }
+
+    async getEscrowChannel(escrowChannelId: string): Promise<core.Channel> {
+        return this.innerClient.getEscrowChannel(escrowChannelId);
+    }
+
+    // -----------------------------------------------------------------------
+    // App registry
+    // -----------------------------------------------------------------------
+
+    async getApps(options?: {
+        appId?: string;
+        ownerWallet?: string;
+        page?: number;
+        pageSize?: number;
+    }): Promise<{ apps: AppInfoV1[]; metadata: core.PaginationMetadata }> {
+        return this.innerClient.getApps(options);
+    }
+
+    async registerApp(
+        appID: string,
+        metadata: string,
+        creationApprovalNotRequired: boolean,
+    ): Promise<void> {
+        await this.innerClient.registerApp(appID, metadata, creationApprovalNotRequired);
+    }
+
+    // -----------------------------------------------------------------------
+    // Security token locking
+    // -----------------------------------------------------------------------
+
+    async lockSecurityTokens(
+        targetWallet: Address,
+        chainId: number,
+        amount: bigint,
+    ): Promise<string> {
+        if (amount <= 0n) throw new Error('amount must be positive');
+        const decimals = await this.getLockingTokenDecimals(chainId);
+        const humanAmount = this.toHumanAmount(amount, decimals);
+        return this.innerClient.escrowSecurityTokens(
+            targetWallet,
+            BigInt(chainId),
+            humanAmount,
+        );
+    }
+
+    async initiateSecurityTokensWithdrawal(chainId: number): Promise<string> {
+        return this.innerClient.initiateSecurityTokensWithdrawal(BigInt(chainId));
+    }
+
+    async cancelSecurityTokensWithdrawal(chainId: number): Promise<string> {
+        return this.innerClient.cancelSecurityTokensWithdrawal(BigInt(chainId));
+    }
+
+    async withdrawSecurityTokens(
+        chainId: number,
+        destination: Address,
+    ): Promise<string> {
+        return this.innerClient.withdrawSecurityTokens(BigInt(chainId), destination);
+    }
+
+    async approveSecurityToken(chainId: number, amount: bigint): Promise<string> {
+        if (amount <= 0n) throw new Error('amount must be positive');
+        const decimals = await this.getLockingTokenDecimals(chainId);
+        const humanAmount = this.toHumanAmount(amount, decimals);
+        return this.innerClient.approveSecurityToken(BigInt(chainId), humanAmount);
+    }
+
+    async getLockedBalance(chainId: number, wallet?: Address): Promise<bigint> {
+        const balance = await this.innerClient.getLockedBalance(
+            BigInt(chainId),
+            wallet ?? this.userAddress,
+        );
+        const decimals = await this.getLockingTokenDecimals(chainId);
+        return BigInt(balance.mul(new Decimal(10).pow(decimals)).toFixed(0));
+    }
+
+    private static readonly LOCKING_ASSET_ABI = [
+        { type: 'function', name: 'asset', inputs: [], outputs: [{ type: 'address' }], stateMutability: 'view' },
+    ] as const;
+
+    private static readonly ERC20_DECIMALS_ABI = [
+        { type: 'function', name: 'decimals', inputs: [], outputs: [{ type: 'uint8' }], stateMutability: 'view' },
+    ] as const;
+
+    private async getLockingTokenDecimals(chainId: number): Promise<number> {
+        const cached = this._lockingTokenDecimals.get(chainId);
+        if (cached !== undefined) return cached;
+
+        const blockchains = await this.ensureBlockchains();
+        const chain = blockchains.find((b) => b.id === BigInt(chainId));
+        if (!chain?.lockingContractAddress) {
+            throw new Error(`No locking contract configured for chain ${chainId}`);
+        }
+
+        const rpcUrl = this._blockchainRPCs[chainId];
+        if (!rpcUrl) {
+            throw new Error(
+                `No RPC URL configured for chain ${chainId}. ` +
+                'Pass blockchainRPCs in NitroliteClientConfig to use locking methods.',
+            );
+        }
+
+        const publicClient = createPublicClient({ transport: http(rpcUrl) });
+
+        const tokenAddress = await publicClient.readContract({
+            address: chain.lockingContractAddress,
+            abi: NitroliteClient.LOCKING_ASSET_ABI,
+            functionName: 'asset',
+        }) as Address;
+
+        const decimals = await publicClient.readContract({
+            address: tokenAddress,
+            abi: NitroliteClient.ERC20_DECIMALS_ABI,
+            functionName: 'decimals',
+        }) as number;
+
+        this._lockingTokenDecimals.set(chainId, decimals);
+        return decimals;
     }
 }

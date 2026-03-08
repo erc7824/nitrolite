@@ -141,11 +141,10 @@ await client.close();
 
 | Method | Description |
 |---|---|
-| `createAppSession(definition, allocations, quorumSigs?, opts?)` | Create an app session (optionally with quorum signatures and `ownerSig`) |
-| `closeAppSession(appSessionId, allocations, quorumSigs?)` | Close an app session (optionally with quorum signatures) |
-| `submitAppState(params)` | Submit state update (operate/deposit/withdraw/close) with optional `quorum_sigs` |
+| `createAppSession(definition, allocations, quorumSigs, opts?)` | Create an app session with quorum signatures (optional `ownerSig` via opts) |
+| `closeAppSession(appSessionId, allocations, quorumSigs)` | Close an app session with quorum signatures |
+| `submitAppState(params)` | Submit state update (operate/deposit/withdraw/close) |
 | `getAppDefinition(appSessionId)` | Get the definition for a session |
-| `rebalanceAppSessions(signedUpdates)` | Rebalance allocations across app sessions |
 
 ### App Registry
 
@@ -367,7 +366,7 @@ await client.withdrawSecurityTokens(chainId, destinationWallet);
 
 ### Amount conventions
 
-All compat methods accept **raw amounts** (smallest token unit). The compat layer converts to human-readable `Decimal` internally before delegating to the v1 SDK (which uses `Decimal` throughout).
+The compat layer accepts raw amounts (smallest token unit) and converts to human-readable `Decimal` before delegating to the v1 SDK.
 
 | Method group | Input type | Example: 100 tokens (18 decimals) |
 |---|---|---|

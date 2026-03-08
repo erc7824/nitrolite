@@ -12,7 +12,6 @@ import type {
     AppSessionKeyStateV1,
     AppInfoV1,
     ChannelSessionKeyStateV1,
-    SignedAppStateUpdateV1,
 } from '@yellow-org/sdk';
 import type * as core from '@yellow-org/sdk';
 import Decimal from 'decimal.js';
@@ -1013,14 +1012,6 @@ export class NitroliteClient {
         creationApprovalNotRequired: boolean,
     ): Promise<void> {
         await this.innerClient.registerApp(appID, metadata, creationApprovalNotRequired);
-    }
-
-    // -----------------------------------------------------------------------
-    // App session rebalance
-    // -----------------------------------------------------------------------
-
-    async rebalanceAppSessions(signedUpdates: SignedAppStateUpdateV1[]): Promise<string> {
-        return this.innerClient.rebalanceAppSessions(signedUpdates);
     }
 
     // -----------------------------------------------------------------------

@@ -198,14 +198,14 @@ export interface CloseAppSessionRequestParams {
     allocations: RPCAppSessionAllocation[];
     version?: number;
     session_data?: string;
-    quorum_sigs?: string[];
+    quorum_sigs: string[];
 }
 
 export interface CreateAppSessionRequestParams {
     definition: RPCAppDefinition;
     allocations: RPCAppSessionAllocation[];
     session_data?: string;
-    quorum_sigs?: string[];
+    quorum_sigs: string[];
     owner_sig?: string;
 }
 

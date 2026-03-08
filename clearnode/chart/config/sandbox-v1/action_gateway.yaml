@@ -1,19 +1,19 @@
 # yaml-language-server: $schema=../../../config/schemas/action_gateway_schema.yaml
-level_step_tokens: "100"
-app_cost: "200"
+level_step_tokens: "200"
+app_cost: "2000"
 action_gates:
   transfer:
     free_actions_allowance: 10
     increase_per_level: 5
   app_session_creation:
-    free_actions_allowance: 5
-    increase_per_level: 2
+    free_actions_allowance: 50
+    increase_per_level: 5
   app_session_operation:
-    free_actions_allowance: 20
-    increase_per_level: 10
+    free_actions_allowance: 100
+    increase_per_level: 15
   app_session_deposit:
-    free_actions_allowance: 15
-    increase_per_level: 7
+    free_actions_allowance: 50
+    increase_per_level: 5
   app_session_withdrawal:
-    free_actions_allowance: 15
-    increase_per_level: 7
+    free_actions_allowance: 50
+    increase_per_level: 10

@@ -86,7 +86,7 @@ const assets   = await client.getAssetsList();
 
 ### 4. Transfer off-chain
 
-`transfer()` accepts human-readable string amounts (the compat layer scales by token decimals internally):
+`transfer()` accepts raw-unit string amounts (smallest denomination). The compat layer divides by token decimals internally before delegating to the v1 SDK:
 
 ```typescript
 await client.transfer(recipientAddress, [
@@ -335,11 +335,12 @@ poller.setInterval(10000); // change interval
 
 ## Security Token Locking
 
-Lock tokens into the on-chain Locking contract to provide security deposits:
+Lock tokens into the on-chain Locking contract to provide security deposits. The locking token and its decimals are resolved from the contract at runtime — `blockchainRPCs` must be configured for the target chain or these methods will throw.
 
 ```typescript
 const chainId = 11155111; // Sepolia
-const amount = 100_000_000n; // 100 USDC in raw units (6 decimals)
+// Yellow token on Sepolia has 18 decimals; 100 YELLOW = 100 * 10^18
+const amount = 100_000_000_000_000_000_000n;
 
 // Approve the Locking contract to spend tokens
 await client.approveSecurityToken(chainId, amount);
@@ -347,7 +348,7 @@ await client.approveSecurityToken(chainId, amount);
 // Lock tokens for a target address
 await client.lockSecurityTokens(targetWallet, chainId, amount);
 
-// Query locked balance
+// Query locked balance (returns raw bigint in token's smallest unit)
 const locked = await client.getLockedBalance(chainId);
 
 // Initiate unlock (starts the unlock period)

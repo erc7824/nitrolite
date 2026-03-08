@@ -1,8 +1,8 @@
 // =============================================================================
-// @layer-3/nitrolite-compat barrel export
+// @yellow-org/sdk-compat barrel export
 //
 // Re-exports everything apps previously imported from '@layer-3/nitrolite'
-// (v0.5.3) but backed by the v1.0.0 SDK.
+// (v0.5.3) but backed by the v1.0.0+ SDK (@yellow-org/sdk).
 // =============================================================================
 
 // --- Client facade ---
@@ -123,6 +123,7 @@ export {
     UserRejectedError,
     InsufficientFundsError,
     NotInitializedError,
+    OngoingStateTransitionError,
     getUserFacingMessage,
 } from './errors';
 
@@ -133,7 +134,7 @@ export { EventPoller, type EventPollerCallbacks } from './events';
 export { buildClientOptions, blockchainRPCsFromEnv, type CompatClientConfig } from './config';
 
 // NOTE: SDK classes (Client, ChannelDefaultSigner, etc.) are intentionally NOT
-// re-exported here. Barrel re-exports from '@layer-3/nitrolite' trigger eager
+// re-exported here. Barrel re-exports from '@yellow-org/sdk' trigger eager
 // module evaluation of the full SDK, which has side effects that throw during
 // SSR / module-load time. Apps needing those classes should import directly
-// from '@layer-3/nitrolite'.
+// from '@yellow-org/sdk'.

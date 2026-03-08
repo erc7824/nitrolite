@@ -111,6 +111,8 @@ await client.close();
 | `closeChannel()` | Close all open channels |
 | `resizeChannel({ allocate_amount, token })` | Resize an existing channel |
 | `challengeChannel({ state })` | Challenge a channel on-chain |
+| `acknowledge(tokenAddress)` | Acknowledge a pending state or create a channel |
+| `checkTokenAllowance(chainId, tokenAddress)` | Check ERC-20 allowance for the ChannelHub |
 
 ### Queries
 
@@ -123,6 +125,9 @@ await client.close();
 | `getAssetsList()` | List supported assets |
 | `getAccountInfo()` | Aggregate balance + channel count |
 | `getConfig()` | Node configuration |
+| `getBlockchains()` | List supported blockchains |
+| `getActionAllowances(wallet?)` | Get gated action allowances for a wallet |
+| `getEscrowChannel(escrowChannelId)` | Query an escrow channel by ID |
 | `getChannelData(channelId)` | Full channel + state for a specific channel |
 | `getLastAppSessionsListError()` | Last `getAppSessionsList()` error message (if any) |
 
@@ -134,6 +139,14 @@ await client.close();
 | `closeAppSession(appSessionId, allocations, quorumSigs?)` | Close an app session (optionally with quorum signatures) |
 | `submitAppState(params)` | Submit state update (operate/deposit/withdraw/close) with optional `quorum_sigs` |
 | `getAppDefinition(appSessionId)` | Get the definition for a session |
+| `rebalanceAppSessions(signedUpdates)` | Rebalance allocations across app sessions |
+
+### App Registry
+
+| Method | Description |
+|---|---|
+| `getApps(options?)` | List registered applications (filter by appId, owner, pagination) |
+| `registerApp(appID, metadata, creationApprovalNotRequired)` | Register a new application |
 
 ### App Session Signing Helpers
 
@@ -173,12 +186,24 @@ await client.close();
 | `parseAmount(tokenAddress, humanAmount)` | Convert human-readable string → raw bigint |
 | `findOpenChannel(tokenAddress, chainId?)` | Find an open channel for a given token |
 
+### Security Token Locking
+
+| Method | Description |
+|---|---|
+| `lockSecurityTokens(targetWallet, chainId, amount)` | Lock tokens into the Locking contract for a target address |
+| `initiateSecurityTokensWithdrawal(chainId)` | Start the unlock process for locked tokens |
+| `cancelSecurityTokensWithdrawal(chainId)` | Re-lock tokens, cancelling a pending unlock |
+| `withdrawSecurityTokens(chainId, destination)` | Withdraw unlocked tokens to a destination address |
+| `approveSecurityToken(chainId, amount)` | Approve the Locking contract to spend tokens |
+| `getLockedBalance(chainId, wallet?)` | Query locked balance (returns raw bigint) |
+
 ### Lifecycle
 
 | Method | Description |
 |---|---|
 | `ping()` | Health check |
 | `close()` | Close the WebSocket connection |
+| `waitForClose()` | Returns a promise that resolves when the connection is closed |
 | `refreshAssets()` | Re-fetch the asset map from the clearnode |
 
 ### Accessing the v1.0.0 SDK Directly
@@ -253,6 +278,7 @@ The compat layer provides typed error classes for common failure modes:
 | `UserRejectedError` | `USER_REJECTED` | User cancelled in wallet |
 | `InsufficientFundsError` | `INSUFFICIENT_FUNDS` | Not enough balance |
 | `NotInitializedError` | `NOT_INITIALIZED` | Client not connected |
+| `OngoingStateTransitionError` | `ONGOING_STATE_TRANSITION` | Previous action still finalizing |
 
 ### `getUserFacingMessage(error)`
 
@@ -304,6 +330,35 @@ poller.start();
 poller.stop();
 poller.setInterval(10000); // change interval
 ```
+
+## Security Token Locking
+
+Lock tokens into the on-chain Locking contract to provide security deposits:
+
+```typescript
+const chainId = 11155111; // Sepolia
+const amount = 100_000_000n; // 100 USDC in raw units (6 decimals)
+
+// Approve the Locking contract to spend tokens
+await client.approveSecurityToken(chainId, amount);
+
+// Lock tokens for a target address
+await client.lockSecurityTokens(targetWallet, chainId, amount);
+
+// Query locked balance
+const locked = await client.getLockedBalance(chainId);
+
+// Initiate unlock (starts the unlock period)
+await client.initiateSecurityTokensWithdrawal(chainId);
+
+// Cancel unlock (re-lock tokens)
+await client.cancelSecurityTokensWithdrawal(chainId);
+
+// After unlock period elapses, withdraw to a destination
+await client.withdrawSecurityTokens(chainId, destinationWallet);
+```
+
+All amounts use raw `bigint` units (consistent with `deposit()` and `withdrawal()`). The compat layer converts to human-readable `Decimal` values internally.
 
 ## RPC Stubs
 

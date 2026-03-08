@@ -10,8 +10,11 @@ import type {
     AppParticipantV1,
     AppAllocationV1,
     AppSessionKeyStateV1,
+    AppInfoV1,
     ChannelSessionKeyStateV1,
+    SignedAppStateUpdateV1,
 } from '@yellow-org/sdk';
+import type * as core from '@yellow-org/sdk';
 import Decimal from 'decimal.js';
 import { Address, Hex, WalletClient, formatUnits, parseUnits } from 'viem';
 
@@ -42,6 +45,7 @@ import {
     AllowanceError,
     InsufficientFundsError,
     NotInitializedError,
+    OngoingStateTransitionError,
     UserRejectedError,
 } from './errors';
 
@@ -134,6 +138,8 @@ export class NitroliteClient {
     private _lastChannels: LedgerChannel[] = [];
     private _lastAppSessionsListError: string | null = null;
     private _lastAppSessionsListErrorLogged: string | null = null;
+    private _blockchains: core.Blockchain[] | null = null;
+    private _lockingTokenDecimals = new Map<number, number>();
 
     private constructor(client: Client, userAddress: Address, chainId: number) {
         this.innerClient = client;
@@ -306,6 +312,7 @@ export class NitroliteClient {
         if (lower.includes('user rejected') || lower.includes('user denied')) return new UserRejectedError(msg);
         if (lower.includes('insufficient funds') || lower.includes('exceeds balance')) return new InsufficientFundsError(msg);
         if (lower.includes('not initialized') || lower.includes('not connected')) return new NotInitializedError(msg);
+        if (lower.includes('ongoing') || lower.includes('state transition')) return new OngoingStateTransitionError(msg);
         return error instanceof Error ? error : new Error(msg);
     }
 
@@ -691,7 +698,7 @@ export class NitroliteClient {
             : JSON.stringify({ allocations: allocs });
 
         const v1Def: AppDefinitionV1 = {
-            application: def.application ?? (def as any).protocol ?? '',
+            applicationId: def.application ?? (def as any).protocol ?? '',
             participants: def.participants.map((addr, i) => ({
                 walletAddress: addr as Address,
                 signatureWeight: def.weights[i] ?? 1,
@@ -755,7 +762,7 @@ export class NitroliteClient {
     async getAppDefinition(appSessionId: string): Promise<GetAppDefinitionResponseParams> {
         const def = await this.innerClient.getAppDefinition(appSessionId);
         return {
-            protocol: def.application,
+            protocol: def.applicationId,
             participants: def.participants.map((p) => p.walletAddress),
             weights: def.participants.map((p) => p.signatureWeight),
             quorum: def.quorum,
@@ -930,5 +937,160 @@ export class NitroliteClient {
 
     async ping(): Promise<void> {
         await this.innerClient.ping();
+    }
+
+    waitForClose(): Promise<void> {
+        return this.innerClient.waitForClose();
+    }
+
+    // -----------------------------------------------------------------------
+    // Acknowledge
+    // -----------------------------------------------------------------------
+
+    async acknowledge(tokenAddress: Address): Promise<void> {
+        const { symbol } = await this.resolveToken(tokenAddress);
+        await this.innerClient.acknowledge(symbol);
+    }
+
+    // -----------------------------------------------------------------------
+    // Token allowance
+    // -----------------------------------------------------------------------
+
+    async checkTokenAllowance(chainId: number, tokenAddress: Address): Promise<bigint> {
+        return this.innerClient.checkTokenAllowance(
+            BigInt(chainId),
+            tokenAddress,
+            this.userAddress,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional queries
+    // -----------------------------------------------------------------------
+
+    async getBlockchains(): Promise<core.Blockchain[]> {
+        return this.ensureBlockchains();
+    }
+
+    private async ensureBlockchains(): Promise<core.Blockchain[]> {
+        if (!this._blockchains) {
+            this._blockchains = await this.innerClient.getBlockchains();
+        }
+        return this._blockchains;
+    }
+
+    async getActionAllowances(wallet?: Address): Promise<core.ActionAllowance[]> {
+        return this.innerClient.getActionAllowances(wallet ?? this.userAddress);
+    }
+
+    async getEscrowChannel(escrowChannelId: string): Promise<core.Channel> {
+        return this.innerClient.getEscrowChannel(escrowChannelId);
+    }
+
+    // -----------------------------------------------------------------------
+    // App registry
+    // -----------------------------------------------------------------------
+
+    async getApps(options?: {
+        appId?: string;
+        ownerWallet?: string;
+        page?: number;
+        pageSize?: number;
+    }): Promise<{ apps: AppInfoV1[]; metadata: core.PaginationMetadata }> {
+        return this.innerClient.getApps(options);
+    }
+
+    async registerApp(
+        appID: string,
+        metadata: string,
+        creationApprovalNotRequired: boolean,
+    ): Promise<void> {
+        await this.innerClient.registerApp(appID, metadata, creationApprovalNotRequired);
+    }
+
+    // -----------------------------------------------------------------------
+    // App session rebalance
+    // -----------------------------------------------------------------------
+
+    async rebalanceAppSessions(signedUpdates: SignedAppStateUpdateV1[]): Promise<string> {
+        return this.innerClient.rebalanceAppSessions(signedUpdates);
+    }
+
+    // -----------------------------------------------------------------------
+    // Security token locking
+    // -----------------------------------------------------------------------
+
+    async lockSecurityTokens(
+        targetWallet: Address,
+        chainId: number,
+        amount: bigint,
+    ): Promise<string> {
+        if (amount <= 0n) throw new Error('amount must be positive');
+        const decimals = await this.getLockingTokenDecimals(chainId);
+        const humanAmount = this.toHumanAmount(amount, decimals);
+        return this.innerClient.escrowSecurityTokens(
+            targetWallet,
+            BigInt(chainId),
+            humanAmount,
+        );
+    }
+
+    async initiateSecurityTokensWithdrawal(chainId: number): Promise<string> {
+        return this.innerClient.initiateSecurityTokensWithdrawal(BigInt(chainId));
+    }
+
+    async cancelSecurityTokensWithdrawal(chainId: number): Promise<string> {
+        return this.innerClient.cancelSecurityTokensWithdrawal(BigInt(chainId));
+    }
+
+    async withdrawSecurityTokens(
+        chainId: number,
+        destination: Address,
+    ): Promise<string> {
+        return this.innerClient.withdrawSecurityTokens(BigInt(chainId), destination);
+    }
+
+    async approveSecurityToken(chainId: number, amount: bigint): Promise<string> {
+        if (amount <= 0n) throw new Error('amount must be positive');
+        const decimals = await this.getLockingTokenDecimals(chainId);
+        const humanAmount = this.toHumanAmount(amount, decimals);
+        return this.innerClient.approveSecurityToken(BigInt(chainId), humanAmount);
+    }
+
+    async getLockedBalance(chainId: number, wallet?: Address): Promise<bigint> {
+        const balance = await this.innerClient.getLockedBalance(
+            BigInt(chainId),
+            wallet ?? this.userAddress,
+        );
+        const decimals = await this.getLockingTokenDecimals(chainId);
+        return BigInt(balance.mul(new Decimal(10).pow(decimals)).toFixed(0));
+    }
+
+    private async getLockingTokenDecimals(chainId: number): Promise<number> {
+        const cached = this._lockingTokenDecimals.get(chainId);
+        if (cached !== undefined) return cached;
+
+        try {
+            const blockchains = await this.ensureBlockchains();
+            const chain = blockchains.find((b) => b.id === BigInt(chainId));
+            if (chain?.lockingContractAddress) {
+                await this.ensureAssets();
+                for (const [, info] of this.assetsByToken) {
+                    if (info.chainId === BigInt(chainId)) {
+                        this._lockingTokenDecimals.set(chainId, info.decimals);
+                        return info.decimals;
+                    }
+                }
+                console.warn(
+                    `[compat] Could not resolve token decimals for locking contract ${chain.lockingContractAddress} on chain ${chainId}; defaulting to 6 (USDC). ` +
+                    'If the locked token uses different decimals, amounts will be incorrect.',
+                );
+            }
+        } catch {
+            console.warn(`[compat] Failed to fetch blockchain info for chain ${chainId}; defaulting locking token decimals to 6`);
+        }
+
+        this._lockingTokenDecimals.set(chainId, 6);
+        return 6;
     }
 }

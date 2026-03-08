@@ -1,7 +1,7 @@
 /**
  * Compat Layer Comprehensive Lifecycle Example
  *
- * Exercises every public API offered by @layer-3/nitrolite-compat:
+ * Exercises every public API offered by @yellow-org/sdk-compat:
  *   - NitroliteClient: creation, ping, config, assets, balances, channels,
  *     transfers, app sessions (create/submit/close), asset helpers, error classification
  *   - EventPoller: start/stop with callbacks

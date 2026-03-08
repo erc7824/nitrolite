@@ -703,7 +703,7 @@ export class NitroliteClient {
             : opts?.ownerSig;
 
         const v1Def: AppDefinitionV1 = {
-            applicationId: def.application ?? (def as any).protocol ?? '',
+            applicationId: def.application || '',
             participants: def.participants.map((addr, i) => ({
                 walletAddress: addr as Address,
                 signatureWeight: def.weights[i] ?? 1,

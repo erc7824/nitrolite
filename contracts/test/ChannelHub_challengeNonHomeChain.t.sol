@@ -33,7 +33,7 @@ contract ChannelHubTest_Challenge_NonHomeChain_EscrowDeposit is ChannelHubTest_C
     - escrow deposit can be challenged until `unlockAt` time has NOT passed
     - escrow deposit can NOT be challenged after `unlockAt` time has passed
     - challenged escrow deposit can be resolved until `challengeExpireAt` time has passed with a newer finalization state, which removes challenge and unlock funds
-    - challenged escrow deposit does NOT be resolved if `challengeExpireAt` has passed, but
+    - challenged escrow deposit can NOT be resolved if `challengeExpireAt` has passed, but
         can be withdrawn after `challengeExpireAt` time passes
     - reverts on challenging already challenged escrow deposit
     */
@@ -159,7 +159,7 @@ contract ChannelHubTest_Challenge_NonHomeChain_EscrowDeposit is ChannelHubTest_C
         );
     }
 
-    function test_challengedEscrowDeposit_fundsWithdrawn_afterChallengeExpiry() public {
+    function test_challengedEscrowDeposit_canNotBeResolved_nodeReclaimsAfterChallengeExpiry() public {
         _challengeEscrowDeposit();
 
         (, EscrowStatus statusAfterChallenge,,,,) = cHub.getEscrowDepositData(escrowId);
@@ -198,7 +198,7 @@ contract ChannelHubTest_Challenge_NonHomeChain_EscrowWithdrawal is ChannelHubTes
     - reverts on challenging NON-EXISTENT escrow withdrawal
     - escrow withdrawal can be challenged
     - challenged escrow withdrawal can be resolved until `challengeExpireAt` time has passed with a newer finalization state, which removes challenge and unlock funds
-    - challenged escrow withdrawal does NOT be resolved if `challengeExpireAt` has passed, but
+    - challenged escrow withdrawal can NOT be resolved if `challengeExpireAt` has passed, but
         can be withdrawn after `challengeExpireAt` time passes
     - reverts on challenging already challenged escrow withdrawal
     */

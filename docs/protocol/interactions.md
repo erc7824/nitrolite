@@ -26,196 +26,70 @@ The protocol does not require a specific transport technology.
 
 All protocol messages share a common envelope structure.
 
-```
-MessageEnvelope {
-  RequestId:  string    // unique identifier for correlation
-  Type:       string    // message type identifier
-  Payload:    object    // type-specific message data
-}
-```
+| Field     | Description                                         |
+| --------- | --------------------------------------------------- |
+| Type      | Message type (request, response, event, or error)   |
+| RequestId | Numeric identifier unique within the connection     |
+| Method    | Operation name identifying the requested action     |
+| Payload   | Type-specific message data                          |
+| Timestamp | Time the message was created, in milliseconds       |
+
+Messages are encoded as compact ordered arrays: [Type, RequestId, Method, Payload, Timestamp].
+
+## Message Types
+
+| Type                              |
+| ---------------------------------------- |
+| Request                                  |
+| Successful response                      |
+| Event notification                       |
+| Error response                           |
 
 ## Core Operations
 
 The protocol defines the following core operations:
 
-| Operation      | Direction       | Description                                    |
-| -------------- | --------------- | ---------------------------------------------- |
-| OpenChannel    | User → Node     | Request to create a new channel                |
-| CloseChannel   | User → Node     | Request to close an existing channel           |
-| UpdateState    | Bidirectional   | Propose a new state for a channel              |
-| Checkpoint     | User → Node     | Request to checkpoint state on-chain           |
-| Commit.        | User → Node     | Commit assets to an application session        |
-| Release        | User → Node     | Release assets from an application session     |
+| Operation         | Direction     | Description                                    |
+| ----------------- | ------------- | ---------------------------------------------- |
+| RequestCreation   | User → Node   | Request to create a new channel                |
+| SubmitState       | User → Node   | Submit a signed state transition               |
+| GetLatestState    | User → Node   | Retrieve the current state for a channel       |
+| GetHomeChannel    | User → Node   | Retrieve on-chain home channel data            |
+| GetEscrowChannel  | User → Node   | Retrieve on-chain escrow channel data          |
 
-## Operation: OpenChannel
+### Operation: RequestCreation
 
-### Purpose
+Creates a new channel with an initial state.
 
-Request creation of a new channel between participants.
+The request MUST include the channel definition parameters and the user's signature on the initial state. The node validates the channel definition, computes the channel identifier, verifies the user's signature, co-signs the state, and stores the channel record.
 
-### Request
+The response includes the channel identifier and the co-signed initial state.
 
-```
-OpenChannelRequest {
-  Participants:  []address
-  Assets:        []AssetAllocation
-  Challenge:     uint64
-}
-```
+### Operation: SubmitState
 
-### Successful Result
+Submits a user-signed state transition for processing.
 
-```
-OpenChannelResult {
-  ChannelId:  bytes32
-  State:      ChannelState
-}
-```
+The request MUST include the signed state with a valid transition. The node validates the state against advancement rules, verifies the user's signature, co-signs the state, and applies any side effects (e.g. scheduling blockchain operations for non-OPERATE intents, creating receiver states for transfers).
 
-### Failure Result
+The response includes the co-signed state.
 
-```
-ErrorResult {
-  Code:     uint16
-  Message:  string
-}
-```
+### Operation: GetLatestState
 
-### Related Events
+Retrieves the current state for a given user and asset.
 
-- ChannelOpened event broadcast to all participants
+The response includes the latest state. Implementations MAY support filtering to return only mutually signed states.
 
-## Operation: CloseChannel
+### Operation: GetHomeChannel
 
-### Purpose
+Retrieves the on-chain home channel data for a given user and asset.
 
-Request cooperative closure of an existing channel.
+### Operation: GetEscrowChannel
 
-### Request
-
-```
-CloseChannelRequest {
-  ChannelId:     bytes32
-  FinalState:    ChannelState
-  Signatures:    []Signature
-}
-```
-
-### Successful Result
-
-```
-CloseChannelResult {
-  ChannelId:  bytes32
-  Status:     string
-}
-```
-
-### Failure Result
-
-```
-ErrorResult {
-  Code:     uint16
-  Message:  string
-}
-```
-
-### Related Events
-
-- ChannelClosed event broadcast to all participants
-
-## Operation: UpdateState
-
-### Purpose
-
-Propose a new state update for a channel.
-
-### Request
-
-```
-UpdateStateRequest {
-  ChannelId:   bytes32
-  State:       ChannelState
-  Signatures:  []Signature
-}
-```
-
-### Successful Result
-
-```
-UpdateStateResult {
-  ChannelId:  bytes32
-  Version:    uint64
-}
-```
-
-### Failure Result
-
-```
-ErrorResult {
-  Code:     uint16
-  Message:  string
-}
-```
-
-### Related Events
-
-- StateUpdated event sent to all channel participants
-
-## Operation: Checkpoint
-
-### Purpose
-
-Request that the current state be checkpointed on the settlement layer.
-
-### Request
-
-```
-CheckpointRequest {
-  ChannelId:  bytes32
-}
-```
-
-### Successful Result
-
-```
-CheckpointResult {
-  ChannelId:      bytes32
-  Version:        uint64
-  TransactionId:  string
-}
-```
-
-### Failure Result
-
-```
-ErrorResult {
-  Code:     uint16
-  Message:  string
-}
-```
-
-### Related Events
-
-- CheckpointCompleted event after on-chain confirmation
+Retrieves the on-chain escrow channel data for a given escrow channel identifier.
 
 ## Event Messages
 
-Events are asynchronous notifications generated by the protocol. They are not responses to specific requests.
-
-```
-EventMessage {
-  Type:       string    // event type identifier
-  ChannelId:  bytes32   // related channel
-  Data:       object    // event-specific data
-}
-```
-
-Event types include:
-
-- **ChannelOpened** — a new channel has been created
-- **ChannelClosed** — a channel has been settled
-- **StateUpdated** — a channel state has been updated
-- **CheckpointCompleted** — a checkpoint has been confirmed on-chain
+The event message system is reserved for future specification. Events are asynchronous notifications generated by the protocol and are not responses to specific requests.
 
 ## Correlation and Identifiers
 
@@ -223,28 +97,27 @@ Responses are correlated with requests using the RequestId field.
 
 Rules:
 
-- Each request must include a unique RequestId
-- The corresponding response must include the same RequestId
-- Events do not carry a RequestId — they are identified by their event type and channel identifier
+- Each request MUST include a RequestId unique within the connection
+- The corresponding response MUST include the same RequestId
 
 ## Error Handling
 
-Errors are communicated through ErrorResult payloads.
+Errors are communicated through error response messages.
 
 Rules:
 
-- Every failed operation must return an ErrorResult
-- Error codes must be numeric and documented
-- Error messages must be human-readable
-- Errors must not expose internal implementation details
+- Every failed operation MUST return an error response
+- The error payload MUST contain a human-readable error message
+- Errors MUST NOT expose internal implementation details
 
 ## Message Ordering
 
-The protocol requires the following ordering guarantees:
+Message ordering requirements MAY depend on the implementation. The following constraints apply at the protocol level:
 
-- State updates for a given channel must be processed in version order
-- A participant must not propose a new state before the previous proposal is resolved (accepted or rejected)
-- Events may arrive at any time and must not block request processing
+- RequestId values MUST NOT be reused within a single connection
+- Events MAY arrive at any time and MUST NOT block request processing
+
+State update ordering (version sequencing) is governed by the [Channel Protocol](channel-protocol.md) and is not a concern of the message transport layer.
 
 ---
 

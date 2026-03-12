@@ -6,7 +6,7 @@ Previous: [Overview](overview.md) | Next: [Cryptography](cryptography.md)
 
 This document defines all protocol terms used throughout the Nitrolite protocol documentation.
 
-Each term is defined once. All other documents must use these terms consistently.
+Each term is defined once. All other documents MUST use these terms consistently.
 
 ## Naming Conventions
 
@@ -18,25 +18,23 @@ Each term is defined once. All other documents must use these terms consistently
 
 ### Channel
 
-A state container shared between participants that allows off-chain updates while maintaining on-chain security guarantees.
-
-Channels enable fast off-chain execution while preserving the ability to settle on-chain if necessary.
+A state container shared between a user and a node that allows off-chain state updates while maintaining on-chain security guarantees. Each channel operates on a single unified asset.
 
 ### Channel Definition
 
-The immutable parameters that define a channel. A channel definition is fixed at creation time and cannot change during the channel lifecycle.
+The immutable parameters that define a channel: user, node, asset, nonce, challenge duration, and approved signature validators. A channel definition is fixed at creation time and MUST NOT change during the channel lifecycle.
 
 ### Channel State
 
-The current agreed configuration of a channel, including asset allocations and metadata. Channel state evolves through off-chain state advancement.
+The current agreed configuration of a channel, including home and non-home ledger allocations, a version number, and a transition field. Channel state evolves through off-chain state advancement.
 
 ### Participant
 
-An entity that holds a signing key and participates in a channel. Each channel has a fixed set of participants defined at creation.
+An entity that holds a signing key and participates in a channel. Each channel has exactly two participants: a user and a node.
 
 ### Asset
 
-A representation of value within the protocol. Assets are identified independently of any specific blockchain.
+A representation of value within the protocol, identified by a human-readable symbol and decimal precision. Assets are identified independently of any specific blockchain; the same logical asset MAY exist on multiple chains with different token addresses.
 
 ## State Concepts
 
@@ -46,29 +44,29 @@ An abstract data structure representing the current configuration of a protocol 
 
 ### State Version
 
-A monotonically increasing integer that identifies the order of state updates. Each new state must have a version strictly greater than the previous state.
+A monotonically increasing integer that identifies the order of state updates. During off-chain advancement, each new state MUST have a version exactly one greater than the previous state.
 
 ### State Advancement
 
-The process of updating a protocol entity's state off-chain through signed messages exchanged between participants.
+The process of updating a protocol entity's state off-chain through signed transitions exchanged between participants.
 
 ### State Enforcement
 
-The process of submitting a signed state to the settlement layer for on-chain validation and enforcement.
+The process of submitting a signed state to the blockchain layer for on-chain validation and enforcement.
 
 ### Transition
 
-A typed operation that describes the reason and parameters for a state update.
+A typed operation that describes the reason and parameters for a state update. Each transition carries a type, transaction identifier, account identifier, and amount.
 
 ### Intent
 
-A signed message from a participant indicating their agreement to a proposed state update.
+A value derived from the transition type that determines how the blockchain layer processes an enforced state. Intents include OPERATE, CLOSE, DEPOSIT, WITHDRAW, and various escrow and migration intents.
 
 ## Cryptographic Concepts
 
 ### Signature
 
-A cryptographic proof that a specific key holder authorized a specific message.
+A cryptographic proof that a specific key holder authorized a specific message. The protocol uses ECDSA over secp256k1.
 
 ### Signer
 
@@ -76,45 +74,57 @@ An entity capable of producing signatures. Each signer is associated with a spec
 
 ### Session Key
 
-A delegated signing key authorized by a participant's primary key to sign specific types of state updates on their behalf.
+A delegated signing key authorized by a participant's primary key to sign specific types of state updates on their behalf. Session key authorization MUST be associated with the same address as the channel's user or node participant.
 
 ### Signature Validation Mode
 
-A mechanism that determines how a signature is verified. Different validation modes support different key types and authorization schemes.
+A mechanism that determines how a signature is verified. The protocol currently defines two modes: default (0x00) for standard ECDSA validation and session key (0x01) for delegated validation.
 
 ## Ledger Concepts
 
 ### Ledger
 
-A record of asset allocations within a channel, associated with a specific blockchain.
+A record of asset allocations within a channel, associated with a specific blockchain. Each ledger tracks user and node allocations and net flows, and MUST satisfy the invariant that allocations equal net flows.
 
 ### Home Ledger
 
-The primary ledger of a channel, located on the blockchain where the channel was created. The home ledger is the authoritative source for channel state enforcement.
+The primary ledger of a channel state, associated with the blockchain where the state is enforced. The home ledger is the authoritative source for channel state enforcement.
 
 ### Non-Home Ledger
 
-A secondary ledger tracking asset allocations on a blockchain other than the home chain.
+A secondary ledger tracking asset allocations on a blockchain other than the home chain. Used for cross-chain escrow operations and migrations.
+
+### Home Chain
+
+The blockchain identified by the home ledger's chain identifier. The home chain determines where enforcement operations are executed. It MAY change through a migration operation.
 
 ## Protocol Operations
 
 ### Checkpoint
 
-The operation of submitting a signed state to the settlement layer. A checkpoint records the latest agreed state on-chain.
+The operation of submitting a signed state to the blockchain layer. A checkpoint records the latest agreed state on-chain.
+
+### Challenge
+
+An on-chain operation where a participant disputes the current enforced state by submitting a signed state along with a challenger signature. Initiates the challenge duration, during which other participants MAY respond with a higher-version state.
 
 ### Commit
 
-The operation of moving assets from a channel into an extension, such as an application session.
+The operation of moving assets from a channel into an extension, such as an application session. Decreases the user's allocation and the node's net flow.
 
 ### Release
 
-The operation of returning assets from an extension back to the channel.
+The operation of returning assets from an extension back to the channel. Increases the user's allocation and the node's net flow.
+
+### Escrow
+
+A two-phase mechanism for cross-chain operations. An escrow initiate locks funds, and an escrow finalize releases them upon cooperative completion or after a timeout period.
 
 ## Extension Concepts
 
 ### Extension
 
-An additional protocol module that provides functionality beyond the core channel protocol. Extensions interact with channels through defined interfaces.
+An additional protocol module that provides functionality beyond the core channel protocol. Extensions interact with channels through commit and release transitions.
 
 ### Application Session
 

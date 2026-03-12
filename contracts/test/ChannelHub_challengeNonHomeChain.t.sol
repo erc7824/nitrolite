@@ -138,7 +138,7 @@ contract ChannelHubTest_Challenge_NonHomeChain_EscrowDeposit is ChannelHubTest_C
     function test_resolveChallengedEscrowDeposit_withFinalizeState_beforeChallengeExpiry() public {
         _challengeEscrowDeposit();
 
-        (, EscrowStatus statusAfterChallenge,,,, ) = cHub.getEscrowDepositData(escrowId);
+        (, EscrowStatus statusAfterChallenge,,,,) = cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(statusAfterChallenge), uint8(EscrowStatus.DISPUTED), "Should be DISPUTED after challenge");
 
         uint256 nodeVaultBefore = cHub.getAccountBalance(node, address(token));
@@ -162,7 +162,7 @@ contract ChannelHubTest_Challenge_NonHomeChain_EscrowDeposit is ChannelHubTest_C
     function test_challengedEscrowDeposit_fundsWithdrawn_afterChallengeExpiry() public {
         _challengeEscrowDeposit();
 
-        (, EscrowStatus statusAfterChallenge,,,, ) = cHub.getEscrowDepositData(escrowId);
+        (, EscrowStatus statusAfterChallenge,,,,) = cHub.getEscrowDepositData(escrowId);
         assertEq(uint8(statusAfterChallenge), uint8(EscrowStatus.DISPUTED), "Should be DISPUTED after challenge");
 
         vm.warp(block.timestamp + EscrowDepositEngine.CHALLENGE_DURATION + 1);
@@ -223,7 +223,7 @@ contract ChannelHubTest_Challenge_NonHomeChain_EscrowWithdrawal is ChannelHubTes
                 chainId: NON_HOME_CHAIN_ID, // 42 — this IS the home chain (not current chain)
                 token: NON_HOME_TOKEN,
                 decimals: 18,
-                userAllocation: 500,  // user has enough allocation to withdraw
+                userAllocation: 500, // user has enough allocation to withdraw
                 userNetFlow: 500,
                 nodeAllocation: 0,
                 nodeNetFlow: 0
@@ -312,9 +312,7 @@ contract ChannelHubTest_Challenge_NonHomeChain_EscrowWithdrawal is ChannelHubTes
 
         // Cooperative path: locked funds released to user wallet (withdrawal succeeded)
         assertEq(
-            token.balanceOf(alice),
-            aliceBalanceBefore + WITHDRAWAL_AMOUNT,
-            "User should receive withdrawal amount"
+            token.balanceOf(alice), aliceBalanceBefore + WITHDRAWAL_AMOUNT, "User should receive withdrawal amount"
         );
         // Node vault should be unchanged (locked amount was already deducted at initiation)
         assertEq(cHub.getAccountBalance(node, address(token)), nodeVaultBefore, "Node vault should be unchanged");

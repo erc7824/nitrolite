@@ -33,6 +33,7 @@ contract ChannelHubTest_Challenge_HomeChain_NormalOperation is ChannelHubTest_Ch
     - challenged state can NOT be resolved after `challengeExpireAt` time has passed
     - a channel can NOT be challenged again during a challenge
     - a channel can NOT be challenged with an earlier state
+    - a non-yet-on-chain channel can NOT be challenged
     */
 
     function setUp() public override {
@@ -290,6 +291,29 @@ contract ChannelHubTest_Challenge_HomeChain_NormalOperation is ChannelHubTest_Ch
         vm.prank(node);
         vm.expectRevert(ChannelHub.ChallengerVersionTooLow.selector);
         cHub.challengeChannel(channelId, initState, challengerSig, ParticipantIndex.NODE);
+    }
+
+    function test_revert_challengeNonExistingChannel() public {
+        ChannelDefinition memory newDef = ChannelDefinition({
+            challengeDuration: CHALLENGE_DURATION,
+            user: alice,
+            node: node,
+            nonce: NONCE + 42,
+            approvedSignatureValidators: 0,
+            metadata: bytes32("42")
+        });
+        bytes32 newChannelId = Utils.getChannelId(newDef, CHANNEL_HUB_VERSION);
+
+        // Off-chain: user transfers 100 to node
+        State memory stateV1 =
+            nextState(initState, StateIntent.OPERATE, [uint256(900), uint256(0)], [int256(1000), int256(-100)]);
+        stateV1 = mutualSignStateBothWithEcdsaValidator(stateV1, newChannelId, ALICE_PK);
+
+        bytes memory challengerSig = signChallengeEip191WithEcdsaValidator(newChannelId, stateV1, NODE_PK);
+
+        vm.prank(node);
+        vm.expectRevert(ChannelHub.IncorrectChannelStatus.selector);
+        cHub.challengeChannel(newChannelId, stateV1, challengerSig, ParticipantIndex.NODE);
     }
 }
 

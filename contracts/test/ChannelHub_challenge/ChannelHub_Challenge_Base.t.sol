@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ChannelHubTest_Base} from "./ChannelHub_Base.t.sol";
+import {ChannelHubTest_Base} from "../ChannelHub_Base.t.sol";
 
-import {Utils} from "../src/Utils.sol";
-import {State, ChannelDefinition, StateIntent, Ledger, DEFAULT_SIG_VALIDATOR_ID} from "../src/interfaces/Types.sol";
-import {TestUtils} from "./TestUtils.sol";
+import {Utils} from "../../src/Utils.sol";
+import {State, ChannelDefinition, StateIntent, Ledger, DEFAULT_SIG_VALIDATOR_ID} from "../../src/interfaces/Types.sol";
+import {TestUtils} from "../TestUtils.sol";
 
 /**
  * @dev Base contract for challenge tests with common helper functions.

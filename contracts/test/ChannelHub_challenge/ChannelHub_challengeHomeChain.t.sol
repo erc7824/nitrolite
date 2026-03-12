@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import {ChannelHubTest_Challenge_Base} from "./ChannelHub_Challenge_Base.t.sol";
 
-import {Utils} from "../src/Utils.sol";
+import {Utils} from "../../src/Utils.sol";
 import {
     State,
     ChannelDefinition,
@@ -12,9 +12,9 @@ import {
     ChannelStatus,
     ParticipantIndex,
     DEFAULT_SIG_VALIDATOR_ID
-} from "../src/interfaces/Types.sol";
-import {ChannelHub} from "../src/ChannelHub.sol";
-import {ChannelEngine} from "../src/ChannelEngine.sol";
+} from "../../src/interfaces/Types.sol";
+import {ChannelHub} from "../../src/ChannelHub.sol";
+import {ChannelEngine} from "../../src/ChannelEngine.sol";
 
 /*
  * @dev This file uses integration / blackbox testing through ChannelHub to verify

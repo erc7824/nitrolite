@@ -8,6 +8,7 @@ import {ChannelHubTest_Base} from "./ChannelHub_Base.t.sol";
 import {Utils} from "../src/Utils.sol";
 import {ChannelHub} from "../src/ChannelHub.sol";
 import {ChannelDefinition, State, StateIntent, Ledger, ParticipantIndex} from "../src/interfaces/Types.sol";
+import {EscrowWithdrawalEngine} from "../src/EscrowWithdrawalEngine.sol";
 
 /**
  * Black-box tests verifying that NodeBalanceUpdated is emitted on every operation
@@ -487,7 +488,7 @@ contract ChannelHubTest_emitsNodeBalanceUpdated is ChannelHubTest_Base {
         cHub.challengeEscrowWithdrawal(escrowId, sig, ParticipantIndex.USER);
 
         // Expire the challenge
-        vm.warp(block.timestamp + cHub.MIN_CHALLENGE_DURATION() + 1);
+        vm.warp(block.timestamp + EscrowWithdrawalEngine.CHALLENGE_DURATION + 1);
 
         // Finalize via timeout: node reclaims DEPOSIT_AMOUNT → vault = INITIAL_BALANCE
         _expectEmitNodeBalanceUpdated(INITIAL_BALANCE);

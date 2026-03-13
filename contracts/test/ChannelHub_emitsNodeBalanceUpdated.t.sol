@@ -12,10 +12,8 @@ import {
     State,
     StateIntent,
     Ledger,
-    ParticipantIndex,
-    DEFAULT_SIG_VALIDATOR_ID
+    ParticipantIndex
 } from "../src/interfaces/Types.sol";
-import {TestUtils} from "./TestUtils.sol";
 
 /**
  * Black-box tests verifying that NodeBalanceUpdated is emitted on every operation
@@ -37,6 +35,7 @@ import {TestUtils} from "./TestUtils.sol";
  * off-chain concern and belongs in off-chain unit tests.
  */
 
+// forge-lint: disable-start(unsafe-typecast)
 contract ChannelHubTest_emitsNodeBalanceUpdated is ChannelHubTest_Base {
     /**
      * Emits NodeBalanceUpdated:
@@ -604,3 +603,4 @@ contract ChannelHubTest_emitsNodeBalanceUpdated is ChannelHubTest_Base {
         assertEq(cHub.getAccountBalance(node, address(token)), INITIAL_BALANCE - DEPOSIT_AMOUNT);
     }
 }
+// forge-lint: disable-end(unsafe-typecast)

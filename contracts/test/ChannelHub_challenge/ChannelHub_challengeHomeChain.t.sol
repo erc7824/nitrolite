@@ -3,6 +3,8 @@ pragma solidity 0.8.30;
 
 import {ChannelHubTest_Challenge_Base} from "./ChannelHub_Challenge_Base.t.sol";
 
+// forge-lint: disable-start(unsafe-typecast)
+
 import {Utils} from "../../src/Utils.sol";
 import {
     State,
@@ -10,8 +12,7 @@ import {
     StateIntent,
     Ledger,
     ChannelStatus,
-    ParticipantIndex,
-    DEFAULT_SIG_VALIDATOR_ID
+    ParticipantIndex
 } from "../../src/interfaces/Types.sol";
 import {ChannelHub} from "../../src/ChannelHub.sol";
 import {ChannelEngine} from "../../src/ChannelEngine.sol";
@@ -980,3 +981,4 @@ contract ChannelHubTest_Challenge_HomeChain_HomeMigration is ChannelHubTest_Chal
         cHub.challengeChannel(channelId, finalizeMigrationState, challengerSig, ParticipantIndex.NODE);
     }
 }
+// forge-lint: disable-end(unsafe-typecast)

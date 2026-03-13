@@ -394,7 +394,8 @@ contract ChannelHub is IVault, ReentrancyGuard {
             }
             // Only INITIALIZED escrows can be purged; CHALLENGED escrows require manual finalization
             if (_isEscrowDepositUnlockable(meta)) {
-                uint256 updatedBalance = _nodeBalances[meta.node][meta.initState.nonHomeLedger.token] + meta.lockedAmount;
+                uint256 updatedBalance =
+                    _nodeBalances[meta.node][meta.initState.nonHomeLedger.token] + meta.lockedAmount;
                 _nodeBalances[meta.node][meta.initState.nonHomeLedger.token] = updatedBalance;
 
                 meta.status = EscrowStatus.FINALIZED;

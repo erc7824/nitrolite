@@ -98,6 +98,36 @@ A secondary ledger tracking asset allocations on a blockchain other than the hom
 
 The blockchain identified by the home ledger's chain identifier. The home chain determines where enforcement operations are executed. It MAY change through a migration operation.
 
+### Locked Funds
+
+The total assets held by the blockchain enforcement contract on behalf of a specific channel. Unless the channel is being closed, the sum of UserAllocation and NodeAllocation MUST equal the locked funds.
+
+### Vault
+
+A pool of available funds maintained by the node on a specific blockchain, separate from any specific channel. The vault is used to cover required fund locking when a transition requires the node to lock additional assets into a channel.
+
+### WAD Normalization
+
+The process of scaling chain-specific asset amounts to the asset's configured decimal precision for exact, lossless cross-chain comparisons. Each unified asset defines a canonical decimal precision (e.g. 6 for USDC), which serves as the normalization target. The maximum supported decimal precision is 18.
+
+## State Signing Categories
+
+### Mutually Signed State
+
+A state that carries valid signatures from both the user and the node. Only mutually signed states are enforceable on-chain.
+
+### Node-Issued Pending State
+
+A state produced by the node that carries only the node's signature. A pending state is NOT enforceable on-chain and becomes mutually signed only after the user acknowledges it.
+
+### Channel Status
+
+The on-chain state of a channel, which can be *operating*, *disputed*, *migrating-in*, or *migrated out*.
+
+### Escrow Channel Identifier
+
+A 32-byte hash derived deterministically from the home channel identifier and the state version. Used to uniquely identify each escrow operation.
+
 ## Protocol Operations
 
 ### Checkpoint

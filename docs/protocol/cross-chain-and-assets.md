@@ -29,16 +29,18 @@ Symbol collisions are prevented by the node's asset configuration. The protocol 
 
 ### Amount Normalization
 
-Assets on different blockchains MAY have different decimal precisions (e.g. USDC has 6 decimals on Ethereum but may have different precision on other chains). The protocol normalizes amounts for cross-chain comparisons using WAD normalization (scaling to 18 decimal places):
+Assets on different blockchains MAY have different decimal precisions (e.g. USDC has 6 decimals on Ethereum but may have different precision on other chains). The protocol normalizes amounts for cross-chain comparisons using WAD normalization, which scales chain-specific amounts to the asset's configured decimal precision:
 
 ```
-NormalizedAmount = Amount * 10^(18 - Decimals)
+NormalizedAmount = Amount * 10^(AssetDecimals - ChainDecimals)
 ```
+
+Each unified asset defines a canonical decimal precision (e.g. 6 for USDC). This is the minimum precision across all supported chains for that asset. Chain-specific amounts are scaled to this canonical precision for comparison.
 
 Rules:
 
 - Normalization is used **only for cross-chain comparisons** (e.g. validating that escrow amounts match across chains). It is not used for storage or accounting — stored values remain in their chain-native precision.
-- The maximum supported decimal precision is 18. Tokens with more than 18 decimals are not supported.
+- The asset's configured decimal precision acts as the normalization target. The maximum supported decimal precision is 18. Tokens with more than 18 decimals are not supported.
 - Normalization is exact and lossless when scaling up. No rounding or remainder occurs.
 - The blockchain layer validates that declared decimals match the actual token decimals on the current chain.
 

@@ -4,13 +4,9 @@ pragma solidity 0.8.30;
 import {Vm} from "forge-std/Vm.sol";
 
 import {ChannelHubTest_Base} from "./ChannelHub_Base.t.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
-
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Utils} from "../src/Utils.sol";
 import {ChannelHub} from "../src/ChannelHub.sol";
-import {ECDSAValidator} from "../src/sigValidators/ECDSAValidator.sol";
 import {
     ChannelDefinition,
     State,
@@ -488,7 +484,7 @@ contract ChannelHubTest_emitsNodeBalanceUpdated is ChannelHubTest_Base {
         assertEq(cHub.getAccountBalance(node, address(token)), INITIAL_BALANCE + DEPOSIT_AMOUNT);
     }
 
-    function test_succcess_onFinalizeEscrowWithdrawal_nonHome_afterChallengeTimeout() public {
+    function test_success_onFinalizeEscrowWithdrawal_nonHome_afterChallengeTimeout() public {
         // Setup: node locks DEPOSIT_AMOUNT → vault = INITIAL_BALANCE - DA
         (bytes32 escrowId, State memory initState) = _initiateEscrowWithdrawal();
 
@@ -525,10 +521,11 @@ contract ChannelHubTest_emitsNodeBalanceUpdated is ChannelHubTest_Base {
     // ======== Tests: does NOT emit NodeBalanceUpdated ========
 
     function test_noEmit_onCreateChannel_depositIntent_onlyUserDeposits() public {
+        // channel is created in _createSimpleChannel; re-verify logs from that call are cleared
+        vm.recordLogs();
+
         _createSimpleChannel();
 
-        vm.recordLogs();
-        // channel was already created in _createSimpleChannel; re-verify logs from that call are cleared
         _assertNoEmitNodeBalanceUpdated();
 
         assertEq(cHub.getAccountBalance(node, address(token)), INITIAL_BALANCE);

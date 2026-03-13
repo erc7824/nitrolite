@@ -7,13 +7,7 @@ import {ChannelHubTest_Base} from "./ChannelHub_Base.t.sol";
 
 import {Utils} from "../src/Utils.sol";
 import {ChannelHub} from "../src/ChannelHub.sol";
-import {
-    ChannelDefinition,
-    State,
-    StateIntent,
-    Ledger,
-    ParticipantIndex
-} from "../src/interfaces/Types.sol";
+import {ChannelDefinition, State, StateIntent, Ledger, ParticipantIndex} from "../src/interfaces/Types.sol";
 
 /**
  * Black-box tests verifying that NodeBalanceUpdated is emitted on every operation

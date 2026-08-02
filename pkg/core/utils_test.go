@@ -214,6 +214,36 @@ func TestValidateDecimalPrecision(t *testing.T) {
 
 func TestValidateDecimalPrecision_EdgeCases(t *testing.T) {
 	t.Parallel()
+	// Regression: a value whose SCALE exceeds maxDecimals but whose significant
+	// digits do not. Balances loaded from storage (e.g. SUM() over a NUMERIC
+	// column) carry a wide scale, and decimal.Sub propagates it, so derived
+	// amounts such as the withdraw delta in handleWithdrawIntent hit this.
+	t.Run("trailing_zeros_within_precision", func(t *testing.T) {
+		t.Parallel()
+		amount, err := decimal.NewFromString("0.030000000000000000")
+		assert.NoError(t, err)
+		assert.NoError(t, ValidateDecimalPrecision(amount, 6),
+			"a value exactly representable in 6 decimals must be accepted regardless of its scale")
+	})
+
+	t.Run("trailing_zeros_from_subtraction", func(t *testing.T) {
+		t.Parallel()
+		current, err := decimal.NewFromString("0.060000000000000000")
+		assert.NoError(t, err)
+		incoming, err := decimal.NewFromString("0.03")
+		assert.NoError(t, err)
+		assert.NoError(t, ValidateDecimalPrecision(current.Sub(incoming), 6),
+			"a derived amount must not be rejected because the stored operand had a wider scale")
+	})
+
+	t.Run("wide_scale_with_real_excess_precision_still_rejected", func(t *testing.T) {
+		t.Parallel()
+		amount, err := decimal.NewFromString("0.030000010000000000")
+		assert.NoError(t, err)
+		assert.Error(t, ValidateDecimalPrecision(amount, 6),
+			"a value needing more than 6 decimals must still be rejected")
+	})
+
 	t.Run("negative_amount", func(t *testing.T) {
 		t.Parallel()
 		amount := decimal.NewFromFloat(-1.123456)

@@ -115,9 +115,22 @@ func TransitionToIntent(transition Transition) uint8 {
 	// FINALIZE_MIGRATION.
 }
 
-// ValidateDecimalPrecision validates that an amount doesn't exceed the maximum allowed decimal places.
+// ValidateDecimalPrecision returns an error when amount is not exactly
+// representable with maxDecimals fractional digits.
+//
+// The rule is value-based, not scale-based: an amount carrying trailing
+// zeros beyond maxDecimals (for example 0.030000000000000000 against a
+// 6-decimal asset) is valid, because no significant digit is lost by
+// representing it with maxDecimals.
 func ValidateDecimalPrecision(amount decimal.Decimal, maxDecimals uint8) error {
-	if amount.Exponent() < -int32(maxDecimals) {
+	// Compare against the truncated value rather than testing the exponent
+	// directly: a decimal's exponent reflects its *scale*, which can be widened
+	// by arithmetic or by storage round-trips without adding any significant
+	// digits. For example a balance loaded via SUM() over a NUMERIC column can
+	// come back as 0.030000000000000000 (exponent -18); subtracting from it
+	// propagates that scale, and the result would be rejected here even though
+	// the value is exactly representable in 6 decimals.
+	if !amount.Equal(amount.Truncate(int32(maxDecimals))) {
 		return fmt.Errorf("amount exceeds maximum decimal precision: max %d decimals allowed, got %d", maxDecimals, -amount.Exponent())
 	}
 	return nil
